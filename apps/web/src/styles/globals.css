@@ -1,70 +1,230 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+/* Night mode follows either the .dark class or the reader's data-theme choice. */
+@custom-variant dark (&:where(.dark, .dark *, [data-theme="night"], [data-theme="night"] *));
 
+/*
+ * Tailwind utilities. Raw Furrow tokens keep the spec names (--color-paper,
+ * --color-accent = tangerine, --color-muted = muted ink) in :root below; the
+ * shadcn names (accent, muted) stay surfaces so primitives keep their meaning.
+ */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--card);
-  --color-popover-foreground: var(--foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--foreground);
+  --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--secondary);
-  --color-accent-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
-  --color-input: var(--border);
-  --color-ring: var(--primary);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --font-sans: Arial, Helvetica, sans-serif;
-  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-paper: var(--color-paper);
+  --color-paper-2: var(--color-paper-2);
+  --color-paper-3: var(--color-paper-3);
+  --color-sheet: var(--color-sheet);
+  --color-ink: var(--color-ink);
+  --color-ink-2: var(--color-ink-2);
+  --color-ink-muted: var(--color-muted);
+  --color-rule: var(--color-rule);
+  --color-grid: var(--color-grid);
+  --color-tangerine: var(--color-accent);
+  --color-tangerine-ink: var(--color-accent-ink);
+  --color-tangerine-soft: var(--color-accent-soft);
+  --color-focus: var(--color-focus);
+  --color-green: var(--color-green);
+  --color-green-soft: var(--color-green-soft);
+  --color-water: var(--color-water);
+  --color-water-soft: var(--color-water-soft);
+  --color-error: var(--color-error);
+  --color-error-soft: var(--color-error-soft);
+
+  --font-sans: var(--font-body);
+  --font-serif: var(--font-display);
+  --font-mono: var(--font-outlier);
+}
+
+@theme {
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-pill: 6px;
+  --radius-card: 10px;
+  --radius-entry: 14px;
+  --radius-book: 3px 8px 8px 3px;
+
+  --shadow-card:
+    0 1px 2px oklch(18% 0.006 60 / 0.08),
+    0 14px 28px -16px oklch(18% 0.006 60 / 0.24);
+  --shadow-lift:
+    0 1px 1px oklch(18% 0.006 60 / 0.1), 0 2px 4px -1px oklch(18% 0.006 60 / 0.1),
+    0 24px 44px -20px oklch(18% 0.006 60 / 0.38);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.64, 0, 0.78, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-roll: cubic-bezier(0.625, 0.05, 0, 1);
+  --ease-curtain: cubic-bezier(0.76, 0, 0.24, 1);
 }
 
 :root {
-  --radius: 0.75rem;
-  --background: #fafafa;
-  --foreground: #191919;
-  --card: #ffffff;
-  --card-foreground: #191919;
-  --primary: #bb371e;
-  --primary-foreground: #ffffff;
-  --secondary: #f0f0ef;
-  --muted: #f4f4f3;
-  --muted-foreground: #656561;
-  --border: #e4e4e1;
-  --destructive: #b91c1c;
+  --font-display: "Literata", Georgia, ui-serif, serif;
+  --font-reader: var(--font-display);
+  --font-body: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-outlier: "Red Hat Mono", ui-monospace, monospace;
+  --font-reader-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-reader-accessible: "Atkinson Hyperlegible", ui-sans-serif, system-ui,
+    sans-serif;
+
+  /* Furrow Manila (day) */
+  --color-paper: oklch(96% 0.011 85);
+  --color-paper-2: oklch(99.5% 0.005 85);
+  --color-paper-3: oklch(92% 0.016 85);
+  --color-sheet: oklch(99.3% 0.004 85);
+  --color-ink: oklch(18% 0.006 60);
+  --color-ink-2: oklch(28% 0.008 60);
+  --color-muted: oklch(44% 0.012 60);
+  --color-rule: oklch(88% 0.013 85);
+  --color-grid: oklch(90% 0.014 85);
+
+  --color-accent: oklch(70% 0.19 40);
+  --color-accent-ink: oklch(18% 0.006 60);
+  --color-accent-soft: oklch(91% 0.05 50);
+  --color-focus: oklch(60% 0.19 40);
+  --color-green: oklch(48% 0.11 150);
+  --color-green-soft: oklch(92% 0.04 150);
+  --color-water: oklch(60% 0.05 232);
+  --color-water-soft: oklch(92% 0.025 232);
+  --color-error: oklch(52% 0.18 25);
+  --color-error-soft: oklch(92% 0.04 25);
+
+  --space-3xs: 0.125rem;
+  --space-2xs: 0.25rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2.5rem;
+  --space-2xl: 4rem;
+  --space-3xl: 6rem;
+  --space-4xl: 9rem;
+
+  --container-app: 80rem;
+  --gutter: clamp(1rem, 4vw, 3rem);
+
+  --dur-micro: 120ms;
+  --dur-short: 220ms;
+  --dur-long: 420ms;
+
+  --z-base: 1;
+  --z-raised: 10;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-sticky-nav: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
+
+  --reader-font-size: 1.125rem;
+  --reader-line-height: 1.7;
+  --reader-measure: 62ch;
+  --reader-font: var(--font-reader);
+
+  /* shadcn/ui bridge */
+  --background: var(--color-paper);
+  --foreground: var(--color-ink);
+  --card: var(--color-paper-2);
+  --card-foreground: var(--color-ink);
+  --popover: var(--color-paper-2);
+  --popover-foreground: var(--color-ink);
+  --primary: var(--color-accent);
+  --primary-foreground: var(--color-accent-ink);
+  --secondary: var(--color-paper-3);
+  --secondary-foreground: var(--color-ink-2);
+  --muted: var(--color-paper-3);
+  --muted-foreground: var(--color-muted);
+  --accent: var(--color-paper-3);
+  --accent-foreground: var(--color-ink);
+  --destructive: var(--color-error);
+  --destructive-foreground: var(--color-paper-2);
+  --border: var(--color-rule);
+  --input: var(--color-muted);
+  --ring: var(--color-focus);
+  --radius: 10px;
 }
 
-.dark {
-  --background: #161616;
-  --foreground: #f5f5f4;
-  --card: #202020;
-  --card-foreground: #f5f5f4;
-  --primary: #fb846b;
-  --primary-foreground: #29100a;
-  --secondary: #2d2d2b;
-  --muted: #252525;
-  --muted-foreground: #b0b0aa;
-  --border: #3b3b37;
-  --destructive: #ff8a8a;
+[data-theme="sepia"] {
+  --color-paper: oklch(91% 0.022 80);
+  --color-paper-2: oklch(94% 0.016 80);
+  --color-paper-3: oklch(87% 0.026 80);
+  --color-ink: oklch(20% 0.01 55);
+  --color-ink-2: oklch(30% 0.012 55);
+  --color-muted: oklch(40% 0.015 55);
+  --color-rule: oklch(83% 0.022 80);
+  --color-grid: oklch(86% 0.022 80);
+}
+
+.dark,
+[data-theme="night"] {
+  color-scheme: dark;
+  --color-paper: oklch(16% 0.008 65);
+  --color-paper-2: oklch(20% 0.01 65);
+  --color-paper-3: oklch(24% 0.012 65);
+  --color-sheet: oklch(26% 0.012 65);
+  --color-ink: oklch(90% 0.01 85);
+  --color-ink-2: oklch(78% 0.01 85);
+  --color-muted: oklch(68% 0.012 75);
+  --color-rule: oklch(30% 0.012 65);
+  --color-grid: oklch(23% 0.01 65);
+  --color-accent: oklch(72% 0.18 42);
+  --color-accent-ink: oklch(16% 0.008 65);
+  --color-accent-soft: oklch(30% 0.06 42);
+  --color-focus: oklch(72% 0.18 42);
+  --color-green: oklch(72% 0.12 150);
+  --color-green-soft: oklch(27% 0.05 150);
+  --color-water: oklch(72% 0.06 232);
+  --color-water-soft: oklch(27% 0.03 232);
+  --color-error: oklch(70% 0.17 25);
+  --color-error-soft: oklch(28% 0.06 25);
+  --destructive-foreground: var(--color-paper);
 }
 
 @layer base {
   * {
     @apply border-border;
   }
+  html,
+  body {
+    overflow-x: clip;
+  }
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
   }
   button,
   a,
@@ -73,11 +233,137 @@
   select {
     -webkit-tap-highlight-color: transparent;
   }
+  a[href],
   button:not(:disabled),
-  a {
+  summary,
+  select,
+  label[for],
+  [role="button"],
+  [role="tab"],
+  [role="switch"],
+  input[type="checkbox"],
+  input[type="radio"] {
     cursor: pointer;
   }
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+    transition: none;
+  }
   ::selection {
-    background: #bb371e22;
+    background: var(--color-accent-soft);
+    color: var(--color-ink);
+  }
+}
+
+@layer components {
+  .container-app {
+    width: 100%;
+    max-width: calc(var(--container-app) + var(--gutter) * 2);
+    margin-inline: auto;
+    padding-inline: var(--gutter);
+  }
+
+  /* Book as an index: ink rule on top, hairlines between rows, no outer box. */
+  .ruled-index {
+    border-top: 1px solid var(--color-ink);
+  }
+  .ruled-index > * + * {
+    border-top: 1px solid var(--color-rule);
+  }
+
+  .notebook-card {
+    border-radius: var(--radius-entry);
+    border: 1px solid var(--color-ink);
+    background: var(--color-paper-2);
+    overflow: hidden;
+  }
+  .notebook-card__head {
+    background: var(--color-ink);
+    color: var(--color-paper);
+    font-family: var(--font-outlier);
+    font-size: 0.75rem;
+    padding: 0.5rem 1rem;
+  }
+  .notebook-card__body {
+    background-color: var(--color-paper-2);
+    background-image:
+      linear-gradient(var(--color-grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
+    background-size: 8px 8px;
+    padding: 1rem;
+  }
+
+  /* Book cover: sharp spine on the left, soft fore-edge on the right. */
+  .book-cover {
+    position: relative;
+    aspect-ratio: 3 / 4;
+    border-radius: var(--radius-book);
+    overflow: hidden;
+    box-shadow:
+      inset 3px 0 6px oklch(18% 0.006 60 / 0.15),
+      var(--shadow-card);
+  }
+  .book-cover::before {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    left: 6px;
+    width: 14px;
+    border-left: 2px solid oklch(18% 0.006 60 / 0.08);
+    background: linear-gradient(90deg, oklch(100% 0 0 / 0.22), transparent);
+    pointer-events: none;
+  }
+  .book-cover::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to right, transparent 70%, oklch(0% 0 0 / 0.12));
+    pointer-events: none;
+  }
+
+  .hairline-draw {
+    height: 1px;
+    background: var(--color-ink);
+    transform-origin: left center;
+  }
+
+  .tabular {
+    font-family: var(--font-outlier);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .reader-prose {
+    font-family: var(--reader-font);
+    font-size: var(--reader-font-size);
+    line-height: var(--reader-line-height);
+    max-width: var(--reader-measure);
+    font-optical-sizing: auto;
+    font-variant-numeric: oldstyle-nums proportional-nums;
+    color: var(--color-ink);
+  }
+  .reader-prose p {
+    margin-bottom: 1.25em;
+    text-wrap: pretty;
+  }
+  @media (max-width: 640px) {
+    .reader-prose {
+      --reader-font-size: 1.0625rem;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

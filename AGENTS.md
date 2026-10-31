@@ -1,3 +1,131 @@
+# AGENTS.md - AnzaBook Guidelines & Agent Workflow
+
+Welcome to **AnzaBook**. This repository enforces a high-standard agentic engineering methodology and a strict anti-AI-slop design aesthetic. 
+
+Every AI coding assistant working on this codebase MUST abide by the workflows, skills, and guardrails outlined below.
+
+---
+
+## 1. Core Engineering Workflow (Superpowers Framework)
+
+Follow disciplined software development methodology at all times. Do not skip phases or jump straight into code editing without structured alignment.
+
+### Phase 1: Exploration & Alignment (`@skill:brainstorming`)
+- Before writing any code, planning new features, or modifying system architecture, activate **`brainstorming`**.
+- Clarify user requirements, edge cases, data structures, and trade-offs.
+- Explore at least 2 distinct implementation approaches before locking in the direction.
+
+### Phase 2: Structured Planning (`@skill:writing-plans`, `@skill:executing-plans`)
+- Break down tasks into small, verifiable increments (2–5 minutes per step).
+- Specify exact file paths, interfaces, and expected behavior.
+- Validate each step before moving on to the next.
+
+### Phase 3: Test-Driven Development (`@skill:test-driven-development`)
+- **Strict RED-GREEN-REFACTOR cycle**:
+  1. Write a failing unit or integration test first.
+  2. Run the test suite to observe the failure (RED).
+  3. Write the minimal amount of code necessary to make the test pass (GREEN).
+  4. Refactor code for elegance and readability while keeping tests passing.
+- Never write production code without accompanying tests where applicable.
+
+### Phase 4: Systematic Debugging (`@skill:systematic-debugging`)
+- When bugs or test failures occur, NEVER guess fixes or blindly edit files.
+- Follow the 4-phase debugging process:
+  1. **Reproduce**: Create a minimal deterministic reproduction.
+  2. **Isolate**: Inspect logs, stack traces, and isolate root causes.
+  3. **Hypothesize**: Formulate a clear hypothesis explaining the failure.
+  4. **Verify**: Apply the fix and verify that the reproduction now passes without regressions.
+
+### Phase 5: Verification & Review (`@skill:verification-before-completion`, `@skill:requesting-code-review`)
+- **Evidence before assertions**: Run linters, type checks, and test suites. Confirm real terminal output before declaring any task complete.
+- Conduct a code review against architectural standards and plan criteria.
+
+---
+
+## 2. Frontend & UI Design Standards (Anti-Slop Stack)
+
+Our frontend must look **human-crafted, intentional, and distinctive**—never like a generic AI template. We leverage a 3-layer anti-slop synergy:
+
+```
+[ Layer 1: Anti-Slop (Filter) ] -> Strips out generic AI cliches & bad defaults
+[ Layer 2: Taste-Skill (Art Direction) ] -> Provides award-level layout, typography & blueprints
+[ Layer 3: Hallmark (Floor & Linting) ] -> Enforces hard accessibility floors & visual linting
+```
+
+### 1. Guardrail Filter (`@skill:antislop`, `@skill:antislop-ui`)
+- **Strictly Prohibited AI Tells**:
+  - Overused purple-to-blue / neon gradients.
+  - Symmetrical 3-column feature cards with generic glow borders.
+  - Oversized rounded pill buttons on every action.
+  - Floating decorative shapes, meaningless icons inside rounded squares.
+  - Nested cards inside cards.
+- **Announcement Protocol**: Before starting any UI work, announce the active antislop mode:
+  `antislop active: <strict|balanced> (project preference).`
+
+### 2. Frontend Art Direction (`@skill:design-taste-frontend`)
+- When creating or redesigning landing pages, marketing pages, or app interfaces:
+  - **Declare Brief & Direction**: Infer page type, audience, vibe words, and brand constraints upfront.
+  - **Typography & Scale**: Use bold, proportional font hierarchies with intentional weight contrast.
+  - **Layout Blueprint**: Avoid cookie-cutter grids; use varied rhythm, asymmetrical focal points, and breathing space.
+  - **App Screens vs Pages**: For dashboards/data views, prioritize visual density, clear tabular layouts, and functional tools over decorative fluff.
+
+### 3. Hard Design Floors & Linting (`@skill:hallmark`)
+- **The Floor** (Non-negotiable):
+  - Every color and font must route through declared tokens or theme variables.
+  - Never animate `width`, `height`, `top`, or `left`; use `transform` and `opacity`.
+  - Content must remain readable and functional with `prefers-reduced-motion: reduce`.
+  - The hero headline, core sentence, and primary CTA must be visible without scrolling at 1280x800.
+  - Never fabricate fake user testimonials, invented metrics, or fake logo walls.
+- **Verbs**:
+  - Use `hallmark redesign <path>` to reskin an existing UI while preserving underlying logic and data wiring.
+  - Use `hallmark audit <path>` to run a comprehensive anti-slop visual check.
+
+---
+
+## 3. Copywriting & Content Tone (`@skill:antislop-copywriting`)
+
+- **Tone**: Direct, authentic, crisp, and human.
+- **Forbidden Words & AI Slop Phrases**:
+  - *"Supercharge", "Unleash", "Elevate", "Delve", "In today's fast-paced world", "Cutting-edge", "Seamlessly", "Game-changer"*.
+- **Headlines**: Tell the user what the product actually does; avoid empty motivational slogans.
+- **Buttons / CTAs**: Action-oriented and concrete (e.g., *"Open book catalog"*, *"Export data"*, rather than vague *"Get started"*).
+
+---
+
+## 4. Human Accessibility & Mobile Layout (`@skill:antislop-human`, `@skill:antislop-layoutmobile`)
+
+- **Contrast**: Maintain WCAG AA standard (minimum 4.5:1 for normal text, 3:1 for large text).
+- **Keyboard Navigation**: All interactive elements must show a distinct `:focus-visible` state.
+- **Mobile First**:
+  - Minimum touch target: 44x44px.
+  - Never allow horizontal overflow (`overflow-x: clip`).
+  - Container gutters must scale cleanly from mobile (16px) to desktop (32px+).
+
+---
+
+## 5. Code Hygiene & Comments (`@skill:antislop-code`)
+
+- **No Obvious Comments**: Remove redundant, stating-the-obvious comments (e.g., `// Set title`, `// Return result`, `// Initialize variables`).
+- **Keep High-Value Comments**: Keep explanations of non-obvious algorithms, security boundaries, edge-case workarounds, or external API quirks.
+- **Clean Architecture**: Strive for self-documenting code with meaningful naming conventions and modular separation of concerns.
+
+---
+
+## Quick Reference: Skill Invocation Guide
+
+| Scenario / Task | Recommended Skill / Plugin | Action |
+| :--- | :--- | :--- |
+| Starting a new feature or complex architecture | `@skill:brainstorming` | Clarify requirements, brainstorm trade-offs |
+| Writing step-by-step implementation tasks | `@skill:writing-plans` | Create verifiable bite-sized plan |
+| Implementing features or bug fixes | `@skill:test-driven-development` | RED-GREEN-REFACTOR test loop |
+| Investigating unexpected bug or test failure | `@skill:systematic-debugging` | 4-phase root cause analysis |
+| Building / styling web pages or landing pages | `@skill:design-taste-frontend` + `@skill:antislop-ui` | Apply art direction & strip AI cliches |
+| Auditing or redesigning an existing page | `@skill:hallmark` | Run `hallmark audit` or `hallmark redesign` |
+| Writing copy, marketing text, or documentation | `@skill:antislop-copywriting` | Human tone, strip marketing buzzwords |
+| Reviewing code before committing / merging | `@skill:requesting-code-review` + `@skill:verification-before-completion` | Verify test suite and code quality |
+
+---
+
 # Build on this starter
 
 This is the **Express + TanStack Start + PostgreSQL monorepo** of the ngodingpakeai starter family. An Express 5 API (Better Auth, Drizzle, RBAC) and a TanStack Start web app live side by side and share one TypeScript contract package. Help beginners turn a plain-language idea into a working app. Keep explanations short, explain decisions in familiar words, and implement the smallest useful feature end to end. Ask only about product decisions that materially change the work.

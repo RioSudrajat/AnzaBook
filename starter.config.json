@@ -1,7 +1,7 @@
 {
   "id": "express-tanstack-postgres",
-  "name": "Express TanStack Postgres",
-  "description": "An AI-friendly monorepo with an Express API, a TanStack Start web app, Drizzle and PostgreSQL.",
+  "name": "AnzaBook",
+  "description": "Platform baca digital dwibahasa, buku cetak Edisi Rakyat terjangkau, dan komunitas literasi Indonesia.",
   "baseVersion": "0.1.0",
   "framework": "express+tanstack-start",
   "database": "postgresql"

@@ -1,1 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#191919"/><path d="m14 25 18-10 18 10-18 10-18-10Zm0 10 18 10 18-10M14 45l18 10 18-10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <!-- Rounded App Icon Background -->
+  <rect width="64" height="64" rx="16" fill="#13110F"/>
+  
+  <!-- Left Pillar 'A' / Book Spine in Manila Paper -->
+  <path d="M13 51V17C13 13.134 16.134 10 20 10H25V51H13Z" fill="#F6F2E9"/>
+  
+  <!-- Interlocking Ribbon 'B' in Furrow Tangerine -->
+  <path d="M25 12H39C45.5 12 49.5 15.8 49.5 21C49.5 25 46.5 27.8 42.5 28.5C47.5 29.3 51.5 33 51.5 38.5C51.5 44.5 46 48.5 39 48.5H25V42H38C42 42 44.5 40.2 44.5 36.8C44.5 33.2 41.5 31.5 37 31.5H25V12Z" fill="#F06A24"/>
+  
+  <!-- Inner Ribbon Cutouts -->
+  <circle cx="37" cy="21.5" r="3" fill="#13110F"/>
+  <path d="M25 24L31 27.5L25 31V24Z" fill="#13110F"/>
+</svg>

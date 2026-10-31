@@ -28,10 +28,20 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: `${siteConfig.name} — Your starting point` },
+      { title: `${siteConfig.name} : Pustaka Digital & Edisi Rakyat` },
       { name: "description", content: siteConfig.description },
     ],
     links: [
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      {
+        rel: "preconnect",
+        href: "https://fonts.gstatic.com",
+        crossOrigin: "anonymous",
+      },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&family=Literata:ital,opsz,wght@0,7..72,400..600;1,7..72,400&family=Plus+Jakarta+Sans:wght@400;500;600&family=Red+Hat+Mono:wght@400;500&display=swap",
+      },
       { rel: "stylesheet", href: globalsCss },
       { rel: "icon", href: "/icon.svg", type: "image/svg+xml" },
     ],
@@ -44,7 +54,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 
 function RootDocument({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="id">
       <head>
         <HeadContent />
       </head>
