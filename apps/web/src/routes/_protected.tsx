@@ -3,6 +3,7 @@ import {
   Link,
   Outlet,
   redirect,
+  useLocation,
 } from "@tanstack/react-router";
 import { roleHasPermission } from "@starter/shared/permissions";
 import { Brand } from "@/components/brand";
@@ -24,6 +25,13 @@ const navLink =
 
 function ProtectedLayout() {
   const { user } = Route.useRouteContext().session;
+  const location = useLocation();
+  const isReader = location.pathname.startsWith("/read");
+
+  if (isReader) {
+    return <Outlet />;
+  }
+
   // Presentation only; /admin guards itself and the API enforces the role.
   const canAdmin = roleHasPermission(user.role, { notes: ["read-any"] });
 
