@@ -8,6 +8,8 @@ import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { databaseError, databaseUrl } from "./db/connection";
+import * as schema from "./db/schema";
+import { seedCatalog } from "./db/seed-catalog";
 
 // src/migrate.ts and dist/migrate.js both sit one level below apps/api.
 const migrationsFolder = resolve(
@@ -27,8 +29,10 @@ try {
   pool.on("error", () =>
     console.error("The PostgreSQL migration connection was interrupted."),
   );
-  await migrate(drizzle(pool), { migrationsFolder });
+  const db = drizzle(pool, { schema });
+  await migrate(db, { migrationsFolder });
   console.log("PostgreSQL migrations applied.");
+  await seedCatalog(db);
 } catch (error) {
   console.error(databaseError(error));
   process.exitCode = 1;
