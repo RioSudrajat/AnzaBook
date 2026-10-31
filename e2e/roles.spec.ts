@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
-import { API_URL, headers, PASSWORD, setRole, signUp } from "./helpers";
+import { API_URL, headers, setRole, signUp } from "./helpers";
 
 test("admin endpoints answer 401 without a session and 403 for the default role", async ({
   request,

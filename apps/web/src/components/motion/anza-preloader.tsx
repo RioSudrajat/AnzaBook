@@ -1,27 +1,45 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import gsap from "gsap";
 
+const emptySubscribe = () => () => {};
+
+function getPreloaderSnapshot() {
+  if (typeof window === "undefined") return false;
+  const hasSeen = sessionStorage.getItem("anzabook-preloader-v1");
+  const prefersReducedMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
+  return !hasSeen && !prefersReducedMotion;
+}
+
+function getServerSnapshot() {
+  return false;
+}
+
 export function AnzaPreloader() {
-  const [isVisible, setIsVisible] = useState(false);
+  const shouldShow = useSyncExternalStore(
+    emptySubscribe,
+    getPreloaderSnapshot,
+    getServerSnapshot,
+  );
+  const [dismissed, setDismissed] = useState(false);
+
+  const isVisible = shouldShow && !dismissed;
 
   const containerRef = useRef<HTMLDivElement>(null);
   const quoteRef = useRef<HTMLDivElement>(null);
   const metaRef = useRef<HTMLDivElement>(null);
   const svgPathRef = useRef<SVGPathElement>(null);
 
-  useEffect(() => {
-    const hasSeen = sessionStorage.getItem("anzabook-preloader-v1");
-    const prefersReducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-    if (!hasSeen && !prefersReducedMotion) {
-      setIsVisible(true);
-    }
-  }, []);
-
   const dismissPreloader = useCallback(() => {
     if (!containerRef.current) {
-      setIsVisible(false);
+      setDismissed(true);
       sessionStorage.setItem("anzabook-preloader-v1", "true");
       return;
     }
@@ -31,7 +49,7 @@ export function AnzaPreloader() {
       duration: 0.85,
       ease: "power4.inOut",
       onComplete: () => {
-        setIsVisible(false);
+        setDismissed(true);
         sessionStorage.setItem("anzabook-preloader-v1", "true");
       },
     });
