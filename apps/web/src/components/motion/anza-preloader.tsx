@@ -2,19 +2,22 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 
 export function AnzaPreloader() {
-  const [isVisible, setIsVisible] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const hasSeen = sessionStorage.getItem("anzabook-preloader-v1");
-    const prefersReducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-    return !hasSeen && !prefersReducedMotion;
-  });
+  const [isVisible, setIsVisible] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const quoteRef = useRef<HTMLDivElement>(null);
   const metaRef = useRef<HTMLDivElement>(null);
   const svgPathRef = useRef<SVGPathElement>(null);
+
+  useEffect(() => {
+    const hasSeen = sessionStorage.getItem("anzabook-preloader-v1");
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    if (!hasSeen && !prefersReducedMotion) {
+      setIsVisible(true);
+    }
+  }, []);
 
   const dismissPreloader = useCallback(() => {
     if (!containerRef.current) {

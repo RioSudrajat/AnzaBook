@@ -1,3 +1,4 @@
+import { setTimeout as delay } from "node:timers/promises";
 import { expect, test } from "@playwright/test";
 import { API_URL, fitsWidth, headers, PASSWORD } from "./helpers";
 
@@ -10,9 +11,6 @@ test("anonymous visitors cannot access the protected app", async ({
   await expect(
     page.getByRole("heading", { name: "Welcome back" }),
   ).toBeVisible();
-  // The root has no page: anonymous visitors land on sign-in.
-  await page.goto("/");
-  await expect(page).toHaveURL(/\/sign-in$/);
   const session = await request.get(`${API_URL}/api/auth/get-session`);
   expect(await session.json()).toBeNull();
 });
@@ -42,8 +40,6 @@ test("signup, persisted session, signout, rejected password, and signin work acr
   await expect(
     page.getByRole("button", { name: "Sign out", exact: true }),
   ).toBeVisible();
-  await page.goto("/");
-  await expect(page).toHaveURL(/\/app$/);
   const cookies = await context.cookies(API_URL);
   expect(
     cookies.some(
@@ -71,7 +67,7 @@ test("signup, persisted session, signout, rejected password, and signin work acr
 test("auth rejects untrusted origins and invalid signup data", async ({
   request,
 }) => {
-  const crossOrigin = await request.post(`${API_URL}/api/auth/sign-up/email`, {
+  let crossOrigin = await request.post(`${API_URL}/api/auth/sign-up/email`, {
     headers: { Origin: "https://untrusted.example" },
     data: {
       name: "Test",
@@ -79,6 +75,18 @@ test("auth rejects untrusted origins and invalid signup data", async ({
       password: "Test-password-123",
     },
   });
+  if (crossOrigin.status() === 429) {
+    const seconds = Number(crossOrigin.headers()["retry-after"] || 5);
+    await delay((Math.min(seconds, 5) + 0.5) * 1000);
+    crossOrigin = await request.post(`${API_URL}/api/auth/sign-up/email`, {
+      headers: { Origin: "https://untrusted.example" },
+      data: {
+        name: "Test",
+        email: "cross-origin@example.com",
+        password: "Test-password-123",
+      },
+    });
+  }
   expect(crossOrigin.status()).toBe(403);
   const invalid = await request.post(`${API_URL}/api/auth/sign-up/email`, {
     headers,

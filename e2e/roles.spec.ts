@@ -38,12 +38,8 @@ test("the admin page renders only for a permitted role and can delete any note",
   });
   const note = (await created.json()).data;
 
-  const email = `roles-${randomUUID()}@example.com`;
-  await page.goto("/sign-up");
-  await page.getByLabel("Name").fill("Page Viewer");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Create account" }).click();
+  const email = await signUp(page.request, "Page Viewer");
+  await page.goto("/app");
   await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByRole("link", { name: "Admin" })).toHaveCount(0);
 

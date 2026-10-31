@@ -26,10 +26,7 @@ import { PublisherStudioPanel } from "@/features/publisher/components/publisher-
 import { ShareStudioPanel } from "@/features/share/components/share-studio-panel";
 
 const appSearchSchema = z.object({
-  tab: z
-    .enum(["shelves", "history", "share", "publisher"])
-    .optional()
-    .default("shelves"),
+  tab: z.enum(["shelves", "history", "share", "publisher"]).optional(),
 });
 
 export const Route = createFileRoute("/_protected/app")({
