@@ -164,3 +164,10 @@ export type ParagraphCommentDto = {
   content: string;
   createdAt: string;
 };
+
+export type {
+  PrintEconomicsResult,
+  PrintTierResult,
+  SimulatePrintInput,
+} from "../print-economics.js";
+
