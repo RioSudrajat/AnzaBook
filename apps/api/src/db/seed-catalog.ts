@@ -1,5 +1,4 @@
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { eq } from "drizzle-orm";
 import * as schema from "./schema";
 
 export async function seedCatalog(db: NodePgDatabase<typeof schema>): Promise<void> {

@@ -37,9 +37,30 @@ export function requirePermission(permissions: Permissions): RequestHandler {
   };
 }
 
+// Optional authentication: sets req.auth if session is present, but does not reject anonymous visitors.
+export const optionalAuth: RequestHandler = async (req, _res, next) => {
+  try {
+    const session = await auth.api.getSession({
+      headers: fromNodeHeaders(req.headers),
+      query: { disableCookieCache: true },
+    });
+    if (session) {
+      req.auth = session;
+      setRequestUser(session.user.id);
+    }
+  } catch {
+    // anonymous visitor
+  }
+  next();
+};
+
 // The verified session inside a handler mounted after requireAuth.
 export function getAuth(req: Request) {
   if (!req.auth)
     throw new Error("getAuth() used on a route without requireAuth");
   return req.auth;
+}
+
+export function getOptionalAuth(req: Request) {
+  return req.auth ?? null;
 }
