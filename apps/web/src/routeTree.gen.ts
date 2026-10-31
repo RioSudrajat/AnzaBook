@@ -17,6 +17,8 @@ import { Route as AuthSignUpRouteImport } from './routes/_auth/sign-up'
 import { Route as ProtectedAdminRouteImport } from './routes/_protected/admin'
 import { Route as ProtectedAppRouteImport } from './routes/_protected/app'
 import { Route as ProtectedNotesRouteImport } from './routes/_protected/notes'
+import { Route as BooksSlugRouteImport } from './routes/books.$slug'
+import { Route as ProtectedReadSlugRouteImport } from './routes/_protected/read.$slug'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -56,6 +58,16 @@ const ProtectedNotesRoute = ProtectedNotesRouteImport.update({
   path: '/notes',
   getParentRoute: () => ProtectedRoute,
 } as any)
+const BooksSlugRoute = BooksSlugRouteImport.update({
+  id: '/books/$slug',
+  path: '/books/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProtectedReadSlugRoute = ProtectedReadSlugRouteImport.update({
+  id: '/read/$slug',
+  path: '/read/$slug',
+  getParentRoute: () => ProtectedRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -64,6 +76,8 @@ export interface FileRoutesByFullPath {
   '/admin': typeof ProtectedAdminRoute
   '/app': typeof ProtectedAppRoute
   '/notes': typeof ProtectedNotesRoute
+  '/books/$slug': typeof BooksSlugRoute
+  '/read/$slug': typeof ProtectedReadSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -72,6 +86,8 @@ export interface FileRoutesByTo {
   '/admin': typeof ProtectedAdminRoute
   '/app': typeof ProtectedAppRoute
   '/notes': typeof ProtectedNotesRoute
+  '/books/$slug': typeof BooksSlugRoute
+  '/read/$slug': typeof ProtectedReadSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -83,12 +99,30 @@ export interface FileRoutesById {
   '/_protected/admin': typeof ProtectedAdminRoute
   '/_protected/app': typeof ProtectedAppRoute
   '/_protected/notes': typeof ProtectedNotesRoute
+  '/books/$slug': typeof BooksSlugRoute
+  '/_protected/read/$slug': typeof ProtectedReadSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/sign-in' | '/sign-up' | '/admin' | '/app' | '/notes'
+  fullPaths:
+    | '/'
+    | '/sign-in'
+    | '/sign-up'
+    | '/admin'
+    | '/app'
+    | '/notes'
+    | '/books/$slug'
+    | '/read/$slug'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/sign-in' | '/sign-up' | '/admin' | '/app' | '/notes'
+  to:
+    | '/'
+    | '/sign-in'
+    | '/sign-up'
+    | '/admin'
+    | '/app'
+    | '/notes'
+    | '/books/$slug'
+    | '/read/$slug'
   id:
     | '__root__'
     | '/'
@@ -99,12 +133,15 @@ export interface FileRouteTypes {
     | '/_protected/admin'
     | '/_protected/app'
     | '/_protected/notes'
+    | '/books/$slug'
+    | '/_protected/read/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRouteWithChildren
   ProtectedRoute: typeof ProtectedRouteWithChildren
+  BooksSlugRoute: typeof BooksSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -165,6 +202,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProtectedNotesRouteImport
       parentRoute: typeof ProtectedRoute
     }
+    '/books/$slug': {
+      id: '/books/$slug'
+      path: '/books/$slug'
+      fullPath: '/books/$slug'
+      preLoaderRoute: typeof BooksSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_protected/read/$slug': {
+      id: '/_protected/read/$slug'
+      path: '/read/$slug'
+      fullPath: '/read/$slug'
+      preLoaderRoute: typeof ProtectedReadSlugRouteImport
+      parentRoute: typeof ProtectedRoute
+    }
   }
 }
 
@@ -184,12 +235,14 @@ interface ProtectedRouteChildren {
   ProtectedAdminRoute: typeof ProtectedAdminRoute
   ProtectedAppRoute: typeof ProtectedAppRoute
   ProtectedNotesRoute: typeof ProtectedNotesRoute
+  ProtectedReadSlugRoute: typeof ProtectedReadSlugRoute
 }
 
 const ProtectedRouteChildren: ProtectedRouteChildren = {
   ProtectedAdminRoute: ProtectedAdminRoute,
   ProtectedAppRoute: ProtectedAppRoute,
   ProtectedNotesRoute: ProtectedNotesRoute,
+  ProtectedReadSlugRoute: ProtectedReadSlugRoute,
 }
 
 const ProtectedRouteWithChildren = ProtectedRoute._addFileChildren(
@@ -200,6 +253,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRouteWithChildren,
   ProtectedRoute: ProtectedRouteWithChildren,
+  BooksSlugRoute: BooksSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

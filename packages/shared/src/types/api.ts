@@ -69,10 +69,12 @@ export type BookSummaryDto = {
   author: string;
   translator: string | null;
   coverUrl: string;
+  coverColor: string;
   synopsis: string;
   bulletinExcerpt: string | null;
   publishedYear: number;
   pageCount: number;
+  readingMinutes: number;
   audioDurationMinutes: number;
   digitalPolicy: DigitalPolicy;
   isWeeklyBulletin: boolean;

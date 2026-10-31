@@ -50,7 +50,26 @@ export const claimPrintCodeSchema = z
   })
   .strict();
 
+export type ListBooksInput = {
+  search?: string;
+  category?: string;
+  paperTier?: "all" | "rakyat_economy" | "standard_trade" | "kolektor_hardcover";
+  limit?: number;
+  offset?: number;
+};
 export type ListBooksQuery = z.infer<typeof listBooksQuerySchema>;
+
+export type ReadBookInput = {
+  mode?: "full" | "blueprint" | "audio";
+  chapter?: number;
+};
 export type ReadBookQuery = z.infer<typeof readBookQuerySchema>;
+
+export type StockInput = {
+  city?: string;
+  partner?: "all" | "gramedia" | "togamas" | "pos_indonesia" | "komunitas";
+};
 export type StockQuery = z.infer<typeof stockQuerySchema>;
-export type ClaimPrintCodeInput = z.infer<typeof claimPrintCodeSchema>;
+
+export type ClaimPrintCodeInput = z.input<typeof claimPrintCodeSchema>;
+export type ClaimPrintCodeOutput = z.infer<typeof claimPrintCodeSchema>;
