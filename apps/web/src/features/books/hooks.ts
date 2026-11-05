@@ -13,23 +13,43 @@ import type {
   CreateParagraphCommentInput,
   CreateReviewInput,
 } from "@starter/shared/validators/community";
+import type {
+  CreateHighlightInput,
+  SaveReadingProgressInput,
+} from "@starter/shared/validators/reading";
+import type { BookHighlightDto, ReadingProgressDto, ReadingProgressScope } from "@starter/shared/types";
+import { communityKeys } from "@/features/community/queries";
 import {
   claimBookCode,
   createBookReview,
   createChapterComment,
+  createHighlight,
+  deleteHighlight,
+  saveReadingProgress,
 } from "./api";
 import {
+  allHighlightsQuery,
+  authorsQuery,
   bookDetailQuery,
+  bookHighlightsQuery,
   bookReaderQuery,
   bookReviewsQuery,
+  bookSessionsQuery,
   booksKeys,
   booksListQuery,
   bookStockQuery,
+  categoriesQuery,
   chapterCommentsQuery,
+  collectionsQuery,
+  readingProgressQuery,
 } from "./queries";
 
 export function useBooks(params?: ListBooksInput) {
   return useSuspenseQuery(booksListQuery(params));
+}
+
+export function useCatalogBooks(params: ListBooksInput) {
+  return useQuery(booksListQuery(params));
 }
 
 export function useBookDetail(slug: string) {
@@ -85,4 +105,87 @@ export function useCreateComment(slug: string) {
       });
     },
   });
+}
+
+export function useAuthors() {
+  return useQuery(authorsQuery());
+}
+
+export function useCollections() {
+  return useQuery(collectionsQuery());
+}
+
+export function useCategories() {
+  return useQuery(categoriesQuery());
+}
+
+export function useReadingProgress(bookId: string, scope: ReadingProgressScope = "full") {
+  return useQuery({
+    ...readingProgressQuery(bookId, scope),
+    enabled: Boolean(bookId),
+  });
+}
+
+export function useSaveReadingProgress(bookId: string, scope: ReadingProgressScope = "full") {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SaveReadingProgressInput) =>
+      saveReadingProgress(bookId, scope, input),
+    onSuccess: async (saved) => {
+      queryClient.setQueryData<ReadingProgressDto | null>(
+        booksKeys.progress(bookId, scope),
+        (current) => !current || current.capturedAt <= saved.capturedAt ? saved : current,
+      );
+      await queryClient.invalidateQueries({ queryKey: communityKeys.shelves(), refetchType: "all" });
+    },
+  });
+}
+
+export function useBookHighlights(bookId: string) {
+  return useQuery({
+    ...bookHighlightsQuery(bookId),
+    enabled: Boolean(bookId),
+  });
+}
+
+export function useAllHighlights() {
+  return useQuery(allHighlightsQuery());
+}
+
+export function useCreateHighlight(bookId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateHighlightInput) => createHighlight(input),
+    onSuccess: (newHighlight) => {
+      queryClient.setQueryData(
+        booksKeys.highlights(bookId),
+        (old: BookHighlightDto[] | undefined) => {
+          if (!old) return [newHighlight];
+          const exists = old.some((h) => h.id === newHighlight.id);
+          return exists ? old : [newHighlight, ...old];
+        },
+      );
+      queryClient.invalidateQueries({ queryKey: booksKeys.highlights(bookId) });
+      queryClient.invalidateQueries({ queryKey: booksKeys.highlights("all") });
+    },
+  });
+}
+
+export function useDeleteHighlight(bookId?: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteHighlight(id),
+    onSuccess: () => {
+      if (bookId) {
+        queryClient.invalidateQueries({
+          queryKey: booksKeys.highlights(bookId),
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: booksKeys.highlights("all") });
+    },
+  });
+}
+
+export function useBookSessions(bookId: string) {
+  return useQuery(bookSessionsQuery(bookId));
 }

@@ -21,6 +21,9 @@ export const books = pgTable(
     title: varchar("title", { length: 255 }).notNull(),
     originalTitle: varchar("original_title", { length: 255 }),
     author: varchar("author", { length: 255 }).notNull(),
+    authorAvatar: text("author_avatar"),
+    editor: varchar("editor", { length: 255 }),
+    editorAvatar: text("editor_avatar"),
     translator: varchar("translator", { length: 255 }),
     coverUrl: text("cover_url").notNull(),
     coverColor: varchar("cover_color", { length: 32 }).notNull().default("#13110F"),
@@ -28,15 +31,21 @@ export const books = pgTable(
     bulletinExcerpt: text("bulletin_excerpt"),
     publishedYear: integer("published_year").notNull().default(2026),
     pageCount: integer("page_count").notNull(),
+    totalChapters: integer("total_chapters").notNull().default(1),
     readingMinutes: integer("reading_minutes").notNull().default(20),
     audioDurationMinutes: integer("audio_duration_minutes").notNull().default(0),
     digitalPolicy: varchar("digital_policy", { length: 32 }).notNull().default("sample_only"),
+    accessTier: varchar("access_tier", { length: 32 }).$type<"free" | "premium" | "premium_physical">().notNull().default("free"),
+    hasPhysical: boolean("has_physical").notNull().default(true),
     securityLevel: varchar("security_level", { length: 32 }).notNull().default("standard_blur"),
     isWeeklyBulletin: boolean("is_weekly_bulletin").notNull().default(false),
     rakyatPriceIdr: integer("rakyat_price_idr").notNull().default(35000),
     standardPriceIdr: integer("standard_price_idr").notNull().default(75000),
     ratingAvg: real("rating_avg").notNull().default(0),
     ratingCount: integer("rating_count").notNull().default(0),
+    availableLanguages: jsonb("available_languages").$type<string[]>().notNull().default(["id"]),
+    categories: jsonb("categories").$type<string[]>().notNull().default([]),
+    collectionName: varchar("collection_name", { length: 120 }),
     genres: jsonb("genres").$type<string[]>().notNull().default([]),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
@@ -116,6 +125,7 @@ export const bookClaimCodes = pgTable(
       .notNull()
       .references(() => books.id, { onDelete: "cascade" }),
     code: varchar("code", { length: 32 }).notNull().unique(),
+    isDemo: boolean("is_demo").notNull().default(false),
     claimedByUserId: text("claimed_by_user_id").references(() => user.id, {
       onDelete: "set null",
     }),
@@ -139,6 +149,7 @@ export const storeBranches = pgTable(
     latitude: real("latitude").notNull().default(-6.2088),
     longitude: real("longitude").notNull().default(106.8456),
     distanceKm: real("distance_km").default(0),
+    phone: varchar("phone", { length: 64 }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
@@ -254,5 +265,65 @@ export const paragraphComments = pgTable(
   (table) => [
     index("paragraph_comments_chapter_para_idx").on(table.chapterId, table.paragraphIndex),
     index("paragraph_comments_user_idx").on(table.userId),
+  ],
+);
+
+export const bookHighlights = pgTable(
+  "book_highlights",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    bookId: uuid("book_id")
+      .notNull()
+      .references(() => books.id, { onDelete: "cascade" }),
+    chapterId: uuid("chapter_id").references(() => bookChapters.id, {
+      onDelete: "cascade",
+    }),
+    chapterNumber: integer("chapter_number").notNull().default(1),
+    pageNumber: integer("page_number").notNull().default(1),
+    selectedText: text("selected_text").notNull(),
+    color: varchar("color", { length: 32 })
+      .$type<"yellow" | "green" | "coral" | "blue">()
+      .notNull()
+      .default("yellow"),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("book_highlights_user_book_idx").on(table.userId, table.bookId),
+    index("book_highlights_chapter_idx").on(table.chapterId),
+  ],
+);
+
+export const readingProgress = pgTable(
+  "reading_progress",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    bookId: uuid("book_id")
+      .notNull()
+      .references(() => books.id, { onDelete: "cascade" }),
+    lastChapterId: uuid("last_chapter_id").references(() => bookChapters.id, {
+      onDelete: "set null",
+    }),
+    lastChapterNumber: integer("last_chapter_number").notNull().default(1),
+    lastPageNumber: integer("last_page_number").notNull().default(1),
+    lastScrollPercent: integer("last_scroll_percent").notNull().default(0),
+    lastParagraphIndex: integer("last_paragraph_index"),
+    layout: varchar("layout", { length: 16 }).$type<"scroll" | "slide">(),
+    scope: varchar("scope", { length: 16 }).$type<"full" | "preview">().notNull().default("full"),
+    capturedAt: timestamp("captured_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("reading_progress_user_book_scope_unique").on(table.userId, table.bookId, table.scope),
+    index("reading_progress_user_idx").on(table.userId),
   ],
 );

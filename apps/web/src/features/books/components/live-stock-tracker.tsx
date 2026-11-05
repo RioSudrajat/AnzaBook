@@ -2,7 +2,6 @@ import { useState } from "react";
 import {
   AlertCircle,
   Building2,
-  CheckCircle2,
   Clock,
   Filter,
   MapPin,
@@ -27,7 +26,6 @@ const PARTNER_OPTIONS: { label: string; value: "all" | PartnerType }[] = [
 export function LiveStockTracker({ slug, initialStocks }: LiveStockTrackerProps) {
   const [selectedCity, setSelectedCity] = useState("Semua Kota");
   const [selectedPartner, setSelectedPartner] = useState<"all" | PartnerType>("all");
-  const [reservedBranchId, setReservedBranchId] = useState<string | null>(null);
 
   const queryCity = selectedCity === "Semua Kota" ? undefined : selectedCity;
   const { data: stockItems, isLoading, isError, refetch } = useBookStock(slug, {
@@ -36,14 +34,6 @@ export function LiveStockTracker({ slug, initialStocks }: LiveStockTrackerProps)
   });
 
   const displayItems = stockItems ?? initialStocks ?? [];
-
-  const handleReserve = (branchId: string) => {
-    setReservedBranchId(branchId);
-    setTimeout(() => {
-      // Clear after 8 seconds
-      setReservedBranchId((curr) => (curr === branchId ? null : curr));
-    }, 8000);
-  };
 
   return (
     <div className="bg-background border border-border rounded-[10px] p-6 shadow-xs">
@@ -59,7 +49,7 @@ export function LiveStockTracker({ slug, initialStocks }: LiveStockTrackerProps)
             </h3>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Data tersinkronisasi langsung dari rak Gramedia dan gudang komunitas baca.
+            Lihat stok yang tercatat dan lokasi toko. Konfirmasi ketersediaan ke toko sebelum berkunjung.
           </p>
         </div>
 
@@ -164,7 +154,6 @@ export function LiveStockTracker({ slug, initialStocks }: LiveStockTrackerProps)
               </thead>
               <tbody className="divide-y divide-border/40 font-sans">
                 {displayItems.map((item) => {
-                  const isReserved = reservedBranchId === item.id;
                   const hasRakyatStock = item.rakyatStock > 0;
                   const isLowRakyatStock = item.rakyatStock > 0 && item.rakyatStock <= 5;
 
@@ -246,30 +235,15 @@ export function LiveStockTracker({ slug, initialStocks }: LiveStockTrackerProps)
 
                       {/* Action */}
                       <td className="py-3 px-3 align-top text-right whitespace-nowrap">
-                        {isReserved ? (
-                          <div className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-[4px] border border-emerald-500/20">
-                            <CheckCircle2 className="size-3.5" />
-                            <span>Reservasi #AZ-{item.id.slice(0, 4)}</span>
-                          </div>
-                        ) : hasRakyatStock ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleReserve(item.id)}
-                            className="h-7 text-[11px] font-mono px-2.5"
+                        <Button asChild variant="outline" size="sm" className="min-h-11">
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${item.branchName} ${item.address}`)}`}
+                            target="_blank"
+                            rel="noreferrer"
                           >
-                            Simpan 1 Eks
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled
-                            className="h-7 text-[11px] font-mono px-2.5 opacity-50"
-                          >
-                            Stok Habis
-                          </Button>
-                        )}
+                            Lihat lokasi
+                          </a>
+                        </Button>
                       </td>
                     </tr>
                   );

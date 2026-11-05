@@ -3,11 +3,10 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ArrowRight,
   BookOpen,
-  CheckCircle2,
   Clock,
   Search,
   Sparkles,
-  Store,
+
 } from "lucide-react";
 import type { BookSummaryDto } from "@starter/shared/types";
 import { Brand } from "@/components/brand";
@@ -15,6 +14,8 @@ import { HeroBookStage } from "@/components/motion/hero-book-stage";
 import { SingleLetterRoll } from "@/components/motion/single-letter-roll";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
+import { BookCover } from "@/features/books/components/book-cover";
+import { BookCatalogCard } from "@/features/books/components/book-catalog-card";
 import { booksListQuery } from "@/features/books/queries";
 
 export const Route = createFileRoute("/")({
@@ -123,37 +124,14 @@ function LandingPage() {
                   </h2>
                 </div>
                 <div className="text-xs font-mono text-muted-foreground">
-                  Edisi #42 &bull; Diperbarui Sabtu Pagi
+                  Buletin Mingguan
                 </div>
               </div>
 
               {/* Weekly Bulletin Featured Card */}
               <div className="bg-background border border-border rounded-[10px] p-6 sm:p-8 md:p-10 shadow-xs grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
                 <div className="lg:col-span-4 flex justify-center">
-                  <div
-                    className="w-[200px] sm:w-[230px] h-[300px] sm:h-[340px] rounded-[3px_8px_8px_3px] shadow-xl p-5 flex flex-col justify-between relative overflow-hidden"
-                    style={{
-                      backgroundColor: bulletin.coverColor || "#F06A24",
-                      color: "#13110F",
-                    }}
-                  >
-                    <div className="absolute left-0 top-0 bottom-0 w-3 bg-gradient-to-r from-black/30 via-white/10 to-transparent pointer-events-none" />
-                    <div className="text-[10px] font-mono uppercase tracking-wider font-semibold opacity-80">
-                      Pilihan Redaksi
-                    </div>
-                    <div>
-                      <h3 className="font-serif text-xl sm:text-2xl font-bold leading-tight">
-                        {bulletin.title}
-                      </h3>
-                      <p className="text-xs mt-2 font-medium opacity-90 font-sans">
-                        {bulletin.author}
-                      </p>
-                    </div>
-                    <div className="pt-3 border-t border-black/15 flex items-center justify-between text-xs font-mono font-semibold">
-                      <span>Edisi Rakyat</span>
-                      <span>Rp{bulletin.rakyatPriceIdr.toLocaleString("id-ID")}</span>
-                    </div>
-                  </div>
+                  <BookCover book={bulletin} className="w-[200px] max-w-full sm:w-[230px]" decorative />
                 </div>
 
                 <div className="lg:col-span-8 flex flex-col justify-between">
@@ -209,10 +187,10 @@ function LandingPage() {
                         <Link
                           to="/read/$slug"
                           params={{ slug: bulletin.slug }}
-                          search={{ mode: "blueprint", chapter: 1 }}
+                          search={{ chapter: 1 }}
                         >
                           <BookOpen className="size-4 mr-2" />
-                          Baca Intisari 20 Menit
+                          Baca Bab 1 (Sampel)
                         </Link>
                       </Button>
 
@@ -310,91 +288,7 @@ function LandingPage() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
                 {filteredBooks.map((book) => (
-                  <div
-                    key={book.id}
-                    className="bg-background border border-border rounded-[10px] p-5 shadow-xs flex flex-col justify-between hover:border-border/90 hover:shadow-md transition-all group"
-                  >
-                    <div>
-                      {/* Book header & cover thumbnail */}
-                      <div className="flex gap-4">
-                        <div
-                          className="w-24 h-32 rounded-[3px_6px_6px_3px] shadow-md shrink-0 flex flex-col justify-between p-2 text-white relative overflow-hidden"
-                          style={{ backgroundColor: book.coverColor || "#13110F" }}
-                        >
-                          <div className="text-[8px] font-mono uppercase tracking-wider opacity-80">
-                            {book.publishedYear}
-                          </div>
-                          <div className="font-serif text-xs font-semibold leading-tight line-clamp-3">
-                            {book.title}
-                          </div>
-                          <div className="text-[9px] font-mono text-[var(--color-accent)] font-bold">
-                            Rp{book.rakyatPriceIdr.toLocaleString("id-ID")}
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col justify-between">
-                          <div>
-                            <div className="flex items-center gap-1 text-[11px] font-mono text-[var(--color-accent)] font-semibold">
-                              <span>
-                                {book.isWeeklyBulletin ? "Buletin Mingguan" : "Edisi Rakyat"}
-                              </span>
-                            </div>
-                            <h3 className="font-serif text-base font-semibold leading-snug text-foreground group-hover:text-[var(--color-accent)] transition-colors mt-0.5 line-clamp-2">
-                              <Link to="/books/$slug" params={{ slug: book.slug }}>
-                                {book.title}
-                              </Link>
-                            </h3>
-                            <p className="text-xs text-muted-foreground font-sans mt-1">
-                              {book.author}
-                            </p>
-                          </div>
-
-                          <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground mt-2">
-                            <span>{book.pageCount} Hal</span>
-                            <span>&bull;</span>
-                            <span>{book.readingMinutes} Mnt</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <p className="text-xs text-muted-foreground mt-4 line-clamp-2 leading-relaxed">
-                        {book.synopsis}
-                      </p>
-
-                      <div className="mt-3 flex items-center gap-1.5 text-[11px] font-mono text-emerald-800 dark:text-emerald-300">
-                        <Store className="size-3 shrink-0" />
-                        <span>Stok Gramedia & Gudang Tersedia</span>
-                      </div>
-                    </div>
-
-                    <div className="mt-5 pt-3 border-t border-border/60 flex items-center justify-between">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold font-mono text-foreground">
-                          Rp{book.rakyatPriceIdr.toLocaleString("id-ID")}
-                        </span>
-                        <span className="text-[10px] font-mono text-muted-foreground line-through">
-                          Ritel: Rp{book.standardPriceIdr.toLocaleString("id-ID")}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <Button asChild variant="outline" size="sm">
-                          <Link
-                            to="/read/$slug"
-                            params={{ slug: book.slug }}
-                            search={{ mode: "blueprint", chapter: 1 }}
-                          >
-                            Intisari
-                          </Link>
-                        </Button>
-                        <Button asChild size="sm">
-                          <Link to="/books/$slug" params={{ slug: book.slug }}>
-                            Detail
-                          </Link>
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
+                  <BookCatalogCard key={book.id} book={book} />
                 ))}
               </div>
             )}
@@ -472,118 +366,19 @@ function LandingPage() {
               </div>
             </div>
 
-            {/* SAAS MEMBERSHIP TIERS */}
-            <div id="keanggotaan" className="mt-16">
-              <div className="text-center max-w-2xl mx-auto mb-8">
-                <h3 className="font-serif text-2xl sm:text-3xl font-bold tracking-tight">
-                  Paket Keanggotaan Pustaka Digital
+            <section id="keanggotaan" aria-labelledby="landing-membership-heading" className="mt-16 grid gap-5 border-y border-border py-8 sm:grid-cols-[1fr_auto] sm:items-center">
+              <div className="max-w-xl">
+                <h3 id="landing-membership-heading" className="font-serif text-2xl font-bold tracking-tight sm:text-3xl">
+                  Baca Premium dengan Nakama
                 </h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Akses tanpa batas seluruh katalog digital, intisari 20 menit, dan diskon cetak fisik.
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  Pilih 3, 6, atau 12 bulan untuk membaca naskah Premium. Paket juga bisa dibeli sebagai hadiah untuk teman.
                 </p>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-                {/* 3 Bulan */}
-                <div className="bg-background border border-border rounded-[10px] p-6 shadow-xs flex flex-col justify-between">
-                  <div>
-                    <h4 className="font-serif text-lg font-bold">Paket Triwulan</h4>
-                    <p className="text-xs text-muted-foreground mt-1 font-mono">3 Bulan Akses Penuh</p>
-                    <div className="mt-4 flex items-baseline gap-1">
-                      <span className="text-3xl font-bold font-mono">Rp60.000</span>
-                      <span className="text-xs text-muted-foreground font-mono">/ 3 bln</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 font-mono">Rp20.000 per bulan</p>
-
-                    <ul className="mt-6 space-y-2.5 text-xs text-foreground/90">
-                      <li className="flex items-center gap-2">
-                        <CheckCircle2 className="size-3.5 text-emerald-600" />
-                        <span>Akses seluruh buku digital & terjemahan</span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <CheckCircle2 className="size-3.5 text-emerald-600" />
-                        <span>Intisari 20 Menit & mode audio</span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <CheckCircle2 className="size-3.5 text-emerald-600" />
-                        <span>Pelacakan membaca Strava Share Studio</span>
-                      </li>
-                    </ul>
-                  </div>
-
-                  <Button asChild variant="outline" className="mt-8 w-full">
-                    <Link to="/sign-up">Pilih Triwulan</Link>
-                  </Button>
-                </div>
-
-                {/* 6 Bulan */}
-                <div className="bg-background border-2 border-[var(--color-accent)] rounded-[10px] p-6 shadow-md flex flex-col justify-between relative">
-                  <div className="absolute -top-3 right-6 bg-[var(--color-accent)] text-[var(--color-accent-ink)] text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-[4px]">
-                    Paling Populer
-                  </div>
-                  <div>
-                    <h4 className="font-serif text-lg font-bold">Paket Semester</h4>
-                    <p className="text-xs text-muted-foreground mt-1 font-mono">6 Bulan Akses Penuh</p>
-                    <div className="mt-4 flex items-baseline gap-1">
-                      <span className="text-3xl font-bold font-mono">Rp108.000</span>
-                      <span className="text-xs text-muted-foreground font-mono">/ 6 bln</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 font-mono">Rp18.000 per bulan</p>
-
-                    <ul className="mt-6 space-y-2.5 text-xs text-foreground/90">
-                      <li className="flex items-center gap-2">
-                        <CheckCircle2 className="size-3.5 text-emerald-600" />
-                        <span>Semua fitur Paket Triwulan</span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <CheckCircle2 className="size-3.5 text-emerald-600" />
-                        <span>Hemat 10% dibanding bulanan</span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <CheckCircle2 className="size-3.5 text-emerald-600" />
-                        <span>Prioritas reservasi stok buku fisik di Gramedia</span>
-                      </li>
-                    </ul>
-                  </div>
-
-                  <Button asChild className="mt-8 w-full shadow-xs">
-                    <Link to="/sign-up">Pilih Semester</Link>
-                  </Button>
-                </div>
-
-                {/* 12 Bulan */}
-                <div className="bg-background border border-border rounded-[10px] p-6 shadow-xs flex flex-col justify-between">
-                  <div>
-                    <h4 className="font-serif text-lg font-bold">Paket Tahunan</h4>
-                    <p className="text-xs text-muted-foreground mt-1 font-mono">12 Bulan Akses Penuh</p>
-                    <div className="mt-4 flex items-baseline gap-1">
-                      <span className="text-3xl font-bold font-mono">Rp192.000</span>
-                      <span className="text-xs text-muted-foreground font-mono">/ tahun</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 font-mono">Hanya Rp16.000 per bulan</p>
-
-                    <ul className="mt-6 space-y-2.5 text-xs text-foreground/90">
-                      <li className="flex items-center gap-2">
-                        <CheckCircle2 className="size-3.5 text-emerald-600" />
-                        <span>Semua fitur Paket Semester</span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <CheckCircle2 className="size-3.5 text-emerald-600" />
-                        <span>Gratis 1 eksemplar buku cetak Edisi Rakyat</span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <CheckCircle2 className="size-3.5 text-emerald-600" />
-                        <span>Badge Profil &ldquo;Kolega Pustaka Rakyat&rdquo;</span>
-                      </li>
-                    </ul>
-                  </div>
-
-                  <Button asChild variant="outline" className="mt-8 w-full">
-                    <Link to="/sign-up">Pilih Tahunan</Link>
-                  </Button>
-                </div>
-              </div>
-            </div>
+              <Button asChild size="lg" className="min-h-11">
+                <Link to="/membership" search={{}}>Lihat paket Nakama</Link>
+              </Button>
+            </section>
           </div>
         </section>
 
@@ -630,7 +425,7 @@ function LandingPage() {
                 </h4>
                 <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
                   Ya. Teks bab yang telah dibuka otomatis tersimpan di peramban perangkat Anda.
-                  Mode Intisari 20 Menit juga dioptimalkan agar ringan dan dapat dibuka seketika
+                  Mode baca digital juga dioptimalkan agar ringan dan dapat dibuka seketika
                   bahkan pada koneksi seluler hemat daya.
                 </p>
               </div>

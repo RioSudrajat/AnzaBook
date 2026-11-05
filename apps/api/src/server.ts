@@ -3,8 +3,10 @@ import { createApp } from "./app";
 import { env } from "./config/env";
 import { checkDatabase, pool } from "./db";
 import { logger } from "./lib/logger";
+import { startMembershipReminderWorker } from "./services/membership-reminders";
 
 const app = createApp();
+let stopMembershipReminders: (() => void) | undefined;
 
 const server = app.listen(env.PORT, env.HOST, async (error) => {
   if (error) {
@@ -26,6 +28,7 @@ const server = app.listen(env.PORT, env.HOST, async (error) => {
     { port: env.PORT, webOrigin: env.WEB_URL, database },
     `API listening on ${env.BETTER_AUTH_URL}`,
   );
+  stopMembershipReminders = startMembershipReminderWorker();
 });
 
 // Graceful shutdown. `pnpm dev` (tsx watch) restarts on every file change;
@@ -35,6 +38,7 @@ let stopping = false;
 async function shutdown(signal: string) {
   if (stopping) return;
   stopping = true;
+  stopMembershipReminders?.();
   logger.info({ signal }, "Shutting down");
   const force = setTimeout(() => {
     logger.warn("Forcing exit after 5s");

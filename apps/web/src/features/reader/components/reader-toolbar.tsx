@@ -1,30 +1,33 @@
 import { useState } from "react";
-import { Link } from "@tanstack/react-router";
 import {
   ArrowLeft,
-  BookOpen,
+  Check,
   CheckCircle,
-  Columns2,
-  FileText,
+  Headphones,
+  Highlighter,
   Languages,
-  ListOrdered,
+  List,
   Moon,
-  Settings2,
+  MoveRight,
+  Share2,
+  ShieldCheck,
+  ShieldOff,
+  Smartphone,
   Sun,
   Type,
 } from "lucide-react";
-import type { ReadingMode } from "@starter/shared/types";
 import { Button } from "@/components/ui/button";
+import { FlagIcon } from "@/components/ui/flag-icon";
 
 export type ReaderTheme = "manila" | "sepia" | "night";
 export type ReaderFont = "serif" | "sans" | "dyslexia";
 export type LanguageView = "id" | "en" | "split";
+export type ReadingLayout = "scroll" | "slide";
 
 type ReaderToolbarProps = {
-  slug: string;
   bookTitle: string;
-  mode: ReadingMode;
-  onModeChange: (m: ReadingMode) => void;
+  readingLayout: ReadingLayout;
+  onReadingLayoutChange: (l: ReadingLayout) => void;
   languageView: LanguageView;
   onLanguageViewChange: (l: LanguageView) => void;
   theme: ReaderTheme;
@@ -42,13 +45,22 @@ type ReaderToolbarProps = {
   }[];
   onSelectChapter: (ch: number) => void;
   onFinishSession: () => void;
+  onExit: () => void;
+  isSaving: boolean;
+  isAudioOpen?: boolean;
+  onToggleAudio?: () => void;
+  isDrmEnabled?: boolean;
+  onToggleDrm?: () => void;
+  isHighlightsOpen?: boolean;
+  onToggleHighlights?: () => void;
+  highlightCount?: number;
+  onShare?: () => void;
 };
 
 export function ReaderToolbar({
-  slug,
   bookTitle,
-  mode,
-  onModeChange,
+  readingLayout,
+  onReadingLayoutChange,
   languageView,
   onLanguageViewChange,
   theme,
@@ -61,131 +73,161 @@ export function ReaderToolbar({
   allChapters,
   onSelectChapter,
   onFinishSession,
+  onExit,
+  isSaving,
+  isAudioOpen,
+  onToggleAudio,
+  isDrmEnabled = false,
+  onToggleDrm,
+  isHighlightsOpen = false,
+  onToggleHighlights,
+  highlightCount = 0,
+  onShare,
 }: ReaderToolbarProps) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isTocOpen, setIsTocOpen] = useState(false);
+  const [isLanguageOpen, setIsLanguageOpen] = useState(false);
+
+  const closeAllMenus = () => {
+    setIsSettingsOpen(false);
+    setIsTocOpen(false);
+    setIsLanguageOpen(false);
+  };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-border/80 bg-background/95 backdrop-blur-sm px-4 py-2.5 transition-colors">
+    <header className="w-full px-4 py-2.5 transition-colors">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-        {/* Left: Back & Title */}
+        {/* Left: Back & Title & AnzaBook Logo */}
         <div className="flex items-center gap-3 min-w-0">
-          <Button asChild variant="ghost" size="sm" className="h-8 px-2">
-            <Link to="/books/$slug" params={{ slug }} title="Kembali ke Detail Buku">
-              <ArrowLeft className="size-4" />
-              <span className="sr-only">Kembali</span>
-            </Link>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onExit}
+            disabled={isSaving}
+            className="min-h-11 min-w-11 px-2"
+            aria-label="Keluar ke Home"
+          >
+            <ArrowLeft className="size-4" aria-hidden="true" />
+            <span className="hidden sm:inline">{isSaving ? "Menyimpan…" : "Keluar"}</span>
           </Button>
 
+          <img
+            src="/logo-mark.svg"
+            alt="AnzaBook"
+            className="size-6 object-contain hidden sm:block shrink-0"
+          />
+
           <div className="min-w-0">
-            <h1 className="font-serif text-sm font-bold text-foreground truncate">
+            <h1 className="font-serif text-sm font-bold text-foreground truncate max-w-[200px] sm:max-w-xs md:max-w-sm">
               {bookTitle}
             </h1>
             <div className="flex items-center gap-1.5 text-[11px] font-mono text-muted-foreground">
               <span>Bab {currentChapter}</span>
               <span>&bull;</span>
-              <span className="capitalize">
-                {mode === "blueprint" ? "Intisari 20 Menit" : "Teks Lengkap"}
-              </span>
+              <span>{allChapters.length} Bab</span>
             </div>
           </div>
         </div>
 
-        {/* Center: Mode & Language Controls (Hidden on very narrow mobile, visible sm+) */}
-        <div className="hidden md:flex items-center gap-2">
-          {/* Mode Switcher */}
-          <div className="bg-muted/60 p-0.5 rounded-[6px] border border-border flex items-center text-xs">
-            <button
-              type="button"
-              onClick={() => onModeChange("full")}
-              className={`px-2.5 py-1 rounded-[4px] font-medium transition-all ${
-                mode === "full"
-                  ? "bg-background text-foreground shadow-xs font-semibold"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <span className="flex items-center gap-1">
-                <FileText className="size-3.5" />
-                Lengkap
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onModeChange("blueprint")}
-              className={`px-2.5 py-1 rounded-[4px] font-medium transition-all ${
-                mode === "blueprint"
-                  ? "bg-background text-foreground shadow-xs font-semibold"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <span className="flex items-center gap-1">
-                <BookOpen className="size-3.5 text-[var(--color-accent)]" />
-                Intisari 20 Menit
-              </span>
-            </button>
-          </div>
-
-          {/* Language View Switcher */}
-          <div className="bg-muted/60 p-0.5 rounded-[6px] border border-border flex items-center text-xs font-mono">
-            <button
-              type="button"
-              onClick={() => onLanguageViewChange("id")}
-              className={`px-2 py-1 rounded-[4px] transition-all ${
-                languageView === "id"
-                  ? "bg-background text-foreground shadow-xs font-bold"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              title="Bahasa Indonesia"
-            >
-              ID
-            </button>
-            <button
-              type="button"
-              onClick={() => onLanguageViewChange("split")}
-              className={`px-2 py-1 rounded-[4px] transition-all flex items-center gap-1 ${
-                languageView === "split"
-                  ? "bg-background text-foreground shadow-xs font-bold"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              title="Tampilan Dwibahasa Split"
-            >
-              <Columns2 className="size-3" />
-              <span>Split</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onLanguageViewChange("en")}
-              className={`px-2 py-1 rounded-[4px] transition-all ${
-                languageView === "en"
-                  ? "bg-background text-foreground shadow-xs font-bold"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              title="Bahasa Asli (Inggris)"
-            >
-              EN
-            </button>
-          </div>
+        {/* Center: Scroll vs Slide Layout Toggle per Screenshot 2 */}
+        <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-[10px] border border-border text-xs font-mono">
+          <button
+            type="button"
+            onClick={() => onReadingLayoutChange("scroll")}
+            className={`px-3 py-1 rounded-[7px] font-medium transition-all flex items-center gap-1.5 ${
+              readingLayout === "scroll"
+                ? "bg-background text-foreground shadow-xs font-bold"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+            title="Mode Baca Gulir Bebas (Continuous Scroll)"
+          >
+            <Smartphone className="size-3.5" />
+            <span>Scroll</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onReadingLayoutChange("slide")}
+            className={`px-3 py-1 rounded-[7px] font-medium transition-all flex items-center gap-1.5 ${
+              readingLayout === "slide"
+                ? "bg-background text-foreground shadow-xs font-bold"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+            title="Mode Baca Halaman Geser (Slide Paginated)"
+          >
+            <MoveRight className="size-3.5" />
+            <span>Slide</span>
+          </button>
         </div>
 
-        {/* Right: Appearance Popover, Chapter Menu, Finish Session CTA */}
-        <div className="flex items-center gap-2">
-          {/* Chapter TOC Dropdown */}
+        {/* Right: Actions, Bab, Stabilo, Aa, Flag Language Menu, DRM, Finish CTA */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* DRM On/Off Toggle for Development & Screenshots */}
+          {onToggleDrm && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onToggleDrm}
+              className={`h-8 text-[11px] font-mono gap-1 px-2 transition-colors ${
+                isDrmEnabled
+                  ? "text-emerald-600 dark:text-emerald-400 border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20"
+                  : "text-amber-600 dark:text-amber-400 border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20"
+              }`}
+              title={
+                isDrmEnabled
+                  ? "Perlindungan Hak Cipta Aktif (Klik untuk matikan sementara agar bebas screenshot)"
+                  : "DRM Nonaktif (Mode Pengembang: Bebas tangkapan layar & salin naskah)"
+              }
+            >
+              {isDrmEnabled ? (
+                <ShieldCheck className="size-3.5 text-emerald-500" />
+              ) : (
+                <ShieldOff className="size-3.5 text-amber-500" />
+              )}
+              <span className="hidden sm:inline">DRM {isDrmEnabled ? "ON" : "OFF"}</span>
+            </Button>
+          )}
+
+          {/* Audio Player Toggle */}
+          {onToggleAudio && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onToggleAudio}
+              className={`h-8 text-xs font-mono gap-1.5 px-2.5 ${
+                isAudioOpen
+                  ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)] border-[var(--color-accent)]/40"
+                  : ""
+              }`}
+              title="Buka Audio Book"
+            >
+              <Headphones className="size-3.5" />
+              <span className="hidden sm:inline">Audio</span>
+            </Button>
+          )}
+
+          {/* Bab / TOC Menu */}
           <div className="relative">
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
-                setIsTocOpen(!isTocOpen);
-                setIsSettingsOpen(false);
+                const next = !isTocOpen;
+                closeAllMenus();
+                setIsTocOpen(next);
               }}
-              className="h-8 text-xs font-mono gap-1.5 px-2.5"
+              className={`size-8 p-0 sm:w-auto sm:px-2.5 sm:h-8 text-xs font-mono gap-1.5 ${
+                isTocOpen ? "bg-muted" : ""
+              }`}
+              title="Daftar Bab"
             >
-              <ListOrdered className="size-3.5" />
+              <List className="size-4" />
               <span className="hidden sm:inline">Bab</span>
             </Button>
 
             {isTocOpen && (
-              <div className="absolute right-0 top-10 w-64 bg-card border border-border rounded-[8px] shadow-xl p-2 z-50 animate-in fade-in zoom-in-95">
+              <div className="absolute right-0 top-10 w-64 bg-card border border-border rounded-[10px] shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95">
                 <div className="px-2 py-1 text-[11px] font-mono uppercase tracking-wider text-muted-foreground border-b border-border/60">
                   Daftar Bab & Sampel
                 </div>
@@ -219,24 +261,50 @@ export function ReaderToolbar({
             )}
           </div>
 
-          {/* Typography & Appearance Settings */}
+          {/* Highlights (Stabilo) Sidebar Toggle matching Screenshot */}
+          {onToggleHighlights && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onToggleHighlights}
+              className={`size-8 p-0 sm:w-auto sm:px-2.5 sm:h-8 text-xs font-mono gap-1.5 transition-colors ${
+                isHighlightsOpen
+                  ? "bg-amber-500/15 text-amber-500 border-amber-500/40 font-bold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              title="Buka Catatan & Stabilo"
+            >
+              <Highlighter className="size-4 text-amber-500" />
+              {highlightCount > 0 && (
+                <span className="text-[11px] font-bold text-amber-500">
+                  {highlightCount}
+                </span>
+              )}
+            </Button>
+          )}
+
+          {/* Typography & Appearance Settings (Aa) */}
           <div className="relative">
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
-                setIsSettingsOpen(!isSettingsOpen);
-                setIsTocOpen(false);
+                const next = !isSettingsOpen;
+                closeAllMenus();
+                setIsSettingsOpen(next);
               }}
-              className="h-8 text-xs font-mono gap-1.5 px-2.5"
-              aria-label="Pengaturan Tampilan"
+              className={`size-8 p-0 sm:w-auto sm:px-2.5 sm:h-8 text-xs font-mono gap-1.5 ${
+                isSettingsOpen ? "bg-muted" : ""
+              }`}
+              aria-label="Pengaturan Tipografi dan Tampilan"
+              title="Pengaturan Tampilan"
             >
-              <Settings2 className="size-3.5" />
-              <span className="hidden sm:inline">Aa</span>
+              <span className="font-serif font-bold text-sm leading-none">Aa</span>
             </Button>
 
             {isSettingsOpen && (
-              <div className="absolute right-0 top-10 w-72 bg-card border border-border rounded-[10px] shadow-xl p-4 z-50 space-y-4 animate-in fade-in zoom-in-95">
+              <div className="absolute right-0 top-10 w-72 bg-card border border-border rounded-[12px] shadow-2xl p-4 z-50 space-y-4 animate-in fade-in zoom-in-95">
                 {/* Theme Mode */}
                 <div>
                   <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground block mb-2">
@@ -357,48 +425,117 @@ export function ReaderToolbar({
                     </Button>
                   </div>
                 </div>
-
-                {/* Mobile Mode / Language Quick Switch inside settings */}
-                <div className="md:hidden pt-2 border-t border-border space-y-2">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground block">
-                    Mode & Bahasa
-                  </span>
-                  <div className="flex gap-2">
-                    <Button
-                      variant={mode === "blueprint" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => onModeChange(mode === "blueprint" ? "full" : "blueprint")}
-                      className="flex-1 h-8 text-xs"
-                    >
-                      {mode === "blueprint" ? "Teks Lengkap" : "Intisari 20 Menit"}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        onLanguageViewChange(
-                          languageView === "split"
-                            ? "id"
-                            : languageView === "id"
-                              ? "en"
-                              : "split",
-                        )
-                      }
-                      className="h-8 text-xs font-mono"
-                    >
-                      <Languages className="size-3.5 mr-1" />
-                      {languageView.toUpperCase()}
-                    </Button>
-                  </div>
-                </div>
               </div>
             )}
           </div>
 
-          {/* Selesai Membaca Button */}
+          {/* Flag Language Switcher Dropdown (Matches Screenshot media_1793820171043_9eab4cb5.png) */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                const next = !isLanguageOpen;
+                closeAllMenus();
+                setIsLanguageOpen(next);
+              }}
+              className={`size-8 rounded-full border border-border flex items-center justify-center transition-all shadow-xs ${
+                isLanguageOpen
+                  ? "bg-muted ring-2 ring-primary/20"
+                  : "bg-muted/40 hover:bg-muted"
+              }`}
+              title="Pilih Bahasa Naskah"
+              aria-label="Pilih Bahasa Naskah"
+            >
+              {languageView === "id" ? (
+                <FlagIcon lang="id" size="sm" className="rounded-full overflow-hidden w-5 h-5 object-cover" />
+              ) : languageView === "en" ? (
+                <FlagIcon lang="en" size="sm" className="rounded-full overflow-hidden w-5 h-5 object-cover" />
+              ) : (
+                <Languages className="size-4 text-foreground" />
+              )}
+            </button>
+
+            {isLanguageOpen && (
+              <div className="absolute right-0 top-10 w-48 bg-[#161413]/95 text-[#EDE8DF] border border-white/10 rounded-[14px] shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 backdrop-blur-md">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onLanguageViewChange("id");
+                    setIsLanguageOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-[8px] text-xs font-sans transition-colors ${
+                    languageView === "id"
+                      ? "bg-white/15 text-white font-semibold"
+                      : "text-white/80 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <FlagIcon lang="id" size="sm" />
+                    <span>Indonesian</span>
+                  </span>
+                  {languageView === "id" && <Check className="size-3.5 text-white" />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    onLanguageViewChange("en");
+                    setIsLanguageOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-[8px] text-xs font-sans transition-colors ${
+                    languageView === "en"
+                      ? "bg-white/15 text-white font-semibold"
+                      : "text-white/80 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <FlagIcon lang="en" size="sm" />
+                    <span>English</span>
+                  </span>
+                  {languageView === "en" && <Check className="size-3.5 text-white" />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    onLanguageViewChange("split");
+                    setIsLanguageOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-[8px] text-xs font-sans transition-colors ${
+                    languageView === "split"
+                      ? "bg-white/15 text-white font-semibold"
+                      : "text-white/80 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <Languages className="size-3.5 opacity-80" />
+                    <span>Bilingual Mode</span>
+                  </span>
+                  {languageView === "split" && <Check className="size-3.5 text-white" />}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Share Action Button */}
+          {onShare && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onShare}
+              className="size-8 p-0"
+              title="Flex & Bagikan Naskah"
+            >
+              <Share2 className="size-4" />
+              <span className="sr-only">Flex</span>
+            </Button>
+          )}
+
+          {/* Selesai Membaca CTA */}
           <Button
             size="sm"
             onClick={onFinishSession}
+            disabled={isSaving}
             className="h-8 text-xs font-mono gap-1.5 px-3 bg-[var(--color-accent)] text-[var(--color-accent-foreground)] hover:brightness-110"
           >
             <CheckCircle className="size-3.5" />

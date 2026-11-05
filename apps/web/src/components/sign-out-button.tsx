@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { LogOut } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
@@ -8,6 +9,7 @@ export function SignOutButton() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
   const router = useRouter();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   async function signOut() {
     setPending(true);
@@ -15,6 +17,7 @@ export function SignOutButton() {
     try {
       const result = await authClient.signOut();
       if (result.error) throw new Error("Sign out failed");
+      queryClient.clear();
       await router.invalidate();
       await navigate({ to: "/sign-in", replace: true });
     } catch {

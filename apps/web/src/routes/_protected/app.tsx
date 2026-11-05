@@ -1,384 +1,424 @@
 import { useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
+  BadgeCheck,
   BookMarked,
-  BookOpen,
-  Calculator,
-  Calendar,
-  Clock,
   Compass,
-  Flame,
-  Gauge,
-  History,
-  Library,
-  Share2,
-  Sparkles,
+  Home,
+  Settings,
 } from "lucide-react";
 import { z } from "zod";
-import type { ShelfStatus } from "@starter/shared/types";
+import type {
+  BookHighlightDto,
+  ReadingSessionDto,
+} from "@starter/shared/types";
 import { siteConfig } from "@/config/site";
-import { Button } from "@/components/ui/button";
-import {
-  useReadingSessions,
-  useUserShelves,
-} from "@/features/community/hooks";
-import { PublisherStudioPanel } from "@/features/publisher/components/publisher-studio-panel";
-import { ShareStudioPanel } from "@/features/share/components/share-studio-panel";
+import { useAuthors, useBooks, useCollections } from "@/features/books/hooks";
+import { useUserShelves } from "@/features/community/hooks";
+import { AllHighlightsDialog } from "@/features/dashboard/components/all-highlights-dialog";
+import { DashboardExplore } from "@/features/dashboard/components/dashboard-explore";
+import { DashboardHome } from "@/features/dashboard/components/dashboard-home";
+import { DashboardLibrary } from "@/features/dashboard/components/dashboard-library";
+import { DashboardSettings } from "@/features/dashboard/components/dashboard-settings";
+import { useMembershipSummary } from "@/features/membership/hooks";
+import { HighlightStoryDialog } from "@/features/reader/components/highlight-story-dialog";
+import { FlexReadingDialog } from "@/features/share/components/flex-reading-dialog";
+
+export type AppTab =
+  | "home"
+  | "explore"
+  | "library"
+  | "settings"
+  | "shelves"
+  | "history"
+  | "share"
+  | "publisher";
 
 const appSearchSchema = z.object({
-  tab: z.enum(["shelves", "history", "share", "publisher"]).optional(),
+  tab: z
+    .enum([
+      "home",
+      "explore",
+      "library",
+      "settings",
+      "shelves",
+      "history",
+      "share",
+      "publisher",
+    ])
+    .optional(),
+  category: z.string().min(1).max(50).optional().catch(undefined),
+  collection: z.string().min(1).max(120).optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/_protected/app")({
   validateSearch: appSearchSchema,
-  head: () => ({ meta: [{ title: `Pusat Baca & Studio | ${siteConfig.name}` }] }),
+  head: () => ({ meta: [{ title: `Pustaka & Studio | ${siteConfig.name}` }] }),
   component: AppPage,
 });
 
-function AppPage() {
+export default function AppPage() {
   const { user } = Route.useRouteContext().session;
   const search = Route.useSearch();
-  const [activeTab, setActiveTab] = useState<
-    "shelves" | "history" | "share" | "publisher"
-  >(search.tab || "shelves");
-  const [shelfFilter, setShelfFilter] = useState<"all" | ShelfStatus>("all");
+  const navigate = useNavigate();
 
+  // Normalize legacy tab parameters
+  const currentTabRaw = search.tab || "home";
+  const activeTab =
+    currentTabRaw === "shelves" || currentTabRaw === "history" || currentTabRaw === "share"
+      ? "library"
+      : currentTabRaw === "publisher"
+        ? "settings"
+        : currentTabRaw;
+
+  // Queries
+  const { data: booksData } = useBooks();
+  const { data: authors = [] } = useAuthors();
+  const { data: collections = [] } = useCollections();
   const { data: shelves = [] } = useUserShelves();
-  const { data: sessionData } = useReadingSessions();
+  const { data: membership } = useMembershipSummary();
 
-  const sessions = sessionData?.data || [];
-  const telemetry = sessionData?.summary || {
-    totalMinutesRead: 0,
-    totalPagesRead: 0,
-    currentStreakDays: 0,
-    booksCompleted: 0,
-    avgWpm: 0,
+  const books = booksData?.data || [];
+  const bulletinBook = booksData?.bulletin || null;
+  const currentlyReading = shelves.find((item) => item.shelfStatus === "reading");
+
+  // Dialog states
+  const [isAllHighlightsOpen, setIsAllHighlightsOpen] = useState(false);
+  const [flexStoryState, setFlexStoryState] = useState<{
+    isOpen: boolean;
+    session: ReadingSessionDto | null;
+    bookTitle: string;
+  }>({
+    isOpen: false,
+    session: null,
+    bookTitle: "",
+  });
+
+  const [quoteStoryState, setQuoteStoryState] = useState<{
+    isOpen: boolean;
+    highlight: BookHighlightDto | null;
+  }>({
+    isOpen: false,
+    highlight: null,
+  });
+
+  const handleTabChange = (tab: "home" | "explore" | "library" | "settings") => {
+    navigate({
+      to: "/app",
+      search: { tab },
+    });
   };
 
-  const filteredShelves =
-    shelfFilter === "all"
-      ? shelves
-      : shelves.filter((s) => s.shelfStatus === shelfFilter);
-
   return (
-    <div className="space-y-8 pb-16">
-      {/* User Welcome Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-mono text-[var(--color-accent)] font-semibold">
-            <Sparkles className="size-3.5" />
-            <span>Pustaka Pembaca Berdaulat</span>
-          </div>
-          <h1 className="font-serif text-2xl sm:text-3xl font-bold tracking-tight text-foreground mt-1">
-            Selamat Datang, {user.name}
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5 font-sans">
-            Kelola rak buku pribadi, pantau kecepatan membaca, dan ciptakan stiker literasi.
-          </p>
+    <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row">
+      {/* 1. Left Fixed Vertical Icon Sidebar (Matching SS 2, 3, 4, 5) */}
+      <aside className="hidden md:flex w-16 shrink-0 border-r border-border/80 bg-card/60 backdrop-blur-md flex-col items-center justify-between py-5 sticky top-0 h-screen z-40 select-none">
+        {/* Top: AnzaBook Logo Mark */}
+        <div className="flex flex-col items-center gap-6">
+          <Link
+            to="/app"
+            search={{ tab: "home" }}
+            onClick={() => handleTabChange("home")}
+            className="p-1.5 rounded-[8px] hover:bg-muted transition-colors"
+            title="Beranda AnzaBook"
+          >
+            <img
+              src="/logo-mark.svg"
+              alt="AnzaBook"
+              className="size-7 object-contain drop-shadow-sm"
+            />
+          </Link>
+
+          {/* Navigation Icons */}
+          <nav className="flex flex-col items-center gap-2" aria-label="Navigasi Utama">
+            {/* Home */}
+            <button
+              type="button"
+              onClick={() => handleTabChange("home")}
+              className={`p-2.5 rounded-[10px] transition-all cursor-pointer ${
+                activeTab === "home"
+                  ? "bg-[var(--color-accent)] text-white shadow-xs font-bold"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+              title="Home"
+            >
+              <Home className="size-5" />
+            </button>
+
+            {/* Explore */}
+            <button
+              type="button"
+              onClick={() => handleTabChange("explore")}
+              className={`p-2.5 rounded-[10px] transition-all cursor-pointer ${
+                activeTab === "explore"
+                  ? "bg-[var(--color-accent)] text-white shadow-xs font-bold"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+              title="Explore (Rak Kategori)"
+            >
+              <Compass className="size-5" />
+            </button>
+
+            {/* My Library */}
+            <button
+              type="button"
+              onClick={() => handleTabChange("library")}
+              className={`p-2.5 rounded-[10px] transition-all cursor-pointer ${
+                activeTab === "library"
+                  ? "bg-[var(--color-accent)] text-white shadow-xs font-bold"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+              title="My Library"
+            >
+              <BookMarked className="size-5" />
+            </button>
+
+            {/* Settings */}
+            <button
+              type="button"
+              onClick={() => handleTabChange("settings")}
+              className={`p-2.5 rounded-[10px] transition-all cursor-pointer ${
+                activeTab === "settings"
+                  ? "bg-[var(--color-accent)] text-white shadow-xs font-bold"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+              title="Settings"
+            >
+              <Settings className="size-5" />
+            </button>
+          </nav>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button asChild size="sm" variant="outline" className="font-mono text-xs gap-1.5">
-            <Link to="/">
-              <Compass className="size-3.5" />
-              Jelajahi Katalog Buku
-            </Link>
-          </Button>
-        </div>
-      </div>
-
-      {/* Reading Telemetry Highlights */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="p-4 rounded-[8px] bg-background border border-border shadow-xs">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-[11px] font-mono uppercase tracking-wider">
-              Total Waktu Baca
-            </span>
-            <Clock className="size-4 text-[var(--color-accent)]" />
-          </div>
-          <div className="mt-2 font-mono text-xl sm:text-2xl font-bold text-foreground">
-            {telemetry.totalMinutesRead} <span className="text-xs font-normal text-muted-foreground">Menit</span>
-          </div>
-        </div>
-
-        <div className="p-4 rounded-[8px] bg-background border border-border shadow-xs">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-[11px] font-mono uppercase tracking-wider">
-              Halaman Selesai
-            </span>
-            <BookOpen className="size-4 text-emerald-600" />
-          </div>
-          <div className="mt-2 font-mono text-xl sm:text-2xl font-bold text-foreground">
-            {telemetry.totalPagesRead} <span className="text-xs font-normal text-muted-foreground">Hal</span>
-          </div>
-        </div>
-
-        <div className="p-4 rounded-[8px] bg-background border border-border shadow-xs">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-[11px] font-mono uppercase tracking-wider">
-              Rata-Rata WPM
-            </span>
-            <Gauge className="size-4 text-amber-500" />
-          </div>
-          <div className="mt-2 font-mono text-xl sm:text-2xl font-bold text-foreground">
-            {telemetry.avgWpm} <span className="text-xs font-normal text-muted-foreground">WPM</span>
-          </div>
-        </div>
-
-        <div className="p-4 rounded-[8px] bg-background border border-border shadow-xs">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-[11px] font-mono uppercase tracking-wider">
-              Streak Aktif
-            </span>
-            <Flame className="size-4 text-orange-500" />
-          </div>
-          <div className="mt-2 font-mono text-xl sm:text-2xl font-bold text-foreground flex items-center gap-1.5">
-            <span>{telemetry.currentStreakDays}</span>
-            <span className="text-xs font-normal text-muted-foreground">Hari</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Tab Navigation */}
-      <div className="border-b border-border">
-        <nav className="flex space-x-6 text-sm font-sans" aria-label="Tabs Ruang Kerja">
+        <div className="flex flex-col items-center gap-4">
+          {/* User Avatar */}
           <button
             type="button"
-            onClick={() => setActiveTab("shelves")}
-            className={`pb-3 font-medium transition-all flex items-center gap-2 cursor-pointer border-b-2 ${
-              activeTab === "shelves"
-                ? "border-[var(--color-accent)] text-foreground font-semibold"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
+            onClick={() => handleTabChange("settings")}
+            className="size-8 rounded-full bg-muted border border-border flex items-center justify-center font-bold text-xs text-foreground hover:ring-2 hover:ring-[var(--color-accent)] transition-all cursor-pointer"
+            title={`Profil ${user.name}`}
           >
-            <Library className="size-4" />
-            <span>Rak Buku Saya ({shelves.length})</span>
+            {user.name.slice(0, 1)}
           </button>
+        </div>
+      </aside>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab("history")}
-            className={`pb-3 font-medium transition-all flex items-center gap-2 cursor-pointer border-b-2 ${
-              activeTab === "history"
-                ? "border-[var(--color-accent)] text-foreground font-semibold"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <History className="size-4" />
-            <span>Riwayat Sesi ({sessions.length})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("share")}
-            className={`pb-3 font-medium transition-all flex items-center gap-2 cursor-pointer border-b-2 ${
-              activeTab === "share"
-                ? "border-[var(--color-accent)] text-foreground font-semibold"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Share2 className="size-4 text-[var(--color-accent)]" />
-            <span>Studio Strava Literasi</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("publisher")}
-            className={`pb-3 font-medium transition-all flex items-center gap-2 cursor-pointer border-b-2 ${
-              activeTab === "publisher"
-                ? "border-[var(--color-accent)] text-foreground font-semibold"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Calculator className="size-4 text-emerald-600" />
-            <span>Studio Penerbit HPP</span>
-          </button>
-        </nav>
-      </div>
-
-      {/* Tab 1: Rak Buku Saya */}
-      {activeTab === "shelves" && (
-        <section aria-labelledby="shelves-heading" className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 id="shelves-heading" className="font-serif text-lg font-bold text-foreground">
-              Daftar Buku Koleksi Anda
-            </h2>
-
-            {/* Filter buttons */}
-            <div className="flex items-center gap-1.5 text-xs font-mono">
-              {(
-                [
-                  { label: "Semua", value: "all" },
-                  { label: "Sedang Dibaca", value: "reading" },
-                  { label: "Ingin Dibaca", value: "want_to_read" },
-                  { label: "Selesai", value: "finished" },
-                ] as const
-              ).map((f) => (
-                <button
-                  key={f.value}
-                  type="button"
-                  onClick={() => setShelfFilter(f.value)}
-                  className={`px-2.5 py-1 rounded-[4px] transition-all cursor-pointer ${
-                    shelfFilter === f.value
-                      ? "bg-foreground text-background font-bold shadow-xs"
-                      : "bg-muted/40 text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
+      {/* 2. Main Content Canvas */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Top Header Bar per Screens */}
+        <header className="sticky top-0 z-30 border-b border-border/80 bg-background/95 backdrop-blur-md px-6 py-3.5 flex items-center justify-between select-none">
+          <div className="flex items-center gap-3">
+            <img
+              src="/logo-mark.svg"
+              alt="AnzaBook"
+              className="size-6 object-contain md:hidden"
+            />
+            <h1 className="font-serif text-lg font-bold capitalize">
+              {activeTab === "home"
+                ? "Home"
+                : activeTab === "explore"
+                  ? "Explore"
+                  : activeTab === "library"
+                    ? "My Library"
+                    : "Settings"}
+            </h1>
           </div>
 
-          {filteredShelves.length === 0 ? (
-            <div className="py-16 text-center bg-muted/20 border border-dashed border-border rounded-[10px] p-8">
-              <BookMarked className="size-10 text-muted-foreground/60 mx-auto mb-3" />
-              <h3 className="font-serif font-bold text-base text-foreground">
-                Belum Ada Buku di Kategori Ini
-              </h3>
-              <p className="text-xs text-muted-foreground max-w-sm mx-auto mt-1 mb-4">
-                Jelajahi karya sastra klasik dan pemikiran dunia di katalog, lalu simpan ke rak baca Anda.
-              </p>
-              <Button asChild size="sm">
-                <Link to="/">Buka Katalog Buku</Link>
-              </Button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredShelves.map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-card border border-border rounded-[8px] p-4 flex gap-4 hover:shadow-sm transition-all"
-                >
-                  <div
-                    className="w-16 h-24 rounded-[2px_4px_4px_2px] shadow-sm flex flex-col justify-between p-2 shrink-0 text-white"
-                    style={{ backgroundColor: item.book.coverColor || "#1E1A17" }}
-                  >
-                    <span className="text-[8px] font-mono opacity-80">
-                      {item.book.publishedYear}
-                    </span>
-                    <span className="font-serif font-bold text-[9px] line-clamp-2 leading-tight">
-                      {item.book.title}
-                    </span>
-                  </div>
+          <Link
+            to="/membership"
+            search={{}}
+            className="inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            <BadgeCheck className="size-4" aria-hidden="true" />
+            Nakama
+          </Link>
+        </header>
 
-                  <div className="flex-1 min-w-0 flex flex-col justify-between">
-                    <div>
-                      <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 bg-muted rounded-[3px] text-muted-foreground">
-                        {item.shelfStatus === "reading"
-                          ? "Sedang Dibaca"
-                          : item.shelfStatus === "want_to_read"
-                            ? "Ingin Dibaca"
-                            : "Selesai"}
-                      </span>
-                      <h4 className="font-serif font-bold text-sm text-foreground truncate mt-1">
-                        {item.book.title}
-                      </h4>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {item.book.author}
-                      </p>
-                    </div>
+        {/* Main Tab Screen Switcher */}
+        <main id="main-content" className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 pt-6">
+          {activeTab === "home" && membership?.status === "expired" && (
+            <section aria-label="Keanggotaan Nakama" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4">
+              <p className="text-sm">Masa aktif Nakama sudah berakhir. Perpanjang untuk melanjutkan buku Premium dari posisi terakhir.</p>
+              <Link
+                to="/membership"
+                search={{}}
+                className="inline-flex min-h-11 items-center rounded-md px-2 text-sm font-semibold underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                Perpanjang Nakama
+              </Link>
+            </section>
+          )}
+          {activeTab === "home" && (
+            <DashboardHome
+              books={books}
+              authors={authors}
+              bulletinBook={bulletinBook}
+              collections={collections}
+              currentlyReading={currentlyReading}
+            />
+          )}
 
-                    <div className="pt-2 flex items-center justify-between border-t border-border/50 text-xs">
-                      <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs">
-                        <Link to="/read/$slug" params={{ slug: item.book.slug }}>
-                          <BookOpen className="size-3 mr-1" />
-                          Baca
-                        </Link>
-                      </Button>
-                      <Button asChild size="sm" variant="outline" className="h-7 px-2 text-xs">
-                        <Link to="/books/$slug" params={{ slug: item.book.slug }}>
-                          Detail
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
+          {activeTab === "explore" && (
+            <DashboardExplore
+              category={search.category}
+              collection={search.collection}
+            />
+          )}
+
+          {activeTab === "library" && (
+            <DashboardLibrary
+              shelves={shelves}
+              onOpenAllHighlights={() => setIsAllHighlightsOpen(true)}
+              onOpenFlexStory={(session, bookTitle) => {
+                setFlexStoryState({
+                  isOpen: true,
+                  session,
+                  bookTitle,
+                });
+              }}
+            />
+          )}
+
+          {activeTab === "settings" && (
+            <DashboardSettings
+              userName={user.name}
+              userEmail={user.email}
+              userRole={user.role ?? undefined}
+              emailVerified={user.emailVerified}
+              memberSince={typeof user.createdAt === "string" ? user.createdAt : user.createdAt.toISOString()}
+            />
+          )}
+        </main>
+
+        {/* Authentic Malaka Books Style Footer (per SS 2, 3, 4, 5) */}
+        <footer className="border-t border-border/80 bg-card/40 mt-16 pt-12 pb-16 px-6 sm:px-12 select-none">
+          <div className="max-w-6xl mx-auto space-y-12">
+            <div className="flex flex-wrap items-start justify-between gap-8 text-xs font-sans">
+              {/* Brand & Mobile apps */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <img src="/logo-mark.svg" alt="AnzaBook" className="size-6 object-contain" />
+                  <span className="font-serif font-bold text-base tracking-tight">
+                    AnzaBook
+                  </span>
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
+                <p className="text-muted-foreground text-xs leading-relaxed max-w-xs">
+                  Pustaka digital dwibahasa dan edisi cetak rakyat. Kedaulatan literasi untuk akal budi yang berdikari.
+                </p>
+                <div className="text-[11px] font-mono text-muted-foreground pt-2">
+                  &copy; Copyright AnzaBook, 2026.
+                </div>
+              </div>
 
-      {/* Tab 2: Riwayat Sesi Baca */}
-      {activeTab === "history" && (
-        <section aria-labelledby="history-heading" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 id="history-heading" className="font-serif text-lg font-bold text-foreground">
-              Catatan Sesi & Telemetri
-            </h2>
-            <span className="text-xs font-mono text-muted-foreground">
-              Total {sessions.length} sesi terekam
-            </span>
+              <nav aria-label="Tautan AnzaBook" className="flex flex-wrap gap-x-5 text-sm">
+                <Link to="/app" search={{ tab: "explore" }} className="inline-flex min-h-11 items-center underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring">
+                  Katalog
+                </Link>
+                <Link to="/membership" search={{}} className="inline-flex min-h-11 items-center underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring">
+                  Keanggotaan Nakama
+                </Link>
+              </nav>
+            </div>
+
+            {/* Giant Subtle Background Watermark Typography */}
+            <div
+              className="text-center font-serif text-5xl sm:text-7xl lg:text-9xl font-black tracking-tighter opacity-[0.035] select-none pointer-events-none"
+              aria-hidden="true"
+            >
+              AnzaBook
+            </div>
           </div>
+        </footer>
+      </div>
 
-          {sessions.length === 0 ? (
-            <div className="py-12 text-center bg-muted/20 border border-dashed border-border rounded-[8px] p-6 text-muted-foreground">
-              <Calendar className="size-8 mx-auto mb-2 opacity-60" />
-              <p className="text-xs font-sans">
-                Belum ada rekaman sesi baca. Mulai membaca buku untuk mencatat kecepatan WPM dan durasi.
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto bg-card border border-border rounded-[8px]">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-border text-muted-foreground font-mono uppercase text-[10px]">
-                    <th className="py-2.5 px-4">Buku & Mode</th>
-                    <th className="py-2.5 px-4">Durasi</th>
-                    <th className="py-2.5 px-4">Halaman</th>
-                    <th className="py-2.5 px-4">Kecepatan</th>
-                    <th className="py-2.5 px-4 text-right">Waktu</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/60 font-sans">
-                  {sessions.map((s) => (
-                    <tr key={s.id} className="hover:bg-muted/30">
-                      <td className="py-3 px-4 font-semibold text-foreground">
-                        <div>{s.bookTitle}</div>
-                        <span className="text-[10px] font-mono text-muted-foreground uppercase">
-                          {s.mode === "blueprint" ? "Intisari 20 Mnt" : "Teks Lengkap"}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 font-mono text-muted-foreground">
-                        {Math.round(s.durationSeconds / 60)} Menit
-                      </td>
-                      <td className="py-3 px-4 font-mono text-muted-foreground">
-                        {s.pagesRead} Hal
-                      </td>
-                      <td className="py-3 px-4 font-mono font-bold text-[var(--color-accent)]">
-                        {s.avgWpm} WPM
-                      </td>
-                      <td className="py-3 px-4 text-right font-mono text-muted-foreground text-[11px]">
-                        {new Date(s.createdAt).toLocaleDateString("id-ID", {
-                          day: "numeric",
-                          month: "short",
-                        })}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      )}
+      {/* 3. Mobile Bottom Navigation Bar */}
+      <nav
+        aria-label="Navigasi Bawah Mobile"
+        className="md:hidden fixed bottom-0 inset-x-0 bg-background/95 backdrop-blur-md border-t border-border z-40 flex items-center justify-around py-2 px-4"
+      >
+        <button
+          type="button"
+          onClick={() => handleTabChange("home")}
+          className={`flex flex-col items-center gap-1 p-1 text-[10px] font-mono ${
+            activeTab === "home" ? "text-[var(--color-accent)] font-bold" : "text-muted-foreground"
+          }`}
+        >
+          <Home className="size-4" />
+          <span>Home</span>
+        </button>
 
-      {/* Tab 3: Studio Strava Literasi */}
-      {activeTab === "share" && (
-        <section aria-labelledby="share-studio-heading">
-          <ShareStudioPanel
-            userName={user.name}
-            recentSessions={sessions}
-          />
-        </section>
-      )}
+        <button
+          type="button"
+          onClick={() => handleTabChange("explore")}
+          className={`flex flex-col items-center gap-1 p-1 text-[10px] font-mono ${
+            activeTab === "explore" ? "text-[var(--color-accent)] font-bold" : "text-muted-foreground"
+          }`}
+        >
+          <Compass className="size-4" />
+          <span>Explore</span>
+        </button>
 
-      {/* Tab 4: Studio Penerbit HPP */}
-      {activeTab === "publisher" && (
-        <section aria-labelledby="publisher-studio-heading">
-          <PublisherStudioPanel />
-        </section>
+        <button
+          type="button"
+          onClick={() => handleTabChange("library")}
+          className={`flex flex-col items-center gap-1 p-1 text-[10px] font-mono ${
+            activeTab === "library" ? "text-[var(--color-accent)] font-bold" : "text-muted-foreground"
+          }`}
+        >
+          <BookMarked className="size-4" />
+          <span>Library</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabChange("settings")}
+          className={`flex flex-col items-center gap-1 p-1 text-[10px] font-mono ${
+            activeTab === "settings" ? "text-[var(--color-accent)] font-bold" : "text-muted-foreground"
+          }`}
+        >
+          <Settings className="size-4" />
+          <span>Settings</span>
+        </button>
+      </nav>
+
+      {/* Dialog: All User Highlights */}
+      <AllHighlightsDialog
+        isOpen={isAllHighlightsOpen}
+        onClose={() => setIsAllHighlightsOpen(false)}
+        onOpenStory={(hl) => {
+          setIsAllHighlightsOpen(false);
+          setQuoteStoryState({
+            isOpen: true,
+            highlight: hl,
+          });
+        }}
+      />
+
+      {/* Dialog: Flex Your Reading Athletic Card */}
+      <FlexReadingDialog
+        isOpen={flexStoryState.isOpen}
+        session={flexStoryState.session}
+        bookTitle={flexStoryState.bookTitle}
+        userName={user.name}
+        onClose={() =>
+          setFlexStoryState((prev) => ({ ...prev, isOpen: false }))
+        }
+      />
+
+      {/* Dialog: Specific Quote 9:16 Story */}
+      {quoteStoryState.highlight && (
+        <HighlightStoryDialog
+          isOpen={quoteStoryState.isOpen}
+          onClose={() =>
+            setQuoteStoryState({ isOpen: false, highlight: null })
+          }
+          bookTitle="Sains, Logika, dan Seni untuk Hidup Bermutu"
+          bookAuthor="Zenius"
+          chapterNumber={quoteStoryState.highlight.chapterNumber}
+          highlightText={quoteStoryState.highlight.selectedText}
+          color={quoteStoryState.highlight.color}
+          note={quoteStoryState.highlight.note || undefined}
+          readerName={user.name}
+        />
       )}
     </div>
   );

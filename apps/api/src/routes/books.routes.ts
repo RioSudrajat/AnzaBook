@@ -19,7 +19,11 @@ import {
   claimPrintCode,
   getBookBySlug,
   getBookReaderPayload,
+  getReadableParagraphCount,
   getBookStock,
+  listAuthors,
+  listCategories,
+  listCollections,
   listBooks,
 } from "../services/books.service";
 import {
@@ -36,6 +40,24 @@ booksRouter.get("/", async (req, res) => {
   const query = listBooksQuerySchema.parse(req.query);
   const result = await listBooks(query);
   res.json(result);
+});
+
+// Public: Authors list
+booksRouter.get("/meta/authors", async (_req, res) => {
+  const authors = await listAuthors();
+  res.json({ data: authors });
+});
+
+// Public: Collections list
+booksRouter.get("/meta/collections", async (_req, res) => {
+  const collections = await listCollections();
+  res.json({ data: collections });
+});
+
+// Public: Categories list
+booksRouter.get("/meta/categories", async (_req, res) => {
+  const categories = await listCategories();
+  res.json({ data: categories });
 });
 
 // Public with optional auth: Book details
@@ -104,6 +126,9 @@ booksRouter.post(
     if (!book) throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
     const auth = getAuth(req);
     const input = createReviewSchema.parse(req.body);
+    if (input.bookId !== book.id) {
+      throw new HttpError(422, "REVIEW_BOOK_MISMATCH", "Ulasan tidak sesuai dengan buku.");
+    }
     const review = await createReview(
       auth.user.id,
       auth.user.name,
@@ -115,10 +140,11 @@ booksRouter.post(
 );
 
 // Marginalia Paragraph Comments
-booksRouter.get("/:slug/comments", async (req, res) => {
-  bookSlugSchema.parse({ slug: req.params.slug });
+booksRouter.get("/:slug/comments", requireAuth, async (req, res) => {
+  const { slug } = bookSlugSchema.parse({ slug: req.params.slug });
   const query = listParagraphCommentsQuerySchema.parse(req.query);
-  const comments = await listComments(query.chapterId);
+  const paragraphCount = await getReadableParagraphCount(slug, query.chapterId, getAuth(req).user.id);
+  const comments = await listComments(query.chapterId, paragraphCount);
   res.json({ data: comments });
 });
 
@@ -128,9 +154,13 @@ booksRouter.post(
   requireTrustedOrigin,
   jsonBody,
   async (req, res) => {
-    bookSlugSchema.parse({ slug: req.params.slug });
+    const { slug } = bookSlugSchema.parse({ slug: req.params.slug });
     const auth = getAuth(req);
     const input = createParagraphCommentSchema.parse(req.body);
+    const paragraphCount = await getReadableParagraphCount(slug, input.chapterId, auth.user.id);
+    if (input.paragraphIndex >= paragraphCount) {
+      throw new HttpError(422, "INVALID_PARAGRAPH", "Paragraf ini berada di luar bagian yang dapat dibaca.");
+    }
     const comment = await createComment(auth.user.id, auth.user.name, input);
     res.status(201).json({ data: comment });
   },

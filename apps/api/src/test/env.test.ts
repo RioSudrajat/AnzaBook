@@ -12,6 +12,12 @@ function loadEnv(overrides: Record<string, string>) {
 }
 
 describe("API environment", () => {
+  it("requires Google OAuth credentials to be configured together", () => {
+    const result = loadEnv({ GOOGLE_CLIENT_ID: "client-id", GOOGLE_CLIENT_SECRET: "" });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("GOOGLE_CLIENT_SECRET");
+    expect(result.stderr).not.toContain("client-id");
+  });
   it("refuses TRUST_PROXY=true, which would trust spoofed client IPs", () => {
     const result = loadEnv({ TRUST_PROXY: "true" });
     expect(result.status).toBe(1);

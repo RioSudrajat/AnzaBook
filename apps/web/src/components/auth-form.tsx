@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { ArrowRight, LoaderCircle } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
@@ -7,12 +8,39 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { siteConfig } from "@/config/site";
 
-export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
+export function AuthForm({
+  mode,
+  redirectTo,
+  socialError,
+}: {
+  mode: "sign-in" | "sign-up";
+  redirectTo?: string;
+  socialError?: boolean;
+}) {
   const signingUp = mode === "sign-up";
   const router = useRouter();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(socialError ? "Login Google gagal. Coba lagi atau masuk dengan email." : "");
+
+  async function signInWithGoogle() {
+    setPending(true);
+    setError("");
+    const errorUrl = new URL(signingUp ? "/sign-up" : "/sign-in", window.location.origin);
+    if (redirectTo) errorUrl.searchParams.set("redirect", redirectTo);
+    try {
+      const result = await authClient.signIn.social({
+        provider: "google",
+        callbackURL: new URL(redirectTo ?? siteConfig.homePath, window.location.origin).href,
+        errorCallbackURL: errorUrl.href,
+      });
+      if (result.error) throw new Error("Google sign-in unavailable");
+    } catch {
+      setError("Login Google belum tersedia atau gagal. Coba masuk dengan email.");
+      setPending(false);
+    }
+  }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -40,9 +68,9 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
         );
         return;
       }
-      // Re-run route guards with the new cookie, then move to the app.
+      queryClient.clear();
       await router.invalidate();
-      await navigate({ to: siteConfig.homePath, replace: true });
+      await navigate({ href: redirectTo ?? siteConfig.homePath, replace: true });
     } catch {
       setError(
         "We couldn't reach the server. Check your connection and try again.",
@@ -145,11 +173,22 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
           </Button>
         </fieldset>
       </form>
+      <Button
+        type="button"
+        variant="outline"
+        size="lg"
+        disabled={pending}
+        onClick={signInWithGoogle}
+        className="mt-3 w-full"
+      >
+        Lanjut dengan Google
+      </Button>
       <p className="mt-6 text-center text-sm text-muted-foreground">
         {signingUp ? "Already have an account?" : "New here?"}{" "}
         <Link
           className="rounded-sm font-medium text-foreground underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
           to={signingUp ? "/sign-in" : "/sign-up"}
+          search={{ redirect: redirectTo }}
         >
           {signingUp ? "Sign in" : "Create an account"}
         </Link>

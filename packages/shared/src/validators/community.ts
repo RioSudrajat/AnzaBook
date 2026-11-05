@@ -4,7 +4,7 @@ export const upsertShelfSchema = z
   .object({
     bookId: z.string().uuid("ID buku harus berupa UUID valid"),
     shelfStatus: z.enum(["want_to_read", "reading", "finished", "abandoned"]),
-    favorite: z.boolean().optional().default(false),
+    favorite: z.boolean().optional(),
   })
   .strict();
 

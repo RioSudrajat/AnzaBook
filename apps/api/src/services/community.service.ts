@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, lt, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   books,
@@ -7,8 +7,11 @@ import {
   userShelves,
   user,
   bookClaimCodes,
+  readingProgress,
+  readingSessions,
 } from "../db/schema";
 import { HttpError } from "../lib/http-error";
+import { toBookSummary } from "./books.service";
 import type {
   CreateParagraphCommentInput,
   CreateReviewInput,
@@ -16,7 +19,6 @@ import type {
 } from "@starter/shared/validators/community";
 import type {
   BookReviewDto,
-  DigitalPolicy,
   ParagraphCommentDto,
   ShelfItemDto,
   ShelfStatus,
@@ -34,67 +36,32 @@ export async function upsertShelf(
 
   if (!book) throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
 
-  const [existing] = await db
-    .select()
-    .from(userShelves)
-    .where(
-      and(
-        eq(userShelves.userId, userId),
-        eq(userShelves.bookId, input.bookId),
-      ),
-    )
-    .limit(1);
-
-  let shelfRow;
-  if (existing) {
-    [shelfRow] = await db
-      .update(userShelves)
-      .set({
-        shelfStatus: input.shelfStatus,
-        favorite: input.favorite !== undefined ? input.favorite : existing.favorite,
-        updatedAt: new Date(),
-      })
-      .where(eq(userShelves.id, existing.id))
-      .returning();
-  } else {
-    [shelfRow] = await db
-      .insert(userShelves)
-      .values({
-        userId,
-        bookId: input.bookId,
-        shelfStatus: input.shelfStatus,
-        favorite: input.favorite ?? false,
-        progressPercent: input.shelfStatus === "finished" ? 100 : 0,
-      })
-      .returning();
-  }
+  const progressPercent = input.shelfStatus === "finished" ? 100 : 0;
+  const [shelfRow] = await db
+    .insert(userShelves)
+    .values({
+      userId,
+      bookId: input.bookId,
+      shelfStatus: input.shelfStatus,
+      favorite: input.favorite ?? false,
+      progressPercent,
+    })
+    .onConflictDoUpdate({
+      target: [userShelves.userId, userShelves.bookId],
+      set: {
+        shelfStatus: input.shelfStatus === "want_to_read"
+          ? sql`case when ${userShelves.shelfStatus} in ('reading', 'finished') then ${userShelves.shelfStatus} else 'want_to_read' end`
+          : input.shelfStatus,
+        favorite: input.favorite,
+        progressPercent: sql`greatest(${userShelves.progressPercent}, ${progressPercent})`,
+      },
+    })
+    .returning();
 
   return {
     id: shelfRow.id,
     bookId: shelfRow.bookId,
-    book: {
-      id: book.id,
-      slug: book.slug,
-      title: book.title,
-      originalTitle: book.originalTitle,
-      author: book.author,
-      translator: book.translator,
-      coverUrl: book.coverUrl,
-      coverColor: book.coverColor,
-      synopsis: book.synopsis,
-      bulletinExcerpt: book.bulletinExcerpt,
-      publishedYear: book.publishedYear,
-      pageCount: book.pageCount,
-      readingMinutes: book.readingMinutes,
-      audioDurationMinutes: book.audioDurationMinutes,
-      digitalPolicy: book.digitalPolicy as DigitalPolicy,
-      isWeeklyBulletin: book.isWeeklyBulletin,
-      rakyatPriceIdr: book.rakyatPriceIdr,
-      standardPriceIdr: book.standardPriceIdr,
-      ratingAvg: book.ratingAvg,
-      ratingCount: book.ratingCount,
-      genres: (book.genres as string[]) || [],
-    },
+    book: toBookSummary(book),
     shelfStatus: shelfRow.shelfStatus as ShelfStatus,
     favorite: shelfRow.favorite,
     progressPercent: shelfRow.progressPercent,
@@ -103,45 +70,41 @@ export async function upsertShelf(
 }
 
 export async function getUserShelves(userId: string): Promise<ShelfItemDto[]> {
+  const activity = sql`coalesce(
+    (select max(${readingProgress.capturedAt}) from ${readingProgress}
+      where ${readingProgress.userId} = ${userShelves.userId} and ${readingProgress.bookId} = ${userShelves.bookId}),
+    (select max(${readingSessions.createdAt}) from ${readingSessions}
+      where ${readingSessions.userId} = ${userShelves.userId} and ${readingSessions.bookId} = ${userShelves.bookId}),
+    ${userShelves.updatedAt}
+  )`;
+  const previewProgressPercent = sql<number | null>`(
+    select case when ${readingProgress.scope} = 'preview'
+      then ${readingProgress.lastScrollPercent} end
+    from ${readingProgress}
+    where ${readingProgress.userId} = ${userShelves.userId}
+      and ${readingProgress.bookId} = ${userShelves.bookId}
+    order by ${readingProgress.capturedAt} desc, ${readingProgress.scope}
+    limit 1
+  )`;
   const rows = await db
     .select({
       shelf: userShelves,
       book: books,
+      previewProgressPercent,
     })
     .from(userShelves)
     .innerJoin(books, eq(userShelves.bookId, books.id))
     .where(eq(userShelves.userId, userId))
-    .orderBy(desc(userShelves.updatedAt));
+    .orderBy(desc(activity), userShelves.id);
 
-  return rows.map(({ shelf, book }) => ({
+  return rows.map(({ shelf, book, previewProgressPercent }) => ({
     id: shelf.id,
     bookId: shelf.bookId,
-    book: {
-      id: book.id,
-      slug: book.slug,
-      title: book.title,
-      originalTitle: book.originalTitle,
-      author: book.author,
-      translator: book.translator,
-      coverUrl: book.coverUrl,
-      coverColor: book.coverColor,
-      synopsis: book.synopsis,
-      bulletinExcerpt: book.bulletinExcerpt,
-      publishedYear: book.publishedYear,
-      pageCount: book.pageCount,
-      readingMinutes: book.readingMinutes,
-      audioDurationMinutes: book.audioDurationMinutes,
-      digitalPolicy: book.digitalPolicy as DigitalPolicy,
-      isWeeklyBulletin: book.isWeeklyBulletin,
-      rakyatPriceIdr: book.rakyatPriceIdr,
-      standardPriceIdr: book.standardPriceIdr,
-      ratingAvg: book.ratingAvg,
-      ratingCount: book.ratingCount,
-      genres: (book.genres as string[]) || [],
-    },
+    book: toBookSummary(book),
     shelfStatus: shelf.shelfStatus as ShelfStatus,
     favorite: shelf.favorite,
     progressPercent: shelf.progressPercent,
+    previewProgressPercent,
     updatedAt: shelf.updatedAt.toISOString(),
   }));
 }
@@ -276,7 +239,7 @@ export async function createComment(
   };
 }
 
-export async function listComments(chapterId: string): Promise<ParagraphCommentDto[]> {
+export async function listComments(chapterId: string, paragraphCount: number): Promise<ParagraphCommentDto[]> {
   const rows = await db
     .select({
       id: paragraphComments.id,
@@ -288,7 +251,7 @@ export async function listComments(chapterId: string): Promise<ParagraphCommentD
     })
     .from(paragraphComments)
     .innerJoin(user, eq(paragraphComments.userId, user.id))
-    .where(eq(paragraphComments.chapterId, chapterId))
+    .where(and(eq(paragraphComments.chapterId, chapterId), lt(paragraphComments.paragraphIndex, paragraphCount)))
     .orderBy(paragraphComments.paragraphIndex, desc(paragraphComments.createdAt));
 
   return rows.map((r) => ({

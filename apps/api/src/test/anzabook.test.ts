@@ -2,6 +2,21 @@ import { describe, expect, it } from "vitest";
 import { agent, originHeader, signUp } from "./helpers";
 
 describe("AnzaBook Core API", () => {
+  it("returns continuous manuscript chapters only when the reader has full access", async () => {
+    const client = agent();
+    await signUp(client, "Pembaca Scroll");
+    const full = await client.get("/api/books/revolusi-cetak-kedaulatan-membaca/read?continuous=true");
+    expect(full.status).toBe(200);
+    expect(full.body.data.chapters.map((chapter: { chapterNumber: number }) => chapter.chapterNumber)).toEqual([1, 2]);
+    expect(full.body.data.chapters[1].contentId).toBeTruthy();
+
+    const preview = await client.get("/api/books/sains-logika-seni-hidup-bermutu/read?continuous=true");
+    expect(preview.status).toBe(200);
+    expect(preview.body.data.hasFullAccess).toBe(false);
+    expect(preview.body.data.chapters).toHaveLength(1);
+    expect(preview.body.data.chapters[0].audioUrl).toBeNull();
+  });
+
   it("provides public catalog, weekly bulletin, and book details", async () => {
     const client = agent();
 
@@ -44,8 +59,8 @@ describe("AnzaBook Core API", () => {
     const client = agent();
     await signUp(client, "Pembaca Rakyat");
 
-    // Book with print_claim_only policy: desain-tipografi-ergonomi-baca
-    const slug = "desain-tipografi-ergonomi-baca";
+    // Book with sample_only / print_claim policy: sains-logika-seni-hidup-bermutu
+    const slug = "sains-logika-seni-hidup-bermutu";
 
     // Chapter 1 (sample) is permitted
     const chap1Res = await client.get(`/api/books/${slug}/read?chapter=1&mode=full`);
@@ -58,10 +73,15 @@ describe("AnzaBook Core API", () => {
     expect(blueprintRes.status).toBe(200);
     expect(blueprintRes.body.data.mode).toBe("blueprint");
 
-    // Chapter 2 without claim is forbidden with 403
-    const chap2Forbidden = await client.get(`/api/books/${slug}/read?chapter=2&mode=full`);
-    expect(chap2Forbidden.status).toBe(403);
-    expect(chap2Forbidden.body.error.code).toBe("FORBIDDEN_DIGITAL_ACCESS");
+    expect(chap1Res.body.data.hasFullAccess).toBe(false);
+    expect(chap1Res.body.data.currentChapter.audioUrl).toBeNull();
+    expect(chap1Res.body.data.currentChapter.contentId.split(/\n\n+/).length).toBeLessThanOrEqual(3);
+
+    for (const mode of ["full", "blueprint", "audio"]) {
+      const locked = await client.get(`/api/books/${slug}/read?chapter=2&mode=${mode}`);
+      expect(locked.status).toBe(403);
+      expect(locked.body.error.code).toBe("FORBIDDEN_DIGITAL_ACCESS");
+    }
 
     // Invalid claim code returns 422 / 404
     const invalidClaim = await client
@@ -74,7 +94,7 @@ describe("AnzaBook Core API", () => {
     const validClaim = await client
       .post(`/api/books/${slug}/claim-code`)
       .set(originHeader)
-      .send({ code: "ANZA-TYPO-2026" });
+      .send({ code: "SAINS-MALAKA-01" });
     expect(validClaim.status).toBe(200);
     expect(validClaim.body.data.success).toBe(true);
 
@@ -82,7 +102,7 @@ describe("AnzaBook Core API", () => {
     const reusedClaim = await client
       .post(`/api/books/${slug}/claim-code`)
       .set(originHeader)
-      .send({ code: "ANZA-TYPO-2026" });
+      .send({ code: "SAINS-MALAKA-01" });
     expect(reusedClaim.status).toBe(409);
 
     // Now Chapter 2 is accessible!
@@ -90,6 +110,25 @@ describe("AnzaBook Core API", () => {
     // Note: if book has only 1 chapter seeded, it responds with 200 or 404 if chapter doesn't exist,
     // but not 403 FORBIDDEN_DIGITAL_ACCESS.
     expect(chap2Unlocked.status).not.toBe(403);
+  });
+
+  it("scopes marginalia to the selected book and readable paragraphs", async () => {
+    const slug = "sains-logika-seni-hidup-bermutu";
+    const client = agent();
+    const details = await client.get(`/api/books/${slug}`);
+    const [first, second] = details.body.data.chapters;
+    expect((await client.get(`/api/books/${slug}/comments?chapterId=${first.id}`)).status).toBe(401);
+    await signUp(client, "Pembaca Catatan");
+    expect((await client.get(`/api/books/${slug}/comments?chapterId=${second.id}`)).status).toBe(403);
+    expect((await client.get(`/api/books/madilog-tan-malaka/comments?chapterId=${first.id}`)).status).toBe(404);
+    const outsidePreview = await client.post(`/api/books/${slug}/comments`).set(originHeader)
+      .send({ chapterId: first.id, paragraphIndex: 4, content: "Catatan di luar cuplikan." });
+    expect(outsidePreview.status).toBe(422);
+    const allowed = await client.post(`/api/books/${slug}/comments`).set(originHeader)
+      .send({ chapterId: first.id, paragraphIndex: 0, content: "Catatan di cuplikan." });
+    expect(allowed.status).toBe(201);
+    const comments = await client.get(`/api/books/${slug}/comments?chapterId=${first.id}`);
+    expect(comments.body.data.map((comment: { id: string }) => comment.id)).toContain(allowed.body.data.id);
   });
 
   it("records reading sessions and calculates telemetry summary for Strava studio", async () => {

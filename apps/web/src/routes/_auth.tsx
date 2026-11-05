@@ -1,11 +1,13 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { Brand } from "@/components/brand";
 import { siteConfig } from "@/config/site";
+import { authSearchSchema } from "@/lib/auth-destination";
 
 // Pathless layout: /sign-in and /sign-up. Signed-in visitors go to the app.
 export const Route = createFileRoute("/_auth")({
-  beforeLoad: ({ context }) => {
-    if (context.session) throw redirect({ to: siteConfig.homePath });
+  validateSearch: authSearchSchema,
+  beforeLoad: ({ context, search }) => {
+    if (context.session) throw redirect({ href: search.redirect ?? siteConfig.homePath });
   },
   component: AuthLayout,
 });

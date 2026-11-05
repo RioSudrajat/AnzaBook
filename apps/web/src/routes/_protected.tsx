@@ -8,13 +8,16 @@ import {
 import { roleHasPermission } from "@starter/shared/permissions";
 import { Brand } from "@/components/brand";
 import { SignOutButton } from "@/components/sign-out-button";
+import { authDestination } from "@/lib/auth-destination";
 
 // Pathless layout for signed-in screens. The check runs on the server during
 // SSR and again on client navigation. It protects pages only: the API
 // authenticates every request itself.
 export const Route = createFileRoute("/_protected")({
-  beforeLoad: ({ context }) => {
-    if (!context.session) throw redirect({ to: "/sign-in" });
+  beforeLoad: ({ context, location }) => {
+    if (!context.session) {
+      throw redirect({ to: "/sign-in", search: { redirect: authDestination(location.href) } });
+    }
     return { session: context.session };
   },
   component: ProtectedLayout,
@@ -27,8 +30,9 @@ function ProtectedLayout() {
   const { user } = Route.useRouteContext().session;
   const location = useLocation();
   const isReader = location.pathname.startsWith("/read");
+  const isApp = location.pathname === "/app";
 
-  if (isReader) {
+  if (isReader || isApp) {
     return <Outlet />;
   }
 

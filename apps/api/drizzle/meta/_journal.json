@@ -15,6 +15,34 @@
       "when": 1793407756355,
       "tag": "0001_amusing_synch",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793811005589,
+      "tag": "0002_orange_dorian_gray",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793831826691,
+      "tag": "0003_membership_reading_checkpoints",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793833320922,
+      "tag": "0004_membership_tax_breakdown",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793848349379,
+      "tag": "0005_disable_demo_claims",
+      "breakpoints": true
     }
   ]
 }

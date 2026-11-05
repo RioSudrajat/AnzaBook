@@ -9,6 +9,7 @@ import type {
   CreateReadingSessionInput,
   ListReadingSessionsQuery,
 } from "@starter/shared/validators/reading";
+import { booksKeys } from "@/features/books/queries";
 import {
   createReadingSession,
   simulatePrintEconomics,
@@ -39,8 +40,12 @@ export function useCreateReadingSession() {
   return useMutation({
     mutationFn: (input: CreateReadingSessionInput) =>
       createReadingSession(input),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: communityKeys.sessions() });
+    onSuccess: async (session) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: communityKeys.sessions() }),
+        queryClient.invalidateQueries({ queryKey: booksKeys.sessions(session.bookId) }),
+        queryClient.invalidateQueries({ queryKey: communityKeys.shelves(), refetchType: "all" }),
+      ]);
     },
   });
 }

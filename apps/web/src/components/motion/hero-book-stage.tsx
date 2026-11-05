@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, BookOpen, Pause, Play, Sparkles, Store } from "lucide-react";
 import type { BookSummaryDto } from "@starter/shared/types";
+import { BookCover } from "@/features/books/components/book-cover";
 import { Button } from "@/components/ui/button";
 
 type HeroBookStageProps = {
@@ -34,30 +35,23 @@ export function HeroBookStage({ books }: HeroBookStageProps) {
     <div className="w-full relative flex flex-col items-center pt-4 pb-8">
       {/* 3D Shelf Stage Area */}
       <div
-        className="w-full max-w-4xl h-[340px] md:h-[400px] flex items-end justify-center relative perspective-[1200px] select-none"
+        className="relative flex h-[180px] w-full max-w-4xl items-end justify-center perspective-[1200px] select-none sm:h-[270px] md:h-[330px]"
         role="region"
         aria-label="Panggung Rak Buku 3D"
       >
         {/* Books on the Shelf */}
-        <div className="flex items-end justify-center gap-3 sm:gap-6 md:gap-8 pb-4 z-10 w-full px-4 overflow-visible">
+        <div className="flex items-end justify-center gap-1.5 sm:gap-4 md:gap-6 pb-4 z-10 w-full px-2">
           {displayBooks.map((book, idx) => {
             const isActive = idx === activeIndex;
             return (
-              <div
+              <button
                 key={book.id}
-                role="button"
-                tabIndex={0}
+                type="button"
                 aria-pressed={isActive}
                 aria-label={`Pilih buku ${book.title}`}
                 onClick={() => {
                   setActiveIndex(idx);
                   setIsPaused(true);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    setActiveIndex(idx);
-                    setIsPaused(true);
-                  }
                 }}
                 className={`relative group cursor-pointer transition-all duration-500 ease-out shrink-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--color-focus)] rounded-[6px] ${
                   isActive
@@ -68,51 +62,7 @@ export function HeroBookStage({ books }: HeroBookStageProps) {
                   transformStyle: "preserve-3d",
                 }}
               >
-                {/* Physical 3D Book Object */}
-                <div
-                  className="w-[120px] sm:w-[150px] md:w-[180px] h-[175px] sm:h-[220px] md:h-[260px] rounded-[3px_8px_8px_3px] shadow-lg flex flex-col justify-between p-3 relative overflow-hidden transition-transform duration-500"
-                  style={{
-                    backgroundColor: book.coverColor || "#13110F",
-                    color: "#F6F2E9",
-                    boxShadow: isActive
-                      ? "0 20px 30px -10px rgba(19, 17, 15, 0.4), inset 4px 0 6px rgba(0,0,0,0.3)"
-                      : "0 10px 18px -6px rgba(19, 17, 15, 0.25), inset 3px 0 4px rgba(0,0,0,0.25)",
-                    transform: isActive
-                      ? "rotateY(-6deg) rotateX(2deg)"
-                      : "rotateY(0deg)",
-                  }}
-                >
-                  {/* Spine crease shading */}
-                  <div className="absolute left-0 top-0 bottom-0 w-3 bg-gradient-to-r from-black/40 via-white/10 to-transparent pointer-events-none" />
-
-                  {/* Header: Format badge */}
-                  <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider opacity-85 z-10">
-                    <span className="bg-black/30 px-1.5 py-0.5 rounded-[3px]">
-                      {book.isWeeklyBulletin ? "Buletin" : "Edisi Rakyat"}
-                    </span>
-                    <span>{book.pageCount} Hal</span>
-                  </div>
-
-                  {/* Middle: Title & Author */}
-                  <div className="z-10 my-auto">
-                    <h3 className="font-serif text-sm sm:text-base font-semibold leading-snug line-clamp-3">
-                      {book.title}
-                    </h3>
-                    <p className="text-[11px] opacity-80 mt-1 font-sans line-clamp-1">
-                      {book.author}
-                    </p>
-                  </div>
-
-                  {/* Footer: Price pill */}
-                  <div className="z-10 flex items-center justify-between pt-2 border-t border-white/15 text-[11px] font-mono">
-                    <span className="text-[var(--color-accent)] font-semibold">
-                      Rp{book.rakyatPriceIdr.toLocaleString("id-ID")}
-                    </span>
-                    <span className="text-[10px] opacity-70 line-through">
-                      Rp{book.standardPriceIdr.toLocaleString("id-ID")}
-                    </span>
-                  </div>
-                </div>
+                <BookCover book={book} className="w-[min(16vw,152px)] sm:w-[min(14vw,152px)]" decorative />
 
                 {/* Drop shadow on shelf */}
                 <div
@@ -120,7 +70,7 @@ export function HeroBookStage({ books }: HeroBookStageProps) {
                     isActive ? "scale-110 opacity-60" : "scale-90 opacity-30"
                   }`}
                 />
-              </div>
+              </button>
             );
           })}
         </div>
@@ -204,10 +154,10 @@ export function HeroBookStage({ books }: HeroBookStageProps) {
                 <Link
                   to="/read/$slug"
                   params={{ slug: activeBook.slug }}
-                  search={{ mode: "blueprint", chapter: 1 }}
+                  search={{ mode: "full", chapter: 1 }}
                 >
                   <BookOpen className="size-3.5 mr-1" />
-                  Intisari 20 Menit
+                  Mulai Membaca
                 </Link>
               </Button>
 

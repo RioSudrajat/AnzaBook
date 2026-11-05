@@ -9,6 +9,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { BookDetailDto, EditionTier } from "@starter/shared/types";
+import { BookCover } from "./book-cover";
 import { Button } from "@/components/ui/button";
 
 type PaperTierSelectorProps = {
@@ -36,15 +37,6 @@ export function PaperTierSelector({ book }: PaperTierSelectorProps) {
       ? null
       : book.editions.find((e) => e.tier === selectedTier) || rakyatEdition;
 
-  const spineWidthPx =
-    selectedTier === "digital"
-      ? 12
-      : selectedTier === "rakyat_economy"
-        ? 16
-        : selectedTier === "standard_trade"
-          ? 22
-          : 32;
-
   const paperEdgeColor =
     selectedTier === "digital"
       ? "#E8E2D4"
@@ -59,57 +51,15 @@ export function PaperTierSelector({ book }: PaperTierSelectorProps) {
       <div className="flex flex-col lg:flex-row gap-8 items-center lg:items-start">
         {/* Left: 3D Paper & Spine Tactile Preview */}
         <div className="flex flex-col items-center shrink-0">
-          <div
-            className="w-[180px] sm:w-[210px] h-[260px] sm:h-[300px] rounded-[3px_8px_8px_3px] shadow-xl p-4 flex flex-col justify-between relative transition-all duration-500 perspective-[1000px]"
-            style={{
-              backgroundColor: book.coverColor || "#13110F",
-              color: "#F6F2E9",
-              transform: "rotateY(-12deg) rotateX(4deg)",
-              transformStyle: "preserve-3d",
+          <BookCover
+            book={book}
+            className="w-[180px] sm:w-[210px]"
+            edition={{
+              paperColor: paperEdgeColor,
+              label: activeEdition ? `${activeEdition.weightGrams} g` : "Dwibahasa",
+              priceIdr: activeEdition?.priceIdr ?? null,
             }}
-          >
-            {/* Spine depth simulation */}
-            <div
-              className="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-black/50 via-white/10 to-transparent pointer-events-none transition-all duration-300"
-              style={{ width: `${spineWidthPx}px` }}
-            />
-
-            {/* Simulated physical paper thickness edge on the right */}
-            <div
-              className="absolute right-0 top-1 bottom-1 w-3 rounded-r-[2px] shadow-inner pointer-events-none transition-colors duration-300 border-l border-black/20"
-              style={{ backgroundColor: paperEdgeColor }}
-            />
-
-            {/* Book cover header */}
-            <div className="text-[10px] font-mono uppercase tracking-wider opacity-85 z-10 flex justify-between">
-              <span>{book.publishedYear}</span>
-              <span>{book.pageCount} Hal</span>
-            </div>
-
-            {/* Book title */}
-            <div className="z-10 my-auto pr-3">
-              <h3 className="font-serif text-base sm:text-lg font-bold leading-snug line-clamp-3">
-                {book.title}
-              </h3>
-              <p className="text-xs opacity-80 mt-1 font-sans line-clamp-1">
-                {book.author}
-              </p>
-            </div>
-
-            {/* Book cover footer */}
-            <div className="z-10 pt-2 border-t border-white/20 flex items-center justify-between text-xs font-mono">
-              <span className="font-semibold text-[var(--color-accent)]">
-                {selectedTier === "digital"
-                  ? "Digital SaaS"
-                  : `Rp${activeEdition?.priceIdr.toLocaleString("id-ID")}`}
-              </span>
-              <span className="text-[10px] opacity-70">
-                {selectedTier === "digital"
-                  ? "Dwibahasa"
-                  : `${activeEdition?.weightGrams}g`}
-              </span>
-            </div>
-          </div>
+          />
 
           {/* Physical specification badge */}
           <div className="mt-4 flex items-center gap-2 text-xs font-mono text-muted-foreground">
@@ -190,11 +140,11 @@ export function PaperTierSelector({ book }: PaperTierSelectorProps) {
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Baca dwibahasa split view, intisari 20 menit, dan audiobook audio sync.
+                  Baca dwibahasa split view, audiobook audio sync, dan akses catatan.
                 </p>
                 <div className="mt-2 text-[11px] font-mono text-muted-foreground flex items-center gap-1">
                   <ShieldCheck className="size-3 text-emerald-600" />
-                  <span>Gratis Sampel Bab 1 & Intisari</span>
+                  <span>Gratis Sampel Bab 1</span>
                 </div>
               </button>
 
@@ -280,10 +230,10 @@ export function PaperTierSelector({ book }: PaperTierSelectorProps) {
                 <Link
                   to="/read/$slug"
                   params={{ slug: book.slug }}
-                  search={{ mode: "blueprint", chapter: 1 }}
+                  search={{ chapter: 1 }}
                 >
                   <BookOpen className="size-4 mr-1.5" />
-                  Baca Intisari 20 Menit
+                  Baca Bab 1
                 </Link>
               </Button>
 
@@ -291,7 +241,7 @@ export function PaperTierSelector({ book }: PaperTierSelectorProps) {
                 <Link
                   to="/read/$slug"
                   params={{ slug: book.slug }}
-                  search={{ mode: "full", chapter: 1 }}
+                  search={{ chapter: 1 }}
                 >
                   Baca Sekarang
                 </Link>

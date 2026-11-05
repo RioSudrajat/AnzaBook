@@ -81,6 +81,12 @@
 }
 
 :root {
+  --book-cover-base: oklch(22% 0.017 60);
+  --book-cover-text: oklch(96% 0.011 85);
+  --book-cover-accent: oklch(88% 0.10 64);
+  --book-cover-shade: oklch(10% 0.012 60 / 55%);
+  --book-cover-spine: oklch(8% 0.01 60 / 80%);
+  --book-cover-crease: oklch(98% 0.01 85 / 14%);
   --font-display: "Literata", Georgia, ui-serif, serif;
   --font-reader: var(--font-display);
   --font-body: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
@@ -365,5 +371,14 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+[data-preview-fade] {
+  mask-image: linear-gradient(to bottom, currentColor max(0px, calc(100% - 7rem)), transparent);
+}
+
+@media (forced-colors: active), (prefers-contrast: more) {
+  [data-preview-fade] {
+    mask-image: none;
   }
 }

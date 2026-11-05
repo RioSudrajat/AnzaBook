@@ -4,16 +4,19 @@ import { Button } from "@/components/ui/button";
 
 type DrmShieldProps = {
   watermarkText: string;
+  enabled?: boolean;
   children: React.ReactNode;
 };
 
-export function DrmShield({ watermarkText, children }: DrmShieldProps) {
+export function DrmShield({ watermarkText, enabled = false, children }: DrmShieldProps) {
   const [isShieldActive, setIsShieldActive] = useState(false);
   const [shieldReason, setShieldReason] = useState<string>(
     "Aktivitas tangkapan layar atau kehilangan fokus terdeteksi.",
   );
 
   useEffect(() => {
+    if (!enabled) return;
+
     // 1. Prevent context menu & copy/cut
     const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault();
@@ -97,36 +100,40 @@ export function DrmShield({ watermarkText, children }: DrmShieldProps) {
       window.removeEventListener("blur", handleWindowBlur);
       window.removeEventListener("touchstart", handleTouchStart);
     };
-  }, []);
+  }, [enabled]);
+
+  const isEffectiveShieldActive = enabled && isShieldActive;
 
   return (
-    <div className="relative select-none" style={{ userSelect: "none", WebkitUserSelect: "none" }}>
-      {/* Background Subtle Watermark Matrix (Permanent Provenance) */}
-      <div
-        className="pointer-events-none fixed inset-0 z-20 flex flex-wrap items-center justify-around overflow-hidden opacity-[0.035] leading-none"
-        aria-hidden="true"
-      >
-        {Array.from({ length: 48 }).map((_, i) => (
-          <div
-            key={i}
-            className="w-64 h-24 rotate-[-25deg] flex items-center justify-center font-mono text-[10px] tracking-widest text-foreground uppercase select-none"
-          >
-            {watermarkText}
-          </div>
-        ))}
-      </div>
+    <div className="relative select-text">
+      {/* Background Subtle Watermark Matrix (Permanent Provenance, only when DRM is enabled) */}
+      {enabled && (
+        <div
+          className="pointer-events-none fixed inset-0 z-20 flex flex-wrap items-center justify-around overflow-hidden opacity-[0.035] leading-none select-none"
+          aria-hidden="true"
+        >
+          {Array.from({ length: 48 }).map((_, i) => (
+            <div
+              key={i}
+              className="w-64 h-24 rotate-[-25deg] flex items-center justify-center font-mono text-[10px] tracking-widest text-foreground uppercase select-none"
+            >
+              {watermarkText}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Actual Content with Blur Filter on Shield Active */}
       <div
         className={`transition-all duration-150 ${
-          isShieldActive ? "blur-2xl opacity-10 pointer-events-none filter" : "blur-none opacity-100"
+          isEffectiveShieldActive ? "blur-2xl opacity-10 pointer-events-none filter" : "blur-none opacity-100"
         }`}
       >
         {children}
       </div>
 
       {/* Pre-Trigger DRM Shield Overlay */}
-      {isShieldActive && (
+      {isEffectiveShieldActive && (
         <div
           role="alertdialog"
           aria-modal="true"
@@ -134,8 +141,17 @@ export function DrmShield({ watermarkText, children }: DrmShieldProps) {
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-md animate-in fade-in duration-100"
         >
           <div className="max-w-md w-full bg-card border border-border rounded-[10px] p-6 shadow-2xl text-center space-y-4">
-            <div className="size-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mx-auto">
-              <ShieldAlert className="size-6" />
+            {/* AnzaBook Official Logo */}
+            <div className="flex justify-center mb-2">
+              <img
+                src="/logo-mark.svg"
+                alt="AnzaBook Logo"
+                className="size-10 object-contain drop-shadow-sm"
+              />
+            </div>
+
+            <div className="size-10 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mx-auto">
+              <ShieldAlert className="size-5" />
             </div>
 
             <div className="space-y-1.5">

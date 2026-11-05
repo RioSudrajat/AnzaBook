@@ -7,6 +7,7 @@ import {
   RotateCcw,
   Volume2,
   VolumeX,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -16,6 +17,7 @@ type AudiobookBarProps = {
   activeParagraphIndex: number;
   totalParagraphs: number;
   onParagraphChange: (index: number) => void;
+  onClose?: () => void;
 };
 
 const PLAYBACK_SPEEDS = [0.75, 1.0, 1.25, 1.5, 2.0];
@@ -26,6 +28,7 @@ export function AudiobookBar({
   activeParagraphIndex,
   totalParagraphs,
   onParagraphChange,
+  onClose,
 }: AudiobookBarProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -119,126 +122,137 @@ export function AudiobookBar({
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-md border-t border-border px-4 py-2.5 shadow-lg">
-      <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
-        {/* Native Audio Element if URL available */}
-        {audioUrl && (
-          <audio
-            ref={audioRef}
-            src={audioUrl}
-            onTimeUpdate={() => {
-              if (audioRef.current) {
-                setCurrentTime(audioRef.current.currentTime);
-              }
-            }}
-            onEnded={() => setIsPlaying(false)}
-          />
-        )}
+    <div className="w-full max-w-5xl mx-auto flex items-center justify-between gap-3 sm:gap-6 py-2 px-3 sm:px-4 text-foreground">
+      {/* Native Audio Element if URL available */}
+      {audioUrl && (
+        <audio
+          ref={audioRef}
+          src={audioUrl}
+          onTimeUpdate={() => {
+            if (audioRef.current) {
+              setCurrentTime(audioRef.current.currentTime);
+            }
+          }}
+          onEnded={() => setIsPlaying(false)}
+        />
+      )}
 
-        {/* Left: Indicator & Chapter Sync */}
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="size-8 rounded-full bg-[var(--color-accent)]/10 text-[var(--color-accent)] flex items-center justify-center shrink-0">
-            <Headphones className="size-4" />
+      {/* Left: Indicator & Chapter Sync */}
+      <div className="flex items-center gap-2.5 min-w-0">
+        <div className="size-8 rounded-full bg-[var(--color-accent)]/10 text-[var(--color-accent)] flex items-center justify-center shrink-0">
+          <Headphones className="size-4" />
+        </div>
+        <div className="hidden sm:block min-w-0">
+          <div className="text-xs font-serif font-bold text-foreground truncate">
+            Sinkronisasi Audio & Naskah
           </div>
-          <div className="hidden sm:block min-w-0">
-            <div className="text-xs font-serif font-bold text-foreground truncate">
-              Sinkronisasi Audio & Naskah
-            </div>
-            <div className="text-[10px] font-mono text-muted-foreground truncate">
-              Paragraf {activeParagraphIndex + 1} dari {totalParagraphs}
-            </div>
+          <div className="text-[10px] font-mono text-muted-foreground truncate">
+            Paragraf {activeParagraphIndex + 1} dari {totalParagraphs}
           </div>
         </div>
+      </div>
 
-        {/* Center: Controls & Scrubber */}
-        <div className="flex-1 max-w-md flex flex-col items-center gap-1">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                const next = Math.max(0, currentTime - 10);
-                setCurrentTime(next);
-                if (audioRef.current) audioRef.current.currentTime = next;
-              }}
-              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-              title="Mundur 10 Detik"
-            >
-              <RotateCcw className="size-3.5" />
-            </Button>
-
-            <Button
-              onClick={togglePlay}
-              size="sm"
-              className="h-8 w-8 rounded-full p-0 bg-[var(--color-accent)] text-[var(--color-accent-foreground)] shadow-xs hover:brightness-110"
-              aria-label={isPlaying ? "Jeda Audio" : "Putar Audio"}
-            >
-              {isPlaying ? (
-                <Pause className="size-4 fill-current" />
-              ) : (
-                <Play className="size-4 fill-current ml-0.5" />
-              )}
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                const next = Math.min(totalDurationSeconds, currentTime + 10);
-                setCurrentTime(next);
-                if (audioRef.current) audioRef.current.currentTime = next;
-              }}
-              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-              title="Maju 10 Detik"
-            >
-              <FastForward className="size-3.5" />
-            </Button>
-          </div>
-
-          <div className="w-full flex items-center gap-2 text-[10px] font-mono text-muted-foreground">
-            <span className="w-9 text-right">{formatTime(currentTime)}</span>
-            <input
-              type="range"
-              min={0}
-              max={totalDurationSeconds || 100}
-              value={currentTime}
-              onChange={handleSeek}
-              className="flex-1 h-1 bg-muted rounded-lg appearance-none cursor-pointer accent-[var(--color-accent)]"
-              aria-label="Progres Audio"
-            />
-            <span className="w-9">{formatTime(totalDurationSeconds)}</span>
-          </div>
-        </div>
-
-        {/* Right: Speed & Mute */}
-        <div className="flex items-center gap-2 shrink-0">
+      {/* Center: Controls & Scrubber */}
+      <div className="flex-1 max-w-md flex flex-col items-center gap-1">
+        <div className="flex items-center gap-3">
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
-            onClick={cycleSpeed}
-            className="h-7 px-2 text-[11px] font-mono font-bold"
-            title="Kecepatan Pemutaran"
+            onClick={() => {
+              const next = Math.max(0, currentTime - 10);
+              setCurrentTime(next);
+              if (audioRef.current) audioRef.current.currentTime = next;
+            }}
+            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+            title="Mundur 10 Detik"
           >
-            {playbackSpeed}x
+            <RotateCcw className="size-3.5" />
+          </Button>
+
+          <Button
+            onClick={togglePlay}
+            size="sm"
+            className="h-8 w-8 rounded-full p-0 bg-[var(--color-accent)] text-[var(--color-accent-foreground)] shadow-xs hover:brightness-110"
+            aria-label={isPlaying ? "Jeda Audio" : "Putar Audio"}
+          >
+            {isPlaying ? (
+              <Pause className="size-4 fill-current" />
+            ) : (
+              <Play className="size-4 fill-current ml-0.5" />
+            )}
           </Button>
 
           <Button
             variant="ghost"
             size="sm"
             onClick={() => {
-              setIsMuted(!isMuted);
-              if (audioRef.current) audioRef.current.muted = !isMuted;
+              const next = Math.min(totalDurationSeconds, currentTime + 10);
+              setCurrentTime(next);
+              if (audioRef.current) audioRef.current.currentTime = next;
             }}
-            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hidden sm:flex"
-            title={isMuted ? "Bunyikan" : "Bisukan"}
+            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+            title="Maju 10 Detik"
           >
-            {isMuted ? (
-              <VolumeX className="size-3.5" />
-            ) : (
-              <Volume2 className="size-3.5" />
-            )}
+            <FastForward className="size-3.5" />
           </Button>
         </div>
+
+        <div className="w-full flex items-center gap-2 text-[10px] font-mono text-muted-foreground">
+          <span className="w-9 text-right">{formatTime(currentTime)}</span>
+          <input
+            type="range"
+            min={0}
+            max={totalDurationSeconds || 100}
+            value={currentTime}
+            onChange={handleSeek}
+            className="flex-1 h-1 bg-muted rounded-lg appearance-none cursor-pointer accent-[var(--color-accent)]"
+            aria-label="Progres Audio"
+          />
+          <span className="w-9">{formatTime(totalDurationSeconds)}</span>
+        </div>
+      </div>
+
+      {/* Right: Speed, Mute & Close */}
+      <div className="flex items-center gap-2 shrink-0">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={cycleSpeed}
+          className="h-7 px-2 text-[11px] font-mono font-bold"
+          title="Kecepatan Pemutaran"
+        >
+          {playbackSpeed}x
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setIsMuted(!isMuted);
+            if (audioRef.current) audioRef.current.muted = !isMuted;
+          }}
+          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hidden sm:flex"
+          title={isMuted ? "Bunyikan" : "Bisukan"}
+        >
+          {isMuted ? (
+            <VolumeX className="size-3.5" />
+          ) : (
+            <Volume2 className="size-3.5" />
+          )}
+        </Button>
+
+        {onClose && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground rounded-full ml-1"
+            title="Tutup Bilah Audio"
+            aria-label="Tutup Bilah Audio"
+          >
+            <X className="size-4" />
+          </Button>
+        )}
       </div>
     </div>
   );

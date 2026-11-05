@@ -4,6 +4,9 @@ export const listBooksQuerySchema = z
   .object({
     search: z.string().max(100).optional(),
     category: z.string().max(50).optional(),
+    language: z.string().max(10).optional(),
+    accessTier: z.enum(["all", "free", "premium"]).optional().default("all"),
+    collection: z.string().max(120).optional(),
     paperTier: z
       .enum(["all", "rakyat_economy", "standard_trade", "kolektor_hardcover"])
       .optional()
@@ -27,6 +30,7 @@ export const readBookQuerySchema = z
   .object({
     mode: z.enum(["full", "blueprint", "audio"]).default("full"),
     chapter: z.coerce.number().int().min(1).default(1),
+    continuous: z.enum(["true", "false"]).optional(),
   })
   .strict();
 
@@ -53,6 +57,9 @@ export const claimPrintCodeSchema = z
 export type ListBooksInput = {
   search?: string;
   category?: string;
+  language?: string;
+  accessTier?: "all" | "free" | "premium";
+  collection?: string;
   paperTier?: "all" | "rakyat_economy" | "standard_trade" | "kolektor_hardcover";
   limit?: number;
   offset?: number;
@@ -62,6 +69,7 @@ export type ListBooksQuery = z.infer<typeof listBooksQuerySchema>;
 export type ReadBookInput = {
   mode?: "full" | "blueprint" | "audio";
   chapter?: number;
+  continuous?: boolean;
 };
 export type ReadBookQuery = z.infer<typeof readBookQuerySchema>;
 

@@ -36,6 +36,8 @@ const schema = z.object({
   BETTER_AUTH_SECRET: z
     .string()
     .min(32, "Run pnpm run setup to generate a secret."),
+  GOOGLE_CLIENT_ID: z.string().trim().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().trim().optional(),
   BETTER_AUTH_URL: origin(
     "Use the API's origin, e.g. http://localhost:4000.",
   ).default("http://localhost:4000"),
@@ -72,6 +74,32 @@ const schema = z.object({
     .enum(["true", "false", "1", "0"])
     .optional()
     .transform((value) => value === "true" || value === "1"),
+  MIDTRANS_SERVER_KEY: z.string().min(1).optional(),
+  MIDTRANS_ENV: z.enum(["sandbox", "production"]).default("sandbox"),
+  MEMBERSHIP_TAX_RATE_BPS: z.preprocess(
+    (value) => typeof value === "string" && value.trim() === "" ? undefined : value,
+    z.coerce.number().int().min(0).max(10_000).optional(),
+  ),
+  GMAIL_CLIENT_ID: z.string().min(1).optional(),
+  GMAIL_CLIENT_SECRET: z.string().min(1).optional(),
+  GMAIL_REFRESH_TOKEN: z.string().min(1).optional(),
+  GMAIL_FROM: z.email().optional(),
+}).superRefine((values, ctx) => {
+  if (Boolean(values.GOOGLE_CLIENT_ID) !== Boolean(values.GOOGLE_CLIENT_SECRET)) {
+    ctx.addIssue({
+      code: "custom",
+      path: [values.GOOGLE_CLIENT_ID ? "GOOGLE_CLIENT_SECRET" : "GOOGLE_CLIENT_ID"],
+      message: "Set both Google OAuth credentials to enable Google sign-in.",
+    });
+  }
+  if (values.MIDTRANS_ENV === "production" && values.MIDTRANS_SERVER_KEY &&
+      values.MEMBERSHIP_TAX_RATE_BPS === undefined) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["MEMBERSHIP_TAX_RATE_BPS"],
+      message: "Set the effective membership tax rate before enabling live payments.",
+    });
+  }
 });
 
 const parsed = schema.safeParse(process.env);
@@ -88,6 +116,9 @@ const values = parsed.data;
 
 export const env = {
   ...values,
+  membershipTaxRateBps: values.MEMBERSHIP_TAX_RATE_BPS ?? (
+    values.MIDTRANS_ENV === "sandbox" ? 1100 : null
+  ),
   PORT: values.PORT ?? (Number(new URL(values.BETTER_AUTH_URL).port) || 4000),
   isProduction: values.NODE_ENV === "production",
   isTest: values.NODE_ENV === "test",

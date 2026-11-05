@@ -123,7 +123,7 @@ docker build -f apps/api/Dockerfile --target migrator -t my-api-migrate .
 docker build -f apps/web/Dockerfile --build-arg VITE_API_URL=https://api.example.com -t my-web .
 ```
 
-Email verification, password recovery email, social login, billing, and AI provider calls are not configured. Add only the services your product needs.
+For AnzaBook's Nakama checkout, Google sign-in, email verification, and expiry reminders, see [membership setup](docs/anzabook-membership.md).
 
 ## Troubleshooting
 

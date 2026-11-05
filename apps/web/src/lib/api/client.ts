@@ -20,7 +20,7 @@ export class ApiError extends Error {
   }
 }
 
-type Method = "GET" | "POST" | "PATCH" | "DELETE";
+type Method = "GET" | "POST" | "PATCH" | "DELETE" | "PUT";
 
 type FailureLogger = (
   path: string,

@@ -80,7 +80,7 @@ export function createApp({
     cors({
       origin: env.trustedOrigins,
       credentials: true,
-      methods: ["GET", "HEAD", "POST", "PATCH", "DELETE", "OPTIONS"],
+      methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       exposedHeaders: ["X-Request-Id", "Location"],
       maxAge: 600,
     }),

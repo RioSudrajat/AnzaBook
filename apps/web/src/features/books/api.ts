@@ -1,11 +1,17 @@
 import type {
+  AuthorSummaryDto,
   BookDetailDto,
+  BookHighlightDto,
   BookReaderPayloadDto,
   BookReviewDto,
   BookSummaryDto,
+  CollectionSummaryDto,
   DataResponse,
   PageMeta,
   ParagraphCommentDto,
+  ReadingProgressDto,
+  ReadingProgressScope,
+  ReadingSessionDto,
   StoreStockItemDto,
 } from "@starter/shared/types";
 import type {
@@ -17,6 +23,10 @@ import type {
   CreateParagraphCommentInput,
   CreateReviewInput,
 } from "@starter/shared/validators/community";
+import type {
+  CreateHighlightInput,
+  SaveReadingProgressInput,
+} from "@starter/shared/validators/reading";
 import { apiFetch } from "@/lib/api/client";
 
 export type BooksListResponse = {
@@ -114,6 +124,99 @@ export async function createChapterComment(
       method: "POST",
       body: input,
     },
+  );
+  return data;
+}
+
+export async function listAuthors(signal?: AbortSignal) {
+  const { data } = await apiFetch<DataResponse<AuthorSummaryDto[]>>(
+    "/api/books/meta/authors",
+    { signal },
+  );
+  return data;
+}
+
+export async function listCollections(signal?: AbortSignal) {
+  const { data } = await apiFetch<DataResponse<CollectionSummaryDto[]>>(
+    "/api/books/meta/collections",
+    { signal },
+  );
+  return data;
+}
+
+export async function listCategories(signal?: AbortSignal) {
+  const { data } = await apiFetch<
+    DataResponse<{ name: string; bookCount: number }[]>
+  >("/api/books/meta/categories", { signal });
+  return data;
+}
+
+export async function getReadingProgress(
+  bookId: string,
+  scope: ReadingProgressScope,
+  signal?: AbortSignal,
+) {
+  const { data } = await apiFetch<DataResponse<ReadingProgressDto | null>>(
+    `/api/reading/progress/${encodeURIComponent(bookId)}?scope=${scope}`,
+    { signal },
+  );
+  return data;
+}
+
+export async function saveReadingProgress(
+  bookId: string,
+  scope: ReadingProgressScope,
+  input: SaveReadingProgressInput,
+) {
+  const { data } = await apiFetch<DataResponse<ReadingProgressDto>>(
+    `/api/reading/progress/${encodeURIComponent(bookId)}?scope=${scope}`,
+    {
+      method: "PUT",
+      body: input,
+    },
+  );
+  return data;
+}
+
+export async function listBookHighlights(bookId: string, signal?: AbortSignal) {
+  const { data } = await apiFetch<DataResponse<BookHighlightDto[]>>(
+    `/api/reading/highlights/${encodeURIComponent(bookId)}`,
+    { signal },
+  );
+  return data;
+}
+
+export async function listAllHighlights(signal?: AbortSignal) {
+  const { data } = await apiFetch<DataResponse<BookHighlightDto[]>>(
+    "/api/reading/highlights/all",
+    { signal },
+  );
+  return data;
+}
+
+export async function createHighlight(input: CreateHighlightInput) {
+  const { data } = await apiFetch<DataResponse<BookHighlightDto>>(
+    "/api/reading/highlights",
+    {
+      method: "POST",
+      body: input,
+    },
+  );
+  return data;
+}
+
+export async function deleteHighlight(id: string) {
+  const result = await apiFetch<{ success: boolean }>(
+    `/api/reading/highlights/${encodeURIComponent(id)}`,
+    { method: "DELETE" },
+  );
+  return result;
+}
+
+export async function listBookSessions(bookId: string, signal?: AbortSignal) {
+  const { data } = await apiFetch<DataResponse<ReadingSessionDto[]>>(
+    `/api/reading/sessions/${encodeURIComponent(bookId)}`,
+    { signal },
   );
   return data;
 }

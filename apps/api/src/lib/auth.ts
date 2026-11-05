@@ -12,8 +12,18 @@ import { env } from "../config/env";
 import { db } from "../db";
 import * as schema from "../db/schema";
 import { logger } from "./logger";
+import { createGmailSender } from "./gmail";
 
 const authLog = logger.child({ module: "better-auth" });
+const sendVerification = env.GMAIL_CLIENT_ID && env.GMAIL_CLIENT_SECRET &&
+  env.GMAIL_REFRESH_TOKEN && env.GMAIL_FROM
+  ? createGmailSender({
+      clientId: env.GMAIL_CLIENT_ID,
+      clientSecret: env.GMAIL_CLIENT_SECRET,
+      refreshToken: env.GMAIL_REFRESH_TOKEN,
+      from: env.GMAIL_FROM,
+    })
+  : null;
 
 // Set by app.ts from Express's req.ip on every request (see TRUST_PROXY).
 export const CLIENT_IP_HEADER = "x-starter-client-ip";
@@ -28,13 +38,34 @@ export const auth = betterAuth({
   // mutations from any origin not listed here.
   trustedOrigins: env.trustedOrigins,
   database: drizzleAdapter(db, { provider: "pg", schema }),
+  ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+    ? {
+        socialProviders: {
+          google: {
+            clientId: env.GOOGLE_CLIENT_ID,
+            clientSecret: env.GOOGLE_CLIENT_SECRET,
+            disableIdTokenSignIn: true,
+          },
+        },
+      }
+    : {}),
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 8,
     maxPasswordLength: 128,
-    // Add an email provider before enabling verification or password recovery.
     requireEmailVerification: false,
   },
+  ...(sendVerification ? {
+    emailVerification: {
+      sendVerificationEmail: async ({ user, url }) => {
+        void sendVerification({
+          to: user.email,
+          subject: "Verifikasi email AnzaBook",
+          text: `Buka tautan ini untuk memverifikasi email AnzaBook: ${url}`,
+        }).catch(() => authLog.warn("Gagal mengirim email verifikasi"));
+      },
+    },
+  } : {}),
   rateLimit: {
     // Better Auth only turns its limiter on by itself when NODE_ENV is
     // production, so a server started without it would accept unlimited

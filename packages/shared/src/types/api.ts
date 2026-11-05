@@ -28,10 +28,12 @@ export type AdminNoteDto = NoteDto & { ownerName: string; ownerEmail: string };
 // ---------------- AnzaBook DTOs ---------------- //
 
 export type DigitalPolicy = "free_open" | "sample_only" | "print_claim_only";
+export type AccessTier = "free" | "premium" | "premium_physical";
 export type EditionTier = "rakyat_economy" | "standard_trade" | "kolektor_hardcover";
 export type PartnerType = "gramedia" | "togamas" | "pos_indonesia" | "komunitas";
 export type ShelfStatus = "want_to_read" | "reading" | "finished" | "abandoned";
 export type ReadingMode = "full" | "blueprint" | "audio";
+export type HighlightColor = "yellow" | "green" | "coral" | "blue";
 
 export type BookPrintEditionDto = {
   id: string;
@@ -56,6 +58,7 @@ export type StoreStockItemDto = {
   address: string;
   latitude: number;
   longitude: number;
+  phone?: string | null;
   rakyatStock: number;
   standardStock: number;
   lastStockCheck: string;
@@ -67,6 +70,9 @@ export type BookSummaryDto = {
   title: string;
   originalTitle: string | null;
   author: string;
+  authorAvatar: string | null;
+  editor: string | null;
+  editorAvatar: string | null;
   translator: string | null;
   coverUrl: string;
   coverColor: string;
@@ -74,22 +80,36 @@ export type BookSummaryDto = {
   bulletinExcerpt: string | null;
   publishedYear: number;
   pageCount: number;
+  totalChapters: number;
   readingMinutes: number;
   audioDurationMinutes: number;
   digitalPolicy: DigitalPolicy;
+  accessTier: AccessTier;
+  hasPhysical: boolean;
   isWeeklyBulletin: boolean;
   rakyatPriceIdr: number;
   standardPriceIdr: number;
   ratingAvg: number;
   ratingCount: number;
+  availableLanguages: string[];
+  categories: string[];
+  collectionName: string | null;
   genres: string[];
 };
 
 export type BookDetailDto = BookSummaryDto & {
+  chapters: BookChapterSummaryDto[];
   editions: BookPrintEditionDto[];
   storeStocks: StoreStockItemDto[];
   hasClaimedDigital: boolean;
   totalShelved: number;
+};
+
+export type BookChapterSummaryDto = {
+  id: string;
+  chapterNumber: number;
+  title: string;
+  isSample: boolean;
 };
 
 export type BookReaderChapterDto = {
@@ -107,13 +127,10 @@ export type BookReaderPayloadDto = {
   book: BookSummaryDto;
   mode: ReadingMode;
   currentChapter: BookReaderChapterDto;
-  allChapters: {
-    id: string;
-    chapterNumber: number;
-    title: string;
-    isSample: boolean;
-  }[];
+  chapters?: BookReaderChapterDto[];
+  allChapters: BookChapterSummaryDto[];
   hasFullAccess: boolean;
+  accessExpiresAt: string | null;
 };
 
 export type ReadingSessionDto = {
@@ -142,6 +159,7 @@ export type ShelfItemDto = {
   shelfStatus: ShelfStatus;
   favorite: boolean;
   progressPercent: number;
+  previewProgressPercent?: number | null;
   updatedAt: string;
 };
 
@@ -163,6 +181,46 @@ export type ParagraphCommentDto = {
   userName: string;
   content: string;
   createdAt: string;
+};
+
+export type BookHighlightDto = {
+  id: string;
+  userId: string;
+  bookId: string;
+  chapterId: string | null;
+  chapterNumber: number;
+  pageNumber: number;
+  selectedText: string;
+  color: HighlightColor;
+  note: string | null;
+  createdAt: string;
+};
+
+export type ReadingProgressDto = {
+  bookId: string;
+  lastChapterId: string | null;
+  lastChapterNumber: number;
+  lastPageNumber: number;
+  lastScrollPercent: number;
+  lastParagraphIndex: number | null;
+  layout: "scroll" | "slide" | null;
+  capturedAt: number;
+  updatedAt: string;
+};
+
+export type ReadingProgressScope = "full" | "preview";
+
+export type AuthorSummaryDto = {
+  name: string;
+  avatarUrl: string | null;
+  bookCount: number;
+};
+
+export type CollectionSummaryDto = {
+  name: string;
+  slug: string;
+  bookCount: number;
+  coverUrl?: string;
 };
 
 export type {

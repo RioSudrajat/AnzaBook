@@ -7,7 +7,7 @@ test("anonymous visitors cannot access the protected app", async ({
   request,
 }) => {
   await page.goto("/app");
-  await expect(page).toHaveURL(/\/sign-in$/);
+  await expect(page).toHaveURL(/\/sign-in\?redirect=%2Fapp$/);
   await expect(
     page.getByRole("heading", { name: "Welcome back" }),
   ).toBeVisible();
@@ -30,16 +30,13 @@ test("signup, persisted session, signout, rejected password, and signin work acr
     .getByRole("button", { name: "Create account", exact: true })
     .click();
   await expect(page).toHaveURL(/\/app$/);
-  await expect(
-    page.getByRole("button", { name: "Sign out", exact: true }),
-  ).toBeVisible();
+  const settings = page.getByRole("navigation", { name: "Navigasi Utama" }).getByRole("button", { name: "Settings" });
+  await expect(settings).toBeVisible();
   // A full reload is rendered by the web server, which reads the session
   // from the API with the browser's cookie.
   await page.reload();
   await expect(page).toHaveURL(/\/app$/);
-  await expect(
-    page.getByRole("button", { name: "Sign out", exact: true }),
-  ).toBeVisible();
+  await expect(settings).toBeVisible();
   const cookies = await context.cookies(API_URL);
   expect(
     cookies.some(
@@ -48,10 +45,11 @@ test("signup, persisted session, signout, rejected password, and signin work acr
   ).toBe(true);
   await page.goto("/sign-in");
   await expect(page).toHaveURL(/\/app$/);
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await expect(page).toHaveURL(/\/sign-in$/);
+  await settings.click();
+  await page.getByRole("button", { name: "Keluar", exact: true }).click();
+  await expect(page).toHaveURL("/");
   await page.goto("/app");
-  await expect(page).toHaveURL(/\/sign-in$/);
+  await expect(page).toHaveURL(/\/sign-in\?redirect=%2Fapp$/);
   await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByLabel("Password", { exact: true }).fill("incorrect-password");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();

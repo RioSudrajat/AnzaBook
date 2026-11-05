@@ -10,6 +10,7 @@
     "./validators/books": "./src/validators/books.ts",
     "./validators/reading": "./src/validators/reading.ts",
     "./validators/community": "./src/validators/community.ts",
+    "./validators/membership": "./src/validators/membership.ts",
     "./validators/publisher": "./src/validators/publisher.ts",
     "./print-economics": "./src/print-economics.ts",
     "./types": "./src/types/api.ts",

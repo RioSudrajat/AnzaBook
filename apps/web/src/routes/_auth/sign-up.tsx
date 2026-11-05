@@ -4,5 +4,10 @@ import { siteConfig } from "@/config/site";
 
 export const Route = createFileRoute("/_auth/sign-up")({
   head: () => ({ meta: [{ title: `Create account | ${siteConfig.name}` }] }),
-  component: () => <AuthForm mode="sign-up" />,
+  component: SignUp,
 });
+
+function SignUp() {
+  const search = Route.useSearch();
+  return <AuthForm mode="sign-up" redirectTo={search.redirect} socialError={!!search.error} />;
+}
