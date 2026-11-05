@@ -43,6 +43,13 @@
       "when": 1793848349379,
       "tag": "0005_disable_demo_claims",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793854341772,
+      "tag": "0006_membership_cancellation",
+      "breakpoints": true
     }
   ]
 }

@@ -38,6 +38,7 @@ export const membershipOrders = pgTable(
     paidTransactionId: text("paid_transaction_id").unique(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     paidAt: timestamp("paid_at", { withTimezone: true }),
+    accessRevokedAt: timestamp("access_revoked_at", { withTimezone: true }),
   },
   (table) => [
     check("membership_orders_tax_breakdown_check", sql`
@@ -55,6 +56,7 @@ export const membershipOrders = pgTable(
 export const memberships = pgTable("memberships", {
   userId: text("user_id").primaryKey().references(() => user.id, { onDelete: "cascade" }),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  canceledAt: timestamp("canceled_at", { withTimezone: true }),
 });
 
 export const membershipPaymentEvents = pgTable(

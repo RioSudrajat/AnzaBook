@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  useCancelMembership,
   useMembershipOrders,
   useMembershipSummary,
   useSaveMembershipReminders,
@@ -23,6 +24,13 @@ import {
 import { ApiError } from "@/lib/api/client";
 import { authClient } from "@/lib/auth-client";
 import { QrProfileDialog } from "./qr-profile-dialog";
+
+const membershipStatusLabel = {
+  inactive: "Belum menjadi Nakama",
+  active: "Nakama aktif",
+  expired: "Nakama berakhir",
+  canceled: "Nakama dibatalkan",
+};
 
 type DashboardSettingsProps = {
   userName: string;
@@ -50,10 +58,13 @@ export function DashboardSettings({
   const [isQrOpen, setIsQrOpen] = useState(false);
   const [username, setUsername] = useState("");
   const [usernameError, setUsernameError] = useState<string>();
+  const [cancelExpiry, setCancelExpiry] = useState<string | null>(null);
+  const cancelTrigger = useRef<HTMLButtonElement>(null);
   const [logoutPending, setLogoutPending] = useState(false);
   const [logoutError, setLogoutError] = useState(false);
   const [verification, setVerification] = useState<"idle" | "pending" | "sent" | "error">("idle");
   const membership = useMembershipSummary();
+  const cancelNakama = useCancelMembership();
   const orders = useMembershipOrders(activeSubTab === "dues_history");
   const saveUsername = useSaveMembershipUsername();
   const saveReminders = useSaveMembershipReminders();
@@ -172,21 +183,77 @@ export function DashboardSettings({
               <div className="sm:col-span-9 flex flex-wrap items-center gap-2">
                 {membership.data ? (
                   <>
-                    <span className="rounded bg-muted px-2 py-1 text-muted-foreground">
-                      {membership.data.status === "active" ? "Nakama aktif"
-                        : membership.data.status === "expired" ? "Nakama berakhir" : "Belum menjadi Nakama"}
+                    <span role="status" className="rounded bg-muted px-2 py-1 text-muted-foreground">
+                      {membershipStatusLabel[membership.data.status]}
                     </span>
                     {membership.data.expiresAt && (
                       <span className="text-muted-foreground">
-                        {membership.data.status === "active" ? "Aktif hingga " : "Berakhir "}
+                        {membership.data.status === "active" ? "Aktif hingga "
+                          : membership.data.status === "canceled" ? "Dibatalkan pada " : "Berakhir "}
                         {formatMembershipDate(membership.data.expiresAt)}
                       </span>
                     )}
                     <Button asChild variant="link" className="min-h-11">
                       <Link to="/membership" search={{}}>
-                        {membership.data.status === "inactive" ? "Jadi Nakama" : "Perpanjang Nakama"}
+                        {membership.data.status === "inactive" ? "Jadi Nakama"
+                          : membership.data.status === "canceled" ? "Gabung kembali" : "Perpanjang Nakama"}
                       </Link>
                     </Button>
+                    {membership.data.status === "active" && membership.data.expiresAt && (
+                      <Button
+                        ref={cancelTrigger}
+                        type="button"
+                        variant="ghost"
+                        className="min-h-11 text-destructive hover:text-destructive"
+                        aria-expanded={cancelExpiry !== null}
+                        aria-controls="nakama-cancellation"
+                        disabled={cancelNakama.isPending}
+                        onClick={() => {
+                          cancelNakama.reset();
+                          setCancelExpiry(cancelExpiry === null ? membership.data?.expiresAt ?? null : null);
+                        }}
+                      >
+                        Batalkan keanggotaan
+                      </Button>
+                    )}
+                    {membership.data.status === "active" && cancelExpiry !== null && (
+                      <fieldset id="nakama-cancellation" className="mt-2 w-full min-w-0 space-y-3 rounded-md border border-border p-4">
+                        <legend className="px-1 font-semibold">Konfirmasi pembatalan Nakama</legend>
+                        <p className="font-sans text-muted-foreground">
+                          Akses Premium langsung dihentikan dan sisa masa aktif berakhir. Pengembalian dana ditangani terpisah.
+                        </p>
+                        {cancelNakama.isError && (
+                          <p role="alert" className="text-destructive">
+                            {cancelNakama.error instanceof ApiError ? cancelNakama.error.message : "Pembatalan gagal. Coba lagi."}
+                          </p>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="min-h-11"
+                            disabled={cancelNakama.isPending}
+                            onClick={() => {
+                              setCancelExpiry(null);
+                              cancelTrigger.current?.focus();
+                            }}
+                          >
+                            Tetap jadi Nakama
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            className="min-h-11"
+                            disabled={cancelNakama.isPending}
+                            onClick={() => cancelNakama.mutate({ confirm: true, expiresAt: cancelExpiry }, {
+                              onSuccess: () => setCancelExpiry(null),
+                            })}
+                          >
+                            {cancelNakama.isPending ? "Membatalkan…" : "Ya, batalkan keanggotaan"}
+                          </Button>
+                        </div>
+                      </fieldset>
+                    )}
                   </>
                 ) : membership.isError ? (
                   <Button variant="link" className="min-h-11" onClick={() => void membership.refetch()}>Muat ulang status</Button>

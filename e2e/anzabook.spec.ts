@@ -41,12 +41,15 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     await expect(page.getByRole("button", { name: "Lanjut ke bab 2", exact: true })).toHaveCount(0);
     await secondChapter.evaluate((section) => section.scrollIntoView({ block: "start" }));
     await expect(page.getByText("Bab 2/2", { exact: true })).toBeVisible();
+    await expect(page.getByText("50%", { exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: "Keluar ke Home" }).click();
     await expect(page).toHaveURL(/\/app/);
+    await expect(page.getByRole("region", { name: "Lanjutkan Membaca" })).toContainText("50%");
     await page.getByRole("region", { name: "Lanjutkan Membaca" }).getByRole("link", { name: "Lanjut Baca" }).click();
     await expect(secondChapter.getByRole("heading")).toBeInViewport();
     await expect(page.getByText("Bab 2/2", { exact: true })).toBeVisible();
+    await expect(page.getByText("50%", { exact: true })).toBeVisible();
 
     const detail = await page.request.get(`${API_URL}/api/books/${slug}`);
     const { data: book } = await detail.json();
@@ -60,7 +63,30 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     expect(checkpoint.ok()).toBeTruthy();
     await page.goto(`/read/${slug}`);
     await expect(page.getByRole("heading", { name: chapter.title, exact: true, level: 1 })).toBeVisible();
-    await expect(page.getByText(/Halaman 1 dari/)).toBeVisible();
+    await expect(page.getByText("Halaman 1 dari 1", { exact: true })).toBeVisible();
+    await expect(page.getByText("99%", { exact: true })).toBeVisible();
+
+    await page.setViewportSize({ width: 1700, height: 1050 });
+    await page.goto(`/read/${slug}?chapter=1`);
+    await expect(page.getByRole("dialog", { name: "Prapemuat Literasi AnzaBook" })).toHaveCount(0);
+    await expect(page.getByText("Bab 1/2", { exact: true })).toBeVisible();
+    await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" }));
+    await expect(page.getByText("Bab 2/2", { exact: true })).toBeVisible();
+    await expect(page.getByText("100%", { exact: true })).toBeVisible();
+    await expect.poll(async () => {
+      const response = await page.request.get(`${API_URL}/api/reading/progress/${book.id}`);
+      return (await response.json()).data;
+    }).toMatchObject({ lastChapterNumber: 2, lastScrollPercent: 100, lastParagraphIndex: 1, layout: "scroll" });
+
+    await page.goto(`/read/${slug}`);
+    await expect(page.getByText("100%", { exact: true })).toBeVisible();
+    await expect.poll(() => page.evaluate(() => {
+      const root = document.scrollingElement!;
+      return root.scrollHeight - root.clientHeight - root.scrollTop;
+    })).toBeLessThanOrEqual(1);
+    await page.getByRole("button", { name: "Keluar ke Home" }).click();
+    await page.goto("/app?tab=library");
+    await expect(page.getByRole("region", { name: "Selesai Dibaca" }).getByRole("link", { name: book.title })).toBeVisible();
   });
 
   test("homepage renders hero book shelf, weekly bulletin, and catalog with ratings and tiers", async ({

@@ -13,6 +13,7 @@ import { db } from "../db";
 import { membershipOrders, membershipReminders, memberships, user } from "../db/schema";
 import { reconcileMembershipPayment } from "../services/membership.service";
 import { processMembershipReminders } from "../services/membership-reminders";
+import { membershipExpiresAt } from "../services/membership-policy";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -144,6 +145,78 @@ describe("membership checkout", () => {
     const [account] = await db.select({ id: user.id }).from(user).where(eq(user.email, recipientEmail));
     await db.update(memberships).set({ expiresAt: new Date() }).where(eq(memberships.userId, account.id));
     expect((await recipient.get(chapter)).status).toBe(403);
+  });
+
+  it("cancels only the caller's membership immediately and keeps old payments revoked", async () => {
+    const reader = agent();
+    const other = agent();
+    const email = await signUp(reader);
+    const otherEmail = await signUp(other);
+    const [account] = await db.select({ id: user.id }).from(user).where(eq(user.email, email));
+    const [otherAccount] = await db.select({ id: user.id }).from(user).where(eq(user.email, otherEmail));
+    const otherExpiry = new Date(Date.now() + 60 * 86400_000);
+    await db.insert(memberships).values({ userId: otherAccount.id, expiresAt: otherExpiry });
+    const [order] = await db.insert(membershipOrders).values({
+      buyerId: account.id, beneficiaryId: account.id, requestId: randomUUID(),
+      planId: "quarterly", months: 3, priceIdr: 66_600,
+    }).returning();
+    const payment = {
+      orderId: order.id, transactionId: "cancel-" + order.id, priceIdr: 66_600,
+      currency: "IDR" as const, status: "paid" as const, paidAt: new Date(),
+    };
+    await reconcileMembershipPayment(payment);
+    const [gift] = await db.insert(membershipOrders).values({
+      buyerId: otherAccount.id, beneficiaryId: account.id, requestId: randomUUID(),
+      planId: "quarterly", months: 3, priceIdr: 66_600,
+    }).returning();
+    await reconcileMembershipPayment({ ...payment, orderId: gift.id, transactionId: "gift-" + gift.id });
+    const chapter = "/api/books/sains-logika-seni-hidup-bermutu/read?chapter=2&mode=full";
+    expect((await reader.get(chapter)).status).toBe(200);
+    const endpoint = "/api/membership/cancel";
+    const { expiresAt } = (await reader.get("/api/membership")).body.data;
+    const confirmation = { confirm: true, expiresAt };
+    expect((await agent().post(endpoint).set(originHeader).send(confirmation)).status).toBe(401);
+    expect((await reader.post(endpoint).set("Origin", "https://other.test").send(confirmation)).status).toBe(403);
+    expect((await reader.post(endpoint).set(originHeader).send({ ...confirmation, userId: otherAccount.id })).status).toBe(422);
+    expect((await reader.post(endpoint).set(originHeader).send({ ...confirmation, confirm: false })).status).toBe(422);
+
+    const [cancel, retry] = await Promise.all([
+      reader.post(endpoint).set(originHeader).send(confirmation),
+      reader.post(endpoint).set(originHeader).send(confirmation),
+    ]);
+    expect(cancel.status).toBe(200);
+    expect(cancel.body.data.status).toBe("canceled");
+    expect(retry.body.data).toEqual(cancel.body.data);
+    expect((await reader.get(chapter)).status).toBe(403);
+    expect((await other.get("/api/membership")).body.data).toMatchObject({
+      status: "active", expiresAt: otherExpiry.toISOString(),
+    });
+    expect((await reader.get("/api/membership/orders/" + order.id)).body.data).toMatchObject({
+      status: "paid", accessRevoked: true,
+    });
+    expect((await other.get("/api/membership/orders/" + gift.id)).body.data).toMatchObject({
+      status: "paid", accessRevoked: false,
+    });
+    const reminders = await db.select().from(membershipReminders).where(eq(membershipReminders.userId, account.id));
+    expect(reminders.length).toBeGreaterThan(0);
+    expect(reminders.every((reminder) => reminder.canceledAt !== null)).toBe(true);
+
+    await reconcileMembershipPayment(payment);
+    await reconcileMembershipPayment({ ...payment, status: "refunded" });
+    expect((await reader.get("/api/membership")).body.data.status).toBe("canceled");
+    expect((await reader.get(chapter)).status).toBe(403);
+    const [newOrder] = await db.insert(membershipOrders).values({
+      buyerId: account.id, beneficiaryId: account.id, requestId: randomUUID(),
+      planId: "quarterly", months: 3, priceIdr: 66_600,
+    }).returning();
+    await reconcileMembershipPayment({ ...payment, orderId: newOrder.id, transactionId: "new-" + newOrder.id, paidAt: new Date() });
+    const [paidOrder] = await db.select().from(membershipOrders).where(eq(membershipOrders.id, newOrder.id));
+    expect((await reader.get("/api/membership")).body.data).toMatchObject({
+      status: "active",
+      expiresAt: membershipExpiresAt([{ months: 3, paidAt: paidOrder.paidAt! }])!.toISOString(),
+    });
+    expect((await reader.post(endpoint).set(originHeader).send(confirmation)).status).toBe(409);
+    expect((await reader.get(chapter)).status).toBe(200);
   });
 
   it("retries reminders, deduplicates delivery and only emails verified accounts", async () => {

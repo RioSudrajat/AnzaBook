@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  membershipCancelSchema,
   membershipCheckoutSchema,
   membershipOrderId,
   membershipRemindersSchema,
@@ -12,6 +13,7 @@ import { jsonBody } from "../middleware/body";
 import { requireTrustedOrigin } from "../middleware/origin";
 import { verifyMidtransNotification } from "../services/membership-payment";
 import {
+  cancelMembership,
   getMembershipOrder,
   getMembershipRecipient,
   getMembershipSummary,
@@ -48,6 +50,11 @@ membershipRouter.use(requireAuth, requireTrustedOrigin);
 
 membershipRouter.get("/", async (req, res) => {
   res.json({ data: await getMembershipSummary(getAuth(req).user.id) });
+});
+
+membershipRouter.post("/cancel", jsonBody, async (req, res) => {
+  const { expiresAt } = membershipCancelSchema.parse(req.body);
+  res.json({ data: await cancelMembership(getAuth(req).user.id, new Date(expiresAt)) });
 });
 
 membershipRouter.post("/username", jsonBody, async (req, res) => {

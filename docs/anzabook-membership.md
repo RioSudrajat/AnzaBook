@@ -15,6 +15,10 @@ Harga paket adalah subtotal sebelum pajak. API menghitung pajak dari subtotal da
 
 Sebelum menyalakan pembayaran live, tetapkan tarif efektif yang berlaku untuk bisnis dan produk. Konfigurasi live membutuhkan `MEMBERSHIP_TAX_RATE_BPS` eksplisit, termasuk `0` bila sesuai. Rincian pesanan lama tetap memakai tarif saat pesanan dibuat. [Referensi item dan total Snap](https://docs.midtrans.com/reference/json-objects)
 
+## Membatalkan keanggotaan
+
+Buka **Settings → Akun → Batalkan keanggotaan**. Setelah dikonfirmasi, sisa akses Premium dari keanggotaan berakhir saat itu juga. Riwayat iuran tetap tercatat. Pembayaran baru yang terverifikasi memulai masa aktif baru.
+
 ## Login Google dan pengingat Gmail
 
 Untuk login, atur `GOOGLE_CLIENT_ID` dan `GOOGLE_CLIENT_SECRET` dari aplikasi OAuth Google. Daftarkan URL API yang diikuti `/api/auth/callback/google` sebagai **Authorized redirect URI**. Pada konfigurasi lokal bawaan, URL-nya `http://localhost:4000/api/auth/callback/google`. [Better Auth Google](https://better-auth.com/docs/authentication/google)

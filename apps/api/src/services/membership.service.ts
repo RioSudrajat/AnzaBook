@@ -74,6 +74,7 @@ function toOrder(order: Order): MembershipOrderDto {
       ? null
       : { subtotalIdr: order.subtotalIdr, taxIdr: order.taxIdr, rateBps: order.taxRateBps },
     status: linkExpired ? "expired" : order.status,
+    accessRevoked: order.buyerId === order.beneficiaryId && order.accessRevokedAt !== null,
     recipientUsername: order.recipientUsername,
     bookSlug: order.bookSlug,
     checkoutUrl: awaitingPayment && !linkExpired ? order.checkoutUrl : null,
@@ -86,15 +87,19 @@ export async function getActiveMembership(userId: string, now = new Date()) {
   const [membership] = await db
     .select({ expiresAt: memberships.expiresAt })
     .from(memberships)
-    .where(and(eq(memberships.userId, userId), gt(memberships.expiresAt, now)));
+    .where(and(eq(memberships.userId, userId), gt(memberships.expiresAt, now), isNull(memberships.canceledAt)));
   return membership ?? null;
 }
 
-export async function getMembershipSummary(userId: string): Promise<MembershipSummaryDto> {
-  const [account] = await db
+export async function getMembershipSummary(
+  userId: string,
+  connection: typeof db | Transaction = db,
+): Promise<MembershipSummaryDto> {
+  const [account] = await connection
     .select({
       username: user.username,
       expiresAt: memberships.expiresAt,
+      canceledAt: memberships.canceledAt,
       reminderEmailsEnabled: user.membershipReminderEmails,
     })
     .from(user)
@@ -104,10 +109,36 @@ export async function getMembershipSummary(userId: string): Promise<MembershipSu
   return {
     username: account?.username ?? null,
     expiresAt: expiresAt?.toISOString() ?? null,
-    status: getMembershipStatus(expiresAt, new Date()),
+    status: account?.canceledAt ? "canceled" : getMembershipStatus(expiresAt, new Date()),
     checkoutAvailable: Boolean(env.MIDTRANS_SERVER_KEY),
     reminderEmailsEnabled: account?.reminderEmailsEnabled ?? true,
   };
+}
+
+export async function cancelMembership(userId: string, expectedExpiry: Date): Promise<MembershipSummaryDto> {
+  return db.transaction(async (tx) => {
+    // Payment reconciliation and reminder delivery take the same beneficiary lock.
+    await tx.select({ id: user.id }).from(user).where(eq(user.id, userId)).for("no key update");
+    const now = new Date();
+    const [current] = await tx.select({ expiresAt: memberships.expiresAt })
+      .from(memberships).where(and(
+        eq(memberships.userId, userId), gt(memberships.expiresAt, now), isNull(memberships.canceledAt),
+      ));
+    if (!current) return getMembershipSummary(userId, tx);
+    if (current.expiresAt.getTime() !== expectedExpiry.getTime()) {
+      throw new HttpError(409, "MEMBERSHIP_CHANGED", "Masa aktif Nakama berubah. Buka konfirmasi baru untuk membatalkan.");
+    }
+
+    await tx.update(memberships).set({ expiresAt: now, canceledAt: now })
+      .where(eq(memberships.userId, userId));
+    await tx.update(membershipOrders).set({ accessRevokedAt: now }).where(and(
+      eq(membershipOrders.beneficiaryId, userId),
+      eq(membershipOrders.status, "paid"),
+      isNull(membershipOrders.accessRevokedAt),
+    ));
+    await cancelPendingReminders(tx, userId, now);
+    return getMembershipSummary(userId, tx);
+  });
 }
 
 export async function setMembershipReminderEmails(userId: string, enabled: boolean) {
@@ -242,29 +273,38 @@ export async function membershipOrderExists(orderId: string) {
   return Boolean(order);
 }
 
+async function cancelPendingReminders(tx: Transaction, userId: string, now: Date, keepExpiry?: Date | null) {
+  await tx.update(membershipReminders).set({ canceledAt: now }).where(and(
+    eq(membershipReminders.userId, userId),
+    isNull(membershipReminders.sentAt),
+    isNull(membershipReminders.canceledAt),
+    keepExpiry ? ne(membershipReminders.expiresAt, keepExpiry) : undefined,
+  ));
+}
+
 async function refreshEntitlement(tx: Transaction, userId: string) {
   const orders = await tx.select({ months: membershipOrders.months, paidAt: membershipOrders.paidAt })
     .from(membershipOrders)
-    .where(and(eq(membershipOrders.beneficiaryId, userId), eq(membershipOrders.status, "paid"), isNotNull(membershipOrders.paidAt)))
+    .where(and(
+      eq(membershipOrders.beneficiaryId, userId),
+      eq(membershipOrders.status, "paid"),
+      isNotNull(membershipOrders.paidAt),
+      isNull(membershipOrders.accessRevokedAt),
+    ))
     .orderBy(asc(membershipOrders.paidAt), asc(membershipOrders.id));
   const expiresAt = membershipExpiresAt(orders.flatMap(({ months, paidAt }) =>
     paidAt ? [{ months, paidAt }] : [],
   ));
 
-  await tx.update(membershipReminders).set({ canceledAt: new Date() }).where(and(
-    eq(membershipReminders.userId, userId),
-    isNull(membershipReminders.sentAt),
-    isNull(membershipReminders.canceledAt),
-    expiresAt ? ne(membershipReminders.expiresAt, expiresAt) : undefined,
-  ));
+  await cancelPendingReminders(tx, userId, new Date(), expiresAt);
   if (!expiresAt) {
-    await tx.delete(memberships).where(eq(memberships.userId, userId));
+    await tx.delete(memberships).where(and(eq(memberships.userId, userId), isNull(memberships.canceledAt)));
     return;
   }
 
   await tx.insert(memberships).values({ userId, expiresAt }).onConflictDoUpdate({
     target: memberships.userId,
-    set: { expiresAt },
+    set: { expiresAt, canceledAt: null },
   });
   await tx.insert(membershipReminders).values([
     { userId, expiresAt, kind: "expiring", dueAt: new Date(expiresAt.getTime() - 7 * DAY_MS) },

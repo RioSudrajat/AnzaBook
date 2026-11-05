@@ -1,4 +1,5 @@
 import type {
+  MembershipCancelInput,
   MembershipCheckoutInput,
   MembershipOrderDto,
   MembershipPlanDto,
@@ -16,6 +17,12 @@ export async function listMembershipPlans(signal?: AbortSignal) {
 
 export async function getMembershipSummary(signal?: AbortSignal) {
   return (await apiFetch<Data<MembershipSummaryDto>>(path, { signal })).data;
+}
+
+export async function cancelMembership(input: MembershipCancelInput) {
+  return (await apiFetch<Data<MembershipSummaryDto>>(`${path}/cancel`, {
+    method: "POST", body: input,
+  })).data;
 }
 
 export async function saveMembershipUsername(username: string) {

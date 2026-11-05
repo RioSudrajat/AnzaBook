@@ -1,4 +1,5 @@
 import { and, desc, eq, lt, sql } from "drizzle-orm";
+import { bookProgressPercent } from "@starter/shared/reading-progress";
 import { db } from "../db";
 import {
   books,
@@ -287,8 +288,7 @@ export async function saveReadingProgress(
       .where(eq(bookChapters.bookId, bookId)).orderBy(bookChapters.chapterNumber)
     : [];
   const chapterIndex = chapters.findIndex((item) => item.number === input.lastChapterNumber);
-  const progressPercent = chapterIndex < 0 ? 0 :
-    Math.floor((chapterIndex * 100 + input.lastScrollPercent) / chapters.length);
+  const progressPercent = bookProgressPercent(chapterIndex, chapters.length, input.lastScrollPercent);
   const shelfStatus = progressPercent >= 100 ? "finished" : "reading";
 
   const row = await db.transaction(async (tx) => {

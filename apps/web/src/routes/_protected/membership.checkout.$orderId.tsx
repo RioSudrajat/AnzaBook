@@ -42,7 +42,7 @@ function CheckoutStatus({ orderId }: { orderId: string }) {
   const checked = useRef(false);
   const returned = useRef(false);
   const status = order?.status;
-  const returnBook = order && !order.recipientUsername ? order.bookSlug : null;
+  const returnBook = order && !order.recipientUsername && !order.accessRevoked ? order.bookSlug : null;
 
   useEffect(() => {
     if (status !== "pending" || checked.current) return;
@@ -108,9 +108,9 @@ function CheckoutStatus({ orderId }: { orderId: string }) {
       {order.status === "paid" && (
         <div className="space-y-4">
           <p className="text-sm">
-            {order.recipientUsername
-              ? `Akses Nakama sudah aktif untuk @${order.recipientUsername}.`
-              : "Akses Nakama sudah aktif untuk akunmu."}
+            {order.accessRevoked ? "Keanggotaan dari pesanan ini sudah dibatalkan."
+              : order.recipientUsername ? `Pembayaran hadiah Nakama untuk @${order.recipientUsername} terverifikasi.`
+              : "Pembayaran Nakama untuk akunmu terverifikasi."}
             {order.paidAt && ` Dibayar ${formatMembershipDate(order.paidAt)}.`}
           </p>
           {returnBook && (

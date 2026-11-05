@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { z } from "zod";
+import { bookProgressPercent } from "@starter/shared/reading-progress";
 import type { BookHighlightDto, HighlightColor } from "@starter/shared/types";
 import type { SaveReadingProgressInput } from "@starter/shared/validators/reading";
 import { Button } from "@/components/ui/button";
@@ -173,6 +174,10 @@ function ReaderPage() {
 
 const paragraphsPerPage = 3;
 
+function slideChapterPercent(pageIndex: number, pageCount: number) {
+  return Math.min(99, Math.round((pageIndex + 1) / pageCount * 100));
+}
+
 function chapterSection(chapterNumber: number) {
   return document.getElementById(`chapter-sec-${chapterNumber}`);
 }
@@ -299,6 +304,12 @@ function ReaderBook() {
       const section = chapterSection(target);
       if (!section) return;
       setScrollPosition({ chapter: target, percent: checkpoint?.lastScrollPercent ?? 0 });
+      if (payload.hasFullAccess && checkpoint === savedProgress && savedChapter &&
+          savedChapter.id === payload.chapters?.at(-1)?.id &&
+          checkpoint?.layout === "scroll" && checkpoint.lastScrollPercent === 100) {
+        window.scrollTo({ top: document.documentElement.scrollHeight });
+        return;
+      }
       const marker = section.querySelector(`[data-reader-paragraph="${checkpoint?.lastParagraphIndex}"]`);
       if (marker && (checkpoint?.lastScrollPercent ?? 0) > 0) {
         marker.scrollIntoView({ block: "start" });
@@ -311,7 +322,7 @@ function ReaderBook() {
       }
     });
     return () => cancelAnimationFrame(frame);
-  }, [payload, progress, requestedChapter, search.chapter, waitingForCheckpoint]);
+  }, [payload, progress, requestedChapter, savedProgress, search.chapter, waitingForCheckpoint]);
 
   useEffect(() => {
     const deadline = payload?.accessExpiresAt;
@@ -342,28 +353,43 @@ function ReaderBook() {
     if (!chapter || !hasRestoredRef.current) return null;
     let positionChapter = chapter;
     let paragraphCount = chapterParagraphCount;
-    let percent = Math.min(99, Math.round((page + 1) / pageCount * 100));
+    let percent = slideChapterPercent(page, pageCount);
     let paragraph = page * paragraphsPerPage;
     if (readingLayout === "scroll") {
       const sections = readerCanvasRef.current?.querySelectorAll<HTMLElement>("section[data-chapter-number]");
+      if (!sections?.length) return null;
+      const finalSection = sections[sections.length - 1];
       const viewportMarker = window.innerHeight * 0.36;
-      let body = sections?.[0];
-      for (const section of sections ?? []) {
+      const scrollRoot = document.scrollingElement;
+      const scrollTop = scrollRoot?.scrollTop ?? 0;
+      const maxScroll = scrollRoot ? scrollRoot.scrollHeight - scrollRoot.clientHeight : 0;
+      const atBookEnd = payload?.hasFullAccess && maxScroll > 0 && scrollTop > 0 && maxScroll - scrollTop <= 1;
+      let body = sections[0];
+      for (const section of sections) {
         if (section.getBoundingClientRect().top > viewportMarker) break;
         body = section;
       }
-      if (!body) return null;
+      if (atBookEnd) body = finalSection;
       const visibleChapter = payload?.chapters?.find((item) => item.chapterNumber === Number(body.dataset.chapterNumber));
       if (visibleChapter) {
         positionChapter = visibleChapter;
         if (visibleChapter !== chapter) paragraphCount = splitParagraphs(visibleChapter.contentId).length;
       }
       const rect = body.getBoundingClientRect();
-      const range = Math.max(1, rect.height - viewportMarker);
-      percent = Math.min(100, Math.max(0, Math.round((-rect.top / range) * 100)));
+      if (atBookEnd) {
+        percent = 100;
+      } else if (payload?.hasFullAccess && body === finalSection) {
+        // A short final chapter may never reach the top before scrolling ends.
+        const chapterStart = Math.max(0, scrollTop + rect.top - parseFloat(getComputedStyle(body).scrollMarginTop));
+        const range = Math.max(1, maxScroll - chapterStart);
+        percent = Math.min(99, Math.max(0, Math.floor((scrollTop - chapterStart) / range * 100)));
+      } else {
+        const range = Math.max(1, rect.height - viewportMarker);
+        percent = Math.min(100, Math.max(0, Math.round((-rect.top / range) * 100)));
+      }
       paragraph = 0;
       for (const marker of body.querySelectorAll<HTMLElement>("[data-reader-paragraph]")) {
-        if (marker.getBoundingClientRect().top <= viewportMarker) {
+        if (atBookEnd || marker.getBoundingClientRect().top <= viewportMarker) {
           paragraph = Number(marker.dataset.readerParagraph);
         }
       }
@@ -378,7 +404,7 @@ function ReaderBook() {
       layout: readingLayout,
       capturedAt: Date.now(),
     };
-  }, [chapter, chapterParagraphCount, pageCount, payload?.chapters, readingLayout, slidePageIndex]);
+  }, [chapter, chapterParagraphCount, pageCount, payload?.chapters, payload?.hasFullAccess, readingLayout, slidePageIndex]);
 
   const queueCheckpoint = useCallback((position: SaveReadingProgressInput) => {
     clearTimeout(pendingCheckpoint.current);
@@ -669,17 +695,13 @@ function ReaderBook() {
         ? "font-sans"
         : "font-sans tracking-wide";
 
-  // Slide mode calculation for current chapter
-  const idParagraphsCurrent = splitParagraphs(currentChapter.contentId);
-  const totalSlidePages = Math.max(
-    1,
-    Math.ceil(idParagraphsCurrent.length / paragraphsPerPage),
-  );
-
-  const currentPercent =
+  const chapterPercent =
     readingLayout === "slide"
-      ? Math.round(((slidePageIndex + 1) / totalSlidePages) * 100)
+      ? slideChapterPercent(slidePageIndex, pageCount)
       : scrollPosition.percent;
+  const currentPercent = payload.hasFullAccess
+    ? bookProgressPercent(chapterIndex, allChapters.length, chapterPercent)
+    : chapterPercent;
 
   return (
     <DrmShield watermarkText={watermark} enabled={isDrmEnabled}>
@@ -730,7 +752,7 @@ function ReaderBook() {
                 audioUrl={currentChapter.audioUrl}
                 totalDurationSeconds={currentChapter.audioDurationSeconds || 900}
                 activeParagraphIndex={activeParagraphIndex}
-                totalParagraphs={idParagraphsCurrent.length}
+                totalParagraphs={chapterParagraphCount}
                 onParagraphChange={(idx) => {
                   setActiveParagraphIndex(idx);
                   chapterSection(currentChapter.chapterNumber)
@@ -926,7 +948,7 @@ function ReaderBook() {
                 className={`${fontClass}`}
                 style={{ fontSize: `${fontSize}px`, lineHeight: 1.85 }}
               >
-                {idParagraphsCurrent
+                {chapterParagraphs
                   .slice(
                     slidePageIndex * paragraphsPerPage,
                     (slidePageIndex + 1) * paragraphsPerPage,
@@ -934,7 +956,7 @@ function ReaderBook() {
                   .map((text, idx) => (
                     <p
                       key={idx}
-                      data-preview-fade={isPremiumPreview && slidePageIndex * paragraphsPerPage + idx === idParagraphsCurrent.length - 1 || undefined}
+                      data-preview-fade={isPremiumPreview && slidePageIndex * paragraphsPerPage + idx === chapterParagraphCount - 1 || undefined}
                       className="leading-relaxed text-justify mb-6 select-text"
                     >
                       {renderHighlightedText(
@@ -960,13 +982,13 @@ function ReaderBook() {
                 </Button>
 
                 <span className="font-bold">
-                  Halaman {slidePageIndex + 1} dari {totalSlidePages}
+                  Halaman {slidePageIndex + 1} dari {pageCount}
                 </span>
 
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={slidePageIndex >= totalSlidePages - 1}
+                  disabled={slidePageIndex >= pageCount - 1}
                   onClick={() => turnPage(slidePageIndex + 1)}
                   className="gap-1.5"
                 >

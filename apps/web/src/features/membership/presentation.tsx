@@ -1,6 +1,7 @@
-import type {
-  MembershipOrderStatus,
-  MembershipPlanDto,
+import {
+  parseMidtransCheckoutUrl,
+  type MembershipOrderStatus,
+  type MembershipPlanDto,
 } from "@starter/shared/validators/membership";
 
 const rupiah = new Intl.NumberFormat("id-ID");
@@ -26,11 +27,7 @@ export const orderStatusLabel: Record<MembershipOrderStatus, string> = {
 };
 
 export function isMidtransCheckoutUrl(value: string | null): value is string {
-  if (!value) return false;
-  const url = URL.parse(value);
-  return !!url && !url.username && !url.password && (
-    url.origin === "https://app.sandbox.midtrans.com" || url.origin === "https://app.midtrans.com"
-  ) && url.pathname.startsWith("/snap/v2/vtweb/");
+  return value !== null && parseMidtransCheckoutUrl(value) !== null;
 }
 
 export function MembershipPriceBreakdown({

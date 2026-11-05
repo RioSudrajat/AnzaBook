@@ -11,6 +11,16 @@ export const membershipOrderStatus = z.enum([
   "refunded",
 ]);
 export const membershipOrderId = z.uuid();
+
+export function parseMidtransCheckoutUrl(value: string): URL | null {
+  const url = URL.parse(value);
+  if (!url || url.username || url.password) return null;
+  if (url.origin !== "https://app.sandbox.midtrans.com" && url.origin !== "https://app.midtrans.com") {
+    return null;
+  }
+  return /^\/snap\/(?:v[34]\/redirection|v2\/vtweb)\/[^/]+$/.test(url.pathname) ? url : null;
+}
+
 const username = z
   .string()
   .trim()
@@ -21,6 +31,10 @@ const username = z
 
 export const membershipUsernameSchema = z.strictObject({ username });
 export const membershipRemindersSchema = z.strictObject({ enabled: z.boolean() });
+export const membershipCancelSchema = z.strictObject({
+  confirm: z.literal(true),
+  expiresAt: z.iso.datetime(),
+});
 
 export const membershipCheckoutSchema = z.strictObject({
   planId: membershipPlanId,
@@ -32,6 +46,7 @@ export const membershipCheckoutSchema = z.strictObject({
 export type MembershipPlanId = z.infer<typeof membershipPlanId>;
 export type MembershipOrderStatus = z.infer<typeof membershipOrderStatus>;
 export type MembershipCheckoutInput = z.infer<typeof membershipCheckoutSchema>;
+export type MembershipCancelInput = z.infer<typeof membershipCancelSchema>;
 
 export type MembershipTaxDto = {
   subtotalIdr: number;
@@ -50,7 +65,7 @@ export type MembershipPlanDto = {
 export type MembershipSummaryDto = {
   username: string | null;
   expiresAt: string | null;
-  status: "inactive" | "active" | "expired";
+  status: "inactive" | "active" | "expired" | "canceled";
   checkoutAvailable: boolean;
   reminderEmailsEnabled: boolean;
 };
@@ -67,6 +82,7 @@ export type MembershipOrderDto = {
   priceIdr: number;
   tax: MembershipTaxDto | null;
   status: MembershipOrderStatus;
+  accessRevoked: boolean;
   recipientUsername: string | null;
   bookSlug: string | null;
   checkoutUrl: string | null;

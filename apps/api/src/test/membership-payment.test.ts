@@ -30,7 +30,7 @@ describe("Midtrans membership payments", () => {
   it("creates only a QRIS checkout and uses an internal return path", async () => {
     const request = vi.fn<typeof fetch>().mockResolvedValue(
       Response.json({
-        redirect_url: "https://app.sandbox.midtrans.com/snap/v3/redirection/token",
+        redirect_url: "https://app.sandbox.midtrans.com/snap/v4/redirection/token",
       }),
     );
     const gateway = createMidtransGateway({ key, mode: "sandbox", webUrl: "https://anzabook.test" }, request);

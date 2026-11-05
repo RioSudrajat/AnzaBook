@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
-import type { MembershipOrderStatus } from "@starter/shared/validators/membership";
+import { parseMidtransCheckoutUrl, type MembershipOrderStatus } from "@starter/shared/validators/membership";
 import { HttpError } from "../lib/http-error";
 
 const amount = z.string().regex(/^\d{1,12}(?:\.00)?$/);
@@ -126,13 +126,10 @@ export function createMidtransGateway(config: MidtransConfig, request = fetch) {
           callbacks: { finish: finish.href, error: finish.href },
         }),
       });
-      const checkout = z.object({ redirect_url: z.url() }).safeParse(response.body);
+      const checkout = z.object({ redirect_url: z.string() }).safeParse(response.body);
       if (response.ok && checkout.success) {
-        const url = new URL(checkout.data.redirect_url);
-        if (url.origin === snapOrigin &&
-            /^\/snap\/(?:v3\/redirection|v2\/vtweb)\/[^/]+$/.test(url.pathname)) {
-          return url.href;
-        }
+        const url = parseMidtransCheckoutUrl(checkout.data.redirect_url);
+        if (url?.origin === snapOrigin) return url.href;
       }
       throw new HttpError(502, "PAYMENT_CHECKOUT_FAILED", "Halaman pembayaran QRIS belum dapat dibuka.");
     },

@@ -6,6 +6,7 @@
   "sideEffects": false,
   "exports": {
     "./permissions": "./src/permissions.ts",
+    "./reading-progress": "./src/reading-progress.ts",
     "./validators/notes": "./src/validators/notes.ts",
     "./validators/books": "./src/validators/books.ts",
     "./validators/reading": "./src/validators/reading.ts",

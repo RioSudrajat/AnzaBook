@@ -24,9 +24,9 @@ test("adds tax to the package price and verifies the gift recipient before check
     await route.fulfill({ json: { data: { username: "nakama_uji", displayName: "Nakama Uji" } } });
   });
   const orderId = "ae8f7246-ec9d-4ad9-abfc-2b7b59f75689";
-  const checkoutUrl = "https://app.sandbox.midtrans.com/snap/v2/vtweb/test-transaction";
+  const checkoutUrl = "https://app.sandbox.midtrans.com/snap/v4/redirection/test-transaction";
   const checkout = {
-    id: orderId, status: "pending", checkoutUrl, planId: "quarterly", priceIdr: 66600,
+    id: orderId, status: "pending", accessRevoked: false, checkoutUrl, planId: "quarterly", priceIdr: 66600,
     months: 3, recipientUsername: "nakama_uji", bookSlug: null, createdAt: new Date().toISOString(),
     paidAt: null, tax: { subtotalIdr: 60000, taxIdr: 6600, rateBps: 1100 },
   };
@@ -60,7 +60,7 @@ test("returns to the saved book only after a verified self-payment", async ({ pa
   const slug = "sains-logika-seni-hidup-bermutu";
   const orderId = "40e5cf3d-60c3-4cb9-8a4c-4ec057922026";
   const checkout = {
-    id: orderId, status: "pending", checkoutUrl: null, planId: "quarterly", priceIdr: 66600,
+    id: orderId, status: "pending", accessRevoked: false, checkoutUrl: null, planId: "quarterly", priceIdr: 66600,
     months: 3, recipientUsername: null, bookSlug: slug, createdAt: new Date().toISOString(),
     paidAt: null, tax: { subtotalIdr: 60000, taxIdr: 6600, rateBps: 1100 },
   };
@@ -86,4 +86,42 @@ test("returns to the saved book only after a verified self-payment", async ({ pa
   verify = true;
   await page.getByRole("button", { name: "Periksa pembayaran" }).click();
   await expect(page).toHaveURL(new RegExp(`/read/${slug}$`));
+});
+
+test("confirms immediate membership cancellation in Settings and updates the account", async ({ page }) => {
+  await signUp(page.request, "Pembaca berhenti Nakama");
+  let summary = {
+    username: null, expiresAt: new Date(Date.now() + 86400_000 * 90).toISOString(),
+    status: "active", checkoutAvailable: true, reminderEmailsEnabled: true,
+  };
+  await page.route(`${API_URL}/api/membership`, (route) => route.fulfill({ json: { data: summary } }));
+  let calls = 0;
+  await page.route(`${API_URL}/api/membership/cancel`, async (route) => {
+    calls++;
+    expect(route.request().postDataJSON()).toEqual({ confirm: true, expiresAt: summary.expiresAt });
+    summary = { ...summary, status: "canceled", expiresAt: new Date().toISOString() };
+    await route.fulfill({ json: { data: summary } });
+  });
+  await page.goto("/app?tab=settings");
+  const cancel = page.getByRole("button", { name: "Batalkan keanggotaan", exact: true });
+  await expect(cancel).toBeVisible();
+  expect(await fitsWidth(page)).toBe(true);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await cancel.focus();
+  await page.keyboard.press("Enter");
+  const confirmation = page.getByRole("group", { name: "Konfirmasi pembatalan Nakama" });
+  await expect(confirmation).toContainText("Akses Premium langsung dihentikan");
+  expect(await fitsWidth(page)).toBe(true);
+  await confirmation.getByRole("button", { name: "Tetap jadi Nakama" }).click();
+  await expect(cancel).toBeFocused();
+  expect(calls).toBe(0);
+  await page.getByRole("button", { name: "Batalkan keanggotaan", exact: true }).click();
+  await confirmation.getByRole("button", { name: "Ya, batalkan keanggotaan" }).click();
+  await expect(page.getByText("Nakama dibatalkan", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Gabung kembali" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Batalkan keanggotaan", exact: true })).toHaveCount(0);
+  expect(calls).toBe(1);
+  expect(await fitsWidth(page)).toBe(true);
+  await page.reload();
+  await expect(page.getByText("Nakama dibatalkan", { exact: true })).toBeVisible();
 });

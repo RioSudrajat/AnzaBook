@@ -4,7 +4,10 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query";
+import { booksKeys } from "@/features/books/queries";
+import { ApiError } from "@/lib/api/client";
 import {
+  cancelMembership,
   checkMembershipRecipient,
   refreshMembershipOrder,
   saveMembershipReminders,
@@ -25,6 +28,26 @@ export function useMembershipPlans() {
 
 export function useMembershipSummary(enabled = true) {
   return useQuery({ ...membershipSummaryQuery(), enabled });
+}
+
+export function useCancelMembership() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: cancelMembership,
+    onMutate: () => queryClient.cancelQueries({ queryKey: membershipKeys.summary }),
+    onSuccess: async (summary) => {
+      queryClient.setQueryData(membershipKeys.summary, summary);
+      await Promise.all([
+        queryClient.resetQueries({ queryKey: booksKeys.readers() }),
+        queryClient.invalidateQueries({ queryKey: membershipKeys.orders }),
+      ]);
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && error.code === "MEMBERSHIP_CHANGED") {
+        return queryClient.invalidateQueries({ queryKey: membershipKeys.summary });
+      }
+    },
+  });
 }
 
 export function useMembershipOrders(enabled = true) {
