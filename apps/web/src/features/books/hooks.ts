@@ -29,6 +29,7 @@ import {
   createChapterComment,
   createHighlight,
   deleteHighlight,
+  restartBookReading,
   saveReadingProgress,
 } from "./api";
 import {
@@ -155,6 +156,28 @@ export function useSaveReadingProgress(
   });
 }
 
+export function useRestartBook(bookId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => restartBookReading(bookId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: communityKeys.shelves(),
+        refetchType: "all",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: booksKeys.progress(bookId, "full"),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: booksKeys.progress(bookId, "preview"),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: booksKeys.sessions(bookId),
+      });
+    },
+  });
+}
+
 export function useBookHighlights(bookId: string) {
   return useQuery({
     ...bookHighlightsQuery(bookId),
@@ -209,7 +232,7 @@ export function useCreateBookReview(slug: string) {
   return useMutation({
     mutationFn: (input: CreateReviewInput) => createBookReview(slug, input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: booksKeys.reviews(slug) });
+      queryClient.invalidateQueries({ queryKey: booksKeys.reviewList(slug) });
       queryClient.invalidateQueries({ queryKey: booksKeys.detail(slug) });
     },
   });

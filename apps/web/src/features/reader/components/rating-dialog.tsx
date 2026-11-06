@@ -40,11 +40,18 @@ export function RatingDialog({
       return;
     }
 
+    const trimmed = content.trim();
+    const finalContent =
+      trimmed.length >= 5
+        ? trimmed
+        : `Penilaian ${rating} bintang untuk buku ini via e-reader AnzaBook.`;
+
     try {
       await createReviewMutation.mutateAsync({
         bookId,
         rating,
-        content: content.trim() || undefined,
+        content: finalContent,
+        editionTierReviewed: "digital",
       });
       setIsSuccess(true);
       setTimeout(() => {

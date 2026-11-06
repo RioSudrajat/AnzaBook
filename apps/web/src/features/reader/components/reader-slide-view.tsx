@@ -1,8 +1,20 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { useEffect, useSyncExternalStore, type ReactNode } from "react";
+import { AnimatePresence, motion, type Variants } from "motion/react";
 import { Check, ChevronLeft, ChevronRight, Star } from "lucide-react";
 import type { BookHighlightDto } from "@starter/shared/types";
 import { Button } from "@/components/ui/button";
+
+function subscribeReducedMotion(callback: () => void) {
+  if (typeof window === "undefined") return () => {};
+  const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+  mediaQuery.addEventListener("change", callback);
+  return () => mediaQuery.removeEventListener("change", callback);
+}
+
+function getReducedMotionSnapshot() {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
 
 type ReaderSlideViewProps = {
   chapterNumber: number;
@@ -51,18 +63,12 @@ export function ReaderSlideView({
   onFlexHighlight,
   direction = 0,
 }: ReaderSlideViewProps) {
-  // Respect user preference for reduced motion
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setPrefersReducedMotion(mediaQuery.matches);
-
-    const handler = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
-    mediaQuery.addEventListener("change", handler);
-    return () => mediaQuery.removeEventListener("change", handler);
-  }, []);
+  // Respect user preference for reduced motion with useSyncExternalStore
+  const prefersReducedMotion = useSyncExternalStore(
+    subscribeReducedMotion,
+    getReducedMotionSnapshot,
+    () => false,
+  );
 
   // Keyboard navigation for arrow keys
   useEffect(() => {
@@ -88,7 +94,7 @@ export function ReaderSlideView({
   const rightParagraphs = paragraphs.slice(half);
 
   // 3D Physical Leaf Flip Motion Variants
-  const flipVariants = {
+  const flipVariants: Variants = {
     enter: (dir: number) =>
       prefersReducedMotion
         ? { opacity: 0 }
@@ -105,7 +111,7 @@ export function ReaderSlideView({
       transformOrigin: "center center",
       transition: {
         duration: prefersReducedMotion ? 0.15 : 0.42,
-        ease: [0.22, 1, 0.36, 1], // Natural air resistance easing
+        ease: [0.22, 1, 0.36, 1],
       },
     },
     exit: (dir: number) =>
