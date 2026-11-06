@@ -9,8 +9,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
   Flame,
   Share2,
   Star,
@@ -20,7 +18,6 @@ import {
 import { z } from "zod";
 import {
   splitChapterIntoPages,
-  getChapterPageInfo,
   computeBookPagination,
   getGlobalPageNumber,
   getChapterAndPageFromGlobal,
@@ -442,6 +439,7 @@ function ReaderBook() {
     });
     return () => cancelAnimationFrame(frame);
   }, [
+    bookPagination,
     payload,
     progress,
     requestedChapter,
@@ -1032,7 +1030,11 @@ function ReaderBook() {
   return (
     <DrmShield watermarkText={watermark} enabled={isDrmEnabled}>
       <div
-        className={`min-h-screen flex flex-col transition-colors duration-300 ${themeClass}`}
+        className={`${
+          readingLayout === "slide"
+            ? "h-screen max-h-screen overflow-hidden"
+            : "min-h-screen"
+        } flex flex-col transition-colors duration-300 ${themeClass}`}
       >
         {/* Sticky Header: Reader Toolbar + Audio Player (stacked in single sticky container so they NEVER overlap) */}
         <div className="sticky top-0 z-40 w-full bg-background/95 backdrop-blur-md border-b border-border shadow-xs transition-colors">
@@ -1101,21 +1103,23 @@ function ReaderBook() {
           )}
         </div>
 
-        {/* Left Dynamic TOC Sidebar (Fixed on left per SS 2 & SS 4, does not push center canvas) */}
-        <ReaderSidebarToc
-          chapters={allChapters}
-          currentChapterNumber={activeChapterNum}
-          onSelectChapter={handleSelectChapter}
-        />
+        {/* Left Dynamic TOC Sidebar (Only rendered in Scroll Mode; hidden in Slide Mode so it never obstructs the book spread) */}
+        {readingLayout === "scroll" && (
+          <ReaderSidebarToc
+            chapters={allChapters}
+            currentChapterNumber={activeChapterNum}
+            onSelectChapter={handleSelectChapter}
+          />
+        )}
 
         {/* Centered Document Reader Canvas */}
         <main
           id="main-content"
           ref={readerCanvasRef}
-          className={`w-full mx-auto px-4 sm:px-6 transition-all ${
+          className={`w-full mx-auto transition-all ${
             readingLayout === "slide"
-              ? "max-w-6xl py-4 pb-16 flex-1 flex flex-col justify-between"
-              : "max-w-2xl sm:max-w-[700px] py-10 pb-40"
+              ? "max-w-[1440px] px-3 sm:px-6 lg:px-8 py-1 sm:py-2 flex-1 h-[calc(100vh-56px)] max-h-[calc(100vh-56px)] overflow-hidden flex flex-col justify-between"
+              : "max-w-2xl sm:max-w-[700px] px-4 sm:px-6 py-10 pb-40"
           }`}
         >
           {saveError && (
@@ -1355,7 +1359,7 @@ function ReaderBook() {
               direction={slideDirection}
             />
           )}
-          {!payload.hasFullAccess && (
+          {!payload.hasFullAccess && readingLayout === "scroll" && (
             <section
               ref={paywallRef}
               tabIndex={-1}
