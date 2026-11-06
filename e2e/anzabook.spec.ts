@@ -8,85 +8,157 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     await expect(page).toHaveURL(/\/sign-up$/);
   });
 
-  test("signup preserves a premium reader destination and shows the preview limit", async ({ page }) => {
+  test("signup preserves a premium reader destination and shows the preview limit", async ({
+    page,
+  }) => {
     const slug = "sains-logika-seni-hidup-bermutu";
     await page.goto(`/books/${slug}`);
-    await expect(page.getByRole("button", { name: "Lihat Pilihan Iuran" })).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Lihat Pilihan Iuran" }),
+    ).toHaveCount(0);
     await expect(page.getByText("Premium", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Start Reading" }).click();
     await expect(page).toHaveURL(/\/sign-in/);
     await page.getByRole("link", { name: "Create an account" }).click();
     await page.getByLabel("Name", { exact: true }).fill("Pembaca Cuplikan");
-    await page.getByLabel("Email", { exact: true }).fill(`cuplikan-${crypto.randomUUID()}@example.test`);
-    await page.getByLabel("Password", { exact: true }).fill("cuplikan-password");
+    await page
+      .getByLabel("Email", { exact: true })
+      .fill(`cuplikan-${crypto.randomUUID()}@example.test`);
+    await page
+      .getByLabel("Password", { exact: true })
+      .fill("cuplikan-password");
     await page.getByRole("button", { name: "Create account" }).click();
     await expect(page).toHaveURL(new RegExp(`/read/${slug}`));
-    await expect(page.getByRole("heading", { name: "Akhir cuplikan" })).toBeVisible();
-    await expect(page.locator("[data-preview-fade]")).toHaveCSS("mask-image", /linear-gradient/);
+    await expect(
+      page.getByRole("heading", { name: "Akhir cuplikan" }),
+    ).toBeVisible();
+    await expect(page.locator("[data-preview-fade]")).toHaveCSS(
+      "mask-image",
+      /linear-gradient/,
+    );
     await expect(page.locator("#chapter-sec-2")).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Jadi Nakama" })).toHaveAttribute("href", /\/membership\?book=/);
+    await expect(
+      page.getByRole("link", { name: "Jadi Nakama" }),
+    ).toHaveAttribute("href", /\/membership\?book=/);
     await page.getByRole("button", { name: "Keluar ke Home" }).click();
     await expect(page).toHaveURL(/\/app/);
-    await expect(page.getByRole("region", { name: "Lanjutkan Membaca" })).toContainText(/Sains, Logika/);
-    await expect(page.getByRole("region", { name: "Lanjutkan Membaca" })).toContainText(/Cuplikan \d+%/);
+    await expect(
+      page.getByRole("region", { name: "Lanjutkan Membaca" }),
+    ).toContainText(/Sains, Logika/);
+    await expect(
+      page.getByRole("region", { name: "Lanjutkan Membaca" }),
+    ).toContainText(/Cuplikan \d+%/);
   });
 
-  test("scrolls across chapter dividers and resumes the chapter reached by scrolling", async ({ page }) => {
+  test("scrolls across chapter dividers and resumes the chapter reached by scrolling", async ({
+    page,
+  }) => {
     await signUp(page.request, "Pembaca Scroll");
     const slug = "revolusi-cetak-kedaulatan-membaca";
     await page.goto(`/read/${slug}`);
     const secondChapter = page.locator("#chapter-sec-2");
     await expect(secondChapter.getByRole("heading")).toBeVisible();
-    await expect(page.getByRole("dialog", { name: "Prapemuat Literasi AnzaBook" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Lanjut ke bab 2", exact: true })).toHaveCount(0);
-    await secondChapter.evaluate((section) => section.scrollIntoView({ block: "start" }));
+    await expect(
+      page.getByRole("dialog", { name: "Prapemuat Literasi AnzaBook" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Lanjut ke bab 2", exact: true }),
+    ).toHaveCount(0);
+    await secondChapter.evaluate((section) =>
+      section.scrollIntoView({ block: "start" }),
+    );
     await expect(page.getByText("Bab 2/2", { exact: true })).toBeVisible();
     await expect(page.getByText("50%", { exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: "Keluar ke Home" }).click();
     await expect(page).toHaveURL(/\/app/);
-    await expect(page.getByRole("region", { name: "Lanjutkan Membaca" })).toContainText("50%");
-    await page.getByRole("region", { name: "Lanjutkan Membaca" }).getByRole("link", { name: "Lanjut Baca" }).click();
+    await expect(
+      page.getByRole("region", { name: "Lanjutkan Membaca" }),
+    ).toContainText("50%");
+    await page
+      .getByRole("region", { name: "Lanjutkan Membaca" })
+      .getByRole("link", { name: "Lanjut Baca" })
+      .click();
     await expect(secondChapter.getByRole("heading")).toBeInViewport();
     await expect(page.getByText("Bab 2/2", { exact: true })).toBeVisible();
     await expect(page.getByText("50%", { exact: true })).toBeVisible();
 
     const detail = await page.request.get(`${API_URL}/api/books/${slug}`);
     const { data: book } = await detail.json();
-    const position = await page.request.get(`${API_URL}/api/reading/progress/${book.id}`);
-    expect((await position.json()).data).toMatchObject({ lastChapterNumber: 2, layout: "scroll" });
-    const chapter = book.chapters[1];
-    const checkpoint = await page.request.put(`${API_URL}/api/reading/progress/${book.id}`, {
-      headers: { Origin: WEB_URL },
-      data: { lastChapterId: chapter.id, lastChapterNumber: chapter.chapterNumber, layout: "slide" },
+    const position = await page.request.get(
+      `${API_URL}/api/reading/progress/${book.id}`,
+    );
+    expect((await position.json()).data).toMatchObject({
+      lastChapterNumber: 2,
+      layout: "scroll",
     });
+    const chapter = book.chapters[1];
+    const checkpoint = await page.request.put(
+      `${API_URL}/api/reading/progress/${book.id}`,
+      {
+        headers: { Origin: WEB_URL },
+        data: {
+          lastChapterId: chapter.id,
+          lastChapterNumber: chapter.chapterNumber,
+          layout: "slide",
+        },
+      },
+    );
     expect(checkpoint.ok()).toBeTruthy();
     await page.goto(`/read/${slug}`);
-    await expect(page.getByRole("heading", { name: chapter.title, exact: true, level: 1 })).toBeVisible();
-    await expect(page.getByText("Halaman 1 dari 1", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: chapter.title, exact: true, level: 1 }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/Page 2 of 2/i),
+    ).toBeVisible();
     await expect(page.getByText("99%", { exact: true })).toBeVisible();
 
     await page.setViewportSize({ width: 1700, height: 1050 });
     await page.goto(`/read/${slug}?chapter=1`);
-    await expect(page.getByRole("dialog", { name: "Prapemuat Literasi AnzaBook" })).toHaveCount(0);
+    await expect(
+      page.getByRole("dialog", { name: "Prapemuat Literasi AnzaBook" }),
+    ).toHaveCount(0);
     await expect(page.getByText("Bab 1/2", { exact: true })).toBeVisible();
-    await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" }));
+    await page.evaluate(() =>
+      window.scrollTo({
+        top: document.documentElement.scrollHeight,
+        behavior: "instant",
+      }),
+    );
     await expect(page.getByText("Bab 2/2", { exact: true })).toBeVisible();
     await expect(page.getByText("100%", { exact: true })).toBeVisible();
-    await expect.poll(async () => {
-      const response = await page.request.get(`${API_URL}/api/reading/progress/${book.id}`);
-      return (await response.json()).data;
-    }).toMatchObject({ lastChapterNumber: 2, lastScrollPercent: 100, lastParagraphIndex: 1, layout: "scroll" });
+    await expect
+      .poll(async () => {
+        const response = await page.request.get(
+          `${API_URL}/api/reading/progress/${book.id}`,
+        );
+        return (await response.json()).data;
+      })
+      .toMatchObject({
+        lastChapterNumber: 2,
+        lastScrollPercent: 100,
+        lastParagraphIndex: 1,
+        layout: "scroll",
+      });
 
     await page.goto(`/read/${slug}`);
     await expect(page.getByText("100%", { exact: true })).toBeVisible();
-    await expect.poll(() => page.evaluate(() => {
-      const root = document.scrollingElement!;
-      return root.scrollHeight - root.clientHeight - root.scrollTop;
-    })).toBeLessThanOrEqual(1);
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const root = document.scrollingElement!;
+          return root.scrollHeight - root.clientHeight - root.scrollTop;
+        }),
+      )
+      .toBeLessThanOrEqual(1);
     await page.getByRole("button", { name: "Keluar ke Home" }).click();
     await page.goto("/app?tab=library");
-    await expect(page.getByRole("region", { name: "Selesai Dibaca" }).getByRole("link", { name: book.title })).toBeVisible();
+    await expect(
+      page
+        .getByRole("region", { name: "Selesai Dibaca" })
+        .getByRole("link", { name: book.title }),
+    ).toBeVisible();
   });
 
   test("homepage renders hero book shelf, weekly bulletin, and catalog with ratings and tiers", async ({
@@ -109,11 +181,18 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     await expect(
       page.getByRole("region", { name: /Panggung Rak Buku 3D/i }),
     ).toBeVisible();
-    await expect(page.getByRole("region", { name: /Panggung Rak Buku 3D/i }).locator("[data-book-cover]").first()).toBeVisible();
+    await expect(
+      page
+        .getByRole("region", { name: /Panggung Rak Buku 3D/i })
+        .locator("[data-book-cover]")
+        .first(),
+    ).toBeVisible();
 
     // Check Catalog Book Link (Sains, Logika, dan Seni untuk Hidup Bermutu)
     const bookLink = page
-      .getByRole("link", { name: /Sains, Logika, dan Seni untuk Hidup Bermutu/i })
+      .getByRole("link", {
+        name: /Sains, Logika, dan Seni untuk Hidup Bermutu/i,
+      })
       .first();
     await expect(bookLink).toBeVisible();
 
@@ -138,12 +217,18 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
       }),
     ).toBeVisible();
     await expect(page.getByText(/Zenius/i).first()).toBeVisible();
-    await expect(page.getByRole("img", { name: "Anza Book", exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("img", { name: "Anza Book", exact: true }),
+    ).toBeVisible();
     await expect(page.locator("[data-book-cover]").first()).toBeVisible();
 
     // Daftar Isi
-    await expect(page.getByRole("heading", { name: /Daftar Isi/i })).toBeVisible();
-    await expect(page.getByText(/Sains Sebagai Kunci Smart Living/i)).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /Daftar Isi/i }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/Sains Sebagai Kunci Smart Living/i),
+    ).toBeVisible();
 
     // Live Stock Tracker & Map
     await expect(
@@ -154,8 +239,12 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     await expect(page.getByText(/Gramedia Matraman/i).first()).toBeVisible();
 
     // Action buttons
-    await expect(page.getByRole("button", { name: /Start Reading/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Save to Library/i })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /Start Reading/i }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /Save to Library/i }),
+    ).toBeVisible();
   });
 
   test("signed-in dashboard provides Home, Explore, Library, and Settings", async ({
@@ -170,26 +259,38 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
 
     // Check Home Tab Content
     await expect(page.getByText(/Buletin Mingguan/i).first()).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Bacaan Populer" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Bacaan Populer" }),
+    ).toBeVisible();
 
     // Switch to Explore Tab
     await page.goto("/app?tab=explore");
     await page.waitForLoadState("networkidle");
-    await expect(page.getByRole("heading", { name: /Jelajahi Berdasarkan Kategori/i })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /Jelajahi Berdasarkan Kategori/i }),
+    ).toBeVisible();
     await expect(page.getByText(/Antropologi/i).first()).toBeVisible();
     await expect(page.getByText(/Berpikir Kritis/i).first()).toBeVisible();
 
     // Switch to My Library Tab
     await page.goto("/app?tab=library");
     await page.waitForLoadState("networkidle");
-    await expect(page.getByRole("main").getByRole("heading", { name: "My Library" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Highlights/i })).toBeVisible();
+    await expect(
+      page.getByRole("main").getByRole("heading", { name: "My Library" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /Highlights/i }),
+    ).toBeVisible();
 
     // Switch to Settings Tab
     await page.goto("/app?tab=settings");
     await page.waitForLoadState("networkidle");
-    await expect(page.getByRole("main").getByRole("heading", { name: "Settings" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Tampilkan QR/i })).toBeVisible();
+    await expect(
+      page.getByRole("main").getByRole("heading", { name: "Settings" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /Tampilkan QR/i }),
+    ).toBeVisible();
   });
 
   test("protected web reader renders layout mode switcher and enforces DRM shield upon PrintScreen", async ({
@@ -203,7 +304,11 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     await page.waitForLoadState("networkidle");
 
     // Verify reader rendered chapter content
-    await expect(page.getByText(/Social Intelligence: Senjata Utama Homo Sapiens/i).first()).toBeVisible();
+    await expect(
+      page
+        .getByText(/Social Intelligence: Senjata Utama Homo Sapiens/i)
+        .first(),
+    ).toBeVisible();
 
     // Glossy progress bar at bottom
     await expect(page.getByText(/Bab 1\//i).first()).toBeVisible();

@@ -17,7 +17,11 @@ import type {
   CreateHighlightInput,
   SaveReadingProgressInput,
 } from "@starter/shared/validators/reading";
-import type { BookHighlightDto, ReadingProgressDto, ReadingProgressScope } from "@starter/shared/types";
+import type {
+  BookHighlightDto,
+  ReadingProgressDto,
+  ReadingProgressScope,
+} from "@starter/shared/types";
 import { communityKeys } from "@/features/community/queries";
 import {
   claimBookCode,
@@ -119,14 +123,20 @@ export function useCategories() {
   return useQuery(categoriesQuery());
 }
 
-export function useReadingProgress(bookId: string, scope: ReadingProgressScope = "full") {
+export function useReadingProgress(
+  bookId: string,
+  scope: ReadingProgressScope = "full",
+) {
   return useQuery({
     ...readingProgressQuery(bookId, scope),
     enabled: Boolean(bookId),
   });
 }
 
-export function useSaveReadingProgress(bookId: string, scope: ReadingProgressScope = "full") {
+export function useSaveReadingProgress(
+  bookId: string,
+  scope: ReadingProgressScope = "full",
+) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: SaveReadingProgressInput) =>
@@ -134,9 +144,13 @@ export function useSaveReadingProgress(bookId: string, scope: ReadingProgressSco
     onSuccess: async (saved) => {
       queryClient.setQueryData<ReadingProgressDto | null>(
         booksKeys.progress(bookId, scope),
-        (current) => !current || current.capturedAt <= saved.capturedAt ? saved : current,
+        (current) =>
+          !current || current.capturedAt <= saved.capturedAt ? saved : current,
       );
-      await queryClient.invalidateQueries({ queryKey: communityKeys.shelves(), refetchType: "all" });
+      await queryClient.invalidateQueries({
+        queryKey: communityKeys.shelves(),
+        refetchType: "all",
+      });
     },
   });
 }
@@ -188,4 +202,15 @@ export function useDeleteHighlight(bookId?: string) {
 
 export function useBookSessions(bookId: string) {
   return useQuery(bookSessionsQuery(bookId));
+}
+
+export function useCreateBookReview(slug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateReviewInput) => createBookReview(slug, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: booksKeys.reviews(slug) });
+      queryClient.invalidateQueries({ queryKey: booksKeys.detail(slug) });
+    },
+  });
 }

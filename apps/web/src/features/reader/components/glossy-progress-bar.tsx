@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Star } from "lucide-react";
 
 type GlossyProgressBarProps = {
   currentChapter: number;
@@ -8,6 +8,7 @@ type GlossyProgressBarProps = {
   onNextChapter?: () => void;
   hasPrev?: boolean;
   hasNext?: boolean;
+  onOpenRating?: () => void;
 };
 
 export function GlossyProgressBar({
@@ -18,6 +19,7 @@ export function GlossyProgressBar({
   onNextChapter,
   hasPrev,
   hasNext,
+  onOpenRating,
 }: GlossyProgressBarProps) {
   const safePercent = Math.min(100, Math.max(0, Math.round(currentPercent)));
 
@@ -58,6 +60,19 @@ export function GlossyProgressBar({
         <div className="text-[11px] font-bold text-white/90 shrink-0 w-8 text-right">
           {safePercent}%
         </div>
+
+        {/* Optional Rating Button */}
+        {onOpenRating && (
+          <button
+            type="button"
+            onClick={onOpenRating}
+            className="p-1 rounded-full hover:bg-white/15 text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+            title="Beri Rating Naskah"
+            aria-label="Beri Rating"
+          >
+            <Star className="size-3.5 fill-amber-400/40" />
+          </button>
+        )}
 
         {/* Next Chapter button */}
         {onNextChapter && (

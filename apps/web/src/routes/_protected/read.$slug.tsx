@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Flame,
   Share2,
+  Star,
   Trophy,
   X,
 } from "lucide-react";
@@ -20,6 +21,9 @@ import { z } from "zod";
 import {
   splitChapterIntoPages,
   getChapterPageInfo,
+  computeBookPagination,
+  getGlobalPageNumber,
+  getChapterAndPageFromGlobal,
 } from "@starter/shared/chapter-pagination";
 import { bookProgressPercent } from "@starter/shared/reading-progress";
 import type { BookHighlightDto, HighlightColor } from "@starter/shared/types";
@@ -44,6 +48,8 @@ import { HighlightStoryDialog } from "@/features/reader/components/highlight-sto
 import { HighlightsSidebar } from "@/features/reader/components/highlights-sidebar";
 import { MarginaliaDrawer } from "@/features/reader/components/marginalia-drawer";
 import { ReaderSidebarToc } from "@/features/reader/components/reader-sidebar-toc";
+import { RatingDialog } from "@/features/reader/components/rating-dialog";
+import { ReaderSlideView } from "@/features/reader/components/reader-slide-view";
 import {
   type LanguageView,
   type ReaderFont,
@@ -254,6 +260,8 @@ function ReaderBook() {
     search.drm ?? false,
   );
   const [isHighlightsOpen, setIsHighlightsOpen] = useState(false);
+  const [isRatingOpen, setIsRatingOpen] = useState(false);
+  const [slideDirection, setSlideDirection] = useState(0);
 
   const [slidePosition, setSlidePosition] = useState({
     chapter: requestedChapter,
@@ -319,13 +327,36 @@ function ReaderBook() {
     languageView === "en" && chapter?.contentEn
       ? chapter.contentEn
       : chapter?.contentId;
+
+  const accessibleChapters =
+    payload?.chapters && payload.chapters.length > 0
+      ? payload.chapters
+      : chapter
+        ? [chapter]
+        : [];
+  const bookPagination = computeBookPagination(
+    accessibleChapters,
+    languageView,
+    paragraphsPerPage,
+  );
+  const currentChapterPagination =
+    bookPagination.chapters.find((c) => c.chapterNumber === activeChapterNum) ??
+    bookPagination.chapters[0];
+  const pageCount = currentChapterPagination?.pageCount ?? 1;
+
   const chapterPages = splitChapterIntoPages(activeChapterContent);
-  const pageCount = Math.max(1, chapterPages.length);
   const slidePageIndex =
     slidePosition.chapter === activeChapterNum
       ? Math.max(0, Math.min(pageCount - 1, slidePosition.page))
       : 0;
   const currentPageObj = chapterPages[slidePageIndex] ?? chapterPages[0];
+  const globalPageNumber = getGlobalPageNumber(
+    activeChapterNum,
+    slidePageIndex,
+    bookPagination,
+  );
+  const totalPages = bookPagination.totalPages;
+
   const chapterParagraphs = splitParagraphs(chapter?.contentId);
   const chapterParagraphCount = chapterParagraphs.length;
   const progress =
@@ -346,10 +377,21 @@ function ReaderBook() {
       hasRestoredRef.current = true;
       if (savedChapter && checkpoint?.layout === "slide") {
         setReadingLayout("slide");
-        setSlidePosition({
-          chapter: savedChapter.chapterNumber,
-          page: checkpoint.lastPageNumber - 1,
-        });
+        if (checkpoint.lastPageNumber) {
+          const resolved = getChapterAndPageFromGlobal(
+            checkpoint.lastPageNumber,
+            bookPagination,
+          );
+          setSlidePosition({
+            chapter: resolved.chapterNumber,
+            page: resolved.localPageIndex,
+          });
+        } else {
+          setSlidePosition({
+            chapter: savedChapter.chapterNumber,
+            page: 0,
+          });
+        }
         return;
       }
       if (
@@ -441,7 +483,18 @@ function ReaderBook() {
       if (!chapter || !hasRestoredRef.current) return null;
       let positionChapter = chapter;
       let paragraphCount = chapterParagraphCount;
-      let percent = slideChapterPercent(page, pageCount);
+      const currentGlobal = getGlobalPageNumber(
+        positionChapter.chapterNumber,
+        page,
+        bookPagination,
+      );
+      let percent =
+        readingLayout === "slide"
+          ? Math.min(
+              99,
+              Math.round((currentGlobal / bookPagination.totalPages) * 100),
+            )
+          : slideChapterPercent(page, pageCount);
       let paragraph = page * paragraphsPerPage;
       if (readingLayout === "scroll") {
         const sections = readerCanvasRef.current?.querySelectorAll<HTMLElement>(
@@ -518,7 +571,7 @@ function ReaderBook() {
         lastChapterNumber: positionChapter.chapterNumber,
         lastPageNumber:
           readingLayout === "slide"
-            ? page + 1
+            ? currentGlobal
             : Math.floor(lastParagraphIndex / paragraphsPerPage) + 1,
         lastScrollPercent: percent,
         lastParagraphIndex,
@@ -527,6 +580,7 @@ function ReaderBook() {
       };
     },
     [
+      bookPagination,
       chapter,
       chapterParagraphCount,
       pageCount,
@@ -580,7 +634,8 @@ function ReaderBook() {
     readingLayout,
   ]);
 
-  function turnPage(page: number) {
+  function turnPage(page: number, dir = 0) {
+    if (dir !== 0) setSlideDirection(dir);
     setSlidePosition({ chapter: activeChapterNum, page });
     const position = capturePosition(page);
     if (position) queueCheckpoint(position);
@@ -591,10 +646,21 @@ function ReaderBook() {
     if (layout === readingLayout) return;
     const position = capturePosition();
     if (layout === "slide") {
-      setSlidePosition({
-        chapter: position?.lastChapterNumber ?? activeChapterNum,
-        page: (position?.lastPageNumber ?? 1) - 1,
-      });
+      if (position?.lastPageNumber) {
+        const resolved = getChapterAndPageFromGlobal(
+          position.lastPageNumber,
+          bookPagination,
+        );
+        setSlidePosition({
+          chapter: resolved.chapterNumber,
+          page: resolved.localPageIndex,
+        });
+      } else {
+        setSlidePosition({
+          chapter: position?.lastChapterNumber ?? activeChapterNum,
+          page: 0,
+        });
+      }
       setReadingLayout(layout);
       window.scrollTo({ top: 0 });
       return;
@@ -633,6 +699,7 @@ function ReaderBook() {
       }
     }
     setSaveError(false);
+    setSlideDirection(ch > activeChapterNum ? 1 : -1);
     setSlidePosition({ chapter: ch, page: 0 });
     window.scrollTo({ top: 0 });
   }
@@ -910,18 +977,30 @@ function ReaderBook() {
   const hasPrevChapter = previousChapter !== undefined;
 
   function goToPreviousSlide() {
+    setSlideDirection(-1);
     if (slidePageIndex > 0) {
-      turnPage(slidePageIndex - 1);
+      turnPage(slidePageIndex - 1, -1);
     } else if (hasPrevChapter && previousChapter !== undefined) {
-      void handleSelectChapter(previousChapter);
+      const prevSummary = bookPagination.chapters.find(
+        (c) => c.chapterNumber === previousChapter,
+      );
+      const targetPage = prevSummary ? Math.max(0, prevSummary.pageCount - 1) : 0;
+      setSlidePosition({ chapter: previousChapter, page: targetPage });
+      const position = capturePosition(targetPage);
+      if (position) queueCheckpoint(position);
+      window.scrollTo({ top: 0 });
     }
   }
 
   function goToNextSlide() {
+    setSlideDirection(1);
     if (slidePageIndex < pageCount - 1) {
-      turnPage(slidePageIndex + 1);
+      turnPage(slidePageIndex + 1, 1);
     } else if (hasNextChapter && nextChapter !== undefined) {
-      void handleSelectChapter(nextChapter);
+      setSlidePosition({ chapter: nextChapter, page: 0 });
+      const position = capturePosition(0);
+      if (position) queueCheckpoint(position);
+      window.scrollTo({ top: 0 });
     }
   }
 
@@ -942,10 +1021,12 @@ function ReaderBook() {
 
   const chapterPercent =
     readingLayout === "slide"
-      ? slideChapterPercent(slidePageIndex, pageCount)
+      ? Math.min(100, Math.round((globalPageNumber / totalPages) * 100))
       : scrollPosition.percent;
   const currentPercent = payload.hasFullAccess
-    ? bookProgressPercent(chapterIndex, allChapters.length, chapterPercent)
+    ? readingLayout === "slide"
+      ? Math.min(100, Math.round((globalPageNumber / totalPages) * 100))
+      : bookProgressPercent(chapterIndex, allChapters.length, chapterPercent)
     : chapterPercent;
 
   return (
@@ -1027,11 +1108,15 @@ function ReaderBook() {
           onSelectChapter={handleSelectChapter}
         />
 
-        {/* Centered Document Reader Canvas (Strictly Centered in Viewport) */}
+        {/* Centered Document Reader Canvas */}
         <main
           id="main-content"
           ref={readerCanvasRef}
-          className="w-full max-w-2xl sm:max-w-[700px] mx-auto px-4 sm:px-6 py-10 pb-40"
+          className={`w-full mx-auto px-4 sm:px-6 transition-all ${
+            readingLayout === "slide"
+              ? "max-w-6xl py-4 pb-16 flex-1 flex flex-col justify-between"
+              : "max-w-2xl sm:max-w-[700px] py-10 pb-40"
+          }`}
         >
           {saveError && (
             <p
@@ -1220,99 +1305,55 @@ function ReaderBook() {
                   <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
                     Akhir buku
                   </p>
-                  <Button
-                    onClick={() => void saveSession("summary", true)}
-                    disabled={isSaving}
-                    size="default"
-                    className="gap-2 font-mono text-xs bg-[var(--color-accent)] text-white hover:brightness-110 shadow-md"
-                  >
-                    <CheckCircle2 className="size-4" />
-                    Simpan sesi baca
-                  </Button>
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsRatingOpen(true)}
+                      size="default"
+                      className="gap-2 font-mono text-xs hover:bg-muted shadow-xs"
+                    >
+                      <Star className="size-4 text-amber-500" />
+                      Beri Rating
+                    </Button>
+                    <Button
+                      onClick={() => void saveSession("summary", true)}
+                      disabled={isSaving}
+                      size="default"
+                      className="gap-2 font-mono text-xs bg-[var(--color-accent)] text-white hover:brightness-110 shadow-md"
+                    >
+                      <CheckCircle2 className="size-4" />
+                      Simpan sesi baca
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
           ) : (
-            /* Slide Mode (Pagination by slide page) */
-            <div
-              data-chapter-number={currentChapter.chapterNumber}
-              className="space-y-8"
-            >
-              <header className="mb-10 text-center pb-6 border-b border-current/15">
-                <div className="text-xs font-mono uppercase tracking-[0.2em] opacity-60 mb-2">
-                  CHAPTER {currentChapter.chapterNumber}
-                </div>
-                <h1 className="font-serif text-2xl sm:text-3xl font-bold tracking-tight">
-                  {currentChapter.title}
-                </h1>
-              </header>
-
-              <div
-                className={`${fontClass}`}
-                style={{ fontSize: `${fontSize}px`, lineHeight: 1.85 }}
-              >
-                {currentPageObj.paragraphs.map((text, idx) => (
-                  <p
-                    key={idx}
-                    data-preview-fade={
-                      (isPremiumPreview &&
-                        slidePageIndex === pageCount - 1 &&
-                        idx === currentPageObj.paragraphs.length - 1) ||
-                      undefined
-                    }
-                    className="leading-relaxed text-justify mb-6 select-text"
-                  >
-                    {renderHighlightedText(
-                      text,
-                      allHighlights.filter(
-                        (item) =>
-                          item.chapterNumber === currentChapter.chapterNumber,
-                      ),
-                      handleFlexHighlight,
-                    )}
-                  </p>
-                ))}
-              </div>
-
-              {/* Slide Pagination Controls */}
-              <div className="mt-12 pt-6 border-t border-current/15 flex items-center justify-between text-xs font-mono">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={slidePageIndex === 0 && !hasPrevChapter}
-                  onClick={goToPreviousSlide}
-                  className="gap-1.5"
-                >
-                  <ChevronLeft className="size-4" />
-                  {slidePageIndex === 0 && hasPrevChapter
-                    ? `Bab ${previousChapter}`
-                    : "Sebelumnya"}
-                </Button>
-
-                <div className="text-center space-y-0.5">
-                  <div className="font-bold tracking-wide">
-                    Bab {activeChapterNum} • Halaman {slidePageIndex + 1} dari{" "}
-                    {pageCount}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground uppercase tracking-widest truncate max-w-[200px] sm:max-w-xs">
-                    {currentChapter.title}
-                  </div>
-                </div>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={slidePageIndex >= pageCount - 1 && !hasNextChapter}
-                  onClick={goToNextSlide}
-                  className="gap-1.5"
-                >
-                  {slidePageIndex >= pageCount - 1 && hasNextChapter
-                    ? `Bab ${nextChapter}`
-                    : "Selanjutnya"}
-                  <ChevronRight className="size-4" />
-                </Button>
-              </div>
-            </div>
+            /* Slide Mode (2-Page Open Book Spread on Desktop / 1-Page on Mobile) */
+            <ReaderSlideView
+              chapterNumber={currentChapter.chapterNumber}
+              chapterTitle={currentChapter.title}
+              isFirstPageOfChapter={slidePageIndex === 0}
+              paragraphs={currentPageObj.paragraphs}
+              globalPageNumber={globalPageNumber}
+              totalPages={totalPages}
+              onPrevPage={goToPreviousSlide}
+              onNextPage={goToNextSlide}
+              canPrev={slidePageIndex > 0 || hasPrevChapter}
+              canNext={slidePageIndex < pageCount - 1 || hasNextChapter}
+              onFinishSession={() => void saveSession("summary")}
+              onOpenRating={() => setIsRatingOpen(true)}
+              fontClass={fontClass}
+              fontSize={fontSize}
+              isPremiumPreview={isPremiumPreview}
+              highlights={allHighlights.filter(
+                (item) => item.chapterNumber === currentChapter.chapterNumber,
+              )}
+              renderHighlights={renderHighlightedText}
+              onFlexHighlight={handleFlexHighlight}
+              direction={slideDirection}
+            />
           )}
           {!payload.hasFullAccess && (
             <section
@@ -1354,29 +1395,23 @@ function ReaderBook() {
           )}
         </main>
 
-        {/* Floating Glossy Glassmorphism Progress Bar at Bottom */}
-        <GlossyProgressBar
-          currentChapter={activeChapterNum}
-          totalChapters={allChapters.length}
-          currentPercent={currentPercent}
-          onPrevChapter={
-            readingLayout === "slide"
-              ? () => {
-                  if (previousChapter !== undefined)
-                    void handleSelectChapter(previousChapter);
-                }
-              : undefined
-          }
-          onNextChapter={
-            readingLayout === "slide"
-              ? () => {
-                  if (nextChapter !== undefined)
-                    void handleSelectChapter(nextChapter);
-                }
-              : undefined
-          }
-          hasPrev={hasPrevChapter}
-          hasNext={hasNextChapter}
+        {/* Floating Glossy Glassmorphism Progress Bar at Bottom (Only in Scroll Mode) */}
+        {readingLayout === "scroll" && (
+          <GlossyProgressBar
+            currentChapter={activeChapterNum}
+            totalChapters={allChapters.length}
+            currentPercent={currentPercent}
+            onOpenRating={() => setIsRatingOpen(true)}
+          />
+        )}
+
+        {/* Book Rating & Review Dialog */}
+        <RatingDialog
+          isOpen={isRatingOpen}
+          onClose={() => setIsRatingOpen(false)}
+          bookId={book.id}
+          bookTitle={book.title}
+          bookSlug={slug}
         />
 
         {/* Floating Text Highlight Popover (Selective Text Blocking) */}
