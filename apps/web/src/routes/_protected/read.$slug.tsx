@@ -1037,7 +1037,7 @@ function ReaderBook() {
         } flex flex-col transition-colors duration-300 ${themeClass}`}
       >
         {/* Sticky Header: Reader Toolbar + Audio Player (stacked in single sticky container so they NEVER overlap) */}
-        <div className="sticky top-0 z-40 w-full bg-background/95 backdrop-blur-md border-b border-border shadow-xs transition-colors">
+        <div className="sticky top-0 z-40 w-full bg-background/95 backdrop-blur-md border-b border-border/40 transition-colors">
           <ReaderToolbar
             bookTitle={book.title}
             readingLayout={readingLayout}

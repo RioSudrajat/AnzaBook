@@ -1,8 +1,13 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { motion } from "motion/react";
-import { Check, ChevronLeft, ChevronRight, Star } from "lucide-react";
 import type { BookHighlightDto } from "@starter/shared/types";
 import { Button } from "@/components/ui/button";
+import {
+  IosCheckmark,
+  IosChevronLeft,
+  IosChevronRight,
+  IosStar,
+} from "@/components/ui/ios-icons";
 
 function subscribeReducedMotion(callback: () => void) {
   if (typeof window === "undefined") return () => {};
@@ -179,7 +184,7 @@ export function ReaderSlideView({
     flipDirection: null,
   });
 
-  // Adjust state during render when globalPageNumber changes (React pattern: no effect needed)
+  // Adjust state during render when globalPageNumber changes
   if (globalPageNumber !== spreadState.prevGlobal) {
     const direction: "next" | "prev" =
       globalPageNumber > spreadState.prevGlobal ? "next" : "prev";
@@ -233,9 +238,9 @@ export function ReaderSlideView({
         className="w-full flex-1 min-h-0 flex items-center justify-center relative py-1 sm:py-2"
         style={{ perspective: "2200px" }}
       >
-        {/* DESKTOP 2-PAGE SPREAD BOOK */}
+        {/* DESKTOP 2-PAGE SPREAD BOOK (Clean flush container without heavy top/bottom drop-shadows) */}
         <div
-          className="hidden md:flex w-full h-full max-h-[calc(100vh-130px)] rounded-2xl bg-[#FAF6EE] dark:bg-[#1C1A17] text-foreground border border-border/40 shadow-[0_20px_50px_rgba(0,0,0,0.35),0_0_0_1px_rgba(255,255,255,0.05)] relative overflow-hidden"
+          className="hidden md:flex w-full h-full max-h-[calc(100vh-125px)] rounded-2xl bg-[#FAF6EE] dark:bg-[#1C1A17] text-foreground border border-border/40 relative overflow-hidden shadow-none"
           style={{ transformStyle: "preserve-3d" }}
         >
           {/* BASE LEFT PAGE */}
@@ -334,38 +339,43 @@ export function ReaderSlideView({
             />
           </div>
 
-          {/* REALISTIC 3D CENTER SPINE BINDING CREASE & SHADOWS */}
+          {/* REALISTIC 3D CENTER SPINE BINDING CREASE & HIGHLIGHTS */}
           <div
-            className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[3px] pointer-events-none z-25 bg-black/50 dark:bg-black/95 shadow-[0_0_8px_rgba(0,0,0,0.85)]"
+            className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[3px] pointer-events-none z-25 bg-black/40 dark:bg-black/90 shadow-[0_0_6px_rgba(0,0,0,0.7)]"
             aria-hidden="true"
           />
           <div
-            className="absolute inset-y-0 left-1/2 -translate-x-12 lg:-translate-x-16 w-px pointer-events-none z-20 bg-white/10 dark:bg-white/5 opacity-60"
+            className="absolute inset-y-0 left-1/2 -translate-x-12 lg:-translate-x-16 w-px pointer-events-none z-20 bg-white/10 dark:bg-white/5 opacity-50"
             aria-hidden="true"
           />
           <div
-            className="absolute inset-y-0 left-1/2 translate-x-12 lg:translate-x-16 w-px pointer-events-none z-20 bg-white/10 dark:bg-white/5 opacity-60"
+            className="absolute inset-y-0 left-1/2 translate-x-12 lg:translate-x-16 w-px pointer-events-none z-20 bg-white/10 dark:bg-white/5 opacity-50"
             aria-hidden="true"
           />
 
-          {/* THE FLIPPING LEAF (ONLY ONE PAGE ROTATES ACROSS THE SPINE) */}
+          {/* FLUID ORGANIC 3D PAGE FLIP: NEXT */}
           {isFlipping && flipDirection === "next" && previousSpread && (
             <motion.div
               key={`flip-next-${activeSpread.globalPageNumber}`}
               initial={{
                 rotateY: 0,
+                scaleX: 1,
+                scaleY: 1,
                 skewY: 0,
                 rotateZ: 0,
               }}
               animate={{
                 rotateY: -180,
-                // Soft paper curvature: corner pulls first, reaches apex curve, flexes and straightens upon landing
-                skewY: [0, -3.2, -1, 2.2, 0],
-                rotateZ: [0, -1.8, -0.6, 1.2, 0],
+                // Soft paper curvature: X-foreshortening creates cylindrical curl illusion
+                scaleX: [1, 0.94, 0.88, 0.94, 1],
+                scaleY: [1, 0.985, 0.975, 0.985, 1],
+                // Soft corner lift, arching crest, and smooth touchdown
+                skewY: [0, -4.5, -1.8, 3.2, 0],
+                rotateZ: [0, -2.2, -0.8, 1.6, 0],
               }}
               transition={{
-                duration: 0.6,
-                ease: [0.22, 0.95, 0.32, 1],
+                duration: 0.65,
+                ease: [0.16, 1, 0.3, 1],
               }}
               onAnimationComplete={handleFlipComplete}
               className="absolute inset-y-0 left-1/2 w-1/2 h-full z-30 pointer-events-none"
@@ -375,7 +385,7 @@ export function ReaderSlideView({
                 willChange: "transform",
               }}
             >
-              {/* FRONT FACE (Turning over from the Right page) */}
+              {/* FRONT FACE (Turning over from Right page) */}
               <div
                 className="absolute inset-0 w-full h-full p-6 sm:p-8 lg:p-10 bg-[#FAF6EE] dark:bg-[#1C1A17] text-foreground rounded-r-2xl border-y border-r border-border/40 overflow-hidden"
                 style={{
@@ -384,12 +394,12 @@ export function ReaderSlideView({
                   transform: "rotateY(0deg)",
                 }}
               >
-                {/* Moving Curvature Shadow on lifting paper */}
+                {/* Dynamic Curvature Shadow Sweep */}
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: [0, 0.45, 0.15, 0] }}
-                  transition={{ duration: 0.6, ease: "easeInOut" }}
-                  className="absolute inset-0 pointer-events-none z-20 bg-gradient-to-l from-black/40 via-black/15 to-transparent dark:from-black/70 dark:via-black/30 dark:to-transparent"
+                  transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+                  className="absolute inset-0 pointer-events-none z-20 bg-gradient-to-l from-black/35 via-black/10 to-transparent dark:from-black/65 dark:via-black/25 dark:to-transparent"
                 />
 
                 <PageColumn
@@ -408,7 +418,7 @@ export function ReaderSlideView({
                 />
               </div>
 
-              {/* BACK FACE (Landing on the Left page) */}
+              {/* BACK FACE (Landing on Left page) */}
               <div
                 className="absolute inset-0 w-full h-full p-6 sm:p-8 lg:p-10 bg-[#FAF6EE] dark:bg-[#1C1A17] text-foreground rounded-l-2xl border-y border-l border-border/40 overflow-hidden"
                 style={{
@@ -417,12 +427,12 @@ export function ReaderSlideView({
                   transform: "rotateY(180deg)",
                 }}
               >
-                {/* Landing Touchdown Shadow */}
+                {/* Touchdown Landing Shadow */}
                 <motion.div
                   initial={{ opacity: 0.5 }}
-                  animate={{ opacity: [0.5, 0.2, 0] }}
-                  transition={{ duration: 0.6, ease: "easeOut" }}
-                  className="absolute inset-0 pointer-events-none z-20 bg-gradient-to-r from-black/40 via-black/15 to-transparent dark:from-black/70 dark:via-black/30 dark:to-transparent"
+                  animate={{ opacity: [0.5, 0.18, 0] }}
+                  transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+                  className="absolute inset-0 pointer-events-none z-20 bg-gradient-to-r from-black/35 via-black/10 to-transparent dark:from-black/65 dark:via-black/25 dark:to-transparent"
                 />
 
                 <PageColumn
@@ -441,23 +451,28 @@ export function ReaderSlideView({
             </motion.div>
           )}
 
+          {/* FLUID ORGANIC 3D PAGE FLIP: PREV */}
           {isFlipping && flipDirection === "prev" && previousSpread && (
             <motion.div
               key={`flip-prev-${activeSpread.globalPageNumber}`}
               initial={{
                 rotateY: 0,
+                scaleX: 1,
+                scaleY: 1,
                 skewY: 0,
                 rotateZ: 0,
               }}
               animate={{
                 rotateY: 180,
-                // Soft paper curvature pulling from left corner across to right
-                skewY: [0, 3.2, 1, -2.2, 0],
-                rotateZ: [0, 1.8, 0.6, -1.2, 0],
+                // Soft paper curvature pulling left to right
+                scaleX: [1, 0.94, 0.88, 0.94, 1],
+                scaleY: [1, 0.985, 0.975, 0.985, 1],
+                skewY: [0, 4.5, 1.8, -3.2, 0],
+                rotateZ: [0, 2.2, 0.8, -1.6, 0],
               }}
               transition={{
-                duration: 0.6,
-                ease: [0.22, 0.95, 0.32, 1],
+                duration: 0.65,
+                ease: [0.16, 1, 0.3, 1],
               }}
               onAnimationComplete={handleFlipComplete}
               className="absolute inset-y-0 left-0 w-1/2 h-full z-30 pointer-events-none"
@@ -467,7 +482,7 @@ export function ReaderSlideView({
                 willChange: "transform",
               }}
             >
-              {/* FRONT FACE (Turning over from the Left page) */}
+              {/* FRONT FACE (Turning over from Left page) */}
               <div
                 className="absolute inset-0 w-full h-full p-6 sm:p-8 lg:p-10 bg-[#FAF6EE] dark:bg-[#1C1A17] text-foreground rounded-l-2xl border-y border-l border-border/40 overflow-hidden"
                 style={{
@@ -480,8 +495,8 @@ export function ReaderSlideView({
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: [0, 0.45, 0.15, 0] }}
-                  transition={{ duration: 0.6, ease: "easeInOut" }}
-                  className="absolute inset-0 pointer-events-none z-20 bg-gradient-to-r from-black/40 via-black/15 to-transparent dark:from-black/70 dark:via-black/30 dark:to-transparent"
+                  transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+                  className="absolute inset-0 pointer-events-none z-20 bg-gradient-to-r from-black/35 via-black/10 to-transparent dark:from-black/65 dark:via-black/25 dark:to-transparent"
                 />
 
                 <PageColumn
@@ -498,7 +513,7 @@ export function ReaderSlideView({
                 />
               </div>
 
-              {/* BACK FACE (Landing on the Right page) */}
+              {/* BACK FACE (Landing on Right page) */}
               <div
                 className="absolute inset-0 w-full h-full p-6 sm:p-8 lg:p-10 bg-[#FAF6EE] dark:bg-[#1C1A17] text-foreground rounded-r-2xl border-y border-r border-border/40 overflow-hidden"
                 style={{
@@ -507,12 +522,12 @@ export function ReaderSlideView({
                   transform: "rotateY(180deg)",
                 }}
               >
-                {/* Landing Touchdown Shadow */}
+                {/* Touchdown Landing Shadow */}
                 <motion.div
                   initial={{ opacity: 0.5 }}
-                  animate={{ opacity: [0.5, 0.2, 0] }}
-                  transition={{ duration: 0.6, ease: "easeOut" }}
-                  className="absolute inset-0 pointer-events-none z-20 bg-gradient-to-l from-black/40 via-black/15 to-transparent dark:from-black/70 dark:via-black/30 dark:to-transparent"
+                  animate={{ opacity: [0.5, 0.18, 0] }}
+                  transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+                  className="absolute inset-0 pointer-events-none z-20 bg-gradient-to-l from-black/35 via-black/10 to-transparent dark:from-black/65 dark:via-black/25 dark:to-transparent"
                 />
 
                 <PageColumn
@@ -535,7 +550,7 @@ export function ReaderSlideView({
         </div>
 
         {/* MOBILE SINGLE PAGE SPREAD (Compact, zero overflow) */}
-        <div className="md:hidden w-full h-full max-h-[calc(100vh-125px)] rounded-xl bg-[#FAF6EE] dark:bg-[#1C1A17] text-foreground border border-border/40 p-4 sm:p-6 overflow-hidden flex flex-col justify-start shadow-md">
+        <div className="md:hidden w-full h-full max-h-[calc(100vh-125px)] rounded-xl bg-[#FAF6EE] dark:bg-[#1C1A17] text-foreground border border-border/40 p-4 sm:p-6 overflow-hidden flex flex-col justify-start shadow-none">
           {isFirstPageOfChapter && (
             <header className="mb-4 text-center pb-3 border-b border-current/15 shrink-0">
               <div className="text-[11px] font-mono uppercase tracking-[0.2em] opacity-60 mb-1">
@@ -569,22 +584,22 @@ export function ReaderSlideView({
         </div>
       </div>
 
-      {/* DOCKED MINIMAL BOTTOM NAVIGATION BAR */}
-      <footer className="w-full h-10 sm:h-12 shrink-0 border-t border-current/15 flex items-center justify-between text-xs font-mono px-2 sm:px-4">
-        {/* Left: Star / Beri Rating Button */}
+      {/* DOCKED MINIMAL BOTTOM BAR (Clean, no dark border-t or heavy shadow smudges) */}
+      <footer className="w-full h-11 sm:h-12 shrink-0 flex items-center justify-between text-xs font-sans px-3 sm:px-6">
+        {/* Left: iOS Star / Beri Rating Button */}
         <Button
           type="button"
           variant="ghost"
           size="sm"
           onClick={onOpenRating}
-          className="gap-2 text-xs font-mono text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 h-8 sm:h-9"
+          className="gap-2 text-xs font-sans text-muted-foreground hover:text-foreground transition-all rounded-full px-3 py-1.5 h-8 sm:h-9 hover:bg-muted/50"
           title="Beri Rating dan Ulasan untuk Buku Ini"
         >
-          <Star className="size-3.5 sm:size-4 text-amber-500/80" />
+          <IosStar filled className="size-4 text-amber-500 fill-amber-400" />
           <span>Beri Rating</span>
         </Button>
 
-        {/* Center: Cumulative Page Counter with Chevrons */}
+        {/* Center: Cumulative Page Counter with iOS Chevrons */}
         <div className="flex items-center gap-2 sm:gap-3">
           <Button
             type="button"
@@ -592,10 +607,10 @@ export function ReaderSlideView({
             size="icon"
             onClick={onPrevPage}
             disabled={!canPrev || isFlipping}
-            className="size-7 sm:size-8 text-muted-foreground hover:text-foreground disabled:opacity-30"
+            className="size-7 sm:size-8 rounded-full text-muted-foreground hover:text-foreground disabled:opacity-25 hover:bg-muted/50 transition-all"
             aria-label="Halaman sebelumnya"
           >
-            <ChevronLeft className="size-4" />
+            <IosChevronLeft className="size-4" />
           </Button>
 
           <span className="font-mono text-xs tracking-wider opacity-80 select-none">
@@ -608,23 +623,22 @@ export function ReaderSlideView({
             size="icon"
             onClick={onNextPage}
             disabled={!canNext || isFlipping}
-            className="size-7 sm:size-8 text-muted-foreground hover:text-foreground disabled:opacity-30"
+            className="size-7 sm:size-8 rounded-full text-muted-foreground hover:text-foreground disabled:opacity-25 hover:bg-muted/50 transition-all"
             aria-label="Halaman selanjutnya"
           >
-            <ChevronRight className="size-4" />
+            <IosChevronRight className="size-4" />
           </Button>
         </div>
 
-        {/* Right: Selesai Dibaca Button */}
+        {/* Right: Selesai Baca Button (Prominent Accent CTA relocated from Top Toolbar per user preference) */}
         <Button
           type="button"
-          variant="ghost"
           size="sm"
           onClick={onFinishSession}
-          className="gap-1.5 text-xs font-mono text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 h-8 sm:h-9"
+          className="h-8 sm:h-9 text-xs font-sans font-medium gap-1.5 px-3.5 rounded-full bg-[var(--color-accent)] text-white shadow-xs hover:brightness-110 active:scale-95 transition-all"
         >
-          <Check className="size-3.5 sm:size-4 text-emerald-500/80" />
-          <span>Selesai Dibaca</span>
+          <IosCheckmark className="size-4" />
+          <span>Selesai Baca</span>
         </Button>
       </footer>
     </div>

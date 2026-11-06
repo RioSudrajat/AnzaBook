@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
-import { CheckCircle2, Star, X } from "lucide-react";
+import { CheckCircle2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { IosStar } from "@/components/ui/ios-icons";
 import { useCreateBookReview } from "@/features/books/hooks";
 
 type RatingDialogProps = {
@@ -121,10 +122,11 @@ export function RatingDialog({
                       className="p-1 text-muted-foreground hover:scale-115 active:scale-95 transition-transform cursor-pointer focus-visible:outline-2 focus-visible:outline-ring rounded-xs"
                       aria-label={`${starVal} dari 5 bintang`}
                     >
-                      <Star
+                      <IosStar
+                        filled={isFilled}
                         className={`size-7 transition-colors ${
                           isFilled
-                            ? "fill-amber-400 text-amber-500 drop-shadow-xs"
+                            ? "text-amber-500 fill-amber-400 drop-shadow-xs"
                             : "text-muted-foreground/30 hover:text-amber-400/60"
                         }`}
                       />
