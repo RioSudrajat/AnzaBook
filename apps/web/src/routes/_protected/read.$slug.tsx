@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+} from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
@@ -11,6 +17,10 @@ import {
   X,
 } from "lucide-react";
 import { z } from "zod";
+import {
+  splitChapterIntoPages,
+  getChapterPageInfo,
+} from "@starter/shared/chapter-pagination";
 import { bookProgressPercent } from "@starter/shared/reading-progress";
 import type { BookHighlightDto, HighlightColor } from "@starter/shared/types";
 import type { SaveReadingProgressInput } from "@starter/shared/validators/reading";
@@ -172,10 +182,10 @@ function ReaderPage() {
   return <ReaderBook key={`${slug}:${chapter ?? ""}`} />;
 }
 
-const paragraphsPerPage = 3;
+const paragraphsPerPage = 5;
 
 function slideChapterPercent(pageIndex: number, pageCount: number) {
-  return Math.min(99, Math.round((pageIndex + 1) / pageCount * 100));
+  return Math.min(99, Math.round(((pageIndex + 1) / pageCount) * 100));
 }
 
 function chapterSection(chapterNumber: number) {
@@ -190,7 +200,13 @@ function ReaderBook() {
   const queryClient = useQueryClient();
   const requestedChapter = search.chapter ?? 1;
 
-  const { data: payload, isLoading, isError, error, refetch } = useBookReader(slug, {
+  const {
+    data: payload,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useBookReader(slug, {
     mode: "full",
     chapter: requestedChapter,
     continuous: true,
@@ -199,20 +215,29 @@ function ReaderBook() {
   const bookId = payload?.book?.id || "";
   const scope = payload?.hasFullAccess ? "full" : "preview";
 
-  const { data: savedProgress, isPending: progressPending } = useReadingProgress(bookId, scope);
-  const previewCheckpoint = useReadingProgress(scope === "full" && !savedProgress ? bookId : "", "preview");
+  const { data: savedProgress, isPending: progressPending } =
+    useReadingProgress(bookId, scope);
+  const previewCheckpoint = useReadingProgress(
+    scope === "full" && !savedProgress ? bookId : "",
+    "preview",
+  );
   const saveProgressMutation = useSaveReadingProgress(bookId, scope);
   const { data: bookHighlights = [] } = useBookHighlights(bookId);
   const createHighlightMutation = useCreateHighlight(bookId);
   const deleteHighlightMutation = useDeleteHighlight(bookId);
 
   // Local optimistic highlights to ensure immediate instant stabilo rendering
-  const [optimisticHighlights, setOptimisticHighlights] = useState<BookHighlightDto[]>([]);
+  const [optimisticHighlights, setOptimisticHighlights] = useState<
+    BookHighlightDto[]
+  >([]);
 
   // Combined merged highlights (optimistic + fetched from server)
   const allHighlights = [
     ...optimisticHighlights.filter(
-      (oh) => !bookHighlights.some((bh) => bh.id === oh.id || bh.selectedText === oh.selectedText),
+      (oh) =>
+        !bookHighlights.some(
+          (bh) => bh.id === oh.id || bh.selectedText === oh.selectedText,
+        ),
     ),
     ...bookHighlights,
   ];
@@ -225,18 +250,28 @@ function ReaderBook() {
   const [languageView, setLanguageView] = useState<LanguageView>("id");
   const [readingLayout, setReadingLayout] = useState<ReadingLayout>("scroll");
   const [isAudioOpen, setIsAudioOpen] = useState(false);
-  const [isDrmEnabled, setIsDrmEnabled] = useState<boolean>(search.drm ?? false);
+  const [isDrmEnabled, setIsDrmEnabled] = useState<boolean>(
+    search.drm ?? false,
+  );
   const [isHighlightsOpen, setIsHighlightsOpen] = useState(false);
 
-  const [slidePosition, setSlidePosition] = useState({ chapter: requestedChapter, page: 0 });
-  const [scrollPosition, setScrollPosition] = useState({ chapter: requestedChapter, percent: 0 });
+  const [slidePosition, setSlidePosition] = useState({
+    chapter: requestedChapter,
+    page: 0,
+  });
+  const [scrollPosition, setScrollPosition] = useState({
+    chapter: requestedChapter,
+    percent: 0,
+  });
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [expiredAccess, setExpiredAccess] = useState<string | null>(null);
 
   // Marginalia & Finish Modal State
   const [activeParagraphIndex, setActiveParagraphIndex] = useState<number>(0);
-  const [marginaliaParagraph, setMarginaliaParagraph] = useState<number | null>(null);
+  const [marginaliaParagraph, setMarginaliaParagraph] = useState<number | null>(
+    null,
+  );
   const [isFinishModalOpen, setIsFinishModalOpen] = useState<boolean>(false);
   const [sessionSummary, setSessionSummary] = useState<{
     durationMinutes: number;
@@ -261,28 +296,44 @@ function ReaderBook() {
   const startTimeRef = useRef<number>(0);
   const sessionIdRef = useRef<string | null>(null);
   const savingRef = useRef(false);
-  const pendingCheckpoint = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const pendingCheckpoint = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
   const createSessionMutation = useCreateReadingSession();
   const hasRestoredRef = useRef(false);
-  const { mutate: saveProgress, mutateAsync: saveProgressAsync } = saveProgressMutation;
+  const { mutate: saveProgress, mutateAsync: saveProgressAsync } =
+    saveProgressMutation;
 
   useEffect(() => {
     startTimeRef.current = Date.now();
     return () => clearTimeout(pendingCheckpoint.current);
   }, []);
 
-  const selectedChapter = readingLayout === "scroll" ? scrollPosition.chapter : slidePosition.chapter;
-  const chapter = payload?.chapters?.find((item) => item.chapterNumber === selectedChapter) ?? payload?.currentChapter;
+  const selectedChapter =
+    readingLayout === "scroll" ? scrollPosition.chapter : slidePosition.chapter;
+  const chapter =
+    payload?.chapters?.find((item) => item.chapterNumber === selectedChapter) ??
+    payload?.currentChapter;
   const activeChapterNum = chapter?.chapterNumber ?? requestedChapter;
+  const activeChapterContent =
+    languageView === "en" && chapter?.contentEn
+      ? chapter.contentEn
+      : chapter?.contentId;
+  const chapterPages = splitChapterIntoPages(activeChapterContent);
+  const pageCount = Math.max(1, chapterPages.length);
+  const slidePageIndex =
+    slidePosition.chapter === activeChapterNum
+      ? Math.max(0, Math.min(pageCount - 1, slidePosition.page))
+      : 0;
+  const currentPageObj = chapterPages[slidePageIndex] ?? chapterPages[0];
   const chapterParagraphs = splitParagraphs(chapter?.contentId);
   const chapterParagraphCount = chapterParagraphs.length;
-  const pageCount = Math.max(1, Math.ceil(chapterParagraphCount / paragraphsPerPage));
-  const slidePageIndex = slidePosition.chapter === activeChapterNum
-    ? Math.min(pageCount - 1, slidePosition.page)
-    : 0;
-  const progress = savedProgress ?? (scope === "full" ? previewCheckpoint.data : null);
-  const waitingForCheckpoint = search.chapter === undefined &&
-    (progressPending || (scope === "full" && !savedProgress && previewCheckpoint.isPending));
+  const progress =
+    savedProgress ?? (scope === "full" ? previewCheckpoint.data : null);
+  const waitingForCheckpoint =
+    search.chapter === undefined &&
+    (progressPending ||
+      (scope === "full" && !savedProgress && previewCheckpoint.isPending));
 
   useEffect(() => {
     if (!payload || hasRestoredRef.current) return;
@@ -295,34 +346,67 @@ function ReaderBook() {
       hasRestoredRef.current = true;
       if (savedChapter && checkpoint?.layout === "slide") {
         setReadingLayout("slide");
-        setSlidePosition({ chapter: savedChapter.chapterNumber, page: checkpoint.lastPageNumber - 1 });
+        setSlidePosition({
+          chapter: savedChapter.chapterNumber,
+          page: checkpoint.lastPageNumber - 1,
+        });
         return;
       }
-      if (!savedChapter && requestedChapter === payload.chapters?.[0]?.chapterNumber) return;
+      if (
+        !savedChapter &&
+        requestedChapter === payload.chapters?.[0]?.chapterNumber
+      )
+        return;
 
       const target = savedChapter?.chapterNumber ?? requestedChapter;
       const section = chapterSection(target);
       if (!section) return;
-      setScrollPosition({ chapter: target, percent: checkpoint?.lastScrollPercent ?? 0 });
-      if (payload.hasFullAccess && checkpoint === savedProgress && savedChapter &&
-          savedChapter.id === payload.chapters?.at(-1)?.id &&
-          checkpoint?.layout === "scroll" && checkpoint.lastScrollPercent === 100) {
+      setScrollPosition({
+        chapter: target,
+        percent: checkpoint?.lastScrollPercent ?? 0,
+      });
+      if (
+        payload.hasFullAccess &&
+        checkpoint === savedProgress &&
+        savedChapter &&
+        savedChapter.id === payload.chapters?.at(-1)?.id &&
+        checkpoint?.layout === "scroll" &&
+        checkpoint.lastScrollPercent === 100
+      ) {
         window.scrollTo({ top: document.documentElement.scrollHeight });
         return;
       }
-      const marker = section.querySelector(`[data-reader-paragraph="${checkpoint?.lastParagraphIndex}"]`);
+      const marker = section.querySelector(
+        `[data-reader-paragraph="${checkpoint?.lastParagraphIndex}"]`,
+      );
       if (marker && (checkpoint?.lastScrollPercent ?? 0) > 0) {
         marker.scrollIntoView({ block: "start" });
-      } else if (savedChapter && checkpoint?.layout === "scroll" && checkpoint.lastScrollPercent > 0) {
+      } else if (
+        savedChapter &&
+        checkpoint?.layout === "scroll" &&
+        checkpoint.lastScrollPercent > 0
+      ) {
         const top = section.getBoundingClientRect().top + window.scrollY;
-        const length = Math.max(0, section.clientHeight - window.innerHeight * 0.6);
-        window.scrollTo({ top: top + length * checkpoint.lastScrollPercent / 100 });
+        const length = Math.max(
+          0,
+          section.clientHeight - window.innerHeight * 0.6,
+        );
+        window.scrollTo({
+          top: top + (length * checkpoint.lastScrollPercent) / 100,
+        });
       } else {
         section.scrollIntoView({ block: "start" });
       }
     });
     return () => cancelAnimationFrame(frame);
-  }, [payload, progress, requestedChapter, savedProgress, search.chapter, waitingForCheckpoint]);
+  }, [
+    payload,
+    progress,
+    requestedChapter,
+    savedProgress,
+    search.chapter,
+    waitingForCheckpoint,
+  ]);
 
   useEffect(() => {
     const deadline = payload?.accessExpiresAt;
@@ -338,7 +422,10 @@ function ReaderBook() {
       }
       setExpiredAccess(deadline ?? null);
       clearTimeout(pendingCheckpoint.current);
-      queryClient.removeQueries({ queryKey: booksKeys.readers(), type: "inactive" });
+      queryClient.removeQueries({
+        queryKey: booksKeys.readers(),
+        type: "inactive",
+      });
       void refetch();
     }
     checkAccess();
@@ -349,81 +436,149 @@ function ReaderBook() {
     };
   }, [payload?.accessExpiresAt, queryClient, refetch]);
 
-  const capturePosition = useCallback((page = slidePageIndex): SaveReadingProgressInput | null => {
-    if (!chapter || !hasRestoredRef.current) return null;
-    let positionChapter = chapter;
-    let paragraphCount = chapterParagraphCount;
-    let percent = slideChapterPercent(page, pageCount);
-    let paragraph = page * paragraphsPerPage;
-    if (readingLayout === "scroll") {
-      const sections = readerCanvasRef.current?.querySelectorAll<HTMLElement>("section[data-chapter-number]");
-      if (!sections?.length) return null;
-      const finalSection = sections[sections.length - 1];
-      const viewportMarker = window.innerHeight * 0.36;
-      const scrollRoot = document.scrollingElement;
-      const scrollTop = scrollRoot?.scrollTop ?? 0;
-      const maxScroll = scrollRoot ? scrollRoot.scrollHeight - scrollRoot.clientHeight : 0;
-      const atBookEnd = payload?.hasFullAccess && maxScroll > 0 && scrollTop > 0 && maxScroll - scrollTop <= 1;
-      let body = sections[0];
-      for (const section of sections) {
-        if (section.getBoundingClientRect().top > viewportMarker) break;
-        body = section;
-      }
-      if (atBookEnd) body = finalSection;
-      const visibleChapter = payload?.chapters?.find((item) => item.chapterNumber === Number(body.dataset.chapterNumber));
-      if (visibleChapter) {
-        positionChapter = visibleChapter;
-        if (visibleChapter !== chapter) paragraphCount = splitParagraphs(visibleChapter.contentId).length;
-      }
-      const rect = body.getBoundingClientRect();
-      if (atBookEnd) {
-        percent = 100;
-      } else if (payload?.hasFullAccess && body === finalSection) {
-        // A short final chapter may never reach the top before scrolling ends.
-        const chapterStart = Math.max(0, scrollTop + rect.top - parseFloat(getComputedStyle(body).scrollMarginTop));
-        const range = Math.max(1, maxScroll - chapterStart);
-        percent = Math.min(99, Math.max(0, Math.floor((scrollTop - chapterStart) / range * 100)));
-      } else {
-        const range = Math.max(1, rect.height - viewportMarker);
-        percent = Math.min(100, Math.max(0, Math.round((-rect.top / range) * 100)));
-      }
-      paragraph = 0;
-      for (const marker of body.querySelectorAll<HTMLElement>("[data-reader-paragraph]")) {
-        if (atBookEnd || marker.getBoundingClientRect().top <= viewportMarker) {
-          paragraph = Number(marker.dataset.readerParagraph);
+  const capturePosition = useCallback(
+    (page = slidePageIndex): SaveReadingProgressInput | null => {
+      if (!chapter || !hasRestoredRef.current) return null;
+      let positionChapter = chapter;
+      let paragraphCount = chapterParagraphCount;
+      let percent = slideChapterPercent(page, pageCount);
+      let paragraph = page * paragraphsPerPage;
+      if (readingLayout === "scroll") {
+        const sections = readerCanvasRef.current?.querySelectorAll<HTMLElement>(
+          "section[data-chapter-number]",
+        );
+        if (!sections?.length) return null;
+        const finalSection = sections[sections.length - 1];
+        const viewportMarker = window.innerHeight * 0.36;
+        const scrollRoot = document.scrollingElement;
+        const scrollTop = scrollRoot?.scrollTop ?? 0;
+        const maxScroll = scrollRoot
+          ? scrollRoot.scrollHeight - scrollRoot.clientHeight
+          : 0;
+        const atBookEnd =
+          payload?.hasFullAccess &&
+          maxScroll > 0 &&
+          scrollTop > 0 &&
+          maxScroll - scrollTop <= 1;
+        let body = sections[0];
+        for (const section of sections) {
+          if (section.getBoundingClientRect().top > viewportMarker) break;
+          body = section;
+        }
+        if (atBookEnd) body = finalSection;
+        const visibleChapter = payload?.chapters?.find(
+          (item) => item.chapterNumber === Number(body.dataset.chapterNumber),
+        );
+        if (visibleChapter) {
+          positionChapter = visibleChapter;
+          if (visibleChapter !== chapter)
+            paragraphCount = splitParagraphs(visibleChapter.contentId).length;
+        }
+        const rect = body.getBoundingClientRect();
+        if (atBookEnd) {
+          percent = 100;
+        } else if (payload?.hasFullAccess && body === finalSection) {
+          // A short final chapter may never reach the top before scrolling ends.
+          const chapterStart = Math.max(
+            0,
+            scrollTop +
+              rect.top -
+              parseFloat(getComputedStyle(body).scrollMarginTop),
+          );
+          const range = Math.max(1, maxScroll - chapterStart);
+          percent = Math.min(
+            99,
+            Math.max(0, Math.floor(((scrollTop - chapterStart) / range) * 100)),
+          );
+        } else {
+          const range = Math.max(1, rect.height - viewportMarker);
+          percent = Math.min(
+            100,
+            Math.max(0, Math.round((-rect.top / range) * 100)),
+          );
+        }
+        paragraph = 0;
+        for (const marker of body.querySelectorAll<HTMLElement>(
+          "[data-reader-paragraph]",
+        )) {
+          if (
+            atBookEnd ||
+            marker.getBoundingClientRect().top <= viewportMarker
+          ) {
+            paragraph = Number(marker.dataset.readerParagraph);
+          }
         }
       }
-    }
-    const lastParagraphIndex = Math.min(paragraph, Math.max(0, paragraphCount - 1));
-    return {
-      lastChapterId: positionChapter.id,
-      lastChapterNumber: positionChapter.chapterNumber,
-      lastPageNumber: readingLayout === "slide" ? page + 1 : Math.floor(lastParagraphIndex / paragraphsPerPage) + 1,
-      lastScrollPercent: percent,
-      lastParagraphIndex,
-      layout: readingLayout,
-      capturedAt: Date.now(),
-    };
-  }, [chapter, chapterParagraphCount, pageCount, payload?.chapters, payload?.hasFullAccess, readingLayout, slidePageIndex]);
+      const lastParagraphIndex = Math.min(
+        paragraph,
+        Math.max(0, paragraphCount - 1),
+      );
+      return {
+        lastChapterId: positionChapter.id,
+        lastChapterNumber: positionChapter.chapterNumber,
+        lastPageNumber:
+          readingLayout === "slide"
+            ? page + 1
+            : Math.floor(lastParagraphIndex / paragraphsPerPage) + 1,
+        lastScrollPercent: percent,
+        lastParagraphIndex,
+        layout: readingLayout,
+        capturedAt: Date.now(),
+      };
+    },
+    [
+      chapter,
+      chapterParagraphCount,
+      pageCount,
+      payload?.chapters,
+      payload?.hasFullAccess,
+      readingLayout,
+      slidePageIndex,
+    ],
+  );
 
-  const queueCheckpoint = useCallback((position: SaveReadingProgressInput) => {
-    clearTimeout(pendingCheckpoint.current);
-    pendingCheckpoint.current = setTimeout(() => saveProgress(position), 1800);
-  }, [saveProgress]);
+  const queueCheckpoint = useCallback(
+    (position: SaveReadingProgressInput) => {
+      clearTimeout(pendingCheckpoint.current);
+      pendingCheckpoint.current = setTimeout(
+        () => saveProgress(position),
+        1800,
+      );
+    },
+    [saveProgress],
+  );
 
   useEffect(() => {
     if (!chapter || readingLayout !== "scroll") return;
     const handleScroll = () => {
       const position = capturePosition();
-      if (!position || savingRef.current || (expiredAccess !== null && expiredAccess === payload?.accessExpiresAt)) return;
-      setScrollPosition((previous) => previous.chapter === position.lastChapterNumber &&
-        previous.percent === position.lastScrollPercent ? previous :
-        { chapter: position.lastChapterNumber, percent: position.lastScrollPercent });
+      if (
+        !position ||
+        savingRef.current ||
+        (expiredAccess !== null && expiredAccess === payload?.accessExpiresAt)
+      )
+        return;
+      setScrollPosition((previous) =>
+        previous.chapter === position.lastChapterNumber &&
+        previous.percent === position.lastScrollPercent
+          ? previous
+          : {
+              chapter: position.lastChapterNumber,
+              percent: position.lastScrollPercent,
+            },
+      );
       queueCheckpoint(position);
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [capturePosition, chapter, expiredAccess, payload?.accessExpiresAt, queueCheckpoint, readingLayout]);
+  }, [
+    capturePosition,
+    chapter,
+    expiredAccess,
+    payload?.accessExpiresAt,
+    queueCheckpoint,
+    readingLayout,
+  ]);
 
   function turnPage(page: number) {
     setSlidePosition({ chapter: activeChapterNum, page });
@@ -436,7 +591,10 @@ function ReaderBook() {
     if (layout === readingLayout) return;
     const position = capturePosition();
     if (layout === "slide") {
-      setSlidePosition({ chapter: position?.lastChapterNumber ?? activeChapterNum, page: (position?.lastPageNumber ?? 1) - 1 });
+      setSlidePosition({
+        chapter: position?.lastChapterNumber ?? activeChapterNum,
+        page: (position?.lastPageNumber ?? 1) - 1,
+      });
       setReadingLayout(layout);
       window.scrollTo({ top: 0 });
       return;
@@ -445,8 +603,12 @@ function ReaderBook() {
     setReadingLayout(layout);
     requestAnimationFrame(() => {
       const section = chapterSection(activeChapterNum);
-      const marker = section?.querySelector(`[data-reader-paragraph="${position?.lastParagraphIndex}"]`);
-      (slidePageIndex > 0 && marker ? marker : section)?.scrollIntoView({ block: "start" });
+      const marker = section?.querySelector(
+        `[data-reader-paragraph="${position?.lastParagraphIndex}"]`,
+      );
+      (slidePageIndex > 0 && marker ? marker : section)?.scrollIntoView({
+        block: "start",
+      });
     });
   }
 
@@ -554,7 +716,10 @@ function ReaderBook() {
     }
   };
 
-  async function saveSession(destination: "home" | "membership" | "summary", finishedBook = false) {
+  async function saveSession(
+    destination: "home" | "membership" | "summary",
+    finishedBook = false,
+  ) {
     if (savingRef.current) return;
     savingRef.current = true;
     setIsSaving(true);
@@ -564,20 +729,40 @@ function ReaderBook() {
     try {
       const position = capturePosition();
       if (bookId && position) {
-        const finalChapter = payload?.allChapters.at(-1)?.chapterNumber === position.lastChapterNumber;
-        const finalPage = readingLayout === "slide" && slidePageIndex === pageCount - 1;
-        if (destination === "summary" && finalChapter && (finishedBook || finalPage) && scope === "full") {
+        const finalChapter =
+          payload?.allChapters.at(-1)?.chapterNumber ===
+          position.lastChapterNumber;
+        const finalPage =
+          readingLayout === "slide" && slidePageIndex === pageCount - 1;
+        if (
+          destination === "summary" &&
+          finalChapter &&
+          (finishedBook || finalPage) &&
+          scope === "full"
+        ) {
           position.lastScrollPercent = 100;
         }
         await saveProgressAsync(position);
         if (startTimeRef.current) {
-          const durationSeconds = Math.min(28_800, Math.max(1, Math.round((Date.now() - startTimeRef.current) / 1000)));
-          const positionChapter = payload?.chapters?.find((item) => item.chapterNumber === position.lastChapterNumber);
-          const words = splitParagraphs(positionChapter?.contentId ?? chapter?.contentId)
+          const durationSeconds = Math.min(
+            28_800,
+            Math.max(1, Math.round((Date.now() - startTimeRef.current) / 1000)),
+          );
+          const positionChapter = payload?.chapters?.find(
+            (item) => item.chapterNumber === position.lastChapterNumber,
+          );
+          const words = splitParagraphs(
+            positionChapter?.contentId ?? chapter?.contentId,
+          )
             .slice(0, (position.lastParagraphIndex ?? 0) + 1)
-            .join(" ").split(/\s+/).filter(Boolean).length;
+            .join(" ")
+            .split(/\s+/)
+            .filter(Boolean).length;
           const pagesRead = Math.max(1, Math.ceil(words / 250));
-          const wpm = Math.max(30, Math.min(1200, Math.round(words * 60 / durationSeconds)));
+          const wpm = Math.max(
+            30,
+            Math.min(1200, Math.round((words * 60) / durationSeconds)),
+          );
           sessionIdRef.current ??= crypto.randomUUID();
           await createSessionMutation.mutateAsync({
             sessionId: sessionIdRef.current,
@@ -589,7 +774,11 @@ function ReaderBook() {
           });
           sessionIdRef.current = null;
           startTimeRef.current = 0;
-          setSessionSummary({ durationMinutes: Math.max(1, Math.round(durationSeconds / 60)), pagesRead, wpm });
+          setSessionSummary({
+            durationMinutes: Math.max(1, Math.round(durationSeconds / 60)),
+            pagesRead,
+            wpm,
+          });
         }
       }
       if (destination === "home") {
@@ -608,7 +797,14 @@ function ReaderBook() {
   }
 
   function handleUpgrade(event: MouseEvent<HTMLAnchorElement>) {
-    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    )
+      return;
     event.preventDefault();
     void saveSession("membership");
   }
@@ -618,11 +814,16 @@ function ReaderBook() {
     startTimeRef.current = Date.now();
   }
 
-  const isLocked = error instanceof ApiError && error.code === "FORBIDDEN_DIGITAL_ACCESS";
-  const isExpired = expiredAccess !== null && expiredAccess === payload?.accessExpiresAt;
+  const isLocked =
+    error instanceof ApiError && error.code === "FORBIDDEN_DIGITAL_ACCESS";
+  const isExpired =
+    expiredAccess !== null && expiredAccess === payload?.accessExpiresAt;
   const isMissing = error instanceof ApiError && error.status === 404;
 
-  if (isLoading || (payload && !isError && !isExpired && waitingForCheckpoint)) {
+  if (
+    isLoading ||
+    (payload && !isError && !isExpired && waitingForCheckpoint)
+  ) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
@@ -637,16 +838,31 @@ function ReaderBook() {
 
   if (isLocked || isExpired) {
     return (
-      <main id="main-content" className="mx-auto flex min-h-svh max-w-xl flex-col items-center justify-center gap-4 px-6 text-center">
+      <main
+        id="main-content"
+        className="mx-auto flex min-h-svh max-w-xl flex-col items-center justify-center gap-4 px-6 text-center"
+      >
         <h1 className="font-serif text-3xl font-semibold">Bab ini terkunci</h1>
-        <p className="text-muted-foreground">Buka cuplikan atau aktifkan akses untuk lanjut membaca naskah lengkap.</p>
+        <p className="text-muted-foreground">
+          Buka cuplikan atau aktifkan akses untuk lanjut membaca naskah lengkap.
+        </p>
         <Button asChild size="lg">
-          <Link to="/read/$slug" params={{ slug }} search={{ chapter: 1 }}>Baca cuplikan</Link>
+          <Link to="/read/$slug" params={{ slug }} search={{ chapter: 1 }}>
+            Baca cuplikan
+          </Link>
         </Button>
         <Button asChild size="lg" variant="outline">
-          <Link to="/membership" search={{ book: slug }}>Jadi Nakama</Link>
+          <Link to="/membership" search={{ book: slug }}>
+            Jadi Nakama
+          </Link>
         </Button>
-        <Link to="/app" search={{ tab: "home" }} className="rounded-sm px-3 py-3 text-sm underline focus-visible:outline-2 focus-visible:outline-ring">Keluar ke Home</Link>
+        <Link
+          to="/app"
+          search={{ tab: "home" }}
+          className="rounded-sm px-3 py-3 text-sm underline focus-visible:outline-2 focus-visible:outline-ring"
+        >
+          Keluar ke Home
+        </Link>
       </main>
     );
   }
@@ -658,9 +874,15 @@ function ReaderBook() {
           {isMissing ? "Naskah tidak ditemukan" : "Naskah belum bisa dimuat"}
         </h2>
         <p className="text-sm text-muted-foreground max-w-md mb-6">
-          {isMissing ? "Buka detail buku untuk melihat bab yang tersedia." : "Periksa koneksi, lalu coba buka naskah lagi."}
+          {isMissing
+            ? "Buka detail buku untuk melihat bab yang tersedia."
+            : "Periksa koneksi, lalu coba buka naskah lagi."}
         </p>
-        {!isMissing && <Button className="mb-3" onClick={() => void refetch()}>Coba lagi</Button>}
+        {!isMissing && (
+          <Button className="mb-3" onClick={() => void refetch()}>
+            Coba lagi
+          </Button>
+        )}
         <Button asChild>
           <Link to="/books/$slug" params={{ slug }}>
             Kembali ke Halaman Buku
@@ -673,12 +895,35 @@ function ReaderBook() {
   const { book, allChapters, watermark } = payload;
   const currentChapter = chapter ?? payload.currentChapter;
   const chaptersList = payload.chapters ?? [currentChapter];
-  const isPremiumPreview = !payload.hasFullAccess && book.accessTier === "premium";
-  const chapterIndex = allChapters.findIndex((item) => item.chapterNumber === activeChapterNum);
-  const nextChapter = payload.hasFullAccess ? allChapters[chapterIndex + 1]?.chapterNumber : undefined;
-  const previousChapter = payload.hasFullAccess ? allChapters[chapterIndex - 1]?.chapterNumber : undefined;
+  const isPremiumPreview =
+    !payload.hasFullAccess && book.accessTier === "premium";
+  const chapterIndex = allChapters.findIndex(
+    (item) => item.chapterNumber === activeChapterNum,
+  );
+  const nextChapter = payload.hasFullAccess
+    ? allChapters[chapterIndex + 1]?.chapterNumber
+    : undefined;
+  const previousChapter = payload.hasFullAccess
+    ? allChapters[chapterIndex - 1]?.chapterNumber
+    : undefined;
   const hasNextChapter = nextChapter !== undefined;
   const hasPrevChapter = previousChapter !== undefined;
+
+  function goToPreviousSlide() {
+    if (slidePageIndex > 0) {
+      turnPage(slidePageIndex - 1);
+    } else if (hasPrevChapter && previousChapter !== undefined) {
+      void handleSelectChapter(previousChapter);
+    }
+  }
+
+  function goToNextSlide() {
+    if (slidePageIndex < pageCount - 1) {
+      turnPage(slidePageIndex + 1);
+    } else if (hasNextChapter && nextChapter !== undefined) {
+      void handleSelectChapter(nextChapter);
+    }
+  }
 
   // Theme styling
   const themeClass =
@@ -705,7 +950,9 @@ function ReaderBook() {
 
   return (
     <DrmShield watermarkText={watermark} enabled={isDrmEnabled}>
-      <div className={`min-h-screen flex flex-col transition-colors duration-300 ${themeClass}`}>
+      <div
+        className={`min-h-screen flex flex-col transition-colors duration-300 ${themeClass}`}
+      >
         {/* Sticky Header: Reader Toolbar + Audio Player (stacked in single sticky container so they NEVER overlap) */}
         <div className="sticky top-0 z-40 w-full bg-background/95 backdrop-blur-md border-b border-border shadow-xs transition-colors">
           <ReaderToolbar
@@ -727,7 +974,11 @@ function ReaderBook() {
             onExit={() => void saveSession("home")}
             isSaving={isSaving}
             isAudioOpen={isAudioOpen}
-            onToggleAudio={currentChapter.audioUrl ? () => setIsAudioOpen(!isAudioOpen) : undefined}
+            onToggleAudio={
+              currentChapter.audioUrl
+                ? () => setIsAudioOpen(!isAudioOpen)
+                : undefined
+            }
             isDrmEnabled={isDrmEnabled}
             onToggleDrm={() => setIsDrmEnabled((prev) => !prev)}
             isHighlightsOpen={isHighlightsOpen}
@@ -737,7 +988,9 @@ function ReaderBook() {
               const firstHighlight = allHighlights[0];
               setStoryDialogData({
                 isOpen: true,
-                text: firstHighlight ? firstHighlight.selectedText : book.synopsis.slice(0, 180),
+                text: firstHighlight
+                  ? firstHighlight.selectedText
+                  : book.synopsis.slice(0, 180),
                 color: firstHighlight ? firstHighlight.color : "yellow",
                 note: firstHighlight?.note || undefined,
               });
@@ -750,7 +1003,9 @@ function ReaderBook() {
               <AudiobookBar
                 key={currentChapter.id}
                 audioUrl={currentChapter.audioUrl}
-                totalDurationSeconds={currentChapter.audioDurationSeconds || 900}
+                totalDurationSeconds={
+                  currentChapter.audioDurationSeconds || 900
+                }
                 activeParagraphIndex={activeParagraphIndex}
                 totalParagraphs={chapterParagraphCount}
                 onParagraphChange={(idx) => {
@@ -779,7 +1034,10 @@ function ReaderBook() {
           className="w-full max-w-2xl sm:max-w-[700px] mx-auto px-4 sm:px-6 py-10 pb-40"
         >
           {saveError && (
-            <p role="alert" className="mb-6 rounded-md border border-destructive/40 p-3 text-sm">
+            <p
+              role="alert"
+              className="mb-6 rounded-md border border-destructive/40 p-3 text-sm"
+            >
               Posisi atau sesi belum tersimpan. Periksa koneksi lalu coba lagi.
             </p>
           )}
@@ -790,8 +1048,12 @@ function ReaderBook() {
                 const idPars = splitParagraphs(chap.contentId);
                 const enPars = splitParagraphs(chap.contentEn);
                 const paragraphs = languageView === "en" ? enPars : idPars;
-                const highlights = allHighlights.filter((item) => item.chapterNumber === chap.chapterNumber);
-                const fadeParagraph = isPremiumPreview ? paragraphs.length - 1 : -1;
+                const highlights = allHighlights.filter(
+                  (item) => item.chapterNumber === chap.chapterNumber,
+                );
+                const fadeParagraph = isPremiumPreview
+                  ? paragraphs.length - 1
+                  : -1;
 
                 return (
                   <section
@@ -806,7 +1068,7 @@ function ReaderBook() {
                         <div className="text-xs font-mono uppercase tracking-[0.2em] opacity-60 mb-2">
                           CHAPTER {chap.chapterNumber}
                         </div>
-                        <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight leading-tight">
+                        <h1 className="font-serif text-2xl sm:text-3xl font-bold tracking-tight">
                           {chap.title}
                         </h1>
                       </header>
@@ -842,7 +1104,11 @@ function ReaderBook() {
                         {idPars.map((idText, pIdx) => {
                           const enText = enPars[pIdx] || "";
                           return (
-                            <div key={pIdx} data-reader-paragraph={pIdx} className="scroll-mt-28">
+                            <div
+                              key={pIdx}
+                              data-reader-paragraph={pIdx}
+                              className="scroll-mt-28"
+                            >
                               {/* Page Divider every 3 paragraphs (SS 3) */}
                               {pIdx > 0 && pIdx % 3 === 0 && (
                                 <div
@@ -853,7 +1119,12 @@ function ReaderBook() {
                                 </div>
                               )}
 
-                              <div data-preview-fade={pIdx === fadeParagraph || undefined} className="grid grid-cols-1 md:grid-cols-2 gap-6 py-1 select-text">
+                              <div
+                                data-preview-fade={
+                                  pIdx === fadeParagraph || undefined
+                                }
+                                className="grid grid-cols-1 md:grid-cols-2 gap-6 py-1 select-text"
+                              >
                                 <p
                                   className={`leading-relaxed text-justify ${fontClass}`}
                                   style={{
@@ -887,29 +1158,56 @@ function ReaderBook() {
                         className={`${fontClass}`}
                         style={{ fontSize: `${fontSize}px`, lineHeight: 1.85 }}
                       >
-                        {paragraphs.map(
-                          (text, pIdx) => (
-                            <div key={pIdx} data-reader-paragraph={pIdx} className="scroll-mt-28">
-                              {/* Page Divider every 3 paragraphs (SS 3) */}
-                              {pIdx > 0 && pIdx % 3 === 0 && (
-                                <div
-                                  className="py-8 my-4 text-center select-none text-current/35 font-mono tracking-[0.6em] text-sm"
-                                  aria-hidden="true"
-                                >
-                                  ***
-                                </div>
-                              )}
+                        {splitChapterIntoPages(
+                          languageView === "en"
+                            ? chap.contentEn
+                            : chap.contentId,
+                        ).map((pg, pgIdx, allPgs) => (
+                          <div key={pgIdx} className="space-y-4">
+                            {pgIdx > 0 && (
+                              <div
+                                className="py-12 my-8 text-center select-none flex items-center justify-center gap-4 text-current/30"
+                                aria-hidden="true"
+                              >
+                                <div className="w-16 h-px bg-current/20" />
+                                <span className="text-xs tracking-[0.6em] opacity-60 select-none">
+                                  ✦ &nbsp; ✦ &nbsp; ✦
+                                </span>
+                                <div className="w-16 h-px bg-current/20" />
+                              </div>
+                            )}
 
-                              <p data-preview-fade={pIdx === fadeParagraph || undefined} className="leading-relaxed text-justify mb-6 select-text">
-                                {renderHighlightedText(
-                                  text,
-                                  highlights,
-                                  handleFlexHighlight,
-                                )}
-                              </p>
-                            </div>
-                          ),
-                        )}
+                            {pg.paragraphs.map((text, localIdx) => {
+                              const pIdx =
+                                allPgs
+                                  .slice(0, pgIdx)
+                                  .reduce(
+                                    (acc, p) => acc + p.paragraphs.length,
+                                    0,
+                                  ) + localIdx;
+                              return (
+                                <div
+                                  key={pIdx}
+                                  data-reader-paragraph={pIdx}
+                                  className="scroll-mt-28"
+                                >
+                                  <p
+                                    data-preview-fade={
+                                      pIdx === fadeParagraph || undefined
+                                    }
+                                    className="leading-relaxed text-justify mb-6 select-text"
+                                  >
+                                    {renderHighlightedText(
+                                      text,
+                                      highlights,
+                                      handleFlexHighlight,
+                                    )}
+                                  </p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ))}
                       </div>
                     )}
                   </section>
@@ -917,24 +1215,29 @@ function ReaderBook() {
               })}
 
               {/* End of Reading Completion Section */}
-              {payload.hasFullAccess && <div className="pt-16 border-t border-current/15 text-center space-y-4">
-                <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
-                  Akhir buku
-                </p>
-                <Button
-                  onClick={() => void saveSession("summary", true)}
-                  disabled={isSaving}
-                  size="default"
-                  className="gap-2 font-mono text-xs bg-[var(--color-accent)] text-white hover:brightness-110 shadow-md"
-                >
-                  <CheckCircle2 className="size-4" />
-                  Simpan sesi baca
-                </Button>
-              </div>}
+              {payload.hasFullAccess && (
+                <div className="pt-16 border-t border-current/15 text-center space-y-4">
+                  <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
+                    Akhir buku
+                  </p>
+                  <Button
+                    onClick={() => void saveSession("summary", true)}
+                    disabled={isSaving}
+                    size="default"
+                    className="gap-2 font-mono text-xs bg-[var(--color-accent)] text-white hover:brightness-110 shadow-md"
+                  >
+                    <CheckCircle2 className="size-4" />
+                    Simpan sesi baca
+                  </Button>
+                </div>
+              )}
             </div>
           ) : (
             /* Slide Mode (Pagination by slide page) */
-            <div data-chapter-number={currentChapter.chapterNumber} className="space-y-8">
+            <div
+              data-chapter-number={currentChapter.chapterNumber}
+              className="space-y-8"
+            >
               <header className="mb-10 text-center pb-6 border-b border-current/15">
                 <div className="text-xs font-mono uppercase tracking-[0.2em] opacity-60 mb-2">
                   CHAPTER {currentChapter.chapterNumber}
@@ -948,24 +1251,27 @@ function ReaderBook() {
                 className={`${fontClass}`}
                 style={{ fontSize: `${fontSize}px`, lineHeight: 1.85 }}
               >
-                {chapterParagraphs
-                  .slice(
-                    slidePageIndex * paragraphsPerPage,
-                    (slidePageIndex + 1) * paragraphsPerPage,
-                  )
-                  .map((text, idx) => (
-                    <p
-                      key={idx}
-                      data-preview-fade={isPremiumPreview && slidePageIndex * paragraphsPerPage + idx === chapterParagraphCount - 1 || undefined}
-                      className="leading-relaxed text-justify mb-6 select-text"
-                    >
-                      {renderHighlightedText(
-                        text,
-                        allHighlights.filter((item) => item.chapterNumber === currentChapter.chapterNumber),
-                        handleFlexHighlight,
-                      )}
-                    </p>
-                  ))}
+                {currentPageObj.paragraphs.map((text, idx) => (
+                  <p
+                    key={idx}
+                    data-preview-fade={
+                      (isPremiumPreview &&
+                        slidePageIndex === pageCount - 1 &&
+                        idx === currentPageObj.paragraphs.length - 1) ||
+                      undefined
+                    }
+                    className="leading-relaxed text-justify mb-6 select-text"
+                  >
+                    {renderHighlightedText(
+                      text,
+                      allHighlights.filter(
+                        (item) =>
+                          item.chapterNumber === currentChapter.chapterNumber,
+                      ),
+                      handleFlexHighlight,
+                    )}
+                  </p>
+                ))}
               </div>
 
               {/* Slide Pagination Controls */}
@@ -973,26 +1279,36 @@ function ReaderBook() {
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={slidePageIndex === 0}
-                  onClick={() => turnPage(slidePageIndex - 1)}
+                  disabled={slidePageIndex === 0 && !hasPrevChapter}
+                  onClick={goToPreviousSlide}
                   className="gap-1.5"
                 >
                   <ChevronLeft className="size-4" />
-                  Sebelumnya
+                  {slidePageIndex === 0 && hasPrevChapter
+                    ? `Bab ${previousChapter}`
+                    : "Sebelumnya"}
                 </Button>
 
-                <span className="font-bold">
-                  Halaman {slidePageIndex + 1} dari {pageCount}
-                </span>
+                <div className="text-center space-y-0.5">
+                  <div className="font-bold tracking-wide">
+                    Bab {activeChapterNum} • Halaman {slidePageIndex + 1} dari{" "}
+                    {pageCount}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-widest truncate max-w-[200px] sm:max-w-xs">
+                    {currentChapter.title}
+                  </div>
+                </div>
 
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={slidePageIndex >= pageCount - 1}
-                  onClick={() => turnPage(slidePageIndex + 1)}
+                  disabled={slidePageIndex >= pageCount - 1 && !hasNextChapter}
+                  onClick={goToNextSlide}
                   className="gap-1.5"
                 >
-                  Selanjutnya
+                  {slidePageIndex >= pageCount - 1 && hasNextChapter
+                    ? `Bab ${nextChapter}`
+                    : "Selanjutnya"}
                   <ChevronRight className="size-4" />
                 </Button>
               </div>
@@ -1005,17 +1321,34 @@ function ReaderBook() {
               aria-labelledby="preview-end"
               className="mt-10 space-y-4 pt-4 text-center focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
             >
-              <p className="font-mono text-xs font-semibold tracking-widest uppercase">Cuplikan</p>
-              <h2 id="preview-end" className="font-serif text-3xl font-semibold">Akhir cuplikan</h2>
+              <p className="font-mono text-xs font-semibold tracking-widest uppercase">
+                Cuplikan
+              </p>
+              <h2
+                id="preview-end"
+                className="font-serif text-3xl font-semibold"
+              >
+                Akhir cuplikan
+              </h2>
               <p className="mx-auto max-w-sm text-base leading-relaxed">
                 {book.digitalPolicy === "print_claim_only"
                   ? "Klaim kode dari buku cetak untuk membuka naskah lengkap."
                   : "Jadi Nakama untuk melanjutkan buku ini dan membuka koleksi Premium."}
               </p>
               <Button asChild size="lg" className="min-h-11">
-                {book.digitalPolicy === "print_claim_only"
-                  ? <Link to="/books/$slug" params={{ slug }}>Buka detail dan klaim kode</Link>
-                  : <Link to="/membership" search={{ book: slug }} onClick={handleUpgrade}>Jadi Nakama</Link>}
+                {book.digitalPolicy === "print_claim_only" ? (
+                  <Link to="/books/$slug" params={{ slug }}>
+                    Buka detail dan klaim kode
+                  </Link>
+                ) : (
+                  <Link
+                    to="/membership"
+                    search={{ book: slug }}
+                    onClick={handleUpgrade}
+                  >
+                    Jadi Nakama
+                  </Link>
+                )}
               </Button>
             </section>
           )}
@@ -1026,8 +1359,22 @@ function ReaderBook() {
           currentChapter={activeChapterNum}
           totalChapters={allChapters.length}
           currentPercent={currentPercent}
-          onPrevChapter={readingLayout === "slide" ? () => { if (previousChapter !== undefined) void handleSelectChapter(previousChapter); } : undefined}
-          onNextChapter={readingLayout === "slide" ? () => { if (nextChapter !== undefined) void handleSelectChapter(nextChapter); } : undefined}
+          onPrevChapter={
+            readingLayout === "slide"
+              ? () => {
+                  if (previousChapter !== undefined)
+                    void handleSelectChapter(previousChapter);
+                }
+              : undefined
+          }
+          onNextChapter={
+            readingLayout === "slide"
+              ? () => {
+                  if (nextChapter !== undefined)
+                    void handleSelectChapter(nextChapter);
+                }
+              : undefined
+          }
           hasPrev={hasPrevChapter}
           hasNext={hasNextChapter}
         />
@@ -1100,7 +1447,8 @@ function ReaderBook() {
                   Sesi Membaca Tercatat!
                 </h3>
                 <p className="text-xs text-muted-foreground mt-1 font-sans">
-                  Pencapaian membaca Anda untuk <strong>{book.title}</strong> telah disimpan di linimasa profil.
+                  Pencapaian membaca Anda untuk <strong>{book.title}</strong>{" "}
+                  telah disimpan di linimasa profil.
                 </p>
 
                 {/* Telemetry Highlights */}
@@ -1134,7 +1482,10 @@ function ReaderBook() {
 
                 {/* Actions */}
                 <div className="mt-6 flex flex-col gap-2.5">
-                  <Button asChild className="gap-2 font-mono text-xs bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent)]/90">
+                  <Button
+                    asChild
+                    className="gap-2 font-mono text-xs bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent)]/90"
+                  >
                     <Link to="/app" search={{ tab: "library" }}>
                       <Share2 className="size-3.5" />
                       Flex Your Reading di My Library
@@ -1146,14 +1497,19 @@ function ReaderBook() {
                       variant="outline"
                       onClick={() => {
                         closeSessionSummary();
-                        if (nextChapter !== undefined) void handleSelectChapter(nextChapter);
+                        if (nextChapter !== undefined)
+                          void handleSelectChapter(nextChapter);
                       }}
                       className="font-mono text-xs"
                     >
                       Lanjut ke Bab {nextChapter}
                     </Button>
                   ) : (
-                    <Button variant="outline" asChild className="font-mono text-xs">
+                    <Button
+                      variant="outline"
+                      asChild
+                      className="font-mono text-xs"
+                    >
                       <Link to="/app" search={{ tab: "home" }}>
                         Kembali ke Home
                       </Link>
