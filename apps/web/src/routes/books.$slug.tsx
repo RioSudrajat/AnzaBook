@@ -4,19 +4,27 @@ import {
   ArrowLeft,
   BookMarked,
   BookOpen,
+  Calendar,
   Check,
   ChevronRight,
   Crown,
   Loader2,
+  MapPin,
   MessageSquare,
   Package,
   ShoppingBag,
   Star,
 } from "lucide-react";
 import type { BookSummaryDto, EditionTier } from "@starter/shared/types";
+import { SiteFooter } from "@/components/site-footer";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api/client";
+import {
+  bookPagePath,
+  bookPreviewPath,
+  bookShareOrigin,
+} from "@/features/books/book-share";
 import { FlagIcon } from "@/components/ui/flag-icon";
 import { BookCover } from "@/features/books/components/book-cover";
 import { BookCatalogCard } from "@/features/books/components/book-catalog-card";
@@ -35,11 +43,42 @@ import { useUpsertShelf } from "@/features/community/hooks";
 export const Route = createFileRoute("/books/$slug")({
   loader: async ({ context, params }) => {
     try {
-      return await context.queryClient.ensureQueryData(bookDetailQuery(params.slug));
+      const { slug, title, author, synopsis } = await context.queryClient.ensureQueryData(
+        bookDetailQuery(params.slug),
+      );
+      return { book: { slug, title, author, synopsis }, origin: bookShareOrigin() };
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) throw notFound();
       throw error;
     }
+  },
+  head: ({ loaderData }) => {
+    if (!loaderData) return {};
+    const { book, origin } = loaderData;
+    const title = `${book.title} — ${book.author}`;
+    const url = new URL(bookPagePath(book.slug), origin).href;
+    const image = new URL(bookPreviewPath(book.slug), origin).href;
+    return {
+      meta: [
+        { title: `${title} | AnzaBook` },
+        { name: "description", content: book.synopsis },
+        { property: "og:type", content: "book" },
+        { property: "og:site_name", content: "AnzaBook" },
+        { property: "og:title", content: title },
+        { property: "og:description", content: book.synopsis },
+        { property: "og:url", content: url },
+        { property: "og:image", content: image },
+        { property: "og:image:type", content: "image/png" },
+        { property: "og:image:width", content: "1200" },
+        { property: "og:image:height", content: "630" },
+        {
+          property: "og:image:alt",
+          content: `Sampul ${book.title}, ${book.author}`,
+        },
+        { name: "twitter:card", content: "summary_large_image" },
+      ],
+      links: [{ rel: "canonical", href: url }],
+    };
   },
   component: BookDetailPage,
 });
@@ -207,9 +246,9 @@ export default function BookDetailPage() {
                   <span className="text-xs font-mono text-muted-foreground">Penerbit:</span>
                   <div className="flex items-center gap-2">
                     <img
-                      src={book.editorAvatar || "/logo-mark.svg"}
+                      src={book.editorAvatar || "/icon.svg"}
                       alt={book.editor || "Anza Book"}
-                      className="size-6 rounded-full object-contain p-0.5 border border-border bg-background"
+                      className="size-6 rounded-[5px] object-contain border border-border/40 shadow-xs"
                     />
                     <span className="font-semibold text-foreground/90">
                       {book.editor || "Anza Book"}
@@ -272,6 +311,53 @@ export default function BookDetailPage() {
                     {cat}
                   </span>
                 ))}
+              </div>
+
+              {/* Mobile Cover & Action Buttons Block */}
+              <div className="block lg:hidden my-6 p-4 rounded-xl border border-border/80 bg-card/60 flex flex-col items-center">
+                <BookCover book={book} className="mb-6 w-[200px] max-w-full sm:w-[240px]" />
+                <div className="w-full max-w-[280px] space-y-3 font-mono">
+                  <Button
+                    onClick={handleStartReading}
+                    size="lg"
+                    className="w-full h-12 bg-red-600 hover:bg-red-500 text-white font-bold text-xs gap-2 shadow-md transition-all active:scale-95"
+                  >
+                    <BookOpen className="size-4" />
+                    Start Reading
+                  </Button>
+
+                  <Button
+                    onClick={handleSaveToLibrary}
+                    variant="outline"
+                    size="lg"
+                    disabled={upsertShelfMutation.isPending || shelfSaved}
+                    className="w-full h-11 bg-background text-foreground border-border hover:bg-muted font-medium text-xs gap-2 transition-all active:scale-95"
+                  >
+                    {shelfSaved ? (
+                      <>
+                        <Check className="size-4 text-emerald-600" />
+                        Tersimpan di Rak!
+                      </>
+                    ) : (
+                      <>
+                        <BookMarked className="size-4" />
+                        Save to Library
+                      </>
+                    )}
+                  </Button>
+                  {shelfError && (
+                    <p role="alert" className="text-sm text-destructive">Buku belum tersimpan. Coba lagi.</p>
+                  )}
+
+                  {book.hasPhysical && (
+                    <Button asChild variant="outline" size="lg" className="w-full min-h-11">
+                      <a href="#stok-buku">
+                        <ShoppingBag className="size-4" aria-hidden="true" />
+                        Lihat stok buku fisik
+                      </a>
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -538,8 +624,8 @@ export default function BookDetailPage() {
             </div>
           </div>
 
-          {/* Right Column: 3D Thick Book Cover & 3 Smart Action Buttons */}
-          <div className="lg:col-span-4 sticky top-28 flex flex-col items-center">
+          {/* Right Column: 3D Thick Book Cover & 3 Smart Action Buttons (Desktop Sticky) */}
+          <div className="hidden lg:flex lg:col-span-4 sticky top-28 flex-col items-center">
             <BookCover book={book} className="mb-8 w-[240px] max-w-full sm:w-[280px]" />
 
             {/* 3 Smart Action Buttons */}
@@ -592,6 +678,84 @@ export default function BookDetailPage() {
           </div>
         </div>
 
+        {/* Acara & Diskusi Komunitas Membahas Buku Ini */}
+        {book.upcomingEvents && book.upcomingEvents.length > 0 && (
+          <div className="pt-12 border-t border-border space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[11px] font-mono uppercase tracking-wider text-[var(--color-accent)] font-semibold">
+                    Agenda Komunitas
+                  </span>
+                </div>
+                <h2 className="font-serif text-2xl font-bold tracking-tight text-foreground">
+                  Diskusi & Acara Buku Ini
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Ikuti bedah buku, sesi baca bersama, atau temu penulis yang diselenggarakan komunitas.
+                </p>
+              </div>
+
+              <Link
+                to="/app"
+                search={{ tab: "events" }}
+                className="text-xs font-mono text-[var(--color-accent)] hover:underline inline-flex items-center gap-1"
+              >
+                <span>Semua Agenda</span>
+                <ChevronRight className="size-3.5" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {book.upcomingEvents.map((ev) => (
+                <Link
+                  key={ev.id}
+                  to="/events/$slug"
+                  params={{ slug: ev.slug }}
+                  className="group block p-4 rounded-[10px] bg-background border border-border/80 hover:border-foreground/30 transition-all shadow-sm"
+                >
+                  <div className="flex gap-3">
+                    {ev.coverUrl ? (
+                      <img
+                        src={ev.coverUrl}
+                        alt={ev.title}
+                        className="size-16 rounded-[8px] object-cover shrink-0 border border-border/50"
+                      />
+                    ) : (
+                      <div className="size-16 rounded-[8px] bg-muted/60 flex items-center justify-center shrink-0 border border-border/50">
+                        <Calendar className="size-6 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="text-[11px] font-mono text-[var(--color-accent)] font-medium">
+                        {new Date(ev.startsAt).toLocaleDateString("id-ID", {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "short",
+                        })} · {new Date(ev.startsAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                      <h3 className="font-serif text-sm font-semibold text-foreground truncate group-hover:text-[var(--color-accent)] transition-colors">
+                        {ev.title}
+                      </h3>
+                      <p className="text-[11px] text-muted-foreground truncate">
+                        Oleh {ev.calendarName}
+                      </p>
+                      <div className="flex items-center gap-1 text-[10px] text-muted-foreground pt-1">
+                        <MapPin className="size-3 shrink-0" />
+                        <span className="truncate">
+                          {ev.format === "online"
+                            ? "Daring (Virtual)"
+                            : ev.venueName || `${ev.district || ""}, ${ev.city || ""}`.trim() || "Lokasi Offline"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Carousel / List: Buku di Kategori yang Sama */}
         {relatedBooks.length > 0 && (
           <div className="pt-12 border-t border-border space-y-6">
@@ -622,6 +786,8 @@ export default function BookDetailPage() {
           </div>
         )}
       </main>
+
+      <SiteFooter />
 
     </div>
   );

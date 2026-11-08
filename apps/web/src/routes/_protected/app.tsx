@@ -1,25 +1,27 @@
-import { useState } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import {
-  BadgeCheck,
-  BookMarked,
-  Compass,
-  Home,
-  Settings,
-} from "lucide-react";
+import { useEffect, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Bell, Calendar, Gift, Home, Library, Moon, Search, Settings, ShoppingCart, Sun } from "lucide-react";
 import { z } from "zod";
 import type {
   BookHighlightDto,
   ReadingSessionDto,
 } from "@starter/shared/types";
 import { siteConfig } from "@/config/site";
+import { SiteFooter } from "@/components/site-footer";
 import { useAuthors, useBooks, useCollections } from "@/features/books/hooks";
 import { useUserShelves } from "@/features/community/hooks";
 import { AllHighlightsDialog } from "@/features/dashboard/components/all-highlights-dialog";
+import { AppDownloadDialog } from "@/features/dashboard/components/app-download-dialog";
+import { AppSidebar } from "@/features/dashboard/components/app-sidebar";
+import { CartDialog } from "@/features/dashboard/components/cart-dialog";
+import { DashboardEvents } from "@/features/events/components/dashboard-events";
 import { DashboardExplore } from "@/features/dashboard/components/dashboard-explore";
 import { DashboardHome } from "@/features/dashboard/components/dashboard-home";
 import { DashboardLibrary } from "@/features/dashboard/components/dashboard-library";
 import { DashboardSettings } from "@/features/dashboard/components/dashboard-settings";
+import { GiftVoucherDialog } from "@/features/dashboard/components/gift-voucher-dialog";
+import { NotificationsDialog } from "@/features/dashboard/components/notifications-dialog";
+import { QrProfileDialog } from "@/features/dashboard/components/qr-profile-dialog";
 import { useMembershipSummary } from "@/features/membership/hooks";
 import { HighlightStoryDialog } from "@/features/reader/components/highlight-story-dialog";
 import { FlexReadingDialog } from "@/features/share/components/flex-reading-dialog";
@@ -27,6 +29,7 @@ import { FlexReadingDialog } from "@/features/share/components/flex-reading-dial
 export type AppTab =
   | "home"
   | "explore"
+  | "events"
   | "library"
   | "settings"
   | "shelves"
@@ -39,6 +42,7 @@ const appSearchSchema = z.object({
     .enum([
       "home",
       "explore",
+      "events",
       "library",
       "settings",
       "shelves",
@@ -65,7 +69,9 @@ export default function AppPage() {
   // Normalize legacy tab parameters
   const currentTabRaw = search.tab || "home";
   const activeTab =
-    currentTabRaw === "shelves" || currentTabRaw === "history" || currentTabRaw === "share"
+    currentTabRaw === "shelves" ||
+    currentTabRaw === "history" ||
+    currentTabRaw === "share"
       ? "library"
       : currentTabRaw === "publisher"
         ? "settings"
@@ -80,9 +86,56 @@ export default function AppPage() {
 
   const books = booksData?.data || [];
   const bulletinBook = booksData?.bulletin || null;
-  const currentlyReading = shelves.find((item) => item.shelfStatus === "reading");
+  const currentlyReading = shelves.find(
+    (item) => item.shelfStatus === "reading",
+  );
 
-  // Dialog states
+  // Sidebar collapse state
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("anzabook_sidebar_collapsed") === "true";
+  });
+
+  const handleToggleSidebar = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("anzabook_sidebar_collapsed", String(next));
+      return next;
+    });
+  };
+
+  // Theme dark mode state: default is LIGHT!
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const savedTheme = localStorage.getItem("anzabook-theme");
+    return savedTheme === "dark";
+  });
+
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [isDark]);
+
+  const handleToggleTheme = () => {
+    setIsDark((prev) => {
+      const next = !prev;
+      localStorage.setItem("anzabook-theme", next ? "dark" : "light");
+      return next;
+    });
+  };
+
+  // Dialog & header interaction states
+  const [isVoucherOpen, setIsVoucherOpen] = useState(false);
+  const [appDownloadPlatform, setAppDownloadPlatform] = useState<"android" | "ios" | null>(null);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(5);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [cartCount] = useState(0);
+  const [isQrProfileOpen, setIsQrProfileOpen] = useState(false);
+
   const [isAllHighlightsOpen, setIsAllHighlightsOpen] = useState(false);
   const [flexStoryState, setFlexStoryState] = useState<{
     isOpen: boolean;
@@ -102,151 +155,133 @@ export default function AppPage() {
     highlight: null,
   });
 
-  const handleTabChange = (tab: "home" | "explore" | "library" | "settings") => {
+  const handleTabChange = (tab: AppTab) => {
     navigate({
       to: "/app",
       search: { tab },
     });
   };
 
+  const membershipTier =
+    membership?.status === "active" ? "Nakama Member" : "Free User";
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row">
-      {/* 1. Left Fixed Vertical Icon Sidebar (Matching SS 2, 3, 4, 5) */}
-      <aside className="hidden md:flex w-16 shrink-0 border-r border-border/80 bg-card/60 backdrop-blur-md flex-col items-center justify-between py-5 sticky top-0 h-screen z-40 select-none">
-        {/* Top: AnzaBook Logo Mark */}
-        <div className="flex flex-col items-center gap-6">
-          <Link
-            to="/app"
-            search={{ tab: "home" }}
-            onClick={() => handleTabChange("home")}
-            className="p-1.5 rounded-[8px] hover:bg-muted transition-colors"
-            title="Beranda AnzaBook"
-          >
-            <img
-              src="/logo-mark.svg"
-              alt="AnzaBook"
-              className="size-7 object-contain drop-shadow-sm"
-            />
-          </Link>
-
-          {/* Navigation Icons */}
-          <nav className="flex flex-col items-center gap-2" aria-label="Navigasi Utama">
-            {/* Home */}
-            <button
-              type="button"
-              onClick={() => handleTabChange("home")}
-              className={`p-2.5 rounded-[10px] transition-all cursor-pointer ${
-                activeTab === "home"
-                  ? "bg-[var(--color-accent)] text-white shadow-xs font-bold"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
-              title="Home"
-            >
-              <Home className="size-5" />
-            </button>
-
-            {/* Explore */}
-            <button
-              type="button"
-              onClick={() => handleTabChange("explore")}
-              className={`p-2.5 rounded-[10px] transition-all cursor-pointer ${
-                activeTab === "explore"
-                  ? "bg-[var(--color-accent)] text-white shadow-xs font-bold"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
-              title="Explore (Rak Kategori)"
-            >
-              <Compass className="size-5" />
-            </button>
-
-            {/* My Library */}
-            <button
-              type="button"
-              onClick={() => handleTabChange("library")}
-              className={`p-2.5 rounded-[10px] transition-all cursor-pointer ${
-                activeTab === "library"
-                  ? "bg-[var(--color-accent)] text-white shadow-xs font-bold"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
-              title="My Library"
-            >
-              <BookMarked className="size-5" />
-            </button>
-
-            {/* Settings */}
-            <button
-              type="button"
-              onClick={() => handleTabChange("settings")}
-              className={`p-2.5 rounded-[10px] transition-all cursor-pointer ${
-                activeTab === "settings"
-                  ? "bg-[var(--color-accent)] text-white shadow-xs font-bold"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
-              title="Settings"
-            >
-              <Settings className="size-5" />
-            </button>
-          </nav>
-        </div>
-
-        <div className="flex flex-col items-center gap-4">
-          {/* User Avatar */}
-          <button
-            type="button"
-            onClick={() => handleTabChange("settings")}
-            className="size-8 rounded-full bg-muted border border-border flex items-center justify-center font-bold text-xs text-foreground hover:ring-2 hover:ring-[var(--color-accent)] transition-all cursor-pointer"
-            title={`Profil ${user.name}`}
-          >
-            {user.name.slice(0, 1)}
-          </button>
-        </div>
-      </aside>
+      {/* 1. Left Collapsible Authentic Sidebar (Matching Screenshot) */}
+      <AppSidebar
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        user={user}
+        membershipTier={membershipTier}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={handleToggleSidebar}
+        onOpenVoucher={() => setIsVoucherOpen(true)}
+        onOpenAppDownload={(platform) => setAppDownloadPlatform(platform)}
+        onOpenProfile={() => setIsQrProfileOpen(true)}
+      />
 
       {/* 2. Main Content Canvas */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Header Bar per Screens */}
+        {/* Top Header Bar per Screenshot */}
         <header className="sticky top-0 z-30 border-b border-border/80 bg-background/95 backdrop-blur-md px-6 py-3.5 flex items-center justify-between select-none">
           <div className="flex items-center gap-3">
             <img
-              src="/logo-mark.svg"
+              src="/icon.svg"
               alt="AnzaBook"
-              className="size-6 object-contain md:hidden"
+              className="size-6 rounded-[5px] object-contain md:hidden border border-border/40 shadow-xs"
             />
-            <h1 className="font-serif text-lg font-bold capitalize">
+            <h1 className="font-serif text-xl sm:text-2xl font-bold">
               {activeTab === "home"
                 ? "Home"
                 : activeTab === "explore"
                   ? "Explore"
-                  : activeTab === "library"
-                    ? "My Library"
-                    : "Settings"}
+                  : activeTab === "events"
+                    ? "Agenda"
+                    : activeTab === "library"
+                      ? "My Library"
+                      : "Settings"}
             </h1>
           </div>
 
-          <Link
-            to="/membership"
-            search={{}}
-            className="inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
-          >
-            <BadgeCheck className="size-4" aria-hidden="true" />
-            Nakama
-          </Link>
+          <div className="flex items-center gap-1 sm:gap-2">
+            {/* Gift Voucher Quick Action */}
+            <button
+              type="button"
+              onClick={() => setIsVoucherOpen(true)}
+              className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
+              title="Klaim Voucher Hadiah"
+              aria-label="Klaim Voucher Hadiah"
+            >
+              <Gift className="size-5" />
+            </button>
+
+            {/* Notification Bell with Badge */}
+            <button
+              type="button"
+              onClick={() => setIsNotificationsOpen(true)}
+              className="relative p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
+              title="Notifikasi"
+              aria-label={`Notifikasi (${unreadCount} belum dibaca)`}
+            >
+              <Bell className="size-5" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 size-4 rounded-full bg-red-600 text-white text-[9px] font-bold font-mono flex items-center justify-center ring-2 ring-background">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+
+            {/* Shopping Cart with Badge */}
+            <button
+              type="button"
+              onClick={() => setIsCartOpen(true)}
+              className="relative p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
+              title="Keranjang Belanja"
+              aria-label={`Keranjang belanja (${cartCount} item)`}
+            >
+              <ShoppingCart className="size-5" />
+              <span className="absolute top-1 right-1 size-4 rounded-full bg-red-600 text-white text-[9px] font-bold font-mono flex items-center justify-center ring-2 ring-background">
+                {cartCount}
+              </span>
+            </button>
+
+            {/* Dark/Light Mode Moon Toggle */}
+            <button
+              type="button"
+              onClick={handleToggleTheme}
+              className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
+              title={isDark ? "Ganti ke Mode Terang" : "Ganti ke Mode Gelap"}
+              aria-label={isDark ? "Ganti ke Mode Terang" : "Ganti ke Mode Gelap"}
+            >
+              {isDark ? <Sun className="size-5" /> : <Moon className="size-5" />}
+            </button>
+          </div>
         </header>
 
         {/* Main Tab Screen Switcher */}
-        <main id="main-content" className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 pt-6">
+        <main
+          id="main-content"
+          className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 pt-6 pb-24 md:pb-8"
+        >
           {activeTab === "home" && membership?.status === "expired" && (
-            <section aria-label="Keanggotaan Nakama" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4">
-              <p className="text-sm">Masa aktif Nakama sudah berakhir. Perpanjang untuk melanjutkan buku Premium dari posisi terakhir.</p>
-              <Link
-                to="/membership"
-                search={{}}
+            <section
+              aria-label="Keanggotaan Nakama"
+              className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4"
+            >
+              <p className="text-sm">
+                Masa aktif Nakama sudah berakhir. Perpanjang untuk melanjutkan
+                buku Premium dari posisi terakhir.
+              </p>
+              <button
+                type="button"
+                onClick={() => handleTabChange("settings")}
                 className="inline-flex min-h-11 items-center rounded-md px-2 text-sm font-semibold underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
               >
                 Perpanjang Nakama
-              </Link>
+              </button>
             </section>
           )}
+
           {activeTab === "home" && (
             <DashboardHome
               books={books}
@@ -263,6 +298,8 @@ export default function AppPage() {
               collection={search.collection}
             />
           )}
+
+          {activeTab === "events" && <DashboardEvents />}
 
           {activeTab === "library" && (
             <DashboardLibrary
@@ -283,102 +320,136 @@ export default function AppPage() {
               userName={user.name}
               userEmail={user.email}
               userRole={user.role ?? undefined}
+              userImage={user.image}
               emailVerified={user.emailVerified}
-              memberSince={typeof user.createdAt === "string" ? user.createdAt : user.createdAt.toISOString()}
+              memberSince={
+                typeof user.createdAt === "string"
+                  ? user.createdAt
+                  : user.createdAt.toISOString()
+              }
             />
           )}
         </main>
 
-        {/* Authentic Malaka Books Style Footer (per SS 2, 3, 4, 5) */}
-        <footer className="border-t border-border/80 bg-card/40 mt-16 pt-12 pb-16 px-6 sm:px-12 select-none">
-          <div className="max-w-6xl mx-auto space-y-12">
-            <div className="flex flex-wrap items-start justify-between gap-8 text-xs font-sans">
-              {/* Brand & Mobile apps */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <img src="/logo-mark.svg" alt="AnzaBook" className="size-6 object-contain" />
-                  <span className="font-serif font-bold text-base tracking-tight">
-                    AnzaBook
-                  </span>
-                </div>
-                <p className="text-muted-foreground text-xs leading-relaxed max-w-xs">
-                  Pustaka digital dwibahasa dan edisi cetak rakyat. Kedaulatan literasi untuk akal budi yang berdikari.
-                </p>
-                <div className="text-[11px] font-mono text-muted-foreground pt-2">
-                  &copy; Copyright AnzaBook, 2026.
-                </div>
-              </div>
-
-              <nav aria-label="Tautan AnzaBook" className="flex flex-wrap gap-x-5 text-sm">
-                <Link to="/app" search={{ tab: "explore" }} className="inline-flex min-h-11 items-center underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring">
-                  Katalog
-                </Link>
-                <Link to="/membership" search={{}} className="inline-flex min-h-11 items-center underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring">
-                  Keanggotaan Nakama
-                </Link>
-              </nav>
-            </div>
-
-            {/* Giant Subtle Background Watermark Typography */}
-            <div
-              className="text-center font-serif text-5xl sm:text-7xl lg:text-9xl font-black tracking-tighter opacity-[0.035] select-none pointer-events-none"
-              aria-hidden="true"
-            >
-              AnzaBook
-            </div>
-          </div>
-        </footer>
+        {/* Authentic Malaka Books Style Footer (with safe padding for mobile bottom bar) */}
+        <div className="pb-20 md:pb-0">
+          <SiteFooter />
+        </div>
       </div>
 
-      {/* 3. Mobile Bottom Navigation Bar */}
+      {/* 3. Mobile Bottom Navigation Bar (WCAG AA 44px+ touch targets) */}
       <nav
         aria-label="Navigasi Bawah Mobile"
-        className="md:hidden fixed bottom-0 inset-x-0 bg-background/95 backdrop-blur-md border-t border-border z-40 flex items-center justify-around py-2 px-4"
+        className="md:hidden fixed bottom-0 inset-x-0 bg-background/95 backdrop-blur-md border-t border-border z-40 flex items-center justify-around py-1.5 px-3 shadow-lg"
       >
         <button
           type="button"
           onClick={() => handleTabChange("home")}
-          className={`flex flex-col items-center gap-1 p-1 text-[10px] font-mono ${
-            activeTab === "home" ? "text-[var(--color-accent)] font-bold" : "text-muted-foreground"
+          className={`flex flex-col items-center justify-center min-h-[48px] min-w-[56px] px-2 py-1 text-[11px] font-mono cursor-pointer rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
+            activeTab === "home"
+              ? "text-[var(--color-accent)] font-bold bg-muted/40"
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          <Home className="size-4" />
+          <Home className="size-5" />
           <span>Home</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleTabChange("explore")}
-          className={`flex flex-col items-center gap-1 p-1 text-[10px] font-mono ${
-            activeTab === "explore" ? "text-[var(--color-accent)] font-bold" : "text-muted-foreground"
+          className={`flex flex-col items-center justify-center min-h-[48px] min-w-[56px] px-2 py-1 text-[11px] font-mono cursor-pointer rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
+            activeTab === "explore"
+              ? "text-[var(--color-accent)] font-bold bg-muted/40"
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          <Compass className="size-4" />
+          <Search className="size-5" />
           <span>Explore</span>
         </button>
 
         <button
           type="button"
-          onClick={() => handleTabChange("library")}
-          className={`flex flex-col items-center gap-1 p-1 text-[10px] font-mono ${
-            activeTab === "library" ? "text-[var(--color-accent)] font-bold" : "text-muted-foreground"
+          onClick={() => handleTabChange("events")}
+          className={`flex flex-col items-center justify-center min-h-[48px] min-w-[56px] px-2 py-1 text-[11px] font-mono cursor-pointer rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
+            activeTab === "events"
+              ? "text-[var(--color-accent)] font-bold bg-muted/40"
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          <BookMarked className="size-4" />
+          <Calendar className="size-5" />
+          <span>Agenda</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabChange("library")}
+          className={`flex flex-col items-center justify-center min-h-[48px] min-w-[56px] px-2 py-1 text-[11px] font-mono cursor-pointer rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
+            activeTab === "library"
+              ? "text-[var(--color-accent)] font-bold bg-muted/40"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Library className="size-5" />
           <span>Library</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleTabChange("settings")}
-          className={`flex flex-col items-center gap-1 p-1 text-[10px] font-mono ${
-            activeTab === "settings" ? "text-[var(--color-accent)] font-bold" : "text-muted-foreground"
+          className={`flex flex-col items-center justify-center min-h-[48px] min-w-[56px] px-2 py-1 text-[11px] font-mono cursor-pointer rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
+            activeTab === "settings"
+              ? "text-[var(--color-accent)] font-bold bg-muted/40"
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          <Settings className="size-4" />
+          <Settings className="size-5" />
           <span>Settings</span>
         </button>
       </nav>
+
+      {/* Dialog: Gift Voucher */}
+      <GiftVoucherDialog
+        isOpen={isVoucherOpen}
+        onClose={() => setIsVoucherOpen(false)}
+        userName={user.name}
+      />
+
+      {/* Dialog: App Download (Android & iOS) */}
+      <AppDownloadDialog
+        isOpen={appDownloadPlatform !== null}
+        platform={appDownloadPlatform}
+        onClose={() => setAppDownloadPlatform(null)}
+      />
+
+      {/* Dialog: Notifications */}
+      <NotificationsDialog
+        isOpen={isNotificationsOpen}
+        onClose={() => setIsNotificationsOpen(false)}
+        unreadCount={unreadCount}
+        onMarkAllRead={() => setUnreadCount(0)}
+      />
+
+      {/* Dialog: Shopping Cart */}
+      <CartDialog
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        cartCount={cartCount}
+        onExplore={() => handleTabChange("explore")}
+      />
+
+      {/* Dialog: QR Profile Card */}
+      <QrProfileDialog
+        isOpen={isQrProfileOpen}
+        onClose={() => setIsQrProfileOpen(false)}
+        userName={user.name}
+        userEmail={user.email}
+        memberSince={
+          typeof user.createdAt === "string"
+            ? user.createdAt
+            : user.createdAt.toISOString()
+        }
+      />
 
       {/* Dialog: All User Highlights */}
       <AllHighlightsDialog
@@ -408,9 +479,7 @@ export default function AppPage() {
       {quoteStoryState.highlight && (
         <HighlightStoryDialog
           isOpen={quoteStoryState.isOpen}
-          onClose={() =>
-            setQuoteStoryState({ isOpen: false, highlight: null })
-          }
+          onClose={() => setQuoteStoryState({ isOpen: false, highlight: null })}
           bookTitle="Sains, Logika, dan Seni untuk Hidup Bermutu"
           bookAuthor="Zenius"
           chapterNumber={quoteStoryState.highlight.chapterNumber}

@@ -3,7 +3,7 @@ import type {
   CheckInRsvpInput,
   CreateCalendarInput,
   CreateEventInput,
-  ListEventsQuery,
+  ListEventsInput,
   ReportEventInput,
   RsvpEventInput,
 } from "@starter/shared/validators/community";
@@ -26,7 +26,7 @@ import {
   locationSuggestionsQuery,
 } from "./queries";
 
-export function useEvents(params?: ListEventsQuery) {
+export function useEvents(params?: ListEventsInput) {
   return useQuery(eventsQuery(params));
 }
 

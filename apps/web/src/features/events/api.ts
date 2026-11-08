@@ -10,6 +10,7 @@ import type {
   CheckInRsvpInput,
   CreateCalendarInput,
   CreateEventInput,
+  ListEventsInput,
   ListEventsQuery,
   ReportEventInput,
   RsvpEventInput,
@@ -36,7 +37,7 @@ export type LocationSuggestion = {
 // 1. Events API
 // ==========================================
 
-export function listEvents(params?: ListEventsQuery, signal?: AbortSignal) {
+export function listEvents(params?: ListEventsInput, signal?: AbortSignal) {
   return apiFetch<EventsListResponse>("/api/events", {
     query: params as Record<string, string | number | boolean | undefined>,
     signal,

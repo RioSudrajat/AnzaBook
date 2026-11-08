@@ -304,4 +304,5 @@ export type UpdateEventInput = z.infer<typeof updateEventSchema>;
 export type RsvpEventInput = z.infer<typeof rsvpEventSchema>;
 export type CheckInRsvpInput = z.infer<typeof checkInRsvpSchema>;
 export type ReportEventInput = z.infer<typeof reportEventSchema>;
+export type ListEventsInput = z.input<typeof listEventsQuerySchema>;
 export type ListEventsQuery = z.infer<typeof listEventsQuerySchema>;

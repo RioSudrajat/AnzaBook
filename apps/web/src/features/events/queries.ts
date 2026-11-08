@@ -1,5 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
-import type { ListEventsQuery } from "@starter/shared/validators/community";
+import type { ListEventsInput } from "@starter/shared/validators/community";
 import {
   getCalendar,
   getEvent,
@@ -11,7 +11,7 @@ import {
 export const eventsKeys = {
   all: ["events"] as const,
   lists: () => [...eventsKeys.all, "list"] as const,
-  list: (params?: ListEventsQuery) =>
+  list: (params?: ListEventsInput) =>
     [...eventsKeys.lists(), params ?? {}] as const,
   details: () => [...eventsKeys.all, "detail"] as const,
   detail: (slug: string) => [...eventsKeys.details(), slug] as const,
@@ -20,7 +20,7 @@ export const eventsKeys = {
   locations: () => [...eventsKeys.all, "locations"] as const,
 };
 
-export function eventsQuery(params?: ListEventsQuery) {
+export function eventsQuery(params?: ListEventsInput) {
   return queryOptions({
     queryKey: eventsKeys.list(params),
     queryFn: ({ signal }) => listEvents(params, signal),
