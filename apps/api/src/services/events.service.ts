@@ -372,6 +372,27 @@ export async function listEvents(
     conditions.push(sql`${communityEvents.endsAt} < ${now}`);
   } else if (query.filter === "upcoming") {
     conditions.push(sql`${communityEvents.endsAt} >= ${now}`);
+  } else if (query.filter === "my_rsvps") {
+    if (!currentUserId) {
+      return {
+        data: [],
+        meta: {
+          limit: query.limit,
+          offset: query.offset,
+          hasMore: false,
+        },
+      };
+    }
+    const userEventIdsSubquery = db
+      .select({ eventId: eventRsvps.eventId })
+      .from(eventRsvps)
+      .where(
+        and(
+          eq(eventRsvps.userId, currentUserId),
+          inArray(eventRsvps.status, ["going", "pending_approval", "waitlisted"]),
+        ),
+      );
+    conditions.push(inArray(communityEvents.id, userEventIdsSubquery));
   }
 
   // Filter published or viewer is manager

@@ -156,7 +156,11 @@ export function DashboardEvents() {
             Agenda Komunitas
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Temukan bedah buku, sesi diskusi film, temu literasi, dan ruang baca bersama.
+            {filterTab === "my_rsvps"
+              ? "Daftar acara yang telah Anda daftarkan dan tiket masuk Anda."
+              : filterTab === "past"
+              ? "Arsip dan riwayat agenda komunitas yang telah selesai diselenggarakan."
+              : "Temukan bedah buku, sesi diskusi film, temu literasi, dan ruang baca bersama."}
           </p>
         </div>
 
@@ -233,21 +237,70 @@ export function DashboardEvents() {
         </div>
       ) : events.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border p-12 text-center text-muted-foreground space-y-3">
-          <CalendarIcon className="size-10 text-muted-foreground/40 mx-auto" />
-          <div className="space-y-1">
-            <h3 className="font-semibold text-foreground text-sm">Belum ada agenda di kategori ini</h3>
-            <p className="text-xs">
-              Mulai buat acara pertama Anda untuk komunitas atau klub baca!
-            </p>
-          </div>
-          <Button
-            type="button"
-            size="sm"
-            onClick={handleCreateClick}
-            className="rounded-lg bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs"
-          >
-            + Buat Acara Baru
-          </Button>
+          {filterTab === "my_rsvps" && !session?.user ? (
+            <>
+              <Users className="size-10 text-muted-foreground/40 mx-auto" />
+              <div className="space-y-1">
+                <h3 className="font-semibold text-foreground text-sm">Masuk untuk Melihat Pendaftaran</h3>
+                <p className="text-xs max-w-sm mx-auto">
+                  Masuk ke akun AnzaBook Anda untuk melihat daftar acara yang Anda ikuti dan status tiket Anda.
+                </p>
+              </div>
+              <Button
+                asChild
+                size="sm"
+                className="rounded-lg bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs cursor-pointer"
+              >
+                <a href="/sign-in">Masuk ke Akun</a>
+              </Button>
+            </>
+          ) : filterTab === "my_rsvps" ? (
+            <>
+              <CalendarIcon className="size-10 text-muted-foreground/40 mx-auto" />
+              <div className="space-y-1">
+                <h3 className="font-semibold text-foreground text-sm">Belum Ada Pendaftaran Acara</h3>
+                <p className="text-xs max-w-sm mx-auto">
+                  Anda belum mendaftar di acara mana pun. Temukan acara menarik di &quot;Acara Terdekat&quot; dan daftarkan diri Anda!
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setFilterTab("upcoming")}
+                className="rounded-lg bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs cursor-pointer"
+              >
+                Jelajahi Acara Terdekat
+              </Button>
+            </>
+          ) : filterTab === "past" ? (
+            <>
+              <CalendarIcon className="size-10 text-muted-foreground/40 mx-auto" />
+              <div className="space-y-1">
+                <h3 className="font-semibold text-foreground text-sm">Belum Ada Riwayat Acara</h3>
+                <p className="text-xs max-w-sm mx-auto">
+                  Belum ada agenda komunitas yang telah berakhir.
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <CalendarIcon className="size-10 text-muted-foreground/40 mx-auto" />
+              <div className="space-y-1">
+                <h3 className="font-semibold text-foreground text-sm">Belum Ada Acara Terdekat</h3>
+                <p className="text-xs max-w-sm mx-auto">
+                  Jadilah yang pertama membuat agenda bedah buku atau temu literasi di komunitas!
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleCreateClick}
+                className="rounded-lg bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs cursor-pointer"
+              >
+                + Buat Acara Baru
+              </Button>
+            </>
+          )}
         </div>
       ) : (
         <div className="space-y-8 max-w-3xl">

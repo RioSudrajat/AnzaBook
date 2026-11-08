@@ -308,4 +308,89 @@ describe("Community Calendars & Events API", () => {
     expect(reportRes.status).toBe(201);
     expect(reportRes.body.data.success).toBe(true);
   });
+
+  it("distinguishes upcoming events from user registered events (filter=my_rsvps)", async () => {
+    const host = agent();
+    const hostEmail = await signUp(host, "Host Filter Test");
+    await setRole(hostEmail, "admin");
+
+    const calRes = await host
+      .post("/api/events/calendars")
+      .set(originHeader)
+      .send({
+        name: "Kalender Filter",
+        slug: `kalender-filter-${Date.now()}`,
+      });
+
+    const calId = calRes.body.data.id;
+
+    // Event 1
+    const ev1Res = await host
+      .post("/api/events")
+      .set(originHeader)
+      .send({
+        calendarId: calId,
+        title: "Acara Satu Terdaftar",
+        description: "Deskripsi acara pertama.",
+        coverUrl: "https://example.com/banner1.jpg",
+        format: "online",
+        onlineMeetingUrl: "https://meet.google.com/ev1",
+        startsAt: new Date(Date.now() + 400000000).toISOString(),
+        endsAt: new Date(Date.now() + 410000000).toISOString(),
+      });
+
+    // Event 2
+    const ev2Res = await host
+      .post("/api/events")
+      .set(originHeader)
+      .send({
+        calendarId: calId,
+        title: "Acara Dua Publik",
+        description: "Deskripsi acara kedua.",
+        coverUrl: "https://example.com/banner2.jpg",
+        format: "online",
+        onlineMeetingUrl: "https://meet.google.com/ev2",
+        startsAt: new Date(Date.now() + 500000000).toISOString(),
+        endsAt: new Date(Date.now() + 510000000).toISOString(),
+      });
+
+    const slug1 = ev1Res.body.data.slug;
+    const slug2 = ev2Res.body.data.slug;
+
+    // User A signs up and RSVPs ONLY to Event 1
+    const userA = agent();
+    await signUp(userA, "Peserta A");
+    const rsvpA = await userA.post(`/api/events/${slug1}/rsvp`).set(originHeader).send({});
+    expect(rsvpA.status).toBe(201);
+
+    // User A checks upcoming: sees both
+    const upcomingRes = await userA.get("/api/events?filter=upcoming");
+    const upcomingSlugs = upcomingRes.body.data.map((e: any) => e.slug);
+    expect(upcomingSlugs).toContain(slug1);
+    expect(upcomingSlugs).toContain(slug2);
+
+    // User A checks my_rsvps: sees ONLY Event 1
+    const myRsvpsRes = await userA.get("/api/events?filter=my_rsvps");
+    const myRsvpsSlugs = myRsvpsRes.body.data.map((e: any) => e.slug);
+    expect(myRsvpsSlugs).toContain(slug1);
+    expect(myRsvpsSlugs).not.toContain(slug2);
+    expect(myRsvpsRes.body.data[0].userRsvpStatus).toBe("going");
+
+    // User B (no RSVPs) checks my_rsvps: gets 0 events
+    const userB = agent();
+    await signUp(userB, "Peserta B");
+    const userBRes = await userB.get("/api/events?filter=my_rsvps");
+    expect(userBRes.body.data).toHaveLength(0);
+
+    // Anonymous checks my_rsvps: gets 0 events
+    const anon = agent();
+    const anonRes = await anon.get("/api/events?filter=my_rsvps");
+    expect(anonRes.body.data).toHaveLength(0);
+
+    // User A cancels RSVP -> my_rsvps no longer contains Event 1
+    await userA.delete(`/api/events/${slug1}/rsvp`).set(originHeader).send();
+    const myRsvpsAfterCancel = await userA.get("/api/events?filter=my_rsvps");
+    const afterCancelSlugs = myRsvpsAfterCancel.body.data.map((e: any) => e.slug);
+    expect(afterCancelSlugs).not.toContain(slug1);
+  });
 });
