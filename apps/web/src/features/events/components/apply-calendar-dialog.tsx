@@ -3,6 +3,7 @@ import { X, Calendar as CalendarIcon, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { useCreateCalendar } from "../hooks";
 
 interface ApplyCalendarDialogProps {
@@ -16,6 +17,8 @@ export function ApplyCalendarDialog({
   onClose,
   onSuccess,
 }: ApplyCalendarDialogProps) {
+  useBodyScrollLock(open);
+
   const [name, setName] = React.useState("");
   const [slug, setSlug] = React.useState("");
   const [type, setType] = React.useState<"community" | "author" | "publisher">(
@@ -72,8 +75,14 @@ export function ApplyCalendarDialog({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#16171b] text-white shadow-2xl">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-xs animate-in fade-in duration-200 select-none"
+      style={{ overscrollBehavior: "contain" }}
+    >
+      <div
+        className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#16171b] text-white shadow-2xl"
+        style={{ overscrollBehavior: "contain" }}
+      >
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
           <div className="flex items-center gap-2.5">
             <CalendarIcon className="size-5 text-amber-400" />

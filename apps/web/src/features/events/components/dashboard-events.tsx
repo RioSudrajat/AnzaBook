@@ -9,18 +9,48 @@ import {
   Sparkles,
   Search,
   Filter,
+  X,
 } from "lucide-react";
 import type { CommunityEventSummaryDto } from "@starter/shared/types";
 import { Button } from "@/components/ui/button";
-import { useEvents } from "../hooks";
+import { authClient } from "@/lib/auth-client";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
+import { useCalendars, useEvents } from "../hooks";
 import { CreateEventDialog } from "./create-event-dialog";
 import { EventDetailDrawer } from "./event-detail-drawer";
+import { ApplyCalendarDialog } from "./apply-calendar-dialog";
 
 export function DashboardEvents() {
   const [filterTab, setFilterTab] = React.useState<"upcoming" | "past" | "my_rsvps">("upcoming");
   const [selectedFormat, setSelectedFormat] = React.useState<"all" | "offline" | "online">("all");
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
   const [selectedEventSlug, setSelectedEventSlug] = React.useState<string | null>(null);
+  const [isHostGateOpen, setIsHostGateOpen] = React.useState(false);
+  const [isApplyCalendarOpen, setIsApplyCalendarOpen] = React.useState(false);
+
+  useBodyScrollLock(isHostGateOpen);
+
+  const { data: session } = authClient.useSession();
+  const { data: calendars = [] } = useCalendars();
+
+  const canHostEvents = React.useMemo(() => {
+    if (!session?.user) return false;
+    const role = session.user.role;
+    if (role === "admin" || role === "author" || role === "publisher") return true;
+    return calendars.some((c) => c.isManager);
+  }, [session, calendars]);
+
+  const handleCreateClick = () => {
+    if (!session?.user) {
+      window.location.href = "/sign-in";
+      return;
+    }
+    if (!canHostEvents) {
+      setIsHostGateOpen(true);
+      return;
+    }
+    setIsCreateOpen(true);
+  };
 
   const { data: eventsData, isLoading } = useEvents({
     filter: filterTab,
@@ -134,7 +164,7 @@ export function DashboardEvents() {
           <Button
             type="button"
             size="sm"
-            onClick={() => setIsCreateOpen(true)}
+            onClick={handleCreateClick}
             className="h-9 gap-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs shadow-sm cursor-pointer"
           >
             <Plus className="size-4" />
@@ -213,7 +243,7 @@ export function DashboardEvents() {
           <Button
             type="button"
             size="sm"
-            onClick={() => setIsCreateOpen(true)}
+            onClick={handleCreateClick}
             className="rounded-lg bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs"
           >
             + Buat Acara Baru
@@ -355,6 +385,71 @@ export function DashboardEvents() {
         onClose={() => setIsCreateOpen(false)}
         onSuccess={(slug) => {
           setSelectedEventSlug(slug);
+        }}
+      />
+
+      {/* Host Access Gate Dialog */}
+      {isHostGateOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-xs animate-in fade-in duration-200 select-none"
+          style={{ overscrollBehavior: "contain" }}
+        >
+          <div
+            className="relative flex w-full max-w-md flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#16171b] p-6 text-white shadow-2xl"
+            style={{ overscrollBehavior: "contain" }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex size-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400">
+                <Sparkles className="size-5" />
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsHostGateOpen(false)}
+                className="flex size-8 items-center justify-center rounded-full text-white/50 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <h3 className="text-base font-bold text-white mb-1">
+              Akses Penyelenggara Acara
+            </h3>
+            <p className="text-xs text-white/60 leading-relaxed mb-6">
+              Di AnzaBook, acara diselenggarakan oleh <strong>Komunitas Baca, TBM, Penulis,</strong> atau <strong>Penerbit</strong> terverifikasi untuk menjaga linimasa tetap berkualitas dan bebas spam.
+              <br /><br />
+              Apakah Anda mengelola komunitas literasi atau seorang penulis? Ajukan kalender komunitas Anda sekarang untuk mulai menyelenggarakan acara.
+            </p>
+
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsHostGateOpen(false);
+                  setIsApplyCalendarOpen(true);
+                }}
+                className="w-full rounded-xl bg-amber-500 hover:bg-amber-400 py-2.5 text-xs font-semibold text-black transition-colors cursor-pointer text-center"
+              >
+                Ajukan Kalender Komunitas
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsHostGateOpen(false)}
+                className="w-full rounded-xl border border-white/10 hover:bg-white/10 py-2 text-xs font-medium text-white/70 transition-colors cursor-pointer text-center"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Apply Calendar Dialog */}
+      <ApplyCalendarDialog
+        open={isApplyCalendarOpen}
+        onClose={() => setIsApplyCalendarOpen(false)}
+        onSuccess={() => {
+          setIsApplyCalendarOpen(false);
+          setIsCreateOpen(true);
         }}
       />
     </div>

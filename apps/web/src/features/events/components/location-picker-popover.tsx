@@ -187,7 +187,10 @@ export function LocationPickerPopover({
 
       {/* Popover Dropdown matching Luma Screenshot 2 */}
       {isOpen && (
-        <div className="absolute top-full left-0 z-40 mt-2 w-full min-w-[340px] max-w-full rounded-xl border border-white/15 bg-[#1b1c20] p-3 text-white shadow-2xl backdrop-blur-md animate-in fade-in-50 zoom-in-95">
+        <div
+          className="absolute top-full left-0 z-40 mt-2 w-full min-w-[340px] max-w-full rounded-xl border border-white/15 bg-[#1b1c20] p-3 text-white shadow-2xl backdrop-blur-md animate-in fade-in-50 zoom-in-95 select-none"
+          style={{ overscrollBehavior: "contain" }}
+        >
           {/* Search Box */}
           <div className="relative mb-3">
             <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-white/40" />
@@ -210,7 +213,10 @@ export function LocationPickerPopover({
             )}
           </div>
 
-          <div className="max-h-[300px] overflow-y-auto space-y-4 pr-1 text-xs">
+          <div
+            className="max-h-[300px] overflow-y-auto space-y-4 pr-1 text-xs"
+            style={{ overscrollBehavior: "contain" }}
+          >
             {/* OSM Search Results */}
             {osmResults.length > 0 && (
               <div>

@@ -13,6 +13,7 @@ import type {
   CommunityEventDetailDto,
   CommunityEventSummaryDto,
 } from "@starter/shared/types";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { EventDetailView } from "./event-detail-view";
 
 interface EventDetailDrawerProps {
@@ -34,6 +35,8 @@ export function EventDetailDrawer({
   hasNextEvent = false,
   hasPrevEvent = false,
 }: EventDetailDrawerProps) {
+  useBodyScrollLock(open);
+
   const [copied, setCopied] = React.useState(false);
 
   if (!open || !event) return null;
@@ -51,10 +54,14 @@ export function EventDetailDrawer({
       <div
         onClick={onClose}
         className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs lg:hidden animate-in fade-in duration-200"
+        style={{ overscrollBehavior: "contain" }}
       />
 
       {/* Slide-over Drawer (matching Luma right drawer) */}
-      <aside className="fixed top-0 right-0 z-40 flex h-full w-full max-w-[440px] sm:max-w-[480px] flex-col border-l border-white/10 bg-[#121316] text-white shadow-2xl animate-in slide-in-from-right duration-250">
+      <aside
+        className="fixed top-0 right-0 z-40 flex h-full w-full max-w-[440px] sm:max-w-[480px] flex-col border-l border-white/10 bg-[#121316] text-white shadow-2xl animate-in slide-in-from-right duration-250 select-none"
+        style={{ overscrollBehavior: "contain", touchAction: "pan-y" }}
+      >
         {/* Top Header Bar matching Luma: >> | Salin Tautan | Halaman Acara ↗ | ^ v */}
         <div className="flex h-13 shrink-0 items-center justify-between border-b border-white/10 px-4 bg-[#141518]">
           {/* Collapse Button */}
