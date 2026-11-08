@@ -29,8 +29,10 @@ export type AdminNoteDto = NoteDto & { ownerName: string; ownerEmail: string };
 
 export type DigitalPolicy = "free_open" | "sample_only" | "print_claim_only";
 export type AccessTier = "free" | "premium" | "premium_physical";
-export type EditionTier = "rakyat_economy" | "standard_trade" | "kolektor_hardcover";
-export type PartnerType = "gramedia" | "togamas" | "pos_indonesia" | "komunitas";
+export type EditionTier =
+  "rakyat_economy" | "standard_trade" | "kolektor_hardcover";
+export type PartnerType =
+  "gramedia" | "togamas" | "pos_indonesia" | "komunitas";
 export type ShelfStatus = "want_to_read" | "reading" | "finished" | "abandoned";
 export type ReadingMode = "full" | "blueprint" | "audio";
 export type HighlightColor = "yellow" | "green" | "coral" | "blue";
@@ -103,6 +105,7 @@ export type BookDetailDto = BookSummaryDto & {
   storeStocks: StoreStockItemDto[];
   hasClaimedDigital: boolean;
   totalShelved: number;
+  upcomingEvents?: CommunityEventSummaryDto[];
 };
 
 export type BookChapterSummaryDto = {
@@ -223,9 +226,124 @@ export type CollectionSummaryDto = {
   coverUrl?: string;
 };
 
+// ---------------- Community Calendars & Events DTOs ---------------- //
+
+export type CommunityCalendarDto = {
+  id: string;
+  slug: string;
+  name: string;
+  type: "community" | "author" | "publisher";
+  description: string;
+  avatarUrl: string | null;
+  coverUrl: string | null;
+  city: string | null;
+  contactEmail: string | null;
+  socialLinks: {
+    instagram?: string;
+    twitter?: string;
+    website?: string;
+  } | null;
+  verificationStatus: "pending" | "verified" | "trusted" | "rejected";
+  followerCount: number;
+  isFollowing?: boolean;
+  isManager?: boolean;
+  createdAt: string;
+};
+
+export type FeaturedWorkDto = {
+  mediaType: "book" | "film" | "article" | "other";
+  title: string;
+  creator?: string;
+  externalUrl?: string;
+};
+
+export type EventCoHostDto = {
+  name: string;
+  avatarUrl?: string;
+  roleLabel?: string;
+};
+
+export type EventAttendeePreviewDto = {
+  userId: string;
+  name: string;
+  image: string | null;
+};
+
+export type CommunityEventSummaryDto = {
+  id: string;
+  slug: string;
+  calendarId: string;
+  calendarSlug: string;
+  calendarName: string;
+  calendarAvatarUrl: string | null;
+  bookId: string | null;
+  bookSummary?: BookSummaryDto | null;
+  featuredWork: FeaturedWorkDto | null;
+  title: string;
+  description: string;
+  coverUrl: string;
+  themePreset: "minimal" | "classic_paper" | "midnight_ink" | "terracotta";
+  visibility: "public" | "private_link";
+  eventType:
+    | "book_club"
+    | "film_discussion"
+    | "silent_reading"
+    | "book_launch"
+    | "writing_session"
+    | "community_meetup";
+  categoryTag: string;
+  coHosts: EventCoHostDto[];
+  format: "offline" | "online" | "hybrid";
+  district: string | null;
+  city: string | null;
+  venueName: string | null;
+  venueAddress: string | null;
+  hideAddressUntilApproved: boolean;
+  isAddressHidden: boolean;
+  latitude: number | null;
+  longitude: number | null;
+  startsAt: string;
+  endsAt: string;
+  timezone: string;
+  capacity: number | null;
+  requiresApproval: boolean;
+  allowWaitlist: boolean;
+  status: "draft" | "pending_review" | "published" | "canceled" | "completed";
+  attendeeCount: number;
+  attendeesPreview: EventAttendeePreviewDto[];
+  userRsvpStatus?: "going" | "pending_approval" | "waitlisted" | "canceled" | "rejected" | null;
+};
+
+export type CommunityEventDetailDto = CommunityEventSummaryDto & {
+  logisticsNotes: string | null;
+  onlineMeetingUrl: string | null;
+  canManage: boolean;
+  userRsvp?: EventRsvpDto | null;
+};
+
+export type EventRsvpDto = {
+  id: string;
+  eventId: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userImage: string | null;
+  status: "going" | "pending_approval" | "waitlisted" | "canceled" | "rejected";
+  checkinCode: string;
+  checkedInAt: string | null;
+  createdAt: string;
+};
+
+export type HostEventAnalyticsDto = {
+  totalRsvps: number;
+  goingCount: number;
+  pendingCount: number;
+  waitlistCount: number;
+  checkedInCount: number;
+};
+
 export type {
   PrintEconomicsResult,
   PrintTierResult,
   SimulatePrintInput,
 } from "../print-economics.js";
-
