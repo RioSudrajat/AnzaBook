@@ -1,0 +1,311 @@
+import { describe, expect, it } from "vitest";
+import { agent, originHeader, setRole, signUp } from "./helpers";
+import { db } from "../db";
+import { user } from "../db/schema";
+import { eq } from "drizzle-orm";
+
+describe("Community Calendars & Events API", () => {
+  it("allows users to apply for a calendar and admins to verify it", async () => {
+    const creator = agent();
+    const creatorEmail = await signUp(creator, "Pegiat Komunitas");
+
+    const calPayload = {
+      name: "Klub Diskusi Senja",
+      slug: "klub-diskusi-senja",
+      type: "community",
+      description: "Komunitas diskusi buku dan literasi alternatif senja.",
+      city: "Jakarta Selatan",
+    };
+
+    const createRes = await creator
+      .post("/api/events/calendars")
+      .set(originHeader)
+      .send(calPayload);
+
+    expect(createRes.status).toBe(201);
+    expect(createRes.body.data.slug).toBe("klub-diskusi-senja");
+    expect(createRes.body.data.verificationStatus).toBe("pending");
+
+    // Admin verifies calendar
+    const adminClient = agent();
+    const adminEmail = await signUp(adminClient, "Admin Moderator");
+    await setRole(adminEmail, "admin");
+
+    const verifyRes = await adminClient
+      .patch(`/api/events/calendars/${createRes.body.data.slug}/verify`)
+      .set(originHeader)
+      .send({ status: "verified" });
+
+    expect(verifyRes.status).toBe(200);
+    expect(verifyRes.body.data.verificationStatus).toBe("verified");
+  });
+
+  it("creates an event with optional featuredWork (film) and enforces 1km pin limit", async () => {
+    const hostClient = agent();
+    const hostEmail = await signUp(hostClient, "Host Penulis");
+    await setRole(hostEmail, "admin"); // admin can publish directly
+
+    const calRes = await hostClient
+      .post("/api/events/calendars")
+      .set(originHeader)
+      .send({
+        name: "Sinema & Aksara",
+        slug: "sinema-aksara",
+        type: "community",
+        description: "Diskusi adaptasi naskah.",
+      });
+
+    const calendarId = calRes.body.data.id;
+
+    // Out of bounds pin (> 1km)
+    const invalidPinRes = await hostClient
+      .post("/api/events")
+      .set(originHeader)
+      .send({
+        calendarId,
+        title: "Bedah Naskah ke Film",
+        description: "Sesi diskusi mendalam naskah skenario.",
+        coverUrl: "https://example.com/banner.jpg",
+        themePreset: "midnight_ink",
+        visibility: "public",
+        eventType: "film_discussion",
+        format: "offline",
+        venueName: "Perpustakaan Cikini",
+        venueAddress: "Taman Ismail Marzuki",
+        latitude: -6.2200,
+        longitude: 106.8400,
+        placeSourceLat: -6.1900,
+        placeSourceLng: 106.8300, // >3 km away
+        startsAt: new Date(Date.now() + 86400000).toISOString(),
+        endsAt: new Date(Date.now() + 90000000).toISOString(),
+      });
+
+    expect([400, 422]).toContain(invalidPinRes.status);
+
+    // Valid event with featuredWork
+    const validEventRes = await hostClient
+      .post("/api/events")
+      .set(originHeader)
+      .send({
+        calendarId,
+        title: "Bedah Naskah ke Film: Laut Bercerita",
+        description: "Sesi diskusi adaptasi naskah Leila Chudori ke layar sinema.",
+        coverUrl: "https://example.com/banner.jpg",
+        themePreset: "midnight_ink",
+        visibility: "public",
+        eventType: "film_discussion",
+        format: "offline",
+        district: "Kecamatan Menteng",
+        city: "Jakarta Pusat",
+        venueName: "Taman Ismail Marzuki",
+        venueAddress: "Jl. Cikini Raya No.73",
+        hideAddressUntilApproved: true,
+        latitude: -6.1895,
+        longitude: 106.8385,
+        placeSourceLat: -6.1895,
+        placeSourceLng: 106.8385,
+        startsAt: new Date(Date.now() + 86400000).toISOString(),
+        endsAt: new Date(Date.now() + 93600000).toISOString(),
+        featuredWork: {
+          mediaType: "film",
+          title: "Laut Bercerita",
+          creator: "Pritagita Arianegara",
+        },
+        requiresApproval: true,
+        capacity: 25,
+      });
+
+    expect(validEventRes.status).toBe(201);
+    expect(validEventRes.body.data.slug).toContain("bedah-naskah-ke-film");
+    expect(validEventRes.body.data.featuredWork?.mediaType).toBe("film");
+  });
+
+  it("masks exact venue address and meeting URL until approved (privacy gating)", async () => {
+    const hostClient = agent();
+    const hostEmail = await signUp(hostClient, "Host Komunitas Rahasia");
+    await setRole(hostEmail, "admin");
+
+    const calRes = await hostClient
+      .post("/api/events/calendars")
+      .set(originHeader)
+      .send({
+        name: "Ruang Rahasia",
+        slug: `ruang-rahasia-${Date.now()}`,
+      });
+
+    const eventRes = await hostClient
+      .post("/api/events")
+      .set(originHeader)
+      .send({
+        calendarId: calRes.body.data.id,
+        title: "Kumpul Diskusi Terbatas",
+        description: "Sesi diskusi tertutup untuk anggota terpilih.",
+        coverUrl: "https://example.com/banner.jpg",
+        format: "offline",
+        district: "Kecamatan Setiabudi",
+        city: "Jakarta Selatan",
+        venueName: "Menara Rajawali Lt. 12",
+        venueAddress: "Jl. DR. Ide Anak Agung Gde Agung Lot 5.1",
+        hideAddressUntilApproved: true,
+        requiresApproval: true,
+        latitude: -6.2284,
+        longitude: 106.8353,
+        startsAt: new Date(Date.now() + 100000000).toISOString(),
+        endsAt: new Date(Date.now() + 110000000).toISOString(),
+        capacity: 10,
+      });
+
+    const eventSlug = eventRes.body.data.slug;
+
+    // Anonymous visitor
+    const anonClient = agent();
+    const anonDetail = await anonClient.get(`/api/events/${eventSlug}`);
+    expect(anonDetail.status).toBe(200);
+    expect(anonDetail.body.data.isAddressHidden).toBe(true);
+    expect(anonDetail.body.data.venueName).toBeNull();
+    expect(anonDetail.body.data.venueAddress).toBeNull();
+    expect(anonDetail.body.data.district).toBe("Kecamatan Setiabudi");
+    expect(anonDetail.body.data.city).toBe("Jakarta Selatan");
+
+    // Regular attendee signs up & RSVPs
+    const attendeeClient = agent();
+    await signUp(attendeeClient, "Peserta Rahasia");
+
+    const rsvpRes = await attendeeClient
+      .post(`/api/events/${eventSlug}/rsvp`)
+      .set(originHeader)
+      .send({ note: "Saya ingin bergabung sesi ini." });
+
+    expect(rsvpRes.status).toBe(201);
+    expect(rsvpRes.body.data.status).toBe("pending_approval");
+
+    // Detail while pending_approval still hides exact address
+    const pendingDetail = await attendeeClient.get(`/api/events/${eventSlug}`);
+    expect(pendingDetail.body.data.isAddressHidden).toBe(true);
+    expect(pendingDetail.body.data.venueName).toBeNull();
+
+    // Host approves attendee
+    const approveRes = await hostClient
+      .post(`/api/events/${eventSlug}/rsvp/${rsvpRes.body.data.id}/approve`)
+      .set(originHeader)
+      .send();
+
+    expect(approveRes.status).toBe(200);
+    expect(approveRes.body.data.status).toBe("going");
+
+    // Detail once approved reveals exact venue address
+    const approvedDetail = await attendeeClient.get(`/api/events/${eventSlug}`);
+    expect(approvedDetail.body.data.isAddressHidden).toBe(false);
+    expect(approvedDetail.body.data.venueName).toBe("Menara Rajawali Lt. 12");
+    expect(approvedDetail.body.data.venueAddress).toContain("Gde Agung");
+  });
+
+  it("handles capacity waitlist and auto-promotes waitlisted user upon cancellation", async () => {
+    const host = agent();
+    const hostEmail = await signUp(host, "Host Kuota");
+    await setRole(hostEmail, "admin");
+
+    const calRes = await host
+      .post("/api/events/calendars")
+      .set(originHeader)
+      .send({
+        name: "Sesi Satu Kursi",
+        slug: `sesi-satu-kursi-${Date.now()}`,
+      });
+
+    const eventRes = await host
+      .post("/api/events")
+      .set(originHeader)
+      .send({
+        calendarId: calRes.body.data.id,
+        title: "Sesi Eksklusif 1 Kursi",
+        description: "Hanya satu peserta yang dapat bergabung.",
+        coverUrl: "https://example.com/banner.jpg",
+        format: "online",
+        onlineMeetingUrl: "https://meet.google.com/one-seat",
+        startsAt: new Date(Date.now() + 200000000).toISOString(),
+        endsAt: new Date(Date.now() + 210000000).toISOString(),
+        capacity: 1,
+        requiresApproval: false,
+        allowWaitlist: true,
+      });
+
+    const slug = eventRes.body.data.slug;
+
+    // First attendee: gets "going"
+    const user1 = agent();
+    await signUp(user1, "Peserta Pertama");
+    const rsvp1 = await user1.post(`/api/events/${slug}/rsvp`).set(originHeader).send({});
+    expect(rsvp1.status).toBe(201);
+    expect(rsvp1.body.data.status).toBe("going");
+
+    // Second attendee: gets "waitlisted"
+    const user2 = agent();
+    await signUp(user2, "Peserta Kedua");
+    const rsvp2 = await user2.post(`/api/events/${slug}/rsvp`).set(originHeader).send({});
+    expect(rsvp2.status).toBe(201);
+    expect(rsvp2.body.data.status).toBe("waitlisted");
+
+    // Check onlineMeetingUrl privacy: user1 gets it, user2 does not
+    const detail1 = await user1.get(`/api/events/${slug}`);
+    expect(detail1.body.data.onlineMeetingUrl).toBe("https://meet.google.com/one-seat");
+
+    const detail2 = await user2.get(`/api/events/${slug}`);
+    expect(detail2.body.data.onlineMeetingUrl).toBeNull();
+
+    // User1 cancels -> user2 is automatically promoted to "going"
+    const cancelRes = await user1.delete(`/api/events/${slug}/rsvp`).set(originHeader).send();
+    expect(cancelRes.status).toBe(200);
+
+    const detail2After = await user2.get(`/api/events/${slug}`);
+    expect(detail2After.body.data.userRsvpStatus).toBe("going");
+    expect(detail2After.body.data.onlineMeetingUrl).toBe("https://meet.google.com/one-seat");
+
+    // Check-in user2 by checkinCode
+    const checkInRes = await host
+      .post(`/api/events/${slug}/check-in`)
+      .set(originHeader)
+      .send({ checkinCode: detail2After.body.data.userRsvp?.checkinCode });
+
+    expect(checkInRes.status).toBe(200);
+    expect(checkInRes.body.data.checkedInAt).toBeTruthy();
+  });
+
+  it("allows attendees to submit reports against an event", async () => {
+    const host = agent();
+    await signUp(host, "Host Report");
+
+    const calRes = await host
+      .post("/api/events/calendars")
+      .set(originHeader)
+      .send({
+        name: "Kalender Report",
+        slug: `kalender-report-${Date.now()}`,
+      });
+
+    const eventRes = await host
+      .post("/api/events")
+      .set(originHeader)
+      .send({
+        calendarId: calRes.body.data.id,
+        title: "Acara Dicurigai",
+        description: "Acara yang memuat konten tidak pantas.",
+        coverUrl: "https://example.com/banner.jpg",
+        format: "online",
+        onlineMeetingUrl: "https://meet.google.com/report",
+        startsAt: new Date(Date.now() + 300000000).toISOString(),
+        endsAt: new Date(Date.now() + 310000000).toISOString(),
+      });
+
+    const reporter = agent();
+    await signUp(reporter, "Pelapor Acara");
+
+    const reportRes = await reporter
+      .post(`/api/events/${eventRes.body.data.slug}/report`)
+      .set(originHeader)
+      .send({ reason: "Informasi acara menyesatkan dan berpotensi spam." });
+
+    expect(reportRes.status).toBe(201);
+    expect(reportRes.body.data.success).toBe(true);
+  });
+});

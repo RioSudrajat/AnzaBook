@@ -6,6 +6,9 @@ import {
   bookChapters,
   bookPrintEditions,
   bookClaimCodes,
+  communityCalendars,
+  communityEvents,
+  eventRsvps,
   storeBranches,
   storeInventories,
   userShelves,
@@ -29,7 +32,9 @@ import type {
   StoreStockItemDto,
 } from "@starter/shared/types";
 
-async function listBookChapters(bookId: string): Promise<BookChapterSummaryDto[]> {
+async function listBookChapters(
+  bookId: string,
+): Promise<BookChapterSummaryDto[]> {
   const chapters = await db
     .select({
       id: bookChapters.id,
@@ -40,18 +45,26 @@ async function listBookChapters(bookId: string): Promise<BookChapterSummaryDto[]
     .where(eq(bookChapters.bookId, bookId))
     .orderBy(bookChapters.chapterNumber);
 
-  return chapters.map((chapter) => ({ ...chapter, isSample: chapter.chapterNumber === 1 }));
+  return chapters.map((chapter) => ({
+    ...chapter,
+    isSample: chapter.chapterNumber === 1,
+  }));
 }
 
-async function hasClaimedBook(bookId: string, userId: string): Promise<boolean> {
+async function hasClaimedBook(
+  bookId: string,
+  userId: string,
+): Promise<boolean> {
   const [claim] = await db
     .select({ id: bookClaimCodes.id })
     .from(bookClaimCodes)
-    .where(and(
-      eq(bookClaimCodes.bookId, bookId),
-      eq(bookClaimCodes.claimedByUserId, userId),
-      env.isProduction ? eq(bookClaimCodes.isDemo, false) : undefined,
-    ))
+    .where(
+      and(
+        eq(bookClaimCodes.bookId, bookId),
+        eq(bookClaimCodes.claimedByUserId, userId),
+        env.isProduction ? eq(bookClaimCodes.isDemo, false) : undefined,
+      ),
+    )
     .limit(1);
   return !!claim;
 }
@@ -60,12 +73,16 @@ export async function getBookReadAccess(
   book: Pick<typeof books.$inferSelect, "id" | "digitalPolicy">,
   userId: string,
 ): Promise<{ hasFullAccess: boolean; accessExpiresAt: string | null }> {
-  if (book.digitalPolicy === "free_open" || await hasClaimedBook(book.id, userId)) {
+  if (
+    book.digitalPolicy === "free_open" ||
+    (await hasClaimedBook(book.id, userId))
+  ) {
     return { hasFullAccess: true, accessExpiresAt: null };
   }
-  const membership = book.digitalPolicy === "sample_only"
-    ? await getActiveMembership(userId)
-    : null;
+  const membership =
+    book.digitalPolicy === "sample_only"
+      ? await getActiveMembership(userId)
+      : null;
   return {
     hasFullAccess: !!membership,
     accessExpiresAt: membership?.expiresAt.toISOString() ?? null,
@@ -73,7 +90,10 @@ export async function getBookReadAccess(
 }
 
 function splitParagraphs(text: string): string[] {
-  return text.split(/\n\n+/).map((paragraph) => paragraph.trim()).filter(Boolean);
+  return text
+    .split(/\n\n+/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
 }
 
 export function getPreviewParagraphCount(text: string): number {
@@ -88,12 +108,20 @@ function previewText(text: string | null, count: number): string | null {
     const cutoff = Math.min(750, Math.ceil(paragraph.length / 2));
     const excerpt = paragraph.slice(0, cutoff);
     const lastWordBreak = excerpt.lastIndexOf(" ");
-    return (lastWordBreak > 0 ? excerpt.slice(0, lastWordBreak) : excerpt) + "…";
+    return (
+      (lastWordBreak > 0 ? excerpt.slice(0, lastWordBreak) : excerpt) + "…"
+    );
   }
-  return paragraphs.slice(0, Math.min(count, paragraphs.length - 1)).join("\n\n");
+  return paragraphs
+    .slice(0, Math.min(count, paragraphs.length - 1))
+    .join("\n\n");
 }
 
-export async function getReadableParagraphCount(slug: string, chapterId: string, userId: string) {
+export async function getReadableParagraphCount(
+  slug: string,
+  chapterId: string,
+  userId: string,
+) {
   const [chapter] = await db
     .select({
       id: books.id,
@@ -106,11 +134,17 @@ export async function getReadableParagraphCount(slug: string, chapterId: string,
     .where(and(eq(books.slug, slug), eq(bookChapters.id, chapterId)))
     .limit(1);
 
-  if (!chapter) throw new HttpError(404, "CHAPTER_NOT_FOUND", "Bab tidak ditemukan.");
+  if (!chapter)
+    throw new HttpError(404, "CHAPTER_NOT_FOUND", "Bab tidak ditemukan.");
   const { hasFullAccess } = await getBookReadAccess(chapter, userId);
   if (hasFullAccess) return splitParagraphs(chapter.contentId).length;
-  if (chapter.chapterNumber === 1) return getPreviewParagraphCount(chapter.contentId);
-  throw new HttpError(403, "FORBIDDEN_DIGITAL_ACCESS", "Bab ini memerlukan akses naskah lengkap.");
+  if (chapter.chapterNumber === 1)
+    return getPreviewParagraphCount(chapter.contentId);
+  throw new HttpError(
+    403,
+    "FORBIDDEN_DIGITAL_ACCESS",
+    "Bab ini memerlukan akses naskah lengkap.",
+  );
 }
 
 export function toBookSummary(row: typeof books.$inferSelect): BookSummaryDto {
@@ -152,13 +186,19 @@ export async function listBooks(query: ListBooksQuery) {
   const conditions = [];
   if (query.search) {
     const keyword = `%${query.search}%`;
-    conditions.push(or(ilike(books.title, keyword), ilike(books.author, keyword)));
+    conditions.push(
+      or(ilike(books.title, keyword), ilike(books.author, keyword)),
+    );
   }
   if (query.category) {
-    conditions.push(sql`${books.categories} @> ${JSON.stringify([query.category])}::jsonb`);
+    conditions.push(
+      sql`${books.categories} @> ${JSON.stringify([query.category])}::jsonb`,
+    );
   }
   if (query.language) {
-    conditions.push(sql`${books.availableLanguages} @> ${JSON.stringify([query.language])}::jsonb`);
+    conditions.push(
+      sql`${books.availableLanguages} @> ${JSON.stringify([query.language])}::jsonb`,
+    );
   }
   if (query.accessTier && query.accessTier !== "all") {
     conditions.push(eq(books.accessTier, query.accessTier));
@@ -194,7 +234,10 @@ export async function listBooks(query: ListBooksQuery) {
   };
 }
 
-export async function getBookBySlug(slug: string, userId?: string): Promise<BookDetailDto | null> {
+export async function getBookBySlug(
+  slug: string,
+  userId?: string,
+): Promise<BookDetailDto | null> {
   const [book] = await db
     .select()
     .from(books)
@@ -225,13 +268,85 @@ export async function getBookBySlug(slug: string, userId?: string): Promise<Book
     .innerJoin(storeBranches, eq(storeInventories.branchId, storeBranches.id))
     .where(eq(storeInventories.bookId, book.id));
 
-  const hasClaimedDigital = userId ? await hasClaimedBook(book.id, userId) : false;
+  const hasClaimedDigital = userId
+    ? await hasClaimedBook(book.id, userId)
+    : false;
   const chapters = await listBookChapters(book.id);
 
   const shelves = await db
     .select({ id: userShelves.id })
     .from(userShelves)
     .where(eq(userShelves.bookId, book.id));
+
+  const eventRows = await db
+    .select({
+      event: communityEvents,
+      calendar: communityCalendars,
+    })
+    .from(communityEvents)
+    .innerJoin(
+      communityCalendars,
+      eq(communityEvents.calendarId, communityCalendars.id),
+    )
+    .where(
+      and(
+        eq(communityEvents.bookId, book.id),
+        eq(communityEvents.status, "published"),
+      ),
+    )
+    .orderBy(communityEvents.startsAt)
+    .limit(5);
+
+  const upcomingEvents = await Promise.all(
+    eventRows.map(async ({ event: ev, calendar: cal }) => {
+      const [goingRes] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(eventRsvps)
+        .where(
+          and(eq(eventRsvps.eventId, ev.id), eq(eventRsvps.status, "going")),
+        );
+      const goingCount = Number(goingRes?.count || 0);
+
+      return {
+        id: ev.id,
+        slug: ev.slug,
+        calendarId: ev.calendarId,
+        calendarName: cal.name,
+        calendarSlug: cal.slug,
+        calendarAvatarUrl: cal.avatarUrl,
+        bookId: ev.bookId,
+        bookSummary: null,
+        featuredWork: ev.featuredWork,
+        title: ev.title,
+        description: ev.description,
+        coverUrl: ev.coverUrl,
+        themePreset: ev.themePreset as any,
+        visibility: ev.visibility as any,
+        eventType: ev.eventType as any,
+        categoryTag: ev.categoryTag,
+        coHosts: ev.coHosts,
+        format: ev.format as any,
+        district: ev.district,
+        city: ev.city,
+        venueName: ev.hideAddressUntilApproved ? null : ev.venueName,
+        venueAddress: ev.hideAddressUntilApproved ? null : ev.venueAddress,
+        hideAddressUntilApproved: ev.hideAddressUntilApproved,
+        isAddressHidden: ev.hideAddressUntilApproved,
+        latitude: ev.hideAddressUntilApproved ? null : ev.latitude,
+        longitude: ev.hideAddressUntilApproved ? null : ev.longitude,
+        startsAt: ev.startsAt.toISOString(),
+        endsAt: ev.endsAt.toISOString(),
+        timezone: ev.timezone,
+        capacity: ev.capacity,
+        requiresApproval: ev.requiresApproval,
+        allowWaitlist: ev.allowWaitlist,
+        status: ev.status as any,
+        attendeeCount: goingCount,
+        attendeesPreview: [],
+        userRsvpStatus: null,
+      };
+    }),
+  );
 
   return {
     ...toBookSummary(book),
@@ -264,17 +379,22 @@ export async function getBookBySlug(slug: string, userId?: string): Promise<Book
     })),
     hasClaimedDigital,
     totalShelved: shelves.length,
+    upcomingEvents,
   };
 }
 
-export async function getBookStock(slug: string, query: StockQuery): Promise<StoreStockItemDto[]> {
+export async function getBookStock(
+  slug: string,
+  query: StockQuery,
+): Promise<StoreStockItemDto[]> {
   const [book] = await db
     .select({ id: books.id })
     .from(books)
     .where(eq(books.slug, slug))
     .limit(1);
 
-  if (!book) throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+  if (!book)
+    throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
 
   const conditions = [eq(storeInventories.bookId, book.id)];
   if (query.city) {
@@ -315,44 +435,71 @@ export async function getBookStock(slug: string, query: StockQuery): Promise<Sto
   }));
 }
 
-export async function claimPrintCode(slug: string, userId: string, code: string) {
+export async function claimPrintCode(
+  slug: string,
+  userId: string,
+  code: string,
+) {
   const [book] = await db
     .select({ id: books.id })
     .from(books)
     .where(eq(books.slug, slug))
     .limit(1);
 
-  if (!book) throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+  if (!book)
+    throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
 
   const [claimRow] = await db
     .select()
     .from(bookClaimCodes)
-    .where(and(
-      eq(bookClaimCodes.bookId, book.id),
-      eq(bookClaimCodes.code, code),
-      env.isProduction ? eq(bookClaimCodes.isDemo, false) : undefined,
-    ))
+    .where(
+      and(
+        eq(bookClaimCodes.bookId, book.id),
+        eq(bookClaimCodes.code, code),
+        env.isProduction ? eq(bookClaimCodes.isDemo, false) : undefined,
+      ),
+    )
     .limit(1);
 
   if (!claimRow) {
-    throw new HttpError(404, "INVALID_CLAIM_CODE", "Kode klaim tidak ditemukan pada buku ini.");
+    throw new HttpError(
+      404,
+      "INVALID_CLAIM_CODE",
+      "Kode klaim tidak ditemukan pada buku ini.",
+    );
   }
 
   if (claimRow.claimedByUserId) {
-    throw new HttpError(409, "CLAIM_CODE_ALREADY_USED", "Kode klaim fisik ini sudah digunakan.");
+    throw new HttpError(
+      409,
+      "CLAIM_CODE_ALREADY_USED",
+      "Kode klaim fisik ini sudah digunakan.",
+    );
   }
 
   const [claimed] = await db
     .update(bookClaimCodes)
     .set({ claimedByUserId: userId, claimedAt: new Date() })
-    .where(and(eq(bookClaimCodes.id, claimRow.id), isNull(bookClaimCodes.claimedByUserId)))
+    .where(
+      and(
+        eq(bookClaimCodes.id, claimRow.id),
+        isNull(bookClaimCodes.claimedByUserId),
+      ),
+    )
     .returning({ id: bookClaimCodes.id });
 
   if (!claimed) {
-    throw new HttpError(409, "CLAIM_CODE_ALREADY_USED", "Kode klaim fisik ini sudah digunakan.");
+    throw new HttpError(
+      409,
+      "CLAIM_CODE_ALREADY_USED",
+      "Kode klaim fisik ini sudah digunakan.",
+    );
   }
 
-  return { success: true, message: "Buku fisik berhasil diklaim. Akses digital terbuka penuh." };
+  return {
+    success: true,
+    message: "Buku fisik berhasil diklaim. Akses digital terbuka penuh.",
+  };
 }
 
 export async function getBookReaderPayload(
@@ -367,7 +514,8 @@ export async function getBookReaderPayload(
     .where(eq(books.slug, slug))
     .limit(1);
 
-  if (!book) throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+  if (!book)
+    throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
 
   const access = await getBookReadAccess(book, userId);
   const requestedChapterNum = query.chapter;
@@ -379,20 +527,33 @@ export async function getBookReaderPayload(
     );
   }
 
-  const continuous = query.continuous === "true" && access.hasFullAccess && query.mode === "full";
+  const continuous =
+    query.continuous === "true" &&
+    access.hasFullAccess &&
+    query.mode === "full";
   const rows = await db
     .select()
     .from(bookChapters)
-    .where(and(
-      eq(bookChapters.bookId, book.id),
-      continuous ? undefined : eq(bookChapters.chapterNumber, requestedChapterNum),
-    ))
+    .where(
+      and(
+        eq(bookChapters.bookId, book.id),
+        continuous
+          ? undefined
+          : eq(bookChapters.chapterNumber, requestedChapterNum),
+      ),
+    )
     .orderBy(bookChapters.chapterNumber);
 
   const chapters = rows.map((row) => {
-    const previewCount = access.hasFullAccess ? 0 : getPreviewParagraphCount(row.contentId);
-    const contentId = access.hasFullAccess ? row.contentId : previewText(row.contentId, previewCount) ?? "";
-    const contentEn = access.hasFullAccess ? row.contentEn : previewText(row.contentEn, previewCount);
+    const previewCount = access.hasFullAccess
+      ? 0
+      : getPreviewParagraphCount(row.contentId);
+    const contentId = access.hasFullAccess
+      ? row.contentId
+      : (previewText(row.contentId, previewCount) ?? "");
+    const contentEn = access.hasFullAccess
+      ? row.contentEn
+      : previewText(row.contentEn, previewCount);
     const canPlayAudio = access.hasFullAccess && query.mode !== "blueprint";
     return {
       id: row.id,
@@ -405,7 +566,9 @@ export async function getBookReaderPayload(
       audioDurationSeconds: canPlayAudio ? row.audioDurationSec : null,
     };
   });
-  const currentChapter = chapters.find((chapter) => chapter.chapterNumber === requestedChapterNum);
+  const currentChapter = chapters.find(
+    (chapter) => chapter.chapterNumber === requestedChapterNum,
+  );
   if (!currentChapter) {
     throw new HttpError(404, "CHAPTER_NOT_FOUND", "Bab tidak ditemukan.");
   }
