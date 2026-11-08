@@ -53,14 +53,15 @@ export function EventDetailDrawer({
       {/* Backdrop overlay on mobile */}
       <div
         onClick={onClose}
-        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs lg:hidden animate-in fade-in duration-200"
+        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs lg:hidden animate-in fade-in duration-200"
         style={{ overscrollBehavior: "contain" }}
       />
 
       {/* Slide-over Drawer (matching Luma right drawer) */}
       <aside
-        className="fixed top-0 right-0 z-40 flex h-full w-full max-w-[440px] sm:max-w-[480px] flex-col border-l border-white/10 bg-[#121316] text-white shadow-2xl animate-in slide-in-from-right duration-250 select-none"
-        style={{ overscrollBehavior: "contain", touchAction: "pan-y" }}
+        data-lenis-prevent
+        className="fixed top-0 right-0 z-50 flex h-full w-full max-w-[440px] sm:max-w-[480px] flex-col border-l border-white/10 bg-[#121316] text-white shadow-2xl animate-in slide-in-from-right duration-250 select-none"
+        style={{ overscrollBehavior: "contain" }}
       >
         {/* Top Header Bar matching Luma: >> | Salin Tautan | Halaman Acara ↗ | ^ v */}
         <div className="flex h-13 shrink-0 items-center justify-between border-b border-white/10 px-4 bg-[#141518]">
@@ -69,7 +70,7 @@ export function EventDetailDrawer({
             type="button"
             onClick={onClose}
             title="Tutup Panel"
-            className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-white/60 hover:bg-white/10 hover:text-white transition-colors"
+            className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-white/60 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
           >
             <ChevronsRight className="size-4" />
           </button>
@@ -129,7 +130,11 @@ export function EventDetailDrawer({
         </div>
 
         {/* Scrollable Event Content */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+        <div
+          data-lenis-prevent
+          className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6 scrollbar-thin"
+          style={{ overscrollBehavior: "contain" }}
+        >
           <EventDetailView event={event} isDrawer={true} />
         </div>
       </aside>

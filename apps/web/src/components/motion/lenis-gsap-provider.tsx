@@ -68,6 +68,9 @@ export function LenisGsapProvider({ children }: { children: ReactNode }) {
     });
 
     lenisRef.current = lenis;
+    if (typeof window !== "undefined") {
+      (window as any).__lenis = lenis;
+    }
 
     lenis.on("scroll", (e: { velocity: number }) => {
       ScrollTrigger.update();
@@ -87,6 +90,9 @@ export function LenisGsapProvider({ children }: { children: ReactNode }) {
       gsap.ticker.remove(updateTicker);
       lenis.destroy();
       lenisRef.current = null;
+      if (typeof window !== "undefined") {
+        (window as any).__lenis = null;
+      }
     };
   }, [isReaderRoute]);
 

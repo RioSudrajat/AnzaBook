@@ -55,20 +55,33 @@ export function ApplyCalendarDialog({
       return;
     }
 
+    const trimmedEmail = contactEmail.trim();
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setErrorMsg("Format email kontak tidak valid (contoh: halo@komunitas.id atau kosongkan jika tidak ada)");
+      return;
+    }
+
     try {
       const res = await createCalendarMutation.mutateAsync({
-        name,
-        slug,
+        name: name.trim(),
+        slug: slug.trim(),
         type,
-        description,
-        city: city || undefined,
-        contactEmail: contactEmail || undefined,
-        socialLinks: instagram ? { instagram } : undefined,
+        description: description.trim(),
+        city: city.trim() || undefined,
+        contactEmail: trimmedEmail || undefined,
+        socialLinks: instagram.trim() ? { instagram: instagram.trim() } : undefined,
       });
       if (onSuccess) onSuccess(res.slug);
       onClose();
     } catch (err: any) {
-      setErrorMsg(err.message || "Gagal membuat kalender komunitas.");
+      if (err?.details && Array.isArray(err.details) && err.details.length > 0) {
+        const detailMessages = err.details
+          .map((d: any) => `${d.message}`)
+          .join(" • ");
+        setErrorMsg(detailMessages);
+      } else {
+        setErrorMsg(err.message || "Gagal membuat kalender komunitas.");
+      }
     }
   };
 
@@ -80,6 +93,7 @@ export function ApplyCalendarDialog({
       style={{ overscrollBehavior: "contain" }}
     >
       <div
+        data-lenis-prevent
         className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#16171b] text-white shadow-2xl"
         style={{ overscrollBehavior: "contain" }}
       >
@@ -208,24 +222,21 @@ export function ApplyCalendarDialog({
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-2">
-            <Button
+          <div className="flex justify-end gap-2.5 pt-2">
+            <button
               type="button"
-              variant="outline"
-              size="sm"
               onClick={onClose}
-              className="border-white/20 text-white hover:bg-white/10"
+              className="rounded-xl border border-white/20 bg-white/5 hover:bg-white/10 px-4 py-2 text-xs font-medium text-white transition-colors cursor-pointer"
             >
               Batal
-            </Button>
-            <Button
+            </button>
+            <button
               type="submit"
-              size="sm"
               disabled={createCalendarMutation.isPending}
-              className="bg-white text-black hover:bg-white/90 font-medium"
+              className="rounded-xl bg-white px-5 py-2 text-xs font-semibold text-black hover:bg-white/90 disabled:opacity-50 transition-all cursor-pointer shadow-sm"
             >
               {createCalendarMutation.isPending ? "Menyimpan..." : "Buat Kalender"}
-            </Button>
+            </button>
           </div>
         </form>
       </div>

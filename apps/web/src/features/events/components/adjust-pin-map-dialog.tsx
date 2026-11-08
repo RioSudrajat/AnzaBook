@@ -137,6 +137,7 @@ export function AdjustPinMapDialog({
       style={{ overscrollBehavior: "contain" }}
     >
       <div
+        data-lenis-prevent
         className="relative flex h-[88vh] max-h-[660px] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#121316] text-white shadow-2xl"
         style={{ overscrollBehavior: "contain" }}
       >

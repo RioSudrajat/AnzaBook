@@ -395,6 +395,7 @@ export function DashboardEvents() {
           style={{ overscrollBehavior: "contain" }}
         >
           <div
+            data-lenis-prevent
             className="relative flex w-full max-w-md flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#16171b] p-6 text-white shadow-2xl"
             style={{ overscrollBehavior: "contain" }}
           >

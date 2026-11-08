@@ -132,6 +132,7 @@ export function EventDescriptionDialog({
       style={{ overscrollBehavior: "contain" }}
     >
       <div
+        data-lenis-prevent
         className="relative flex h-[85vh] max-h-[640px] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#16171b] text-white shadow-2xl"
         style={{ overscrollBehavior: "contain" }}
       >
@@ -148,7 +149,11 @@ export function EventDescriptionDialog({
         </div>
 
         {/* Content Canvas */}
-        <div className="relative flex flex-1 flex-col p-6 overflow-y-auto" style={{ overscrollBehavior: "contain" }}>
+        <div
+          data-lenis-prevent
+          className="relative flex flex-1 flex-col p-6 overflow-y-auto"
+          style={{ overscrollBehavior: "contain" }}
+        >
           {/* Top Line with (+) Trigger */}
           <div className="relative flex items-start gap-3">
             {/* (+) Button matching Screenshot 2 */}

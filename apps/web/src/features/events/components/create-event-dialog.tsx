@@ -261,6 +261,7 @@ export function CreateEventDialog({
       style={{ overscrollBehavior: "contain" }}
     >
       <div
+        data-lenis-prevent
         className="relative flex h-[94vh] max-h-[840px] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border shadow-2xl transition-colors duration-300"
         style={{
           backgroundColor: currentTheme.bg,
@@ -288,7 +289,11 @@ export function CreateEventDialog({
         {/* Studio Body: Split 2 Columns matching Luma Screenshot 1 */}
         <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
           {/* Left Column: 1:1 Poster Upload & Theme Controls */}
-          <div className="flex w-full md:w-[380px] shrink-0 flex-col items-center justify-start border-b md:border-b-0 md:border-r border-white/10 p-6 overflow-y-auto" style={{ overscrollBehavior: "contain" }}>
+          <div
+            data-lenis-prevent
+            className="flex w-full md:w-[380px] shrink-0 flex-col items-center justify-start border-b md:border-b-0 md:border-r border-white/10 p-6 overflow-y-auto"
+            style={{ overscrollBehavior: "contain" }}
+          >
             {/* 1:1 Poster Preview Box */}
             <div className="relative group size-[240px] sm:size-[280px] rounded-2xl overflow-hidden border-2 border-white/15 bg-black/40 shadow-xl">
               <img
@@ -368,7 +373,11 @@ export function CreateEventDialog({
           </div>
 
           {/* Right Column: Title, Dates, Location, Description & Options */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-5 text-white" style={{ overscrollBehavior: "contain" }}>
+          <div
+            data-lenis-prevent
+            className="flex-1 overflow-y-auto p-6 space-y-5 text-white"
+            style={{ overscrollBehavior: "contain" }}
+          >
             {errorMsg && (
               <div className="rounded-lg border border-red-500/40 bg-red-500/15 p-3 text-xs text-red-200">
                 {errorMsg}
