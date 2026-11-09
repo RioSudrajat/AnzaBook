@@ -591,6 +591,12 @@ export async function seedCatalog(
           }
         }
       }
+
+      // Pastikan semua acara yang sebelumnya tersimpan sebagai pending_review diaktifkan ke published
+      await db
+        .update(schema.communityEvents)
+        .set({ status: "published" })
+        .where(eq(schema.communityEvents.status, "pending_review"));
     }
   }
 

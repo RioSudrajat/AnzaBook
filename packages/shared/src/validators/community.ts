@@ -281,7 +281,7 @@ export const listEventsQuerySchema = z
     city: z.string().optional(),
     format: z.enum(eventFormatValues).optional(),
     eventType: z.enum(eventTypeValues).optional(),
-    filter: z.enum(["upcoming", "past", "my_rsvps"]).default("upcoming"),
+    filter: z.enum(["upcoming", "past", "my_rsvps", "hosting"]).default("upcoming"),
     limit: z.coerce.number().int().min(1).max(100).default(30),
     offset: z.coerce.number().int().min(0).default(0),
   })

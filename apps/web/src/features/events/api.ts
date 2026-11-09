@@ -14,6 +14,7 @@ import type {
   ListEventsQuery,
   ReportEventInput,
   RsvpEventInput,
+  UpdateEventInput,
 } from "@starter/shared/validators/community";
 import { apiFetch } from "@/lib/api/client";
 
@@ -84,9 +85,48 @@ export async function cancelRsvp(slug: string) {
   return data;
 }
 
+export async function updateEvent(slug: string, input: UpdateEventInput) {
+  const { data } = await apiFetch<DataResponse<CommunityEventDetailDto>>(
+    `/api/events/${encodeURIComponent(slug)}`,
+    {
+      method: "PATCH",
+      body: input,
+    },
+  );
+  return data;
+}
+
+export async function deleteEvent(slug: string) {
+  const { data } = await apiFetch<DataResponse<{ success: boolean; message: string }>>(
+    `/api/events/${encodeURIComponent(slug)}`,
+    {
+      method: "DELETE",
+    },
+  );
+  return data;
+}
+
+export async function getEventAttendees(slug: string, signal?: AbortSignal) {
+  const { data } = await apiFetch<DataResponse<EventRsvpDto[]>>(
+    `/api/events/${encodeURIComponent(slug)}/attendees`,
+    { signal },
+  );
+  return data;
+}
+
 export async function approveRsvp(slug: string, rsvpId: string) {
   const { data } = await apiFetch<DataResponse<EventRsvpDto>>(
     `/api/events/${encodeURIComponent(slug)}/rsvp/${encodeURIComponent(rsvpId)}/approve`,
+    {
+      method: "POST",
+    },
+  );
+  return data;
+}
+
+export async function rejectRsvp(slug: string, rsvpId: string) {
+  const { data } = await apiFetch<DataResponse<EventRsvpDto>>(
+    `/api/events/${encodeURIComponent(slug)}/rsvp/${encodeURIComponent(rsvpId)}/reject`,
     {
       method: "POST",
     },

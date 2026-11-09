@@ -21,7 +21,7 @@ import { EventDetailDrawer } from "./event-detail-drawer";
 import { ApplyCalendarDialog } from "./apply-calendar-dialog";
 
 export function DashboardEvents() {
-  const [filterTab, setFilterTab] = React.useState<"upcoming" | "past" | "my_rsvps">("upcoming");
+  const [filterTab, setFilterTab] = React.useState<"upcoming" | "past" | "my_rsvps" | "hosting">("upcoming");
   const [selectedFormat, setSelectedFormat] = React.useState<"all" | "offline" | "online">("all");
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
   const [selectedEventSlug, setSelectedEventSlug] = React.useState<string | null>(null);
@@ -156,7 +156,9 @@ export function DashboardEvents() {
             Agenda Komunitas
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {filterTab === "my_rsvps"
+            {filterTab === "hosting"
+              ? "Kelola acara yang Anda selenggarakan, tinjau permohonan peserta, dan perbarui detail."
+              : filterTab === "my_rsvps"
               ? "Daftar acara yang telah Anda daftarkan dan tiket masuk Anda."
               : filterTab === "past"
               ? "Arsip dan riwayat agenda komunitas yang telah selesai diselenggarakan."
@@ -177,7 +179,7 @@ export function DashboardEvents() {
         </div>
       </div>
 
-      {/* Filter Tabs Bar (Mendatang / Terlewat / Pendaftaran Saya) */}
+      {/* Filter Tabs Bar (Mendatang / Dikelola / Pendaftaran Saya / Terlewat) */}
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-1 rounded-xl bg-muted/60 p-1">
           <button
@@ -190,6 +192,17 @@ export function DashboardEvents() {
             }`}
           >
             Acara Terdekat
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterTab("hosting")}
+            className={`rounded-lg px-3 py-1.5 font-medium transition-colors cursor-pointer ${
+              filterTab === "hosting"
+                ? "bg-background text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Dikelola Saya
           </button>
           <button
             type="button"
@@ -237,7 +250,42 @@ export function DashboardEvents() {
         </div>
       ) : events.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border p-12 text-center text-muted-foreground space-y-3">
-          {filterTab === "my_rsvps" && !session?.user ? (
+          {filterTab === "hosting" && !session?.user ? (
+            <>
+              <Users className="size-10 text-muted-foreground/40 mx-auto" />
+              <div className="space-y-1">
+                <h3 className="font-semibold text-foreground text-sm">Masuk untuk Melihat Acara Kelolaan</h3>
+                <p className="text-xs max-w-sm mx-auto">
+                  Masuk ke akun AnzaBook untuk melihat dan mengelola acara yang Anda selenggarakan.
+                </p>
+              </div>
+              <Button
+                asChild
+                size="sm"
+                className="rounded-lg bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs cursor-pointer"
+              >
+                <a href="/sign-in">Masuk ke Akun</a>
+              </Button>
+            </>
+          ) : filterTab === "hosting" ? (
+            <>
+              <Sparkles className="size-10 text-muted-foreground/40 mx-auto" />
+              <div className="space-y-1">
+                <h3 className="font-semibold text-foreground text-sm">Belum Ada Acara yang Anda Buat</h3>
+                <p className="text-xs max-w-sm mx-auto">
+                  Anda belum menyelenggarakan acara apa pun. Mulai buat agenda bedah buku atau temu literasi pertama Anda!
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleCreateClick}
+                className="rounded-lg bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs cursor-pointer"
+              >
+                + Buat Acara Baru
+              </Button>
+            </>
+          ) : filterTab === "my_rsvps" && !session?.user ? (
             <>
               <Users className="size-10 text-muted-foreground/40 mx-auto" />
               <div className="space-y-1">
@@ -369,6 +417,21 @@ export function DashboardEvents() {
 
                         {/* Footer Badges & Attendee Preview */}
                         <div className="flex flex-wrap items-center gap-2 pt-1.5">
+                          {/* Host Manager Badge */}
+                          {ev.canManage && (
+                            <span className="rounded-md bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[10px] font-semibold text-amber-400 flex items-center gap-1">
+                              <Sparkles className="size-3" />
+                              Host
+                            </span>
+                          )}
+
+                          {/* Pending Requests Badge */}
+                          {ev.pendingRsvpCount !== undefined && ev.pendingRsvpCount > 0 && (
+                            <span className="rounded-md bg-rose-500/20 border border-rose-500/30 px-2 py-0.5 text-[10px] font-semibold text-rose-300">
+                              {ev.pendingRsvpCount} Permintaan
+                            </span>
+                          )}
+
                           {/* Waitlist Badge (Luma Screenshot 4) */}
                           {isFull && (
                             <span className="rounded-md bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[10px] font-medium text-amber-400">
@@ -437,6 +500,7 @@ export function DashboardEvents() {
         open={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         onSuccess={(slug) => {
+          setFilterTab("upcoming");
           setSelectedEventSlug(slug);
         }}
       />

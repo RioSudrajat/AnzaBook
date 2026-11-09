@@ -3,6 +3,7 @@ import type { ListEventsInput } from "@starter/shared/validators/community";
 import {
   getCalendar,
   getEvent,
+  getEventAttendees,
   getLocationSuggestions,
   listCalendars,
   listEvents,
@@ -15,6 +16,7 @@ export const eventsKeys = {
     [...eventsKeys.lists(), params ?? {}] as const,
   details: () => [...eventsKeys.all, "detail"] as const,
   detail: (slug: string) => [...eventsKeys.details(), slug] as const,
+  attendees: (slug: string) => [...eventsKeys.all, "attendees", slug] as const,
   calendars: () => [...eventsKeys.all, "calendars"] as const,
   calendar: (slug: string) => [...eventsKeys.calendars(), slug] as const,
   locations: () => [...eventsKeys.all, "locations"] as const,
@@ -24,6 +26,14 @@ export function eventsQuery(params?: ListEventsInput) {
   return queryOptions({
     queryKey: eventsKeys.list(params),
     queryFn: ({ signal }) => listEvents(params, signal),
+  });
+}
+
+export function eventAttendeesQuery(slug: string) {
+  return queryOptions({
+    queryKey: eventsKeys.attendees(slug),
+    queryFn: ({ signal }) => getEventAttendees(slug, signal),
+    enabled: Boolean(slug),
   });
 }
 

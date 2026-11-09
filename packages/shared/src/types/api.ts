@@ -312,6 +312,8 @@ export type CommunityEventSummaryDto = {
   attendeeCount: number;
   attendeesPreview: EventAttendeePreviewDto[];
   userRsvpStatus?: "going" | "pending_approval" | "waitlisted" | "canceled" | "rejected" | null;
+  canManage?: boolean;
+  pendingRsvpCount?: number;
 };
 
 export type CommunityEventDetailDto = CommunityEventSummaryDto & {

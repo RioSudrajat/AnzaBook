@@ -15,6 +15,9 @@ import {
   Film,
   Mail,
   Flag,
+  Pencil,
+  Trash2,
+  Sparkles,
 } from "lucide-react";
 import type {
   CommunityEventDetailDto,
@@ -23,9 +26,12 @@ import type {
 import { Button } from "@/components/ui/button";
 import {
   useCancelRsvp,
+  useDeleteEvent,
   useReportEvent,
   useRsvpEvent,
 } from "../hooks";
+import { EventAttendeesDialog } from "./event-attendees-dialog";
+import { EditEventDialog } from "./edit-event-dialog";
 
 interface EventDetailViewProps {
   event: CommunityEventDetailDto | CommunityEventSummaryDto;
@@ -36,10 +42,20 @@ export function EventDetailView({ event, isDrawer = false }: EventDetailViewProp
   const [reportModalOpen, setReportModalOpen] = React.useState(false);
   const [reportReason, setReportReason] = React.useState("");
   const [reportSent, setReportSent] = React.useState(false);
+  const [isAttendeesModalOpen, setIsAttendeesModalOpen] = React.useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
 
   const rsvpMutation = useRsvpEvent(event.slug);
   const cancelRsvpMutation = useCancelRsvp(event.slug);
   const reportMutation = useReportEvent(event.slug);
+  const deleteMutation = useDeleteEvent();
+
+  const handleDeleteEvent = async () => {
+    if (confirm("Apakah Anda yakin ingin membatalkan/menghapus acara ini secara permanen?")) {
+      await deleteMutation.mutateAsync(event.slug);
+      window.location.reload();
+    }
+  };
 
   const startDate = new Date(event.startsAt);
   const endDate = new Date(event.endsAt);
@@ -209,116 +225,186 @@ export function EventDetailView({ event, isDrawer = false }: EventDetailViewProp
         </div>
       </div>
 
-      {/* Dynamic Registration Box (Luma Screenshots 4, 6) */}
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3.5">
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-white/50">
-          Pendaftaran
+      {/* Dynamic Registration Box or Host Panel */}
+      {event.canManage ? (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-3.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400">
+              <Sparkles className="size-4" />
+              <span>Panel Penyelenggara (Host)</span>
+            </div>
+            <span className="rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-semibold">
+              Tayang Publik
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="rounded-lg bg-black/40 border border-white/10 p-2.5">
+              <span className="text-[10px] text-white/50 block">Pendaftar</span>
+              <span className="text-base font-bold text-white">
+                {event.attendeeCount} Orang
+              </span>
+            </div>
+            <div className="rounded-lg bg-black/40 border border-white/10 p-2.5">
+              <span className="text-[10px] text-white/50 block">Kapasitas</span>
+              <span className="text-base font-bold text-white">
+                {event.capacity ? `${event.capacity} Kursi` : "Tak Terbatas"}
+              </span>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex flex-col gap-2 pt-1">
+            <Button
+              type="button"
+              onClick={() => setIsAttendeesModalOpen(true)}
+              className="w-full h-10 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs shadow-md cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <Users className="size-4" />
+              <span>Kelola Peserta & Persetujuan</span>
+              {event.pendingRsvpCount !== undefined && event.pendingRsvpCount > 0 && (
+                <span className="rounded-full bg-rose-600 px-1.5 py-0.2 text-[10px] font-bold text-white ml-1">
+                  {event.pendingRsvpCount}
+                </span>
+              )}
+            </Button>
+
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditModalOpen(true)}
+                className="border-white/20 text-white hover:bg-white/10 cursor-pointer text-xs"
+              >
+                <Pencil className="size-3.5 mr-1 text-white/70" />
+                Edit Acara
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleDeleteEvent}
+                className="border-rose-500/30 text-rose-300 hover:bg-rose-500/20 hover:text-rose-200 cursor-pointer text-xs"
+              >
+                <Trash2 className="size-3.5 mr-1 text-rose-400" />
+                Hapus Acara
+              </Button>
+            </div>
+          </div>
         </div>
-
-        {/* State 1: Already Registered */}
-        {event.userRsvpStatus ? (
-          <div className="space-y-3">
-            <div
-              className={`flex items-start gap-2 rounded-lg p-3 ${
-                isGoing
-                  ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-200"
-                  : isPending
-                  ? "bg-amber-500/15 border border-amber-500/30 text-amber-200"
-                  : "bg-blue-500/15 border border-blue-500/30 text-blue-200"
-              }`}
-            >
-              <CheckCircle2 className="size-4 shrink-0 mt-0.5" />
-              <div>
-                <div className="font-semibold">
-                  {isGoing && "Pendaftaran Dikonfirmasi (Going)"}
-                  {isPending && "Menunggu Persetujuan Host"}
-                  {isWaitlisted && "Dalam Antrean Daftar Tunggu"}
-                </div>
-                <div className="text-[11px] opacity-80 mt-0.5">
-                  {isGoing && "Tiket dan lokasi lengkap telah terbuka untuk Anda."}
-                  {isPending && "Host akan meninjau pendaftaran Anda sebelum membuka alamat acara."}
-                  {isWaitlisted && "Anda akan otomatis dipromosikan jika kursi tersedia."}
-                </div>
-              </div>
-            </div>
-
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={cancelRsvpMutation.isPending}
-              onClick={handleCancelRsvp}
-              className="w-full border-white/20 text-white/70 hover:bg-white/10 hover:text-white"
-            >
-              {cancelRsvpMutation.isPending ? "Membatalkan..." : "Batalkan Pendaftaran"}
-            </Button>
+      ) : (
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3.5">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-white/50">
+            Pendaftaran
           </div>
-        ) : event.requiresApproval ? (
-          /* State 2: Requires Approval (Screenshot 4) */
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-white/80">
-              <Lock className="size-4 text-amber-400" />
-              <div>
-                <div className="font-semibold text-white">Persetujuan Diperlukan</div>
-                <div className="text-[11px] text-white/50">
-                  Pendaftaran Anda memerlukan persetujuan host.
+
+          {/* State 1: Already Registered */}
+          {event.userRsvpStatus ? (
+            <div className="space-y-3">
+              <div
+                className={`flex items-start gap-2 rounded-lg p-3 ${
+                  isGoing
+                    ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-200"
+                    : isPending
+                    ? "bg-amber-500/15 border border-amber-500/30 text-amber-200"
+                    : "bg-blue-500/15 border border-blue-500/30 text-blue-200"
+                }`}
+              >
+                <CheckCircle2 className="size-4 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-semibold">
+                    {isGoing && "Pendaftaran Dikonfirmasi (Going)"}
+                    {isPending && "Menunggu Persetujuan Host"}
+                    {isWaitlisted && "Dalam Antrean Daftar Tunggu"}
+                  </div>
+                  <div className="text-[11px] opacity-80 mt-0.5">
+                    {isGoing && "Tiket dan lokasi lengkap telah terbuka untuk Anda."}
+                    {isPending && "Host akan meninjau pendaftaran Anda sebelum membuka alamat acara."}
+                    {isWaitlisted && "Anda akan otomatis dipromosikan jika kursi tersedia."}
+                  </div>
                 </div>
               </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={cancelRsvpMutation.isPending}
+                onClick={handleCancelRsvp}
+                className="w-full border-white/20 text-white/70 hover:bg-white/10 hover:text-white"
+              >
+                {cancelRsvpMutation.isPending ? "Membatalkan..." : "Batalkan Pendaftaran"}
+              </Button>
             </div>
-
-            <p className="text-white/70 text-[11px]">
-              Silakan klik tombol di bawah untuk meminta akses bergabung ke acara ini.
-            </p>
-
-            <Button
-              type="button"
-              disabled={rsvpMutation.isPending}
-              onClick={handleRsvp}
-              className="w-full h-11 rounded-xl bg-white text-black font-semibold hover:bg-white/90 text-sm shadow-lg cursor-pointer"
-            >
-              {rsvpMutation.isPending ? "Mengirim Permintaan..." : "Minta untuk Bergabung"}
-            </Button>
-          </div>
-        ) : isFull && event.allowWaitlist ? (
-          /* State 3: Full Capacity -> Waitlist (Screenshot 6) */
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-amber-300">
-              <Users className="size-4 text-amber-400" />
-              <div>
-                <div className="font-semibold text-white">Acara Penuh</div>
-                <div className="text-[11px] text-white/50">
-                  Kapasitas kursi penuh. Anda dapat bergabung dengan daftar tunggu.
+          ) : event.requiresApproval ? (
+            /* State 2: Requires Approval (Screenshot 4) */
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-white/80">
+                <Lock className="size-4 text-amber-400" />
+                <div>
+                  <div className="font-semibold text-white">Persetujuan Diperlukan</div>
+                  <div className="text-[11px] text-white/50">
+                    Pendaftaran Anda memerlukan persetujuan host.
+                  </div>
                 </div>
               </div>
+
+              <p className="text-white/70 text-[11px]">
+                Silakan klik tombol di bawah untuk meminta akses bergabung ke acara ini.
+              </p>
+
+              <Button
+                type="button"
+                disabled={rsvpMutation.isPending}
+                onClick={handleRsvp}
+                className="w-full h-11 rounded-xl bg-white text-black font-semibold hover:bg-white/90 text-sm shadow-lg cursor-pointer"
+              >
+                {rsvpMutation.isPending ? "Mengirim Permintaan..." : "Minta untuk Bergabung"}
+              </Button>
             </div>
+          ) : isFull && event.allowWaitlist ? (
+            /* State 3: Full Capacity -> Waitlist (Screenshot 6) */
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-amber-300">
+                <Users className="size-4 text-amber-400" />
+                <div>
+                  <div className="font-semibold text-white">Acara Penuh</div>
+                  <div className="text-[11px] text-white/50">
+                    Kapasitas kursi penuh. Anda dapat bergabung dengan daftar tunggu.
+                  </div>
+                </div>
+              </div>
 
-            <p className="text-white/70 text-[11px]">
-              Klik tombol di bawah untuk bergabung dengan daftar tunggu. Anda akan otomatis masuk jika tempat tambahan tersedia.
-            </p>
+              <p className="text-white/70 text-[11px]">
+                Klik tombol di bawah untuk bergabung dengan daftar tunggu. Anda akan otomatis masuk jika tempat tambahan tersedia.
+              </p>
 
-            <Button
-              type="button"
-              disabled={rsvpMutation.isPending}
-              onClick={handleRsvp}
-              className="w-full h-11 rounded-xl bg-white text-black font-semibold hover:bg-white/90 text-sm shadow-lg cursor-pointer"
-            >
-              {rsvpMutation.isPending ? "Memproses..." : "Daftar Tunggu"}
-            </Button>
-          </div>
-        ) : (
-          /* State 4: Standard Open Registration */
-          <div className="space-y-3">
-            <Button
-              type="button"
-              disabled={rsvpMutation.isPending}
-              onClick={handleRsvp}
-              className="w-full h-11 rounded-xl bg-white text-black font-semibold hover:bg-white/90 text-sm shadow-lg cursor-pointer"
-            >
-              {rsvpMutation.isPending ? "Mendaftar..." : "Daftar Acara"}
-            </Button>
-          </div>
-        )}
-      </div>
+              <Button
+                type="button"
+                disabled={rsvpMutation.isPending}
+                onClick={handleRsvp}
+                className="w-full h-11 rounded-xl bg-white text-black font-semibold hover:bg-white/90 text-sm shadow-lg cursor-pointer"
+              >
+                {rsvpMutation.isPending ? "Memproses..." : "Daftar Tunggu"}
+              </Button>
+            </div>
+          ) : (
+            /* State 4: Standard Open Registration */
+            <div className="space-y-3">
+              <Button
+                type="button"
+                disabled={rsvpMutation.isPending}
+                onClick={handleRsvp}
+                className="w-full h-11 rounded-xl bg-white text-black font-semibold hover:bg-white/90 text-sm shadow-lg cursor-pointer"
+              >
+                {rsvpMutation.isPending ? "Mendaftar..." : "Daftar Acara"}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Featured Work / Linked Book (if available) */}
       {(event.bookSummary || event.featuredWork) && (
@@ -587,6 +673,23 @@ export function EventDetailView({ event, isDrawer = false }: EventDetailViewProp
             )}
           </div>
         </div>
+      )}
+
+      {/* Host Management Modals */}
+      {event.canManage && (
+        <>
+          <EventAttendeesDialog
+            open={isAttendeesModalOpen}
+            onClose={() => setIsAttendeesModalOpen(false)}
+            eventSlug={event.slug}
+            eventTitle={event.title}
+          />
+          <EditEventDialog
+            open={isEditModalOpen}
+            onClose={() => setIsEditModalOpen(false)}
+            event={event}
+          />
+        </>
       )}
     </div>
   );

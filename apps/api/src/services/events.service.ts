@@ -299,10 +299,7 @@ export async function createEvent(
     .slice(0, 120);
   const slug = `${baseSlug}-${randomBytes(3).toString("hex")}`;
 
-  const status =
-    calendar.verificationStatus === "trusted" || userRole === "admin"
-      ? "published"
-      : "pending_review";
+  const status = "published";
 
   const [event] = await db
     .insert(communityEvents)
@@ -393,10 +390,45 @@ export async function listEvents(
         ),
       );
     conditions.push(inArray(communityEvents.id, userEventIdsSubquery));
+  } else if (query.filter === "hosting") {
+    if (!currentUserId) {
+      return {
+        data: [],
+        meta: {
+          limit: query.limit,
+          offset: query.offset,
+          hasMore: false,
+        },
+      };
+    }
+    conditions.push(
+      sql`EXISTS (
+        SELECT 1 FROM ${communityCalendarMembers}
+        WHERE ${communityCalendarMembers.calendarId} = ${communityEvents.calendarId}
+          AND ${communityCalendarMembers.userId} = ${currentUserId}
+          AND ${communityCalendarMembers.role} IN ('owner', 'admin')
+      )`,
+    );
   }
 
-  // Filter published or viewer is manager
-  conditions.push(eq(communityEvents.status, "published"));
+  // Filter published for public viewing, unless query is hosting or viewer manages calendar
+  if (query.filter !== "hosting") {
+    if (currentUserId) {
+      conditions.push(
+        or(
+          eq(communityEvents.status, "published"),
+          sql`EXISTS (
+            SELECT 1 FROM ${communityCalendarMembers}
+            WHERE ${communityCalendarMembers.calendarId} = ${communityEvents.calendarId}
+              AND ${communityCalendarMembers.userId} = ${currentUserId}
+              AND ${communityCalendarMembers.role} IN ('owner', 'admin')
+          )`,
+        ),
+      );
+    } else {
+      conditions.push(eq(communityEvents.status, "published"));
+    }
+  }
 
   const rows = await db
     .select({
@@ -465,6 +497,20 @@ export async function listEvents(
       isManager = await isCalendarManager(calendar.id, currentUserId, currentUserRole);
     }
 
+    let pendingRsvpCount = 0;
+    if (isManager) {
+      const [pCount] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(eventRsvps)
+        .where(
+          and(
+            eq(eventRsvps.eventId, event.id),
+            eq(eventRsvps.status, "pending_approval"),
+          ),
+        );
+      pendingRsvpCount = Number(pCount?.count || 0);
+    }
+
     const isAddressHidden =
       event.hideAddressUntilApproved &&
       userRsvpStatus !== "going" &&
@@ -507,6 +553,8 @@ export async function listEvents(
       attendeeCount: Number(attCount?.count || 0),
       attendeesPreview: previews,
       userRsvpStatus,
+      canManage: isManager,
+      pendingRsvpCount,
     });
   }
 
@@ -977,4 +1025,174 @@ export async function getLocationSuggestions(): Promise<{
     recentVenues: venues.filter((v): v is typeof v & { venueName: string; venueAddress: string } => !!v.venueName && !!v.venueAddress),
     partnerVenues: branches,
   };
+}
+
+export async function getEventAttendees(
+  slug: string,
+  hostUserId: string,
+  userRole: string = "user",
+): Promise<EventRsvpDto[]> {
+  const [event] = await db
+    .select({ id: communityEvents.id, calendarId: communityEvents.calendarId })
+    .from(communityEvents)
+    .where(eq(communityEvents.slug, slug))
+    .limit(1);
+
+  if (!event) {
+    throw new HttpError(404, "EVENT_NOT_FOUND", "Acara tidak ditemukan.");
+  }
+
+  const canManage = await isCalendarManager(event.calendarId, hostUserId, userRole);
+  if (!canManage) {
+    throw new HttpError(403, "FORBIDDEN", "Hanya pengelola kalender yang dapat melihat daftar peserta lengkap.");
+  }
+
+  const rows = await db
+    .select({
+      id: eventRsvps.id,
+      eventId: eventRsvps.eventId,
+      userId: eventRsvps.userId,
+      userName: user.name,
+      userEmail: user.email,
+      userImage: user.image,
+      status: eventRsvps.status,
+      checkinCode: eventRsvps.checkinCode,
+      checkedInAt: eventRsvps.checkedInAt,
+      createdAt: eventRsvps.createdAt,
+    })
+    .from(eventRsvps)
+    .innerJoin(user, eq(eventRsvps.userId, user.id))
+    .where(eq(eventRsvps.eventId, event.id))
+    .orderBy(desc(eventRsvps.createdAt));
+
+  return rows.map((r) => ({
+    ...r,
+    status: r.status as any,
+    checkedInAt: r.checkedInAt?.toISOString() || null,
+    createdAt: r.createdAt.toISOString(),
+  }));
+}
+
+export async function rejectRsvp(
+  slug: string,
+  rsvpId: string,
+  hostUserId: string,
+  userRole: string = "user",
+): Promise<EventRsvpDto> {
+  const [event] = await db
+    .select({ id: communityEvents.id, calendarId: communityEvents.calendarId })
+    .from(communityEvents)
+    .where(eq(communityEvents.slug, slug))
+    .limit(1);
+
+  if (!event) {
+    throw new HttpError(404, "EVENT_NOT_FOUND", "Acara tidak ditemukan.");
+  }
+
+  const canManage = await isCalendarManager(event.calendarId, hostUserId, userRole);
+  if (!canManage) {
+    throw new HttpError(403, "FORBIDDEN", "Hanya pengelola yang dapat menolak pendaftar.");
+  }
+
+  const [row] = await db
+    .update(eventRsvps)
+    .set({ status: "rejected", updatedAt: new Date() })
+    .where(and(eq(eventRsvps.id, rsvpId), eq(eventRsvps.eventId, event.id)))
+    .returning();
+
+  if (!row) {
+    throw new HttpError(404, "RSVP_NOT_FOUND", "Pendaftaran tidak ditemukan.");
+  }
+
+  const [userData] = await db
+    .select({ name: user.name, email: user.email, image: user.image })
+    .from(user)
+    .where(eq(user.id, row.userId))
+    .limit(1);
+
+  return {
+    id: row.id,
+    eventId: row.eventId,
+    userId: row.userId,
+    userName: userData?.name || "Peserta",
+    userEmail: userData?.email || "",
+    userImage: userData?.image || null,
+    status: row.status as any,
+    checkinCode: row.checkinCode,
+    checkedInAt: row.checkedInAt?.toISOString() || null,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+export async function updateEvent(
+  slug: string,
+  hostUserId: string,
+  userRole: string = "user",
+  input: UpdateEventInput,
+): Promise<CommunityEventDetailDto> {
+  const [event] = await db
+    .select({ id: communityEvents.id, calendarId: communityEvents.calendarId })
+    .from(communityEvents)
+    .where(eq(communityEvents.slug, slug))
+    .limit(1);
+
+  if (!event) {
+    throw new HttpError(404, "EVENT_NOT_FOUND", "Acara tidak ditemukan.");
+  }
+
+  const canManage = await isCalendarManager(event.calendarId, hostUserId, userRole);
+  if (!canManage) {
+    throw new HttpError(403, "FORBIDDEN", "Hanya pengelola kalender yang dapat memperbarui acara.");
+  }
+
+  const patch: Record<string, any> = { updatedAt: new Date() };
+  if (input.title !== undefined) patch.title = input.title;
+  if (input.description !== undefined) patch.description = input.description;
+  if (input.coverUrl !== undefined) patch.coverUrl = input.coverUrl;
+  if (input.themePreset !== undefined) patch.themePreset = input.themePreset;
+  if (input.format !== undefined) patch.format = input.format;
+  if (input.venueName !== undefined) patch.venueName = input.venueName;
+  if (input.venueAddress !== undefined) patch.venueAddress = input.venueAddress;
+  if (input.district !== undefined) patch.district = input.district;
+  if (input.city !== undefined) patch.city = input.city;
+  if (input.latitude !== undefined) patch.latitude = input.latitude;
+  if (input.longitude !== undefined) patch.longitude = input.longitude;
+  if (input.onlineMeetingUrl !== undefined) patch.onlineMeetingUrl = input.onlineMeetingUrl || null;
+  if (input.startsAt !== undefined) patch.startsAt = new Date(input.startsAt);
+  if (input.endsAt !== undefined) patch.endsAt = new Date(input.endsAt);
+  if (input.capacity !== undefined) patch.capacity = input.capacity || null;
+  if (input.requiresApproval !== undefined) patch.requiresApproval = input.requiresApproval;
+  if (input.allowWaitlist !== undefined) patch.allowWaitlist = input.allowWaitlist;
+
+  await db
+    .update(communityEvents)
+    .set(patch)
+    .where(eq(communityEvents.id, event.id));
+
+  return (await getEventBySlug(slug, hostUserId, userRole))!;
+}
+
+export async function deleteEvent(
+  slug: string,
+  hostUserId: string,
+  userRole: string = "user",
+): Promise<{ success: boolean; message: string }> {
+  const [event] = await db
+    .select({ id: communityEvents.id, calendarId: communityEvents.calendarId })
+    .from(communityEvents)
+    .where(eq(communityEvents.slug, slug))
+    .limit(1);
+
+  if (!event) {
+    throw new HttpError(404, "EVENT_NOT_FOUND", "Acara tidak ditemukan.");
+  }
+
+  const canManage = await isCalendarManager(event.calendarId, hostUserId, userRole);
+  if (!canManage) {
+    throw new HttpError(403, "FORBIDDEN", "Hanya pengelola kalender yang dapat menghapus acara.");
+  }
+
+  await db.delete(communityEvents).where(eq(communityEvents.id, event.id));
+
+  return { success: true, message: "Acara berhasil dihapus." };
 }

@@ -393,4 +393,88 @@ describe("Community Calendars & Events API", () => {
     const afterCancelSlugs = myRsvpsAfterCancel.body.data.map((e: any) => e.slug);
     expect(afterCancelSlugs).not.toContain(slug1);
   });
+
+  it("allows host to manage events: publish immediately, filter=hosting, update, attendees, and delete", async () => {
+    const host = agent();
+    await signUp(host, "Host Mandiri");
+
+    // Host creates calendar
+    const calRes = await host
+      .post("/api/events/calendars")
+      .set(originHeader)
+      .send({
+        name: "Klub Mandiri",
+        slug: `klub-mandiri-${Date.now()}`,
+      });
+    expect(calRes.status).toBe(201);
+    const calId = calRes.body.data.id;
+
+    // Host creates event -> MUST be published immediately
+    const evRes = await host
+      .post("/api/events")
+      .set(originHeader)
+      .send({
+        calendarId: calId,
+        title: "Temu Komunitas Mandiri",
+        description: "Diskusi pertama kami.",
+        coverUrl: "https://example.com/banner-mandiri.jpg",
+        format: "online",
+        onlineMeetingUrl: "https://meet.google.com/mandiri",
+        startsAt: new Date(Date.now() + 600000000).toISOString(),
+        endsAt: new Date(Date.now() + 610000000).toISOString(),
+        requiresApproval: true,
+      });
+    expect(evRes.status).toBe(201);
+    expect(evRes.body.data.status).toBe("published");
+    const slug = evRes.body.data.slug;
+
+    // Check upcoming feed -> event is visible to everyone
+    const upcomingRes = await host.get("/api/events?filter=upcoming");
+    const upcomingSlugs = upcomingRes.body.data.map((e: any) => e.slug);
+    expect(upcomingSlugs).toContain(slug);
+
+    // Check hosting feed -> host sees it in hosting tab
+    const hostingRes = await host.get("/api/events?filter=hosting");
+    const hostingSlugs = hostingRes.body.data.map((e: any) => e.slug);
+    expect(hostingSlugs).toContain(slug);
+    expect(hostingRes.body.data[0].canManage).toBe(true);
+
+    // Another user applies
+    const attendee = agent();
+    await signUp(attendee, "Calon Peserta");
+    const rsvpRes = await attendee.post(`/api/events/${slug}/rsvp`).set(originHeader).send({});
+    expect(rsvpRes.status).toBe(201);
+    expect(rsvpRes.body.data.status).toBe("pending_approval");
+    const rsvpId = rsvpRes.body.data.id;
+
+    // Host views attendee list
+    const attendeesRes = await host.get(`/api/events/${slug}/attendees`);
+    expect(attendeesRes.status).toBe(200);
+    expect(attendeesRes.body.data).toHaveLength(1);
+    expect(attendeesRes.body.data[0].userName).toBe("Calon Peserta");
+
+    // Host rejects attendee
+    const rejectRes = await host
+      .post(`/api/events/${slug}/rsvp/${rsvpId}/reject`)
+      .set(originHeader)
+      .send({});
+    expect(rejectRes.status).toBe(200);
+    expect(rejectRes.body.data.status).toBe("rejected");
+
+    // Host updates event title
+    const updateRes = await host
+      .patch(`/api/events/${slug}`)
+      .set(originHeader)
+      .send({ title: "Temu Komunitas Mandiri - Edisi Revisi" });
+    expect(updateRes.status).toBe(200);
+    expect(updateRes.body.data.title).toBe("Temu Komunitas Mandiri - Edisi Revisi");
+
+    // Host deletes event
+    const delRes = await host.delete(`/api/events/${slug}`).set(originHeader).send();
+    expect(delRes.status).toBe(200);
+
+    // After deletion, event is gone
+    const getRes = await host.get(`/api/events/${slug}`);
+    expect(getRes.status).toBe(404);
+  });
 });

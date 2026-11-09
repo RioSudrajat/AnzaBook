@@ -7,6 +7,7 @@ import {
   listEventsQuerySchema,
   reportEventSchema,
   rsvpEventSchema,
+  updateEventSchema,
 } from "@starter/shared/validators/community";
 import { HttpError } from "../lib/http-error";
 import {
@@ -23,14 +24,18 @@ import {
   checkInRsvp,
   createCalendar,
   createEvent,
+  deleteEvent,
   getCalendarBySlug,
+  getEventAttendees,
   getEventBySlug,
   getLocationSuggestions,
   listCalendars,
   listEvents,
+  rejectRsvp,
   reportEvent,
   rsvpEvent,
   toggleFollowCalendar,
+  updateEvent,
   verifyCalendar,
 } from "../services/events.service";
 
@@ -153,6 +158,50 @@ eventsRouter.get("/:slug", optionalAuth, async (req, res) => {
   res.json({ data: event });
 });
 
+// Update event details (host only)
+eventsRouter.patch(
+  "/:slug",
+  requireAuth,
+  requireTrustedOrigin,
+  jsonBody,
+  async (req, res) => {
+    const user = getAuth(req).user;
+    const slug = String(req.params.slug);
+    const input = updateEventSchema.parse(req.body);
+    const updated = await updateEvent(slug, user.id, user.role || "user", input);
+    res.json({ data: updated });
+  },
+);
+
+// Delete event (host only)
+eventsRouter.delete(
+  "/:slug",
+  requireAuth,
+  requireTrustedOrigin,
+  async (req, res) => {
+    const user = getAuth(req).user;
+    const slug = String(req.params.slug);
+    const result = await deleteEvent(slug, user.id, user.role || "user");
+    res.json({ data: result });
+  },
+);
+
+// Get event attendees (host only)
+eventsRouter.get(
+  "/:slug/attendees",
+  requireAuth,
+  async (req, res) => {
+    const user = getAuth(req).user;
+    const slug = String(req.params.slug);
+    const attendees = await getEventAttendees(
+      slug,
+      user.id,
+      user.role || "user",
+    );
+    res.json({ data: attendees });
+  },
+);
+
 // RSVP to an event
 eventsRouter.post(
   "/:slug/rsvp",
@@ -189,6 +238,25 @@ eventsRouter.post(
     const slug = String(req.params.slug);
     const rsvpId = String(req.params.rsvpId);
     const rsvp = await approveRsvp(
+      slug,
+      rsvpId,
+      user.id,
+      user.role || "user",
+    );
+    res.json({ data: rsvp });
+  },
+);
+
+// Host rejects pending RSVP
+eventsRouter.post(
+  "/:slug/rsvp/:rsvpId/reject",
+  requireAuth,
+  requireTrustedOrigin,
+  async (req, res) => {
+    const user = getAuth(req).user;
+    const slug = String(req.params.slug);
+    const rsvpId = String(req.params.rsvpId);
+    const rsvp = await rejectRsvp(
       slug,
       rsvpId,
       user.id,

@@ -6,6 +6,7 @@ import type {
   ListEventsInput,
   ReportEventInput,
   RsvpEventInput,
+  UpdateEventInput,
 } from "@starter/shared/validators/community";
 import {
   approveRsvp,
@@ -13,13 +14,18 @@ import {
   checkInRsvp,
   createCalendar,
   createEvent,
+  deleteEvent,
+  getEventAttendees,
+  rejectRsvp,
   reportEvent,
   rsvpEvent,
   toggleFollowCalendar,
+  updateEvent,
 } from "./api";
 import {
   calendarDetailQuery,
   calendarsQuery,
+  eventAttendeesQuery,
   eventDetailQuery,
   eventsKeys,
   eventsQuery,
@@ -79,12 +85,52 @@ export function useCancelRsvp(slug: string) {
   });
 }
 
+export function useEventAttendees(slug: string) {
+  return useQuery(eventAttendeesQuery(slug));
+}
+
+export function useUpdateEvent(slug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateEventInput) => updateEvent(slug, input),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: eventsKeys.detail(slug) });
+      queryClient.invalidateQueries({ queryKey: eventsKeys.lists() });
+      return updated;
+    },
+  });
+}
+
+export function useDeleteEvent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (slug: string) => deleteEvent(slug),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: eventsKeys.all });
+    },
+  });
+}
+
 export function useApproveRsvp(slug: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (rsvpId: string) => approveRsvp(slug, rsvpId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: eventsKeys.detail(slug) });
+      queryClient.invalidateQueries({ queryKey: eventsKeys.attendees(slug) });
+      queryClient.invalidateQueries({ queryKey: eventsKeys.lists() });
+    },
+  });
+}
+
+export function useRejectRsvp(slug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (rsvpId: string) => rejectRsvp(slug, rsvpId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: eventsKeys.detail(slug) });
+      queryClient.invalidateQueries({ queryKey: eventsKeys.attendees(slug) });
+      queryClient.invalidateQueries({ queryKey: eventsKeys.lists() });
     },
   });
 }
@@ -95,6 +141,7 @@ export function useCheckInRsvp(slug: string) {
     mutationFn: (input: CheckInRsvpInput) => checkInRsvp(slug, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: eventsKeys.detail(slug) });
+      queryClient.invalidateQueries({ queryKey: eventsKeys.attendees(slug) });
     },
   });
 }
