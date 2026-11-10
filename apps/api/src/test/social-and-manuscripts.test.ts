@@ -1,15 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { agent, originHeader, signUp } from "./helpers";
 import { db } from "../db";
 import {
-  books,
   communityCalendars,
-  communityCalendarMembers,
   communityWalletLedgers,
   publishers,
-  publisherMembers,
   user,
 } from "../db/schema";
 
@@ -120,7 +117,7 @@ describe("Social Profile, 4D Explore, Community Membership & Manuscript Studio A
 
   it("submits official author application and updates authorStatus", async () => {
     const authorClient = agent();
-    const email = await signUp(authorClient, "Calon Penulis");
+    await signUp(authorClient, "Calon Penulis");
 
     const appRes = await authorClient
       .post("/api/social/author-applications")
@@ -247,7 +244,7 @@ describe("Social Profile, 4D Explore, Community Membership & Manuscript Studio A
 
   it("manages community membership (/join, /leave) and enforces wallet RBAC", async () => {
     const ownerClient = agent();
-    const ownerEmail = await signUp(ownerClient, "Ketua Komunitas");
+    await signUp(ownerClient, "Ketua Komunitas");
 
     const memberClient = agent();
     await signUp(memberClient, "Anggota Komunitas");

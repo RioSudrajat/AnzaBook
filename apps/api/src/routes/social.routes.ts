@@ -97,16 +97,15 @@ socialRouter.post(
   jsonBody,
   async (req, res) => {
     const currentUserId = getAuth(req).user.id;
-    const targetUserId = String(req.params.userId);
-    const isSubscribedUpdates =
-      typeof req.body?.isSubscribedUpdates === "boolean"
-        ? req.body.isSubscribedUpdates
-        : true;
+    const input = followUserSchema.parse({
+      targetUserId: String(req.params.userId),
+      ...(req.body ?? {}),
+    });
 
     const result = await followUser(
       currentUserId,
-      targetUserId,
-      isSubscribedUpdates,
+      input.targetUserId,
+      input.isSubscribedUpdates,
     );
     res.json({ data: result });
   },

@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   authorApplications,
@@ -11,7 +11,6 @@ import {
 import { HttpError } from "../lib/http-error";
 import type {
   ApplyAuthorInput,
-  FollowUserInput,
   UpdateProfileBioInput,
 } from "@starter/shared/validators/social";
 import type {
