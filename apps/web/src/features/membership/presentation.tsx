@@ -6,7 +6,10 @@ import {
 
 const rupiah = new Intl.NumberFormat("id-ID");
 const calendar = new Intl.DateTimeFormat("id-ID", {
-  day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Jakarta",
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  timeZone: "Asia/Jakarta",
 });
 
 export function formatRupiah(value: number) {

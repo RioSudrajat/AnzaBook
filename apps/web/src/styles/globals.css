@@ -70,7 +70,8 @@
     0 1px 2px oklch(18% 0.006 60 / 0.08),
     0 14px 28px -16px oklch(18% 0.006 60 / 0.24);
   --shadow-lift:
-    0 1px 1px oklch(18% 0.006 60 / 0.1), 0 2px 4px -1px oklch(18% 0.006 60 / 0.1),
+    0 1px 1px oklch(18% 0.006 60 / 0.1),
+    0 2px 4px -1px oklch(18% 0.006 60 / 0.1),
     0 24px 44px -20px oklch(18% 0.006 60 / 0.38);
 
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -83,7 +84,7 @@
 :root {
   --book-cover-base: oklch(22% 0.017 60);
   --book-cover-text: oklch(96% 0.011 85);
-  --book-cover-accent: oklch(88% 0.10 64);
+  --book-cover-accent: oklch(88% 0.1 64);
   --book-cover-shade: oklch(10% 0.012 60 / 55%);
   --book-cover-spine: oklch(8% 0.01 60 / 80%);
   --book-cover-crease: oklch(98% 0.01 85 / 14%);
@@ -92,8 +93,8 @@
   --font-body: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
   --font-outlier: "Red Hat Mono", ui-monospace, monospace;
   --font-reader-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-reader-accessible: "Atkinson Hyperlegible", ui-sans-serif, system-ui,
-    sans-serif;
+  --font-reader-accessible:
+    "Atkinson Hyperlegible", ui-sans-serif, system-ui, sans-serif;
 
   /* Furrow Manila (day) */
   --color-paper: oklch(96% 0.011 85);
@@ -328,7 +329,11 @@
     content: "";
     position: absolute;
     inset: 0;
-    background: linear-gradient(to right, transparent 70%, oklch(0% 0 0 / 0.12));
+    background: linear-gradient(
+      to right,
+      transparent 70%,
+      oklch(0% 0 0 / 0.12)
+    );
     pointer-events: none;
   }
 
@@ -374,7 +379,11 @@
   }
 }
 [data-preview-fade] {
-  mask-image: linear-gradient(to bottom, currentColor max(0px, calc(100% - 7rem)), transparent);
+  mask-image: linear-gradient(
+    to bottom,
+    currentColor max(0px, calc(100% - 7rem)),
+    transparent
+  );
 }
 
 @media (forced-colors: active), (prefers-contrast: more) {

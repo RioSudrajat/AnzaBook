@@ -15,10 +15,15 @@ export const membershipOrderId = z.uuid();
 export function parseMidtransCheckoutUrl(value: string): URL | null {
   const url = URL.parse(value);
   if (!url || url.username || url.password) return null;
-  if (url.origin !== "https://app.sandbox.midtrans.com" && url.origin !== "https://app.midtrans.com") {
+  if (
+    url.origin !== "https://app.sandbox.midtrans.com" &&
+    url.origin !== "https://app.midtrans.com"
+  ) {
     return null;
   }
-  return /^\/snap\/(?:v[34]\/redirection|v2\/vtweb)\/[^/]+$/.test(url.pathname) ? url : null;
+  return /^\/snap\/(?:v[34]\/redirection|v2\/vtweb)\/[^/]+$/.test(url.pathname)
+    ? url
+    : null;
 }
 
 const username = z
@@ -30,7 +35,9 @@ const username = z
   });
 
 export const membershipUsernameSchema = z.strictObject({ username });
-export const membershipRemindersSchema = z.strictObject({ enabled: z.boolean() });
+export const membershipRemindersSchema = z.strictObject({
+  enabled: z.boolean(),
+});
 export const membershipCancelSchema = z.strictObject({
   confirm: z.literal(true),
   expiresAt: z.iso.datetime(),

@@ -1,25 +1,18 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type MouseEvent,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import {
-  CheckCircle2,
-  Flame,
-  Share2,
-  Star,
-  Trophy,
-  X,
-} from "lucide-react";
+import { CheckCircle2, Flame, Share2, Star, Trophy, X } from "lucide-react";
 import { z } from "zod";
 import {
   splitChapterIntoPages,
   computeBookPagination,
-  getGlobalPageNumber,
   getChapterAndPageFromGlobal,
 } from "@starter/shared/chapter-pagination";
 import { bookProgressPercent } from "@starter/shared/reading-progress";
@@ -35,6 +28,15 @@ import {
   useSaveReadingProgress,
 } from "@/features/books/hooks";
 import { booksKeys } from "@/features/books/queries";
+import { bookPagePath } from "@/features/books/book-share";
+import { BookShareDialog } from "@/features/books/components/book-share-dialog";
+import {
+  findSlide,
+  slideParagraphText,
+  useSlidePagination,
+  type SlidePosition,
+  type SlideSpread,
+} from "@/features/reader/slide-pagination";
 import { ApiError } from "@/lib/api/client";
 import { useCreateReadingSession } from "@/features/community/hooks";
 import { AudiobookBar } from "@/features/reader/components/audiobook-bar";
@@ -80,8 +82,11 @@ function renderHighlightedText(
   text: string,
   highlights: BookHighlightDto[],
   onFlexHighlight: (h: BookHighlightDto) => void,
+  range?: { start: number; end: number },
 ) {
-  if (!highlights.length || !text) return text;
+  const start = range?.start ?? 0;
+  const end = range?.end ?? text.length;
+  if (!highlights.length || !text) return text.slice(start, end);
 
   type Match = { start: number; end: number; highlight: BookHighlightDto };
   const matches: Match[] = [];
@@ -121,7 +126,7 @@ function renderHighlightedText(
     }
   }
 
-  if (!matches.length) return text;
+  if (!matches.length) return text.slice(start, end);
 
   // Sort matches by start position
   matches.sort((a, b) => a.start - b.start);
@@ -137,12 +142,13 @@ function renderHighlightedText(
   }
 
   const elements: React.ReactNode[] = [];
-  let cursor = 0;
+  let cursor = start;
 
   nonOverlapping.forEach((m, i) => {
-    if (m.start > cursor) {
-      elements.push(text.slice(cursor, m.start));
-    }
+    const matchStart = Math.max(start, m.start);
+    const matchEnd = Math.min(end, m.end);
+    if (matchStart >= matchEnd) return;
+    if (matchStart > cursor) elements.push(text.slice(cursor, matchStart));
 
     const h = m.highlight;
     const colorBg =
@@ -163,18 +169,17 @@ function renderHighlightedText(
           onFlexHighlight(h);
         }}
         className={`rounded-xs cursor-pointer transition-all hover:brightness-105 active:scale-98 ${colorBg}`}
+        style={range ? { paddingInline: 0, fontWeight: "inherit" } : undefined}
         title="Stabilo AnzaBook: Klik untuk Flex kutipan ini ke Instagram Story atau WhatsApp"
       >
-        {text.slice(m.start, m.end)}
+        {text.slice(matchStart, matchEnd)}
       </mark>,
     );
 
-    cursor = m.end;
+    cursor = matchEnd;
   });
 
-  if (cursor < text.length) {
-    elements.push(text.slice(cursor));
-  }
+  if (cursor < end) elements.push(text.slice(cursor, end));
 
   return elements;
 }
@@ -186,10 +191,6 @@ function ReaderPage() {
 }
 
 const paragraphsPerPage = 5;
-
-function slideChapterPercent(pageIndex: number, pageCount: number) {
-  return Math.min(99, Math.round(((pageIndex + 1) / pageCount) * 100));
-}
 
 function chapterSection(chapterNumber: number) {
   return document.getElementById(`chapter-sec-${chapterNumber}`);
@@ -258,11 +259,15 @@ function ReaderBook() {
   );
   const [isHighlightsOpen, setIsHighlightsOpen] = useState(false);
   const [isRatingOpen, setIsRatingOpen] = useState(false);
-  const [slideDirection, setSlideDirection] = useState(0);
+  const [share, setShare] = useState<{
+    url: string;
+    trigger: HTMLButtonElement;
+  } | null>(null);
 
-  const [slidePosition, setSlidePosition] = useState({
+  const [slidePosition, setSlidePosition] = useState<SlidePosition>({
     chapter: requestedChapter,
-    page: 0,
+    paragraph: -1,
+    offset: 0,
   });
   const [scrollPosition, setScrollPosition] = useState({
     chapter: requestedChapter,
@@ -320,39 +325,31 @@ function ReaderBook() {
     payload?.chapters?.find((item) => item.chapterNumber === selectedChapter) ??
     payload?.currentChapter;
   const activeChapterNum = chapter?.chapterNumber ?? requestedChapter;
-  const activeChapterContent =
-    languageView === "en" && chapter?.contentEn
-      ? chapter.contentEn
-      : chapter?.contentId;
-
-  const accessibleChapters =
-    payload?.chapters && payload.chapters.length > 0
-      ? payload.chapters
-      : chapter
-        ? [chapter]
-        : [];
-  const bookPagination = computeBookPagination(
+  const accessibleChapters = useMemo(
+    () =>
+      payload?.chapters?.length
+        ? payload.chapters
+        : payload?.currentChapter
+          ? [payload.currentChapter]
+          : [],
+    [payload?.chapters, payload?.currentChapter],
+  );
+  const fontClass =
+    fontFamily === "serif"
+      ? "font-serif"
+      : fontFamily === "sans"
+        ? "font-sans"
+        : "[font-family:var(--font-reader-accessible)] tracking-wide";
+  const { spreads, setProbe } = useSlidePagination(
     accessibleChapters,
-    languageView,
-    paragraphsPerPage,
+    readingLayout === "slide",
+    languageView === "en",
+    fontClass,
+    fontSize,
   );
-  const currentChapterPagination =
-    bookPagination.chapters.find((c) => c.chapterNumber === activeChapterNum) ??
-    bookPagination.chapters[0];
-  const pageCount = currentChapterPagination?.pageCount ?? 1;
-
-  const chapterPages = splitChapterIntoPages(activeChapterContent);
-  const slidePageIndex =
-    slidePosition.chapter === activeChapterNum
-      ? Math.max(0, Math.min(pageCount - 1, slidePosition.page))
-      : 0;
-  const currentPageObj = chapterPages[slidePageIndex] ?? chapterPages[0];
-  const globalPageNumber = getGlobalPageNumber(
-    activeChapterNum,
-    slidePageIndex,
-    bookPagination,
-  );
-  const totalPages = bookPagination.totalPages;
+  const slideIndex = findSlide(spreads, slidePosition);
+  const activeSpread =
+    readingLayout === "slide" ? spreads[slideIndex] : undefined;
 
   const chapterParagraphs = splitParagraphs(chapter?.contentId);
   const chapterParagraphCount = chapterParagraphs.length;
@@ -374,21 +371,38 @@ function ReaderBook() {
       hasRestoredRef.current = true;
       if (savedChapter && checkpoint?.layout === "slide") {
         setReadingLayout("slide");
-        if (checkpoint.lastPageNumber) {
-          const resolved = getChapterAndPageFromGlobal(
-            checkpoint.lastPageNumber,
-            bookPagination,
-          );
-          setSlidePosition({
-            chapter: resolved.chapterNumber,
-            page: resolved.localPageIndex,
-          });
-        } else {
-          setSlidePosition({
-            chapter: savedChapter.chapterNumber,
-            page: 0,
-          });
-        }
+        const legacyPage = getChapterAndPageFromGlobal(
+          checkpoint.lastPageNumber ?? 1,
+          computeBookPagination(
+            accessibleChapters,
+            languageView,
+            paragraphsPerPage,
+          ),
+        );
+        const content =
+          languageView === "en" && savedChapter.contentEn
+            ? savedChapter.contentEn
+            : savedChapter.contentId;
+        const legacyTextIndex =
+          legacyPage.chapterNumber === savedChapter.chapterNumber
+            ? splitChapterIntoPages(content)
+                .slice(0, legacyPage.localPageIndex)
+                .reduce((count, page) => count + page.paragraphs.length, 0)
+            : 0;
+        const readableParagraphs = splitParagraphs(content).flatMap(
+          (raw, index) => (slideParagraphText(raw) ? [index] : []),
+        );
+        const savedIndex =
+          checkpoint.lastParagraphIndex ??
+          readableParagraphs[legacyTextIndex] ??
+          -1;
+        setSlidePosition({
+          chapter: savedChapter.chapterNumber,
+          paragraph:
+            readableParagraphs.find((index) => index >= savedIndex) ??
+            savedIndex,
+          offset: 0,
+        });
         return;
       }
       if (
@@ -439,7 +453,8 @@ function ReaderBook() {
     });
     return () => cancelAnimationFrame(frame);
   }, [
-    bookPagination,
+    accessibleChapters,
+    languageView,
     payload,
     progress,
     requestedChapter,
@@ -476,118 +491,121 @@ function ReaderBook() {
     };
   }, [payload?.accessExpiresAt, queryClient, refetch]);
 
-  const capturePosition = useCallback(
-    (page = slidePageIndex): SaveReadingProgressInput | null => {
-      if (!chapter || !hasRestoredRef.current) return null;
-      let positionChapter = chapter;
-      let paragraphCount = chapterParagraphCount;
-      const currentGlobal = getGlobalPageNumber(
-        positionChapter.chapterNumber,
-        page,
-        bookPagination,
-      );
-      let percent =
-        readingLayout === "slide"
-          ? Math.min(
-              99,
-              Math.round((currentGlobal / bookPagination.totalPages) * 100),
-            )
-          : slideChapterPercent(page, pageCount);
-      let paragraph = page * paragraphsPerPage;
-      if (readingLayout === "scroll") {
-        const sections = readerCanvasRef.current?.querySelectorAll<HTMLElement>(
-          "section[data-chapter-number]",
-        );
-        if (!sections?.length) return null;
-        const finalSection = sections[sections.length - 1];
-        const viewportMarker = window.innerHeight * 0.36;
-        const scrollRoot = document.scrollingElement;
-        const scrollTop = scrollRoot?.scrollTop ?? 0;
-        const maxScroll = scrollRoot
-          ? scrollRoot.scrollHeight - scrollRoot.clientHeight
-          : 0;
-        const atBookEnd =
-          payload?.hasFullAccess &&
-          maxScroll > 0 &&
-          scrollTop > 0 &&
-          maxScroll - scrollTop <= 1;
-        let body = sections[0];
-        for (const section of sections) {
-          if (section.getBoundingClientRect().top > viewportMarker) break;
-          body = section;
-        }
-        if (atBookEnd) body = finalSection;
-        const visibleChapter = payload?.chapters?.find(
-          (item) => item.chapterNumber === Number(body.dataset.chapterNumber),
-        );
-        if (visibleChapter) {
-          positionChapter = visibleChapter;
-          if (visibleChapter !== chapter)
-            paragraphCount = splitParagraphs(visibleChapter.contentId).length;
-        }
-        const rect = body.getBoundingClientRect();
-        if (atBookEnd) {
-          percent = 100;
-        } else if (payload?.hasFullAccess && body === finalSection) {
-          // A short final chapter may never reach the top before scrolling ends.
-          const chapterStart = Math.max(
-            0,
-            scrollTop +
-              rect.top -
-              parseFloat(getComputedStyle(body).scrollMarginTop),
-          );
-          const range = Math.max(1, maxScroll - chapterStart);
-          percent = Math.min(
-            99,
-            Math.max(0, Math.floor(((scrollTop - chapterStart) / range) * 100)),
-          );
-        } else {
-          const range = Math.max(1, rect.height - viewportMarker);
-          percent = Math.min(
-            100,
-            Math.max(0, Math.round((-rect.top / range) * 100)),
-          );
-        }
-        paragraph = 0;
-        for (const marker of body.querySelectorAll<HTMLElement>(
-          "[data-reader-paragraph]",
-        )) {
-          if (
-            atBookEnd ||
-            marker.getBoundingClientRect().top <= viewportMarker
-          ) {
-            paragraph = Number(marker.dataset.readerParagraph);
-          }
-        }
-      }
-      const lastParagraphIndex = Math.min(
-        paragraph,
+  const captureSlidePosition = useCallback(
+    (spread: SlideSpread | undefined): SaveReadingProgressInput | null => {
+      if (!spread || !hasRestoredRef.current) return null;
+      const { chapter, position, chapterPage, chapterPages } = spread;
+      const paragraphCount = splitParagraphs(chapter.contentId).length;
+      const paragraph = Math.min(
+        Math.max(0, position.paragraph),
         Math.max(0, paragraphCount - 1),
       );
       return {
-        lastChapterId: positionChapter.id,
-        lastChapterNumber: positionChapter.chapterNumber,
-        lastPageNumber:
-          readingLayout === "slide"
-            ? currentGlobal
-            : Math.floor(lastParagraphIndex / paragraphsPerPage) + 1,
-        lastScrollPercent: percent,
-        lastParagraphIndex,
-        layout: readingLayout,
+        lastChapterId: chapter.id,
+        lastChapterNumber: chapter.chapterNumber,
+        lastPageNumber: Math.floor(paragraph / paragraphsPerPage) + 1,
+        lastScrollPercent: Math.min(
+          99,
+          Math.round((chapterPage / chapterPages) * 100),
+        ),
+        lastParagraphIndex: paragraphCount ? paragraph : undefined,
+        layout: "slide",
         capturedAt: Date.now(),
       };
     },
-    [
-      bookPagination,
-      chapter,
-      chapterParagraphCount,
-      pageCount,
-      payload?.chapters,
-      payload?.hasFullAccess,
-      readingLayout,
-      slidePageIndex,
-    ],
+    [],
   );
+
+  const capturePosition = useCallback((): SaveReadingProgressInput | null => {
+    if (readingLayout === "slide") return captureSlidePosition(activeSpread);
+    if (!chapter || !hasRestoredRef.current) return null;
+    let positionChapter = chapter;
+    let paragraphCount = chapterParagraphCount;
+    let percent = 0;
+    let paragraph = 0;
+    const sections = readerCanvasRef.current?.querySelectorAll<HTMLElement>(
+      "section[data-chapter-number]",
+    );
+    if (!sections?.length) return null;
+    const finalSection = sections[sections.length - 1];
+    const viewportMarker = window.innerHeight * 0.36;
+    const scrollRoot = document.scrollingElement;
+    const scrollTop = scrollRoot?.scrollTop ?? 0;
+    const maxScroll = scrollRoot
+      ? scrollRoot.scrollHeight - scrollRoot.clientHeight
+      : 0;
+    const atBookEnd =
+      payload?.hasFullAccess &&
+      maxScroll > 0 &&
+      scrollTop > 0 &&
+      maxScroll - scrollTop <= 1;
+    let body = sections[0];
+    for (const section of sections) {
+      if (section.getBoundingClientRect().top > viewportMarker) break;
+      body = section;
+    }
+    if (atBookEnd) body = finalSection;
+    const visibleChapter = payload?.chapters?.find(
+      (item) => item.chapterNumber === Number(body.dataset.chapterNumber),
+    );
+    if (visibleChapter) {
+      positionChapter = visibleChapter;
+      if (visibleChapter !== chapter)
+        paragraphCount = splitParagraphs(visibleChapter.contentId).length;
+    }
+    const rect = body.getBoundingClientRect();
+    if (atBookEnd) {
+      percent = 100;
+    } else if (payload?.hasFullAccess && body === finalSection) {
+      // A short final chapter may never reach the top before scrolling ends.
+      const chapterStart = Math.max(
+        0,
+        scrollTop +
+          rect.top -
+          parseFloat(getComputedStyle(body).scrollMarginTop),
+      );
+      const range = Math.max(1, maxScroll - chapterStart);
+      percent = Math.min(
+        99,
+        Math.max(0, Math.floor(((scrollTop - chapterStart) / range) * 100)),
+      );
+    } else {
+      const range = Math.max(1, rect.height - viewportMarker);
+      percent = Math.min(
+        100,
+        Math.max(0, Math.round((-rect.top / range) * 100)),
+      );
+    }
+    paragraph = 0;
+    for (const marker of body.querySelectorAll<HTMLElement>(
+      "[data-reader-paragraph]",
+    )) {
+      if (atBookEnd || marker.getBoundingClientRect().top <= viewportMarker) {
+        paragraph = Number(marker.dataset.readerParagraph);
+      }
+    }
+    const lastParagraphIndex = Math.min(
+      paragraph,
+      Math.max(0, paragraphCount - 1),
+    );
+    return {
+      lastChapterId: positionChapter.id,
+      lastChapterNumber: positionChapter.chapterNumber,
+      lastPageNumber: Math.floor(lastParagraphIndex / paragraphsPerPage) + 1,
+      lastScrollPercent: percent,
+      lastParagraphIndex,
+      layout: readingLayout,
+      capturedAt: Date.now(),
+    };
+  }, [
+    captureSlidePosition,
+    chapter,
+    chapterParagraphCount,
+    payload?.chapters,
+    payload?.hasFullAccess,
+    readingLayout,
+    activeSpread,
+  ]);
 
   const queueCheckpoint = useCallback(
     (position: SaveReadingProgressInput) => {
@@ -632,33 +650,21 @@ function ReaderBook() {
     readingLayout,
   ]);
 
-  function turnPage(page: number, dir = 0) {
-    if (dir !== 0) setSlideDirection(dir);
-    setSlidePosition({ chapter: activeChapterNum, page });
-    const position = capturePosition(page);
+  function turnPage(target: SlideSpread) {
+    setSlidePosition(target.position);
+    const position = captureSlidePosition(target);
     if (position) queueCheckpoint(position);
-    window.scrollTo({ top: 0 });
   }
 
   function changeReadingLayout(layout: ReadingLayout) {
     if (layout === readingLayout) return;
     const position = capturePosition();
     if (layout === "slide") {
-      if (position?.lastPageNumber) {
-        const resolved = getChapterAndPageFromGlobal(
-          position.lastPageNumber,
-          bookPagination,
-        );
-        setSlidePosition({
-          chapter: resolved.chapterNumber,
-          page: resolved.localPageIndex,
-        });
-      } else {
-        setSlidePosition({
-          chapter: position?.lastChapterNumber ?? activeChapterNum,
-          page: 0,
-        });
-      }
+      setSlidePosition({
+        chapter: position?.lastChapterNumber ?? activeChapterNum,
+        paragraph: position?.lastParagraphIndex ?? -1,
+        offset: 0,
+      });
       setReadingLayout(layout);
       window.scrollTo({ top: 0 });
       return;
@@ -670,7 +676,10 @@ function ReaderBook() {
       const marker = section?.querySelector(
         `[data-reader-paragraph="${position?.lastParagraphIndex}"]`,
       );
-      (slidePageIndex > 0 && marker ? marker : section)?.scrollIntoView({
+      ((position?.lastParagraphIndex ?? 0) > 0
+        ? (marker ?? section)
+        : section
+      )?.scrollIntoView({
         block: "start",
       });
     });
@@ -697,8 +706,7 @@ function ReaderBook() {
       }
     }
     setSaveError(false);
-    setSlideDirection(ch > activeChapterNum ? 1 : -1);
-    setSlidePosition({ chapter: ch, page: 0 });
+    setSlidePosition({ chapter: ch, paragraph: -1, offset: 0 });
     window.scrollTo({ top: 0 });
   }
 
@@ -741,7 +749,7 @@ function ReaderBook() {
       bookId,
       chapterId: null,
       chapterNumber: targetChapter,
-      pageNumber: slidePageIndex + 1,
+      pageNumber: activeSpread?.chapterPage ?? 1,
       selectedText: data.selectedText.trim(),
       color: data.color,
       note: data.note || null,
@@ -750,13 +758,15 @@ function ReaderBook() {
 
     // 1. Instantly show highlight in text and increment counter
     setOptimisticHighlights((prev) => [optHighlight, ...prev]);
+    setIsHighlightsOpen(true);
+    setMarginaliaParagraph(null);
 
     // 2. Persist to API
     try {
       const saved = await createHighlightMutation.mutateAsync({
         bookId,
         chapterNumber: targetChapter,
-        pageNumber: slidePageIndex + 1,
+        pageNumber: activeSpread?.chapterPage ?? 1,
         selectedText: data.selectedText.trim(),
         color: data.color,
         note: data.note,
@@ -798,7 +808,7 @@ function ReaderBook() {
           payload?.allChapters.at(-1)?.chapterNumber ===
           position.lastChapterNumber;
         const finalPage =
-          readingLayout === "slide" && slidePageIndex === pageCount - 1;
+          readingLayout === "slide" && slideIndex === spreads.length - 1;
         if (
           destination === "summary" &&
           finalChapter &&
@@ -968,73 +978,23 @@ function ReaderBook() {
   const nextChapter = payload.hasFullAccess
     ? allChapters[chapterIndex + 1]?.chapterNumber
     : undefined;
-  const previousChapter = payload.hasFullAccess
-    ? allChapters[chapterIndex - 1]?.chapterNumber
-    : undefined;
-  const hasNextChapter = nextChapter !== undefined;
-  const hasPrevChapter = previousChapter !== undefined;
-
-  function goToPreviousSlide() {
-    setSlideDirection(-1);
-    if (slidePageIndex > 0) {
-      turnPage(slidePageIndex - 1, -1);
-    } else if (hasPrevChapter && previousChapter !== undefined) {
-      const prevSummary = bookPagination.chapters.find(
-        (c) => c.chapterNumber === previousChapter,
-      );
-      const targetPage = prevSummary ? Math.max(0, prevSummary.pageCount - 1) : 0;
-      setSlidePosition({ chapter: previousChapter, page: targetPage });
-      const position = capturePosition(targetPage);
-      if (position) queueCheckpoint(position);
-      window.scrollTo({ top: 0 });
-    }
-  }
-
-  function goToNextSlide() {
-    setSlideDirection(1);
-    if (slidePageIndex < pageCount - 1) {
-      turnPage(slidePageIndex + 1, 1);
-    } else if (hasNextChapter && nextChapter !== undefined) {
-      setSlidePosition({ chapter: nextChapter, page: 0 });
-      const position = capturePosition(0);
-      if (position) queueCheckpoint(position);
-      window.scrollTo({ top: 0 });
-    }
-  }
-
-  // Theme styling
-  const themeClass =
-    theme === "manila"
-      ? "bg-[#FAF6EE] text-[#1C1917]"
-      : theme === "sepia"
-        ? "bg-[#F4ECD8] text-[#2A2218]"
-        : "bg-[#13110F] text-[#EDE8DF]";
-
-  const fontClass =
-    fontFamily === "serif"
-      ? "font-serif"
-      : fontFamily === "sans"
-        ? "font-sans"
-        : "font-sans tracking-wide";
-
-  const chapterPercent =
-    readingLayout === "slide"
-      ? Math.min(100, Math.round((globalPageNumber / totalPages) * 100))
-      : scrollPosition.percent;
   const currentPercent = payload.hasFullAccess
-    ? readingLayout === "slide"
-      ? Math.min(100, Math.round((globalPageNumber / totalPages) * 100))
-      : bookProgressPercent(chapterIndex, allChapters.length, chapterPercent)
-    : chapterPercent;
+    ? bookProgressPercent(
+        chapterIndex,
+        allChapters.length,
+        scrollPosition.percent,
+      )
+    : scrollPosition.percent;
 
   return (
     <DrmShield watermarkText={watermark} enabled={isDrmEnabled}>
       <div
+        data-theme={theme}
         className={`${
           readingLayout === "slide"
-            ? "h-screen max-h-screen overflow-hidden"
+            ? "h-dvh min-h-[26rem] overflow-clip"
             : "min-h-screen"
-        } flex flex-col transition-colors duration-300 ${themeClass}`}
+        } flex flex-col bg-background text-foreground transition-colors duration-300`}
       >
         {/* Sticky Header: Reader Toolbar + Audio Player (stacked in single sticky container so they NEVER overlap) */}
         <div className="sticky top-0 z-40 w-full bg-background/95 backdrop-blur-md border-b border-border/40 transition-colors">
@@ -1067,17 +1027,12 @@ function ReaderBook() {
             isHighlightsOpen={isHighlightsOpen}
             onToggleHighlights={() => setIsHighlightsOpen(!isHighlightsOpen)}
             highlightCount={allHighlights.length}
-            onShare={() => {
-              const firstHighlight = allHighlights[0];
-              setStoryDialogData({
-                isOpen: true,
-                text: firstHighlight
-                  ? firstHighlight.selectedText
-                  : book.synopsis.slice(0, 180),
-                color: firstHighlight ? firstHighlight.color : "yellow",
-                note: firstHighlight?.note || undefined,
-              });
-            }}
+            onShare={(event) =>
+              setShare({
+                url: new URL(bookPagePath(slug), window.location.origin).href,
+                trigger: event.currentTarget,
+              })
+            }
           />
 
           {/* Floating Audio Player when Opened */}
@@ -1116,9 +1071,9 @@ function ReaderBook() {
         <main
           id="main-content"
           ref={readerCanvasRef}
-          className={`w-full mx-auto transition-all ${
+          className={`w-full mx-auto ${
             readingLayout === "slide"
-              ? "max-w-[1440px] px-3 sm:px-6 lg:px-8 py-1 sm:py-2 flex-1 h-[calc(100vh-56px)] max-h-[calc(100vh-56px)] overflow-hidden flex flex-col justify-between"
+              ? "max-w-[1440px] px-4 sm:px-6 lg:px-8 py-1 sm:py-2 flex min-h-0 flex-1 flex-col"
               : "max-w-2xl sm:max-w-[700px] px-4 sm:px-6 py-10 pb-40"
           }`}
         >
@@ -1157,7 +1112,7 @@ function ReaderBook() {
                         <div className="text-xs font-mono uppercase tracking-[0.2em] opacity-60 mb-2">
                           CHAPTER {chap.chapterNumber}
                         </div>
-                        <h1 className="font-serif text-2xl sm:text-3xl font-bold tracking-tight">
+                        <h1 className="font-serif text-xl sm:text-2xl font-semibold tracking-tight">
                           {chap.title}
                         </h1>
                       </header>
@@ -1180,7 +1135,7 @@ function ReaderBook() {
                         <div className="text-xs font-mono uppercase tracking-[0.2em] opacity-60 mb-3">
                           CHAPTER {chap.chapterNumber}
                         </div>
-                        <h2 className="font-serif text-2xl sm:text-3xl font-bold tracking-tight mb-3">
+                        <h2 className="font-serif text-xl sm:text-2xl font-semibold tracking-tight mb-3">
                           {chap.title}
                         </h2>
                       </div>
@@ -1336,27 +1291,26 @@ function ReaderBook() {
           ) : (
             /* Slide Mode (2-Page Open Book Spread on Desktop / 1-Page on Mobile) */
             <ReaderSlideView
-              chapterNumber={currentChapter.chapterNumber}
-              chapterTitle={currentChapter.title}
-              isFirstPageOfChapter={slidePageIndex === 0}
-              paragraphs={currentPageObj.paragraphs}
-              globalPageNumber={globalPageNumber}
-              totalPages={totalPages}
-              onPrevPage={goToPreviousSlide}
-              onNextPage={goToNextSlide}
-              canPrev={slidePageIndex > 0 || hasPrevChapter}
-              canNext={slidePageIndex < pageCount - 1 || hasNextChapter}
+              spreads={spreads}
+              index={slideIndex}
+              onMeasure={setProbe}
+              onTurn={turnPage}
               onFinishSession={() => void saveSession("summary")}
               onOpenRating={() => setIsRatingOpen(true)}
               fontClass={fontClass}
               fontSize={fontSize}
+              coverColor={book.coverColor}
               isPremiumPreview={isPremiumPreview}
-              highlights={allHighlights.filter(
-                (item) => item.chapterNumber === currentChapter.chapterNumber,
-              )}
-              renderHighlights={renderHighlightedText}
-              onFlexHighlight={handleFlexHighlight}
-              direction={slideDirection}
+              renderFragment={(fragment, chapterNumber) =>
+                renderHighlightedText(
+                  fragment.source,
+                  allHighlights.filter(
+                    (item) => item.chapterNumber === chapterNumber,
+                  ),
+                  handleFlexHighlight,
+                  fragment,
+                )
+              }
             />
           )}
           {!payload.hasFullAccess && readingLayout === "scroll" && (
@@ -1434,6 +1388,16 @@ function ReaderBook() {
           onFlexHighlight={handleFlexHighlight}
           onDeleteHighlight={handleDeleteHighlight}
         />
+
+        {share && (
+          <BookShareDialog
+            slug={slug}
+            title={book.title}
+            url={share.url}
+            trigger={share.trigger}
+            onClose={() => setShare(null)}
+          />
+        )}
 
         {/* 9:16 Flex Your Reading Story Generator Dialog */}
         <HighlightStoryDialog
@@ -1531,13 +1495,12 @@ function ReaderBook() {
                     </Link>
                   </Button>
 
-                  {hasNextChapter ? (
+                  {nextChapter !== undefined ? (
                     <Button
                       variant="outline"
                       onClick={() => {
                         closeSessionSummary();
-                        if (nextChapter !== undefined)
-                          void handleSelectChapter(nextChapter);
+                        void handleSelectChapter(nextChapter);
                       }}
                       className="font-mono text-xs"
                     >

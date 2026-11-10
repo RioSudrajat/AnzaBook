@@ -1,6 +1,6 @@
 # AGENTS.md - AnzaBook Guidelines & Agent Workflow
 
-Welcome to **AnzaBook**. This repository enforces a high-standard agentic engineering methodology and a strict anti-AI-slop design aesthetic. 
+Welcome to **AnzaBook**. This repository enforces a high-standard agentic engineering methodology and a strict anti-AI-slop design aesthetic.
 
 Every AI coding assistant working on this codebase MUST abide by the workflows, skills, and guardrails outlined below.
 
@@ -11,16 +11,19 @@ Every AI coding assistant working on this codebase MUST abide by the workflows, 
 Follow disciplined software development methodology at all times. Do not skip phases or jump straight into code editing without structured alignment.
 
 ### Phase 1: Exploration & Alignment (`@skill:brainstorming`)
+
 - Before writing any code, planning new features, or modifying system architecture, activate **`brainstorming`**.
 - Clarify user requirements, edge cases, data structures, and trade-offs.
 - Explore at least 2 distinct implementation approaches before locking in the direction.
 
 ### Phase 2: Structured Planning (`@skill:writing-plans`, `@skill:executing-plans`)
+
 - Break down tasks into small, verifiable increments (2–5 minutes per step).
 - Specify exact file paths, interfaces, and expected behavior.
 - Validate each step before moving on to the next.
 
 ### Phase 3: Test-Driven Development (`@skill:test-driven-development`)
+
 - **Strict RED-GREEN-REFACTOR cycle**:
   1. Write a failing unit or integration test first.
   2. Run the test suite to observe the failure (RED).
@@ -29,6 +32,7 @@ Follow disciplined software development methodology at all times. Do not skip ph
 - Never write production code without accompanying tests where applicable.
 
 ### Phase 4: Systematic Debugging (`@skill:systematic-debugging`)
+
 - When bugs or test failures occur, NEVER guess fixes or blindly edit files.
 - Follow the 4-phase debugging process:
   1. **Reproduce**: Create a minimal deterministic reproduction.
@@ -37,6 +41,7 @@ Follow disciplined software development methodology at all times. Do not skip ph
   4. **Verify**: Apply the fix and verify that the reproduction now passes without regressions.
 
 ### Phase 5: Verification & Review (`@skill:verification-before-completion`, `@skill:requesting-code-review`)
+
 - **Evidence before assertions**: Run linters, type checks, and test suites. Confirm real terminal output before declaring any task complete.
 - Conduct a code review against architectural standards and plan criteria.
 
@@ -53,6 +58,7 @@ Our frontend must look **human-crafted, intentional, and distinctive**—never l
 ```
 
 ### 1. Guardrail Filter (`@skill:antislop`, `@skill:antislop-ui`)
+
 - **Strictly Prohibited AI Tells**:
   - Overused purple-to-blue / neon gradients.
   - Symmetrical 3-column feature cards with generic glow borders.
@@ -63,6 +69,7 @@ Our frontend must look **human-crafted, intentional, and distinctive**—never l
   `antislop active: <strict|balanced> (project preference).`
 
 ### 2. Frontend Art Direction (`@skill:design-taste-frontend`)
+
 - When creating or redesigning landing pages, marketing pages, or app interfaces:
   - **Declare Brief & Direction**: Infer page type, audience, vibe words, and brand constraints upfront.
   - **Typography & Scale**: Use bold, proportional font hierarchies with intentional weight contrast.
@@ -70,6 +77,7 @@ Our frontend must look **human-crafted, intentional, and distinctive**—never l
   - **App Screens vs Pages**: For dashboards/data views, prioritize visual density, clear tabular layouts, and functional tools over decorative fluff.
 
 ### 3. Hard Design Floors & Linting (`@skill:hallmark`)
+
 - **The Floor** (Non-negotiable):
   - Every color and font must route through declared tokens or theme variables.
   - Never animate `width`, `height`, `top`, or `left`; use `transform` and `opacity`.
@@ -86,9 +94,9 @@ Our frontend must look **human-crafted, intentional, and distinctive**—never l
 
 - **Tone**: Direct, authentic, crisp, and human.
 - **Forbidden Words & AI Slop Phrases**:
-  - *"Supercharge", "Unleash", "Elevate", "Delve", "In today's fast-paced world", "Cutting-edge", "Seamlessly", "Game-changer"*.
+  - _"Supercharge", "Unleash", "Elevate", "Delve", "In today's fast-paced world", "Cutting-edge", "Seamlessly", "Game-changer"_.
 - **Headlines**: Tell the user what the product actually does; avoid empty motivational slogans.
-- **Buttons / CTAs**: Action-oriented and concrete (e.g., *"Open book catalog"*, *"Export data"*, rather than vague *"Get started"*).
+- **Buttons / CTAs**: Action-oriented and concrete (e.g., _"Open book catalog"_, _"Export data"_, rather than vague _"Get started"_).
 
 ---
 
@@ -113,16 +121,16 @@ Our frontend must look **human-crafted, intentional, and distinctive**—never l
 
 ## Quick Reference: Skill Invocation Guide
 
-| Scenario / Task | Recommended Skill / Plugin | Action |
-| :--- | :--- | :--- |
-| Starting a new feature or complex architecture | `@skill:brainstorming` | Clarify requirements, brainstorm trade-offs |
-| Writing step-by-step implementation tasks | `@skill:writing-plans` | Create verifiable bite-sized plan |
-| Implementing features or bug fixes | `@skill:test-driven-development` | RED-GREEN-REFACTOR test loop |
-| Investigating unexpected bug or test failure | `@skill:systematic-debugging` | 4-phase root cause analysis |
-| Building / styling web pages or landing pages | `@skill:design-taste-frontend` + `@skill:antislop-ui` | Apply art direction & strip AI cliches |
-| Auditing or redesigning an existing page | `@skill:hallmark` | Run `hallmark audit` or `hallmark redesign` |
-| Writing copy, marketing text, or documentation | `@skill:antislop-copywriting` | Human tone, strip marketing buzzwords |
-| Reviewing code before committing / merging | `@skill:requesting-code-review` + `@skill:verification-before-completion` | Verify test suite and code quality |
+| Scenario / Task                                | Recommended Skill / Plugin                                                | Action                                      |
+| :--------------------------------------------- | :------------------------------------------------------------------------ | :------------------------------------------ |
+| Starting a new feature or complex architecture | `@skill:brainstorming`                                                    | Clarify requirements, brainstorm trade-offs |
+| Writing step-by-step implementation tasks      | `@skill:writing-plans`                                                    | Create verifiable bite-sized plan           |
+| Implementing features or bug fixes             | `@skill:test-driven-development`                                          | RED-GREEN-REFACTOR test loop                |
+| Investigating unexpected bug or test failure   | `@skill:systematic-debugging`                                             | 4-phase root cause analysis                 |
+| Building / styling web pages or landing pages  | `@skill:design-taste-frontend` + `@skill:antislop-ui`                     | Apply art direction & strip AI cliches      |
+| Auditing or redesigning an existing page       | `@skill:hallmark`                                                         | Run `hallmark audit` or `hallmark redesign` |
+| Writing copy, marketing text, or documentation | `@skill:antislop-copywriting`                                             | Human tone, strip marketing buzzwords       |
+| Reviewing code before committing / merging     | `@skill:requesting-code-review` + `@skill:verification-before-completion` | Verify test suite and code quality          |
 
 ---
 

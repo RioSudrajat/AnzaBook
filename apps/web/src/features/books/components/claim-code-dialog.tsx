@@ -6,7 +6,6 @@ import {
   KeyRound,
   Loader2,
   ShieldAlert,
-  Sparkles,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -69,7 +68,9 @@ export function ClaimCodeDialog({
     return (
       <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-[6px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs font-mono">
         <CheckCircle2 className="size-4 shrink-0" />
-        <span>Edisi Fisik Anda telah terverifikasi. Akses digital aktif penuh.</span>
+        <span>
+          Edisi Fisik Anda telah terverifikasi. Akses digital aktif penuh.
+        </span>
       </div>
     );
   }
@@ -112,7 +113,7 @@ export function ClaimCodeDialog({
             {isSuccess ? (
               <div className="text-center py-4">
                 <div className="size-12 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto mb-3">
-                  <Sparkles className="size-6" />
+                  <CheckCircle2 className="size-6" />
                 </div>
                 <h3
                   id="claim-dialog-title"
@@ -121,8 +122,8 @@ export function ClaimCodeDialog({
                   Klaim Berhasil!
                 </h3>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Akses web reader dwibahasa untuk <strong>{bookTitle}</strong> kini
-                  terbuka penuh di akun Anda.
+                  Akses web reader dwibahasa untuk <strong>{bookTitle}</strong>{" "}
+                  kini terbuka penuh di akun Anda.
                 </p>
 
                 <div className="mt-6 flex flex-col gap-2">
@@ -156,8 +157,8 @@ export function ClaimCodeDialog({
 
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   Beli edisi cetak di Gramedia atau gudang komunitas? Masukkan
-                  kode unik 16 karakter dari segel halaman belakang buku Anda untuk
-                  membuka web reader dwibahasa dan sinkronisasi audio.
+                  kode unik 16 karakter dari segel halaman belakang buku Anda
+                  untuk membuka web reader dwibahasa dan sinkronisasi audio.
                 </p>
 
                 <form onSubmit={handleSubmit} className="mt-5 space-y-4">
@@ -182,7 +183,8 @@ export function ClaimCodeDialog({
                       autoFocus
                     />
                     <p className="text-[11px] font-mono text-muted-foreground mt-1">
-                      Tips pengujian: Gunakan kode demo <code>ANZA-RAKYAT-2026</code>
+                      Tips pengujian: Gunakan kode demo{" "}
+                      <code>ANZA-RAKYAT-2026</code>
                     </p>
                   </div>
 

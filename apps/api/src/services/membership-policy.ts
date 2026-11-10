@@ -5,15 +5,20 @@ import type {
   MembershipTaxDto,
 } from "@starter/shared/validators/membership";
 
-export const membershipPlans: ReadonlyArray<Pick<MembershipPlanDto, "id" | "months"> & { subtotalIdr: number }> = [
+export const membershipPlans: ReadonlyArray<
+  Pick<MembershipPlanDto, "id" | "months"> & { subtotalIdr: number }
+> = [
   { id: "quarterly", months: 3, subtotalIdr: 60_000 },
   { id: "semiannual", months: 6, subtotalIdr: 108_000 },
   { id: "yearly", months: 12, subtotalIdr: 192_000 },
 ];
 const jakartaOffsetMs = 7 * 60 * 60 * 1000;
 
-export function membershipTaxBreakdown(subtotalIdr: number, rateBps: number): MembershipTaxDto {
-  const taxIdr = Math.round(subtotalIdr * rateBps / 10_000);
+export function membershipTaxBreakdown(
+  subtotalIdr: number,
+  rateBps: number,
+): MembershipTaxDto {
+  const taxIdr = Math.round((subtotalIdr * rateBps) / 10_000);
   return { subtotalIdr, taxIdr, rateBps };
 }
 

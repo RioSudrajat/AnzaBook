@@ -1,4 +1,4 @@
-import { and, desc, eq, lt, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
 import { bookProgressPercent } from "@starter/shared/reading-progress";
 import { db } from "../db";
 import {
@@ -45,7 +45,8 @@ export async function createReadingSession(
     .where(eq(books.id, input.bookId))
     .limit(1);
 
-  if (!book) throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+  if (!book)
+    throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
 
   const session = await db.transaction(async (tx) => {
     const [inserted] = await tx
@@ -71,18 +72,50 @@ export async function createReadingSession(
           set: { shelfStatus: "reading" },
           setWhere: eq(userShelves.shelfStatus, "want_to_read"),
         });
+
+      // Prune old sessions: retain only the latest 10 sessions per book per user
+      const excess = await tx
+        .select({ id: readingSessions.id })
+        .from(readingSessions)
+        .where(
+          and(
+            eq(readingSessions.userId, userId),
+            eq(readingSessions.bookId, input.bookId),
+          ),
+        )
+        .orderBy(desc(readingSessions.createdAt))
+        .offset(10);
+
+      if (excess.length > 0) {
+        await tx
+          .delete(readingSessions)
+          .where(
+            inArray(
+              readingSessions.id,
+              excess.map((r) => r.id),
+            ),
+          );
+      }
+
       return inserted;
     }
 
     const [existing] = await tx
       .select()
       .from(readingSessions)
-      .where(and(
-        eq(readingSessions.id, input.sessionId!),
-        eq(readingSessions.userId, userId),
-        eq(readingSessions.bookId, input.bookId),
-      ));
-    if (!existing) throw new HttpError(409, "READING_SESSION_CONFLICT", "Sesi baca tidak dapat dicatat.");
+      .where(
+        and(
+          eq(readingSessions.id, input.sessionId!),
+          eq(readingSessions.userId, userId),
+          eq(readingSessions.bookId, input.bookId),
+        ),
+      );
+    if (!existing)
+      throw new HttpError(
+        409,
+        "READING_SESSION_CONFLICT",
+        "Sesi baca tidak dapat dicatat.",
+      );
     return existing;
   });
 
@@ -154,11 +187,16 @@ export async function listReadingSessions(
   }
 
   const totalMinutesRead = Math.round(totalDurationSeconds / 60);
-  const avgWpm = allUserSessions.length > 0 ? Math.round(wpmSum / allUserSessions.length) : 0;
+  const avgWpm =
+    allUserSessions.length > 0
+      ? Math.round(wpmSum / allUserSessions.length)
+      : 0;
 
-  const activeDays = new Set(allUserSessions.map(({ createdAt }) =>
-    Date.parse(readingDay.format(createdAt)),
-  ));
+  const activeDays = new Set(
+    allUserSessions.map(({ createdAt }) =>
+      Date.parse(readingDay.format(createdAt)),
+    ),
+  );
   let streakDay = Date.parse(readingDay.format(new Date()));
   if (!activeDays.has(streakDay)) streakDay -= dayMs;
   let currentStreakDays = 0;
@@ -210,7 +248,11 @@ export async function getReadingProgress(
   return row ? toReadingProgress(row) : null;
 }
 
-function readingProgressKey(userId: string, bookId: string, scope: ReadingProgressScope) {
+function readingProgressKey(
+  userId: string,
+  bookId: string,
+  scope: ReadingProgressScope,
+) {
   return and(
     eq(readingProgress.userId, userId),
     eq(readingProgress.bookId, bookId),
@@ -218,7 +260,9 @@ function readingProgressKey(userId: string, bookId: string, scope: ReadingProgre
   );
 }
 
-function toReadingProgress(row: typeof readingProgress.$inferSelect): ReadingProgressDto {
+function toReadingProgress(
+  row: typeof readingProgress.$inferSelect,
+): ReadingProgressDto {
   return {
     bookId: row.bookId,
     lastChapterId: row.lastChapterId,
@@ -243,33 +287,62 @@ export async function saveReadingProgress(
     .from(books)
     .where(eq(books.id, bookId))
     .limit(1);
-  if (!book) throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+  if (!book)
+    throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
 
   const { hasFullAccess } = await getBookReadAccess(book, userId);
-  if ((scope === "full" && !hasFullAccess) ||
-      (scope === "preview" && input.lastChapterNumber !== 1)) {
-    throw new HttpError(403, "FORBIDDEN_DIGITAL_ACCESS", "Posisi ini berada di luar bagian buku yang bisa dibaca.");
+  if (
+    (scope === "full" && !hasFullAccess) ||
+    (scope === "preview" && input.lastChapterNumber !== 1)
+  ) {
+    throw new HttpError(
+      403,
+      "FORBIDDEN_DIGITAL_ACCESS",
+      "Posisi ini berada di luar bagian buku yang bisa dibaca.",
+    );
   }
 
   const [chapter] = await db
     .select({ id: bookChapters.id, contentId: bookChapters.contentId })
     .from(bookChapters)
-    .where(and(eq(bookChapters.bookId, bookId), eq(bookChapters.chapterNumber, input.lastChapterNumber)))
+    .where(
+      and(
+        eq(bookChapters.bookId, bookId),
+        eq(bookChapters.chapterNumber, input.lastChapterNumber),
+      ),
+    )
     .limit(1);
   if (!chapter || (input.lastChapterId && input.lastChapterId !== chapter.id)) {
-    throw new HttpError(422, "INVALID_READING_POSITION", "Posisi baca tidak sesuai dengan bab buku.");
+    throw new HttpError(
+      422,
+      "INVALID_READING_POSITION",
+      "Posisi baca tidak sesuai dengan bab buku.",
+    );
   }
-  const paragraphCount = scope === "preview"
-    ? getPreviewParagraphCount(chapter.contentId)
-    : chapter.contentId.split(/\n\n+/).filter((paragraph) => paragraph.trim()).length;
-  if ((input.lastParagraphIndex !== undefined && input.lastParagraphIndex >= paragraphCount) ||
-      input.lastPageNumber > Math.max(1, paragraphCount)) {
-    throw new HttpError(422, "INVALID_READING_POSITION", "Posisi baca berada di luar isi bab.");
+  const paragraphCount =
+    scope === "preview"
+      ? getPreviewParagraphCount(chapter.contentId)
+      : chapter.contentId.split(/\n\n+/).filter((paragraph) => paragraph.trim())
+          .length;
+  if (
+    (input.lastParagraphIndex !== undefined &&
+      input.lastParagraphIndex >= paragraphCount) ||
+    input.lastPageNumber > Math.max(1, paragraphCount)
+  ) {
+    throw new HttpError(
+      422,
+      "INVALID_READING_POSITION",
+      "Posisi baca berada di luar isi bab.",
+    );
   }
 
   const now = Date.now();
   if (input.capturedAt !== undefined && input.capturedAt > now + 60_000) {
-    throw new HttpError(422, "INVALID_READING_POSITION", "Waktu posisi baca tidak valid.");
+    throw new HttpError(
+      422,
+      "INVALID_READING_POSITION",
+      "Waktu posisi baca tidak valid.",
+    );
   }
   const capturedAt = new Date(input.capturedAt ?? now);
   const position = {
@@ -283,12 +356,22 @@ export async function saveReadingProgress(
     updatedAt: capturedAt,
   };
 
-  const chapters = scope === "full"
-    ? await db.select({ number: bookChapters.chapterNumber }).from(bookChapters)
-      .where(eq(bookChapters.bookId, bookId)).orderBy(bookChapters.chapterNumber)
-    : [];
-  const chapterIndex = chapters.findIndex((item) => item.number === input.lastChapterNumber);
-  const progressPercent = bookProgressPercent(chapterIndex, chapters.length, input.lastScrollPercent);
+  const chapters =
+    scope === "full"
+      ? await db
+          .select({ number: bookChapters.chapterNumber })
+          .from(bookChapters)
+          .where(eq(bookChapters.bookId, bookId))
+          .orderBy(bookChapters.chapterNumber)
+      : [];
+  const chapterIndex = chapters.findIndex(
+    (item) => item.number === input.lastChapterNumber,
+  );
+  const progressPercent = bookProgressPercent(
+    chapterIndex,
+    chapters.length,
+    input.lastScrollPercent,
+  );
   const shelfStatus = progressPercent >= 100 ? "finished" : "reading";
 
   const row = await db.transaction(async (tx) => {
@@ -296,19 +379,27 @@ export async function saveReadingProgress(
       .insert(readingProgress)
       .values({ userId, bookId, scope, ...position })
       .onConflictDoUpdate({
-        target: [readingProgress.userId, readingProgress.bookId, readingProgress.scope],
+        target: [
+          readingProgress.userId,
+          readingProgress.bookId,
+          readingProgress.scope,
+        ],
         set: position,
         setWhere: lt(readingProgress.capturedAt, capturedAt),
       })
       .returning();
 
     if (!saved) {
-      const [current] = await tx.select().from(readingProgress)
+      const [current] = await tx
+        .select()
+        .from(readingProgress)
         .where(readingProgressKey(userId, bookId, scope));
       return current;
     }
 
-    await tx.insert(userShelves).values({ userId, bookId, shelfStatus, progressPercent })
+    await tx
+      .insert(userShelves)
+      .values({ userId, bookId, shelfStatus, progressPercent })
       .onConflictDoUpdate({
         target: [userShelves.userId, userShelves.bookId],
         set: {
@@ -330,10 +421,7 @@ export async function listHighlights(
     .select()
     .from(bookHighlights)
     .where(
-      and(
-        eq(bookHighlights.userId, userId),
-        eq(bookHighlights.bookId, bookId),
-      ),
+      and(eq(bookHighlights.userId, userId), eq(bookHighlights.bookId, bookId)),
     )
     .orderBy(desc(bookHighlights.createdAt));
 
@@ -421,7 +509,11 @@ export async function deleteHighlight(
     .returning();
 
   if (!deleted) {
-    throw new HttpError(404, "HIGHLIGHT_NOT_FOUND", "Highlight tidak ditemukan.");
+    throw new HttpError(
+      404,
+      "HIGHLIGHT_NOT_FOUND",
+      "Highlight tidak ditemukan.",
+    );
   }
 }
 
@@ -448,7 +540,8 @@ export async function listSessionsForBook(
         eq(readingSessions.bookId, bookId),
       ),
     )
-    .orderBy(desc(readingSessions.createdAt));
+    .orderBy(desc(readingSessions.createdAt))
+    .limit(10);
 
   return rows.map((r) => ({
     id: r.id,
@@ -460,4 +553,86 @@ export async function listSessionsForBook(
     mode: r.mode as ReadingMode,
     createdAt: r.createdAt.toISOString(),
   }));
+}
+
+export async function restartBookReading(
+  userId: string,
+  bookId: string,
+): Promise<{ success: boolean; shelfStatus: string; progressPercent: number }> {
+  const [book] = await db
+    .select({ id: books.id })
+    .from(books)
+    .where(eq(books.id, bookId))
+    .limit(1);
+
+  if (!book) {
+    throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+  }
+
+  const [firstChapter] = await db
+    .select({ id: bookChapters.id, chapterNumber: bookChapters.chapterNumber })
+    .from(bookChapters)
+    .where(eq(bookChapters.bookId, bookId))
+    .orderBy(bookChapters.chapterNumber)
+    .limit(1);
+
+  const now = new Date();
+
+  await db.transaction(async (tx) => {
+    // 1. Reset userShelves: set shelfStatus to 'reading', progressPercent to 0, lastChapter to 1
+    await tx
+      .insert(userShelves)
+      .values({
+        userId,
+        bookId,
+        shelfStatus: "reading",
+        progressPercent: 0,
+        lastChapter: 1,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [userShelves.userId, userShelves.bookId],
+        set: {
+          shelfStatus: "reading",
+          progressPercent: 0,
+          lastChapter: 1,
+          updatedAt: now,
+        },
+      });
+
+    // 2. Reset readingProgress
+    const resetPosition = {
+      lastChapterId: firstChapter?.id ?? null,
+      lastChapterNumber: 1,
+      lastPageNumber: 1,
+      lastScrollPercent: 0,
+      lastParagraphIndex: 0,
+      layout: "scroll" as const,
+      capturedAt: now,
+      updatedAt: now,
+    };
+
+    await tx
+      .insert(readingProgress)
+      .values({
+        userId,
+        bookId,
+        scope: "full",
+        ...resetPosition,
+      })
+      .onConflictDoUpdate({
+        target: [
+          readingProgress.userId,
+          readingProgress.bookId,
+          readingProgress.scope,
+        ],
+        set: resetPosition,
+      });
+  });
+
+  return {
+    success: true,
+    shelfStatus: "reading",
+    progressPercent: 0,
+  };
 }

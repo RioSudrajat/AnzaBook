@@ -36,7 +36,10 @@ export const createHighlightSchema = z
     chapterId: z.string().uuid().optional().nullable(),
     chapterNumber: z.number().int().min(1).default(1),
     pageNumber: z.number().int().min(1).default(1),
-    selectedText: z.string().min(1, "Teks kutipan tidak boleh kosong").max(5000),
+    selectedText: z
+      .string()
+      .min(1, "Teks kutipan tidak boleh kosong")
+      .max(5000),
     color: z.enum(["yellow", "green", "coral", "blue"]).default("yellow"),
     note: z.string().max(2000).optional().nullable(),
   })
@@ -50,17 +53,30 @@ export const saveReadingProgressSchema = z
     lastScrollPercent: z.number().int().min(0).max(100).default(0),
     lastParagraphIndex: z.number().int().min(0).optional(),
     layout: z.enum(["scroll", "slide"]).optional(),
-    capturedAt: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
+    capturedAt: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(Number.MAX_SAFE_INTEGER)
+      .optional(),
   })
   .strict();
 
-export const readingBookParamsSchema = z.object({ bookId: z.string().uuid() }).strict();
+export const readingBookParamsSchema = z
+  .object({ bookId: z.string().uuid() })
+  .strict();
 
 export const readingProgressQuerySchema = z
   .object({ scope: z.enum(["full", "preview"]).default("full") })
   .strict();
 
-export type CreateReadingSessionInput = z.infer<typeof createReadingSessionSchema>;
-export type ListReadingSessionsQuery = z.infer<typeof listReadingSessionsQuerySchema>;
+export type CreateReadingSessionInput = z.infer<
+  typeof createReadingSessionSchema
+>;
+export type ListReadingSessionsQuery = z.infer<
+  typeof listReadingSessionsQuerySchema
+>;
 export type CreateHighlightInput = z.infer<typeof createHighlightSchema>;
-export type SaveReadingProgressInput = z.infer<typeof saveReadingProgressSchema>;
+export type SaveReadingProgressInput = z.infer<
+  typeof saveReadingProgressSchema
+>;

@@ -39,14 +39,16 @@ export function StoreMap({
             </h3>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Pilih cabang rekanan untuk melihat ketersediaan stok buku fisik secara langsung.
+            Pilih cabang rekanan untuk melihat ketersediaan stok buku fisik
+            secara langsung.
           </p>
         </div>
 
         {/* Quick Branch Switcher Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
           {stocks.map((stock) => {
-            const isSelected = (selectedBranchId || activeBranchId) === stock.id;
+            const isSelected =
+              (selectedBranchId || activeBranchId) === stock.id;
             return (
               <button
                 key={stock.id}
@@ -61,7 +63,9 @@ export function StoreMap({
                     : "bg-background border-border/80 text-muted-foreground hover:bg-muted"
                 }`}
               >
-                {stock.branchName.replace("Gramedia ", "").replace(" & Kolektif Buku", "")}
+                {stock.branchName
+                  .replace("Gramedia ", "")
+                  .replace(" & Kolektif Buku", "")}
               </button>
             );
           })}
@@ -84,7 +88,9 @@ export function StoreMap({
               <div>
                 <div className="flex items-center gap-1.5 text-[10px] font-mono text-[var(--color-accent)] font-bold uppercase tracking-wider">
                   <Store className="size-3" />
-                  <span>{currentBranch.partnerType} &bull; {currentBranch.city}</span>
+                  <span>
+                    {currentBranch.partnerType} &bull; {currentBranch.city}
+                  </span>
                 </div>
                 <h4 className="font-serif text-sm font-semibold text-foreground mt-0.5">
                   {currentBranch.branchName}

@@ -11,7 +11,8 @@ const config = {
 
 describe("membership email delivery", () => {
   it("authorizes a sender and sends a text reminder through the Gmail API", async () => {
-    const fetchMock = vi.fn<typeof fetch>()
+    const fetchMock = vi
+      .fn<typeof fetch>()
       .mockResolvedValueOnce(Response.json({ access_token: "access-token" }))
       .mockResolvedValueOnce(Response.json({ id: "gmail-message-id" }));
     const send = createMembershipMailer(config, fetchMock);
@@ -25,9 +26,15 @@ describe("membership email delivery", () => {
 
     const [tokenCall, gmailCall] = fetchMock.mock.calls;
     expect(tokenCall[0]).toBe("https://oauth2.googleapis.com/token");
-    expect((tokenCall[1]?.body as URLSearchParams).get("grant_type")).toBe("refresh_token");
-    expect(gmailCall[0]).toBe("https://gmail.googleapis.com/gmail/v1/users/me/messages/send");
-    expect(gmailCall[1]?.headers).toMatchObject({ Authorization: "Bearer access-token" });
+    expect((tokenCall[1]?.body as URLSearchParams).get("grant_type")).toBe(
+      "refresh_token",
+    );
+    expect(gmailCall[0]).toBe(
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+    );
+    expect(gmailCall[1]?.headers).toMatchObject({
+      Authorization: "Bearer access-token",
+    });
     const { raw } = JSON.parse(String(gmailCall[1]?.body)) as { raw: string };
     const message = Buffer.from(raw, "base64url").toString("utf8");
     expect(message).toContain("To: reader@example.com\r\n");
@@ -39,12 +46,14 @@ describe("membership email delivery", () => {
   it("rejects unsafe addresses before contacting the mail service", async () => {
     const fetchMock = vi.fn<typeof fetch>();
     const send = createMembershipMailer(config, fetchMock);
-    await expect(send({
-      to: "reader@example.com\r\nBcc: hidden@example.com",
-      kind: "expiring",
-      expiresAt: new Date(),
-      deliveryKey: "reminder-key",
-    })).rejects.toThrow("Invalid reminder recipient");
+    await expect(
+      send({
+        to: "reader@example.com\r\nBcc: hidden@example.com",
+        kind: "expiring",
+        expiresAt: new Date(),
+        deliveryKey: "reminder-key",
+      }),
+    ).rejects.toThrow("Invalid reminder recipient");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,9 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
-import { parseMidtransCheckoutUrl, type MembershipOrderStatus } from "@starter/shared/validators/membership";
+import {
+  parseMidtransCheckoutUrl,
+  type MembershipOrderStatus,
+} from "@starter/shared/validators/membership";
 import { HttpError } from "../lib/http-error";
 
 const amount = z.string().regex(/^\d{1,12}(?:\.00)?$/);
@@ -41,19 +44,29 @@ export type VerifiedPayment = {
 export function verifyMidtransNotification(input: unknown, key: string) {
   const result = notificationSchema.safeParse(input);
   if (!result.success) {
-    throw new HttpError(401, "INVALID_PAYMENT_SIGNATURE", "Tanda tangan pembayaran tidak valid.");
+    throw new HttpError(
+      401,
+      "INVALID_PAYMENT_SIGNATURE",
+      "Tanda tangan pembayaran tidak valid.",
+    );
   }
   const { order_id, status_code, gross_amount, signature_key } = result.data;
   const expected = createHash("sha512")
     .update(order_id + status_code + gross_amount + key)
     .digest();
   if (!timingSafeEqual(expected, Buffer.from(signature_key, "hex"))) {
-    throw new HttpError(401, "INVALID_PAYMENT_SIGNATURE", "Tanda tangan pembayaran tidak valid.");
+    throw new HttpError(
+      401,
+      "INVALID_PAYMENT_SIGNATURE",
+      "Tanda tangan pembayaran tidak valid.",
+    );
   }
   return order_id;
 }
 
-function midtransStatus(data: z.infer<typeof statusSchema>): MembershipOrderStatus {
+function midtransStatus(
+  data: z.infer<typeof statusSchema>,
+): MembershipOrderStatus {
   switch (data.transaction_status) {
     case "settlement":
     case "partial_refund":
@@ -77,13 +90,15 @@ function midtransStatus(data: z.infer<typeof statusSchema>): MembershipOrderStat
 }
 
 function settlementTime(value?: string) {
-  if (!value || !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) return null;
+  if (!value || !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value))
+    return null;
   const date = new Date(value.replace(" ", "T") + "+07:00");
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
 export function createMidtransGateway(config: MidtransConfig, request = fetch) {
-  const domain = config.mode === "sandbox" ? "sandbox.midtrans.com" : "midtrans.com";
+  const domain =
+    config.mode === "sandbox" ? "sandbox.midtrans.com" : "midtrans.com";
   const snapOrigin = "https://app." + domain;
   const headers = {
     Accept: "application/json",
@@ -98,9 +113,13 @@ export function createMidtransGateway(config: MidtransConfig, request = fetch) {
         signal: AbortSignal.timeout(7000),
         redirect: "error",
       });
-      return { ok: response.ok, body: await response.json() as unknown };
+      return { ok: response.ok, body: (await response.json()) as unknown };
     } catch {
-      throw new HttpError(502, "PAYMENT_UNAVAILABLE", "Midtrans belum bisa dihubungi. Coba lagi.");
+      throw new HttpError(
+        502,
+        "PAYMENT_UNAVAILABLE",
+        "Midtrans belum bisa dihubungi. Coba lagi.",
+      );
     }
   }
 
@@ -113,37 +132,77 @@ export function createMidtransGateway(config: MidtransConfig, request = fetch) {
       taxIdr: number;
     }) {
       const finish = new URL("/membership/checkout/" + order.id, config.webUrl);
-      const items = [{ id: "nakama", name: `Nakama ${order.months} bulan`, price: order.subtotalIdr, quantity: 1 }];
-      if (order.taxIdr > 0) items.push({ id: "tax", name: "Pajak", price: order.taxIdr, quantity: 1 });
+      const items = [
+        {
+          id: "nakama",
+          name: `Nakama ${order.months} bulan`,
+          price: order.subtotalIdr,
+          quantity: 1,
+        },
+      ];
+      if (order.taxIdr > 0)
+        items.push({
+          id: "tax",
+          name: "Pajak",
+          price: order.taxIdr,
+          quantity: 1,
+        });
       const response = await call(snapOrigin + "/snap/v1/transactions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          transaction_details: { order_id: order.id, gross_amount: order.priceIdr },
+          transaction_details: {
+            order_id: order.id,
+            gross_amount: order.priceIdr,
+          },
           item_details: items,
           enabled_payments: ["other_qris"],
           page_expiry: { duration: 1, unit: "day" },
           callbacks: { finish: finish.href, error: finish.href },
         }),
       });
-      const checkout = z.object({ redirect_url: z.string() }).safeParse(response.body);
+      const checkout = z
+        .object({ redirect_url: z.string() })
+        .safeParse(response.body);
       if (response.ok && checkout.success) {
         const url = parseMidtransCheckoutUrl(checkout.data.redirect_url);
         if (url?.origin === snapOrigin) return url.href;
       }
-      throw new HttpError(502, "PAYMENT_CHECKOUT_FAILED", "Halaman pembayaran QRIS belum dapat dibuka.");
+      throw new HttpError(
+        502,
+        "PAYMENT_CHECKOUT_FAILED",
+        "Halaman pembayaran QRIS belum dapat dibuka.",
+      );
     },
 
     async getPayment(orderId: string): Promise<VerifiedPayment | null> {
-      const response = await call("https://api." + domain + "/v2/" + encodeURIComponent(orderId) + "/status");
-      if (z.object({ status_code: z.literal("404") }).safeParse(response.body).success) return null;
+      const response = await call(
+        "https://api." +
+          domain +
+          "/v2/" +
+          encodeURIComponent(orderId) +
+          "/status",
+      );
+      if (
+        z.object({ status_code: z.literal("404") }).safeParse(response.body)
+          .success
+      )
+        return null;
 
       const parsed = statusSchema.safeParse(response.body);
       if (!response.ok || !parsed.success || parsed.data.order_id !== orderId) {
-        throw new HttpError(502, "PAYMENT_STATUS_INVALID", "Status pembayaran tidak dapat diverifikasi.");
+        throw new HttpError(
+          502,
+          "PAYMENT_STATUS_INVALID",
+          "Status pembayaran tidak dapat diverifikasi.",
+        );
       }
       if (parsed.data.payment_type !== "qris") {
-        throw new HttpError(409, "PAYMENT_METHOD_MISMATCH", "Pembayaran pesanan ini harus menggunakan QRIS.");
+        throw new HttpError(
+          409,
+          "PAYMENT_METHOD_MISMATCH",
+          "Pembayaran pesanan ini harus menggunakan QRIS.",
+        );
       }
       return {
         orderId,

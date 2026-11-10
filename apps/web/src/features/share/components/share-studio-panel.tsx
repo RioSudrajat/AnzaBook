@@ -5,7 +5,7 @@ import {
   Gauge,
   Receipt,
   Quote,
-  Sparkles,
+  Share2,
   Smartphone,
   Square,
   Check,
@@ -96,13 +96,15 @@ export function ShareStudioPanel({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border">
         <div>
           <div className="flex items-center gap-2">
-            <Sparkles className="size-5 text-[var(--color-accent)]" />
+            <Share2 className="size-5 text-[var(--color-accent)]" />
             <h3 className="font-serif text-xl font-bold tracking-tight">
               Studio Strava Literasi (Flex Your Reading)
             </h3>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Ekspor stiker pencapaian baca transparan, kuitansi penghematan rakyat, atau kartu kutipan untuk Instagram Stories dan linimasa sosial.
+            Ekspor stiker pencapaian baca transparan, kuitansi penghematan
+            rakyat, atau kartu kutipan untuk Instagram Stories dan linimasa
+            sosial.
           </p>
         </div>
 
@@ -341,7 +343,9 @@ export function ShareStudioPanel({
         <div className="lg:col-span-7 flex flex-col items-center justify-center bg-muted/20 border border-dashed border-border rounded-[10px] p-4 sm:p-6 min-h-[460px] overflow-hidden">
           <div
             className={`shadow-2xl rounded-[8px] overflow-hidden transition-all duration-300 max-w-full ${
-              aspect === "story" ? "w-[260px] sm:w-[320px]" : "w-[300px] sm:w-[380px]"
+              aspect === "story"
+                ? "w-[260px] sm:w-[320px]"
+                : "w-[300px] sm:w-[380px]"
             }`}
           >
             <canvas
@@ -356,7 +360,8 @@ export function ShareStudioPanel({
           </div>
 
           <span className="text-[11px] font-mono text-muted-foreground mt-4">
-            Pratinjau Kanvas 1080p ({aspect === "story" ? "9:16 Story" : "1:1 Square"})
+            Pratinjau Kanvas 1080p (
+            {aspect === "story" ? "9:16 Story" : "1:1 Square"})
           </span>
         </div>
       </div>

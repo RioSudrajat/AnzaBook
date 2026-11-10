@@ -24,7 +24,8 @@ import {
 export const booksKeys = {
   all: ["books"] as const,
   lists: () => [...booksKeys.all, "list"] as const,
-  list: (params?: ListBooksInput) => [...booksKeys.lists(), params ?? {}] as const,
+  list: (params?: ListBooksInput) =>
+    [...booksKeys.lists(), params ?? {}] as const,
   details: () => [...booksKeys.all, "detail"] as const,
   detail: (slug: string) => [...booksKeys.details(), slug] as const,
   stocks: () => [...booksKeys.all, "stock"] as const,
@@ -76,7 +77,10 @@ export function categoriesQuery() {
   });
 }
 
-export function readingProgressQuery(bookId: string, scope: ReadingProgressScope) {
+export function readingProgressQuery(
+  bookId: string,
+  scope: ReadingProgressScope,
+) {
   return queryOptions({
     queryKey: booksKeys.progress(bookId, scope),
     queryFn: ({ signal }) => getReadingProgress(bookId, scope, signal),

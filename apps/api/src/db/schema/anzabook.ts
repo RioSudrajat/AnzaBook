@@ -26,36 +26,50 @@ export const books = pgTable(
     editorAvatar: text("editor_avatar"),
     translator: varchar("translator", { length: 255 }),
     coverUrl: text("cover_url").notNull(),
-    coverColor: varchar("cover_color", { length: 32 }).notNull().default("#13110F"),
+    coverColor: varchar("cover_color", { length: 32 })
+      .notNull()
+      .default("#13110F"),
     synopsis: text("synopsis").notNull(),
     bulletinExcerpt: text("bulletin_excerpt"),
     publishedYear: integer("published_year").notNull().default(2026),
     pageCount: integer("page_count").notNull(),
     totalChapters: integer("total_chapters").notNull().default(1),
     readingMinutes: integer("reading_minutes").notNull().default(20),
-    audioDurationMinutes: integer("audio_duration_minutes").notNull().default(0),
-    digitalPolicy: varchar("digital_policy", { length: 32 }).notNull().default("sample_only"),
-    accessTier: varchar("access_tier", { length: 32 }).$type<"free" | "premium" | "premium_physical">().notNull().default("free"),
+    audioDurationMinutes: integer("audio_duration_minutes")
+      .notNull()
+      .default(0),
+    digitalPolicy: varchar("digital_policy", { length: 32 })
+      .notNull()
+      .default("sample_only"),
+    accessTier: varchar("access_tier", { length: 32 })
+      .$type<"free" | "premium" | "premium_physical">()
+      .notNull()
+      .default("free"),
     hasPhysical: boolean("has_physical").notNull().default(true),
-    securityLevel: varchar("security_level", { length: 32 }).notNull().default("standard_blur"),
+    securityLevel: varchar("security_level", { length: 32 })
+      .notNull()
+      .default("standard_blur"),
     isWeeklyBulletin: boolean("is_weekly_bulletin").notNull().default(false),
     rakyatPriceIdr: integer("rakyat_price_idr").notNull().default(35000),
     standardPriceIdr: integer("standard_price_idr").notNull().default(75000),
     ratingAvg: real("rating_avg").notNull().default(0),
     ratingCount: integer("rating_count").notNull().default(0),
-    availableLanguages: jsonb("available_languages").$type<string[]>().notNull().default(["id"]),
+    availableLanguages: jsonb("available_languages")
+      .$type<string[]>()
+      .notNull()
+      .default(["id"]),
     categories: jsonb("categories").$type<string[]>().notNull().default([]),
     collectionName: varchar("collection_name", { length: 120 }),
     genres: jsonb("genres").$type<string[]>().notNull().default([]),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [
-    index("books_bulletin_idx").on(table.isWeeklyBulletin),
-  ],
+  (table) => [index("books_bulletin_idx").on(table.isWeeklyBulletin)],
 );
 
 export const bookChapters = pgTable(
@@ -66,28 +80,37 @@ export const bookChapters = pgTable(
       .notNull()
       .references(() => books.id, { onDelete: "cascade" }),
     chapterNumber: integer("chapter_number").notNull(),
-    isBlueprintSummary: boolean("is_blueprint_summary").notNull().default(false),
+    isBlueprintSummary: boolean("is_blueprint_summary")
+      .notNull()
+      .default(false),
     titleId: varchar("title_id", { length: 255 }).notNull(),
     titleEn: varchar("title_en", { length: 255 }),
     contentId: text("content_id").notNull(),
     contentEn: text("content_en"),
     blueprintContent: text("blueprint_content").notNull().default(""),
     paragraphsJson: jsonb("paragraphs_json")
-      .$type<{
-        index: number;
-        textId: string;
-        textEn?: string;
-        audioStartSec?: number;
-        audioEndSec?: number;
-      }[]>()
+      .$type<
+        {
+          index: number;
+          textId: string;
+          textEn?: string;
+          audioStartSec?: number;
+          audioEndSec?: number;
+        }[]
+      >()
       .notNull()
       .default([]),
     audioUrl: text("audio_url"),
     audioDurationSec: integer("audio_duration_sec"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (table) => [
-    uniqueIndex("book_chapters_book_num_unique").on(table.bookId, table.chapterNumber),
+    uniqueIndex("book_chapters_book_num_unique").on(
+      table.bookId,
+      table.chapterNumber,
+    ),
     index("book_chapters_book_idx").on(table.bookId),
   ],
 );
@@ -105,16 +128,22 @@ export const bookPrintEditions = pgTable(
     paperType: varchar("paper_type", { length: 120 }).notNull(),
     paperGsm: real("paper_gsm").notNull(),
     coverType: varchar("cover_type", { length: 120 }).notNull(),
-    bindingType: varchar("binding_type", { length: 120 }).notNull().default("Lem Panas"),
+    bindingType: varchar("binding_type", { length: 120 })
+      .notNull()
+      .default("Lem Panas"),
     priceIdr: integer("price_idr").notNull(),
     traditionalPriceIdr: integer("traditional_price_idr").notNull(),
     savingsPercent: integer("savings_percent").notNull(),
     weightGrams: integer("weight_grams").notNull().default(220),
     inStock: boolean("in_stock").notNull().default(true),
     notes: text("notes"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
-  (table) => [index("book_print_editions_book_tier_idx").on(table.bookId, table.tier)],
+  (table) => [
+    index("book_print_editions_book_tier_idx").on(table.bookId, table.tier),
+  ],
 );
 
 export const bookClaimCodes = pgTable(
@@ -130,11 +159,11 @@ export const bookClaimCodes = pgTable(
       onDelete: "set null",
     }),
     claimedAt: timestamp("claimed_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
-  (table) => [
-    index("book_claim_codes_user_idx").on(table.claimedByUserId),
-  ],
+  (table) => [index("book_claim_codes_user_idx").on(table.claimedByUserId)],
 );
 
 export const storeBranches = pgTable(
@@ -150,7 +179,9 @@ export const storeBranches = pgTable(
     longitude: real("longitude").notNull().default(106.8456),
     distanceKm: real("distance_km").default(0),
     phone: varchar("phone", { length: 64 }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (table) => [
     index("store_branches_city_idx").on(table.city),
@@ -170,11 +201,18 @@ export const storeInventories = pgTable(
       .references(() => books.id, { onDelete: "cascade" }),
     rakyatStock: integer("rakyat_stock").notNull().default(0),
     standardStock: integer("standard_stock").notNull().default(0),
-    stockStatus: varchar("stock_status", { length: 32 }).notNull().default("available"),
-    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }).defaultNow().notNull(),
+    stockStatus: varchar("stock_status", { length: 32 })
+      .notNull()
+      .default("available"),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (table) => [
-    uniqueIndex("store_inventories_branch_book_unique").on(table.branchId, table.bookId),
+    uniqueIndex("store_inventories_branch_book_unique").on(
+      table.branchId,
+      table.bookId,
+    ),
     index("store_inventories_book_idx").on(table.bookId),
   ],
 );
@@ -193,10 +231,15 @@ export const readingSessions = pgTable(
     durationSeconds: integer("duration_seconds").notNull(),
     avgWpm: integer("avg_wpm").notNull(),
     mode: varchar("mode", { length: 32 }).notNull().default("full"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (table) => [
-    index("reading_sessions_user_created_idx").on(table.userId, table.createdAt.desc()),
+    index("reading_sessions_user_created_idx").on(
+      table.userId,
+      table.createdAt.desc(),
+    ),
     index("reading_sessions_book_idx").on(table.bookId),
   ],
 );
@@ -211,7 +254,9 @@ export const userShelves = pgTable(
     bookId: uuid("book_id")
       .notNull()
       .references(() => books.id, { onDelete: "cascade" }),
-    shelfStatus: varchar("shelf_status", { length: 32 }).notNull().default("want_to_read"),
+    shelfStatus: varchar("shelf_status", { length: 32 })
+      .notNull()
+      .default("want_to_read"),
     progressPercent: integer("progress_percent").notNull().default(0),
     lastChapter: integer("last_chapter").notNull().default(1),
     favorite: boolean("favorite").notNull().default(false),
@@ -238,12 +283,19 @@ export const bookReviews = pgTable(
       .references(() => books.id, { onDelete: "cascade" }),
     ratingHalfSteps: integer("rating_half_steps").notNull(), // 1..10 representing 0.5..5.0
     content: text("content").notNull(),
-    editionTierReviewed: varchar("edition_tier_reviewed", { length: 32 }).notNull().default("rakyat_economy"),
+    editionTierReviewed: varchar("edition_tier_reviewed", { length: 32 })
+      .notNull()
+      .default("rakyat_economy"),
     isVerifiedReader: boolean("is_verified_reader").notNull().default(true),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (table) => [
-    index("book_reviews_book_created_idx").on(table.bookId, table.createdAt.desc()),
+    index("book_reviews_book_created_idx").on(
+      table.bookId,
+      table.createdAt.desc(),
+    ),
     index("book_reviews_user_idx").on(table.userId),
   ],
 );
@@ -260,10 +312,15 @@ export const paragraphComments = pgTable(
       .references(() => bookChapters.id, { onDelete: "cascade" }),
     paragraphIndex: integer("paragraph_index").notNull(),
     content: text("content").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (table) => [
-    index("paragraph_comments_chapter_para_idx").on(table.chapterId, table.paragraphIndex),
+    index("paragraph_comments_chapter_para_idx").on(
+      table.chapterId,
+      table.paragraphIndex,
+    ),
     index("paragraph_comments_user_idx").on(table.userId),
   ],
 );
@@ -289,7 +346,9 @@ export const bookHighlights = pgTable(
       .notNull()
       .default("yellow"),
     note: text("note"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (table) => [
     index("book_highlights_user_book_idx").on(table.userId, table.bookId),
@@ -315,15 +374,24 @@ export const readingProgress = pgTable(
     lastScrollPercent: integer("last_scroll_percent").notNull().default(0),
     lastParagraphIndex: integer("last_paragraph_index"),
     layout: varchar("layout", { length: 16 }).$type<"scroll" | "slide">(),
-    scope: varchar("scope", { length: 16 }).$type<"full" | "preview">().notNull().default("full"),
-    capturedAt: timestamp("captured_at", { withTimezone: true }).notNull().defaultNow(),
+    scope: varchar("scope", { length: 16 })
+      .$type<"full" | "preview">()
+      .notNull()
+      .default("full"),
+    capturedAt: timestamp("captured_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
   },
   (table) => [
-    uniqueIndex("reading_progress_user_book_scope_unique").on(table.userId, table.bookId, table.scope),
+    uniqueIndex("reading_progress_user_book_scope_unique").on(
+      table.userId,
+      table.bookId,
+      table.scope,
+    ),
     index("reading_progress_user_idx").on(table.userId),
   ],
 );

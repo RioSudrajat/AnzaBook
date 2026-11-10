@@ -8,7 +8,10 @@ export type MembershipReminderEmail = {
 };
 
 type Config = Parameters<typeof createGmailSender>[0] & { webUrl: string };
-const dateFormat = new Intl.DateTimeFormat("id-ID", { dateStyle: "long", timeZone: "Asia/Jakarta" });
+const dateFormat = new Intl.DateTimeFormat("id-ID", {
+  dateStyle: "long",
+  timeZone: "Asia/Jakarta",
+});
 
 export function createMembershipMailer(config: Config, request = fetch) {
   const send = createGmailSender(config, request);
@@ -19,9 +22,13 @@ export function createMembershipMailer(config: Config, request = fetch) {
     const expired = kind === "expired";
     return send({
       to,
-      subject: expired ? "Akses Nakama sudah berakhir" : "Akses Nakama segera berakhir",
+      subject: expired
+        ? "Akses Nakama sudah berakhir"
+        : "Akses Nakama segera berakhir",
       text: [
-        expired ? `Akses Nakama berakhir pada ${date}.` : `Akses Nakama akan berakhir pada ${date}.`,
+        expired
+          ? `Akses Nakama berakhir pada ${date}.`
+          : `Akses Nakama akan berakhir pada ${date}.`,
         "Posisi bacamu tetap tersimpan.",
         `Perpanjang Nakama di ${membershipPage.href}`,
         "Kamu bisa mengubah preferensi email di Pengaturan AnzaBook.",

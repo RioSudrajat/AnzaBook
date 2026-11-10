@@ -165,8 +165,16 @@ function renderReceipt(
   ctx.font = "20px 'Red Hat Mono', monospace";
   ctx.fillStyle = "#6B6357";
   ctx.fillText("CABANG KOMUNITAS BACA NASIONAL #001", cx, topY + 110);
-  ctx.fillText(`TANGGAL: ${new Date().toLocaleDateString("id-ID")}`, cx, topY + 145);
-  ctx.fillText("------------------------------------------------", cx, topY + 185);
+  ctx.fillText(
+    `TANGGAL: ${new Date().toLocaleDateString("id-ID")}`,
+    cx,
+    topY + 145,
+  );
+  ctx.fillText(
+    "------------------------------------------------",
+    cx,
+    topY + 185,
+  );
 
   // Items
   const startItemY = topY + 240;
@@ -177,7 +185,11 @@ function renderReceipt(
 
   ctx.font = "20px 'Red Hat Mono', monospace";
   ctx.fillStyle = "#6B6357";
-  ctx.fillText("Edisi Cetak Rakyat (Newsprint 48.8 gsm)", paperX + 40, startItemY + 36);
+  ctx.fillText(
+    "Edisi Cetak Rakyat (Newsprint 48.8 gsm)",
+    paperX + 40,
+    startItemY + 36,
+  );
 
   ctx.textAlign = "right";
   ctx.font = "22px 'Red Hat Mono', monospace";
@@ -191,16 +203,28 @@ function renderReceipt(
   ctx.fillText("Rp98.000", paperX + paperW - 40, startItemY + 100);
 
   ctx.textAlign = "center";
-  ctx.fillText("------------------------------------------------", cx, startItemY + 150);
+  ctx.fillText(
+    "------------------------------------------------",
+    cx,
+    startItemY + 150,
+  );
 
   // Big Savings Banner
   const totalSaved = opts.totalSavedIdr || 60000;
   ctx.fillStyle = "#2E5C38";
   ctx.font = "bold 36px 'Red Hat Mono', monospace";
-  ctx.fillText(`TOTAL PENGHEMATAN: Rp${totalSaved.toLocaleString("id-ID")}`, cx, startItemY + 210);
+  ctx.fillText(
+    `TOTAL PENGHEMATAN: Rp${totalSaved.toLocaleString("id-ID")}`,
+    cx,
+    startItemY + 210,
+  );
 
   ctx.font = "22px 'Red Hat Mono', monospace";
-  ctx.fillText("(Hemat 61% untuk Literasi Berkelanjutan)", cx, startItemY + 255);
+  ctx.fillText(
+    "(Hemat 61% untuk Literasi Berkelanjutan)",
+    cx,
+    startItemY + 255,
+  );
 
   // Barcode simulation
   const barcodeY = startItemY + 330;
@@ -284,7 +308,10 @@ function renderQuoteCard(
   ctx.restore();
 }
 
-export function downloadCanvasImage(canvas: HTMLCanvasElement, filename: string) {
+export function downloadCanvasImage(
+  canvas: HTMLCanvasElement,
+  filename: string,
+) {
   const link = document.createElement("a");
   link.download = filename;
   link.href = canvas.toDataURL("image/png");

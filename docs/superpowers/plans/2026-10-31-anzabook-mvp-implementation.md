@@ -32,6 +32,7 @@
 ### Task 1: Environment Setup, Site Identity, Furrow Design System Tokens & Motion Dependencies (`gsap` + `lenis`)
 
 **Files:**
+
 - Modify: `starter.config.json`
 - Modify: `apps/web/package.json`
 - Modify: `apps/web/src/routes/__root.tsx`
@@ -40,6 +41,7 @@
 - Modify: `apps/web/src/components/ui/button.tsx`
 
 **Interfaces:**
+
 - Consumes: `apps/web/public/icon.svg`, `docs/superpowers/specs/2026-10-31-anzabook-design-system.md`
 - Produces:
   - Updated `siteConfig` (`name: "AnzaBook"`, `description: "Platform baca digital dwibahasa, buku cetak Edisi Rakyat terjangkau, dan komunitas literasi Indonesia."`)
@@ -50,10 +52,12 @@
 - [ ] **Step 1: Prepare local environment and install `gsap` and `lenis` in `@starter/web`**
 
 Run:
+
 ```powershell
 pnpm dev:prepare
 pnpm --filter @starter/web add gsap lenis
 ```
+
 Expected: PostgreSQL container is healthy, migrations apply, and `gsap` + `lenis` are added to `apps/web/package.json`.
 
 - [ ] **Step 2: Update `starter.config.json` and `apps/web/src/routes/__root.tsx` with AnzaBook identity and Google Fonts**
@@ -64,6 +68,7 @@ In `apps/web/src/routes/__root.tsx`, set `<html lang="id">`, update the page tit
 - [ ] **Step 3: Implement Hallmark Furrow OKLCH tokens and utility classes in `apps/web/src/styles/globals.css`**
 
 Replace the starter hex variables in `apps/web/src/styles/globals.css` with the exact OKLCH token tables from `docs/superpowers/specs/2026-10-31-anzabook-design-system.md` (Sections 4, 5, 6, 7, 8, 9), including:
+
 - `:root` Furrow Manila palette, `[data-theme="sepia"]`, and `.dark, [data-theme="night"]`
 - Font families `--font-display`, `--font-reader`, `--font-body`, `--font-outlier`, `--font-reader-sans`, `--font-reader-accessible`
 - Radius tokens `--radius-xs: 4px`, `--radius-pill: 6px`, `--radius-card: 10px`, `--radius-entry: 14px`, `--radius-book: 3px 8px 8px 3px`
@@ -92,6 +97,7 @@ git commit -m "feat(design): configure AnzaBook identity, Furrow OKLCH tokens, a
 ### Task 2: Shared Contracts, Permissions & Print HPP Calculator Engine (`packages/shared`)
 
 **Files:**
+
 - Modify: `packages/shared/package.json`
 - Modify: `packages/shared/src/permissions.ts`
 - Create: `packages/shared/src/validators/books.ts`
@@ -103,6 +109,7 @@ git commit -m "feat(design): configure AnzaBook identity, Furrow OKLCH tokens, a
 - Create: `apps/api/src/test/print-economics.test.ts`
 
 **Interfaces:**
+
 - Consumes: `zod`
 - Produces:
   - Subpath exports in `packages/shared/package.json`: `"./validators/books"`, `"./validators/reading"`, `"./validators/community"`, `"./validators/publisher"`, `"./print-economics"`
@@ -129,7 +136,9 @@ describe("AnzaBook Print Economics & Shared Validators", () => {
       authorRoyaltyPct: 12,
     });
     const rakyat = result.tiers.find((t) => t.editionTier === "rakyat_economy");
-    const standard = result.tiers.find((t) => t.editionTier === "standard_trade");
+    const standard = result.tiers.find(
+      (t) => t.editionTier === "standard_trade",
+    );
     expect(rakyat).toBeDefined();
     expect(standard).toBeDefined();
     expect(rakyat!.recommendedPriceIdr).toBeGreaterThanOrEqual(25000);
@@ -172,6 +181,7 @@ Expected: FAIL with module resolution error for `@starter/shared/print-economics
 - [ ] **Step 3: Implement validators, DTOs, permissions, and `calculatePrintEconomics` in `packages/shared`**
 
 Implement:
+
 - `packages/shared/src/print-economics.ts` computing HPP (paper cost per page by GSM `48.8` newsprint vs `72` bookpaper vs `80` hardcover + fixed plate offset cost amortized over `printRun` + direct-to-reader distribution vs 45% retail cut).
 - `packages/shared/src/validators/books.ts`, `reading.ts`, `community.ts`, `publisher.ts` using `.strict()` on every object schema so unknown fields and `userId` are rejected.
 - `packages/shared/src/types/api.ts` and `packages/shared/package.json` exports.
@@ -193,12 +203,14 @@ git commit -m "feat(shared): add AnzaBook validators, DTOs, and Indian-model pri
 ### Task 3: PostgreSQL Schema, Migrations & Literary Seed Data (`apps/api/src/db`)
 
 **Files:**
+
 - Create: `apps/api/src/db/schema/anzabook.ts`
 - Modify: `apps/api/src/db/schema/index.ts`
 - Create: `apps/api/src/services/seed.service.ts`
 - Create: `apps/api/drizzle/<generated_migration>.sql`
 
 **Interfaces:**
+
 - Consumes: `apps/api/src/db/schema/user.ts`, `drizzle-orm/pg-core`
 - Produces:
   - Drizzle tables: `books`, `bookChapters`, `bookPrintEditions`, `bookClaimCodes`, `storeBranches`, `storeInventories`, `readingSessions`, `userShelves`, `bookReviews`, `paragraphComments`
@@ -207,6 +219,7 @@ git commit -m "feat(shared): add AnzaBook validators, DTOs, and Indian-model pri
 - [ ] **Step 1: Define Drizzle schema in `apps/api/src/db/schema/anzabook.ts` and export from `index.ts`**
 
 Create `apps/api/src/db/schema/anzabook.ts` with PostgreSQL `pgTable` definitions matching Section 4 of `PRD_AnzaBook.md`:
+
 - `books`: `id` (uuid PK), `slug` (varchar unique), `title`, `subtitle`, `authorName`, `category`, `synopsis`, `coverColor` (OKLCH/hex accent for 3D spine), `pageCount`, `readingMinutes`, `isWeeklyBulletin` (boolean), `digitalPolicy` (`"full_saas" | "sample_only" | "print_claim_only"`), `securityLevel` (`"standard_blur" | "strict_touch_focus"`), `createdAt`
 - `bookChapters`: `id` (uuid PK), `bookId` (FK `books.id`), `chapterNumber` (integer), `isBlueprintSummary` (boolean for 20-Minute Intisari mode), `titleId`, `titleEn`, `paragraphsJson` (JSONB array of `{ index, textId, textEn, audioStartSec, audioEndSec }`), `audioDurationSec` (integer)
 - `bookPrintEditions`: `id` (uuid PK), `bookId` (FK `books.id`), `isbn` (varchar unique), `editionTier` (`"rakyat_economy" | "standard_trade" | "collector_hardcover"`), `label`, `paperType`, `paperGsm` (real), `coverType`, `priceIdr` (integer), `traditionalPriceIdr` (integer), `weightGrams` (integer), `notes`
@@ -221,15 +234,17 @@ Create `apps/api/src/db/schema/anzabook.ts` with PostgreSQL `pgTable` definition
 - [ ] **Step 2: Generate and apply Drizzle migration**
 
 Run:
+
 ```powershell
 pnpm db:generate
 pnpm db:migrate
 ```
+
 Expected: SQL migration generated in `apps/api/drizzle/` and applied cleanly to PostgreSQL.
 
 - [ ] **Step 3: Implement idempotent catalog seeder in `apps/api/src/services/seed.service.ts`**
 
-Seed 6 curated books spanning Philosophy, Economics of Literacy, Science, Cognitive Psychology, and Indonesian Literature (including a Weekly Bulletin featured book, full + 20-minute Intisari bilingual `ID`/`EN` chapters with audio timestamps, 3 physical print editions per book starting at Rp29.000 *Edisi Rakyat*, valid physical claim codes like `ANZA-RAKYAT-2026`, and 6 `storeBranches` across Gramedia Matraman, Gramedia Grand Indonesia, Gramedia Merdeka Bandung, Gramedia Sudirman Yogyakarta, Gudang Pusat AnzaBook Jakarta, and Kineruku / Kolektif Indie).
+Seed 6 curated books spanning Philosophy, Economics of Literacy, Science, Cognitive Psychology, and Indonesian Literature (including a Weekly Bulletin featured book, full + 20-minute Intisari bilingual `ID`/`EN` chapters with audio timestamps, 3 physical print editions per book starting at Rp29.000 _Edisi Rakyat_, valid physical claim codes like `ANZA-RAKYAT-2026`, and 6 `storeBranches` across Gramedia Matraman, Gramedia Grand Indonesia, Gramedia Merdeka Bandung, Gramedia Sudirman Yogyakarta, Gudang Pusat AnzaBook Jakarta, and Kineruku / Kolektif Indie).
 
 - [ ] **Step 4: Run `pnpm run typecheck` to verify schema types**
 
@@ -248,6 +263,7 @@ git commit -m "feat(db): add AnzaBook schema migrations and curated multi-format
 ### Task 4: Express API Services, Routes & Integration Tests (`apps/api`)
 
 **Files:**
+
 - Create: `apps/api/src/services/books.service.ts`
 - Create: `apps/api/src/services/reading.service.ts`
 - Create: `apps/api/src/services/community.service.ts`
@@ -259,6 +275,7 @@ git commit -m "feat(db): add AnzaBook schema migrations and curated multi-format
 - Create: `apps/api/src/test/anzabook.test.ts`
 
 **Interfaces:**
+
 - Consumes: `apps/api/src/db`, `apps/api/src/services/seed.service.ts`, `@starter/shared/validators/*`, `@starter/shared/print-economics`
 - Produces:
   - `GET /api/books` (public catalog with filter by `category`, `search`, `editionTier`, plus Weekly Bulletin)
@@ -275,6 +292,7 @@ git commit -m "feat(db): add AnzaBook schema migrations and curated multi-format
 - [ ] **Step 1: Write the failing API integration tests in `apps/api/src/test/anzabook.test.ts`**
 
 Cover all 5 Review Focus items and core flows:
+
 1. Public catalog (`GET /api/books`), book detail (`GET /api/books/:slug`), and live Gramedia/warehouse stock filter (`GET /api/books/:slug/stock?city=Jakarta`).
 2. `print_claim_only` digital policy blocking Chapter 2 (`403 FORBIDDEN_DIGITAL_ACCESS`) while allowing 20-minute `blueprint` mode and Chapter 1 sample; then unlocking Chapter 2 after redeeming a valid code via `POST /api/books/:slug/claim-code` (and rejecting invalid/reused codes with `422`/`409`).
 3. Reading telemetry logging (`POST /api/reading-sessions`), 7-day summary calculation (`GET /api/reading-sessions`), and validation rejection (`422`) on invalid WPM or injected `userId`.
@@ -307,6 +325,7 @@ git commit -m "feat(api): implement books, live stock, protected reader, telemet
 ### Task 5: Smooth Scroll (`Lenis` + `GSAP`), Opening Literary Curtain Preloader & 3D Tactile Shelf Landing Page (`apps/web`)
 
 **Files:**
+
 - Create: `apps/web/src/features/books/api.ts`
 - Create: `apps/web/src/features/books/queries.ts`
 - Create: `apps/web/src/features/books/hooks.ts`
@@ -319,6 +338,7 @@ git commit -m "feat(api): implement books, live stock, protected reader, telemet
 - Modify: `apps/web/src/routes/index.tsx`
 
 **Interfaces:**
+
 - Consumes: `gsap`, `gsap/ScrollTrigger`, `lenis`, `/api/books`, `/icon.svg`
 - Produces:
   - `LenisGsapProvider` exposing `useSmoothScroll()` (`{ velocity, isPaused, pauseScroll, resumeScroll }`) and automatically disabling Lenis on `/read/$slug` or `prefers-reduced-motion: reduce`
@@ -329,7 +349,7 @@ git commit -m "feat(api): implement books, live stock, protected reader, telemet
     1. **Editorial Hero + `HeroBookStage` 3D Shelf** (visible at `1280x800` without scrolling: headline, core sentence, and primary CTA `"Buka Katalog Buku"`).
     2. **Buletin Mingguan (Weekly Bulletin)**: Editorial highlight of the week's featured book with one-tap share and `"Baca Intisari 20 Menit"`.
     3. **Eksplorasi Katalog & Filter Kategori**: Searchable, category-filterable book grid using Furrow `Book Shelf Card` (`--radius-book`) and `Ruled Index` metadata.
-    4. **Revolusi Harga Kertas (Adaptasi Model India ke Indonesia)**: Interactive comparison table showing why *Edisi Rakyat (Newsprint 48.8 gsm, Rp29.000)* cuts 60% off traditional retail prices, plus SaaS Membership Tiers (`3 Bulan Rp60.000`, `6 Bulan Rp108.000`, `12 Bulan Rp192.000`).
+    4. **Revolusi Harga Kertas (Adaptasi Model India ke Indonesia)**: Interactive comparison table showing why _Edisi Rakyat (Newsprint 48.8 gsm, Rp29.000)_ cuts 60% off traditional retail prices, plus SaaS Membership Tiers (`3 Bulan Rp60.000`, `6 Bulan Rp108.000`, `12 Bulan Rp192.000`).
     5. **FAQ Spesifik Produk (R-28)**: Real questions about Edisi Rakyat paper quality, physical book Claim Codes, Pre-Trigger Web DRM, and Gramedia store pickup.
 
 - [ ] **Step 1: Create `apps/web/src/features/books/{api,queries,hooks}.ts`**
@@ -339,6 +359,7 @@ Implement isomorphic `apiFetch` wrappers and TanStack Query `queryOptions` + cus
 - [ ] **Step 2: Implement `LenisGsapProvider`, `AnzaPreloader`, `SingleLetterRoll`, and `HeroBookStage` in `apps/web/src/components/motion/`**
 
 Ensure:
+
 - `AnzaPreloader` checks `window.matchMedia("(prefers-reduced-motion: reduce)")` and `sessionStorage.getItem("anzabook-preloader-v1")`. Clicking `"Lewati"` (`data-testid="skip-preloader"`) or pressing `Escape` immediately dismisses the curtain and records the session key.
 - `HeroBookStage` renders the 3D Furrow shelf ledge, book covers with spine crease shading, interactive pull-out inspection card, and a Pause/Play button (`data-testid="carousel-pause-toggle"`).
 - `LenisGsapProvider` disables smooth scroll when `location.pathname.startsWith("/read/")` so the Reading Canvas remains 100% native and distraction-free.
@@ -364,6 +385,7 @@ git commit -m "feat(web): add GSAP/Lenis smooth scroll, Malaka-inspired preloade
 ### Task 6: Book Detail Page, Tiered Paper 3D Switcher & Live Gramedia/Store Stock Tracker (`apps/web`)
 
 **Files:**
+
 - Create: `apps/web/src/routes/books.$slug.tsx`
 - Create: `apps/web/src/features/books/components/paper-tier-selector.tsx`
 - Create: `apps/web/src/features/books/components/live-stock-tracker.tsx`
@@ -373,6 +395,7 @@ git commit -m "feat(web): add GSAP/Lenis smooth scroll, Malaka-inspired preloade
 - Create: `apps/web/src/features/community/hooks.ts`
 
 **Interfaces:**
+
 - Consumes: `bookDetailQuery(slug)`, `bookStockQuery(slug, city)`, `reviewsQuery(slug)`, `useUpsertShelf()`, `useClaimBookCode()`, `useCreateReview()`
 - Produces:
   - Route `/books/$slug` (`apps/web/src/routes/books.$slug.tsx`) with SSR `loader` prefetching book detail, live stock, and reviews
@@ -410,6 +433,7 @@ git commit -m "feat(web): add book detail page with 3D paper tier switcher and l
 ### Task 7: Protected Web Reader (`Full` vs `20-Min Intisari`, Bilingual Split View, Audiobook Sync & Pre-Trigger Web DRM) (`apps/web`)
 
 **Files:**
+
 - Create: `apps/web/src/routes/_protected/read.$slug.tsx`
 - Create: `apps/web/src/features/reader/components/drm-shield.tsx`
 - Create: `apps/web/src/features/reader/components/reader-toolbar.tsx`
@@ -417,6 +441,7 @@ git commit -m "feat(web): add book detail page with 3D paper tier switcher and l
 - Create: `apps/web/src/features/reader/components/marginalia-drawer.tsx`
 
 **Interfaces:**
+
 - Consumes: `bookReaderQuery(slug, mode, chapter)`, `paragraphCommentsQuery(slug, chapter)`, `useCreateReadingSession()`, `useUpsertShelf()`, `useCreateParagraphComment()`
 - Produces:
   - Route `/_protected/read/$slug` (`apps/web/src/routes/_protected/read.$slug.tsx`)
@@ -462,6 +487,7 @@ git commit -m "feat(reader): implement bilingual split-view reader, audiobook sy
 ### Task 8: Signed-In Workspace (`/app`): Smart Shelves, Strava-Style "Flex Your Literacy" Share Studio & Publisher HPP Studio (`apps/web`)
 
 **Files:**
+
 - Create: `apps/web/src/features/share-studio/canvas-renderer.ts`
 - Create: `apps/web/src/features/share-studio/share-studio-panel.tsx`
 - Create: `apps/web/src/features/publisher/publisher-studio-panel.tsx`
@@ -470,15 +496,16 @@ git commit -m "feat(reader): implement bilingual split-view reader, audiobook sy
 - Delete: `e2e/starter.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `shelvesQuery`, `readingSessionsQuery`, `booksQuery`, `usePublisherSimulate()`
 - Produces:
   - `renderShareCardToCanvas(canvas: HTMLCanvasElement, options: ShareCardOptions): void` in `apps/web/src/features/share-studio/canvas-renderer.ts` supporting 4 templates:
-    1. `strava_sticker`: **Transparent PNG Sticker** (large `Red Hat Mono` metrics for *Pages Read*, *Duration*, *Pace WPM*, *Current Streak*, 7-day activity bar chart, and AnzaBook monogram `/icon.svg` in Furrow Tangerine `#F06A24`) ready to overlay on coffee/book photos in IG Story
+    1. `strava_sticker`: **Transparent PNG Sticker** (large `Red Hat Mono` metrics for _Pages Read_, _Duration_, _Pace WPM_, _Current Streak_, 7-day activity bar chart, and AnzaBook monogram `/icon.svg` in Furrow Tangerine `#F06A24`) ready to overlay on coffee/book photos in IG Story
     2. `quote_card`: **Notebook Quote Highlight Card** (`8px` Furrow grid background, book title, author, page badge, and quote text up to 280 chars)
     3. `literacy_receipt`: **Literacy Receipt (Struk Bacaan)** summarizing books read, total pages, and reading hours formatted like a thermal bookshop receipt
     4. `milestone_poster`: **100% Finish / Reading Challenge Milestone Poster**
   - High-res PNG download (`canvas.toDataURL("image/png")`) and Web Share API integration
-  - `PublisherStudioPanel`: Interactive multi-paper HPP & retail price simulator (`pageCount`, `printRun`, `authorRoyaltyPct`) displaying real-time cost breakdowns for *Edisi Rakyat (Newsprint 48.8 gsm)*, *Edisi Standar (Bookpaper 72 gsm)*, and *Edisi Kolektor (Hardcover)*
+  - `PublisherStudioPanel`: Interactive multi-paper HPP & retail price simulator (`pageCount`, `printRun`, `authorRoyaltyPct`) displaying real-time cost breakdowns for _Edisi Rakyat (Newsprint 48.8 gsm)_, _Edisi Standar (Bookpaper 72 gsm)_, and _Edisi Kolektor (Hardcover)_
   - Updated `/_protected/app` (`apps/web/src/routes/_protected/app.tsx`) with `data-starter-placeholder` removed, providing 3 integrated workspace tabs:
     - **Rak Buku & Tantangan Baca** (`Smart Shelves` + multi-metric Reading Challenge: Buku, Halaman, Jam Baca)
     - **Flex Your Literacy (Strava Share Studio)**
@@ -500,11 +527,13 @@ Replace `apps/web/src/routes/_protected/app.tsx` completely so `data-starter-pla
 - [ ] **Step 4: Run `pnpm run doctor`, `pnpm run typecheck`, and `pnpm run lint`**
 
 Run:
+
 ```powershell
 pnpm run doctor
 pnpm run typecheck
 pnpm run lint
 ```
+
 Expected: `pnpm run doctor` reports all checks passing and prints no starter placeholder reminder; `typecheck` and `lint` pass with 0 errors.
 
 - [ ] **Step 5: Commit Task 8**
@@ -519,28 +548,33 @@ git commit -m "feat(web): build Smart Shelves, Strava-style Share Studio PNG gen
 ### Task 9: End-to-End Verification, Playwright Browser Tests & Antislop Delivery Gate
 
 **Files:**
+
 - Create: `e2e/anzabook.spec.ts`
 
 **Interfaces:**
+
 - Consumes: Full production build of `@starter/api` and `@starter/web` via `pnpm test:e2e`
 - Produces: Automated browser verification covering landing animations, catalog, live stock tracker, protected reader DRM, Strava Share Studio, and Publisher HPP calculator
 
 - [ ] **Step 1: Write Playwright E2E test suite in `e2e/anzabook.spec.ts`**
 
 Test the complete user journey:
+
 1. Visit `/`: verify the Opening Literary Curtain Preloader appears and can be skipped via `data-testid="skip-preloader"`, verify the Hero headline & primary CTA are visible at `1280x800`, and verify the 3D Hero Book Carousel (`HeroBookStage`) Pause/Play control (`data-testid="carousel-pause-toggle"`) toggles state cleanly.
-2. Click into a book detail page (`/books/$slug`): switch between *Edisi Rakyat (Newsprint 48.8 gsm)* and *Edisi Standar*, verify price and paper GSM update, and filter the Live Store & Gramedia Stock Tracker by `Jakarta`.
+2. Click into a book detail page (`/books/$slug`): switch between _Edisi Rakyat (Newsprint 48.8 gsm)_ and _Edisi Standar_, verify price and paper GSM update, and filter the Live Store & Gramedia Stock Tracker by `Jakarta`.
 3. Sign up a new user account, open `/app`: verify Smart Shelves, switch to **Flex Your Literacy (Strava Share Studio)**, render the **Strava Transparent Sticker**, and verify the canvas generates a valid `data:image/png;base64,...` output; switch to **Publisher Studio** and verify the HPP calculator updates prices when changing page count.
 4. Open the Protected Web Reader (`/read/$slug`): toggle **Bilingual Split View (`ID + EN`)**, switch to **Intisari 20 Menit**, trigger the **Pre-Trigger Web DRM Shield** (via simulated `Alt`/`Shift` keydown or window `blur`), verify the DRM watermark overlay appears (`data-testid="drm-watermark-overlay"`), resume reading, and log a completed reading session.
 
 - [ ] **Step 2: Run full quality gates (`pnpm check`, `pnpm build`, and `pnpm test:e2e`)**
 
 Run:
+
 ```powershell
 pnpm check
 pnpm build
 pnpm test:e2e
 ```
+
 Expected: All lint, typecheck, unit/API integration tests, production builds, and Playwright E2E tests PASS.
 
 - [ ] **Step 3: Commit Task 9**

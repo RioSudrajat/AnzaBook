@@ -1,220 +1,215 @@
-# Product Requirements Document (PRD): AnzaBook
-**Versi:** 1.1 (Updated: Tech Stack Monorepo, Web Pre-Trigger DRM & Strava-Style Share Studio)  
-**Tanggal:** 31 Oktober 2026  
-**Status:** Siap Review Final Sebelum Masuk Tahap Implementation Plan
+# Product Requirements Document — AnzaBook
 
----
+**Versi 3.1 · 7 November 2026 · Baseline pengembangan dan pilot**
 
-## Bagian 1: Hasil Riset & Reverse Engineering
+## 1. Ringkasan eksekutif
 
-Sebelum masuk ke spesifikasi fitur dan teknis, bagian ini membedah empat pilar riset yang menjadi fondasi produk dan model bisnis AnzaBook.
+AnzaBook adalah platform baca untuk buku fiksi dan nonfiksi Indonesia. Penulis dan penerbit dapat menawarkan akses digital dengan aturan yang jelas. Pembaca bisa melanjutkan buku dari posisi terakhir, merayakan sesi baca atau buku yang tamat, lalu menemukan orang dan ruang untuk membacanya bersama.
 
-### 1.1 Reverse Engineering: Malaka Books (`malakabooks.id`)
-Malaka Books memposisikan diri sebagai penerbit sekaligus platform baca digital berbasis langganan (SaaS literasi) yang menargetkan pembaca modern dengan rentang perhatian (*attention span*) pendek namun membutuhkan substansi padat.
+Tiga masalah menentukan prioritas produk.
 
-* **Arsitektur Konten (Micro-Book / Ringkas):** Buku dikemas dalam format 20 hingga 30 halaman per judul (durasi baca sekitar 45 hingga 60 menit). Fokus pada nonfiksi populer: filsafat praktis (*The Thinking Blueprint*), psikologi, ekonomi, sains, dan karier.
-* **Fitur Utama Reader & Eksplorasi:**
-  * **Bilingual / Multi-Language Reading:** Tersedia buku berbahasa Inggris dan fitur baca dwibahasa (Indonesia, Inggris, Jepang, Jerman, Korea) untuk memperkaya kosakata sambil membaca.
-  * **Weekly Bulletin:** Kurasi editorial mingguan di bagian teratas halaman utama (*Home*) untuk mendorong buku yang relevan dengan isu terkini, dilengkapi tombol bagikan sekali ketuk (*one-tap share*).
-  * **Quote Sharing ke Media Sosial:** Pembaca bisa melakukan *highlight* kalimat dan langsung mengekspornya menjadi kartu kutipan visual untuk Instagram Story atau X.
-  * **Progress Tracker & Auto-Resume:** Melacak persentase bacaan dan membuka kembali halaman terakhir lintas perangkat.
-* **Model Monetisasi (Tiered Subscription):**
-  * Sebagian buku gratis sebagai *lead magnet*, sedangkan katalog penuh dibuka lewat iuran keanggotaan:
-    * Paket 3 Bulan: Rp80.000 (~Rp26.667/bulan)
-    * Paket 6 Bulan: Rp140.000 (~Rp23.333/bulan)
-    * Paket 12 Bulan: Rp240.000 (~Rp20.000/bulan)
-* **Celah Strategis untuk AnzaBook:** Malaka Books kuat di nonfiksi pendek digital, namun belum menggabungkan katalog fiksi/novel panjang, ekosistem sosial sekelas Goodreads, fitur *Flex Your Read* bergaya Strava, opsi cetak fisik berlapis (*tiered print*), serta pelacakan stok toko buku secara *real-time*.
+1. **DRM — Beri penulis kendali saat membawa buku cetak ke digital.** Dalam survei IKAPI pada 2021 terhadap lebih dari 130 penerbit, sekitar **75%** menemukan buku mereka dibajak dan dijual di lokapasar. Risiko kehilangan kendali atas salinan dapat membuat sebagian pemegang hak menahan distribusi digital. AnzaBook menawarkan penerbitan bertahap, pemeriksaan hak baca di server, dan cara menelusuri dugaan kebocoran. [IKAPI, survei pembajakan](https://www.ikapi.org/2023/05/20/pembajakan-buku-membunuh-kreativitas/). [UPI, studi kasus distribusi perpustakaan digital](https://repository.upi.edu/86240/3/S_PSPI_1606701_Chapter%201.pdf).
+2. **Flex Your Literacy — Jadikan membaca kebiasaan yang terlihat.** Skor membaca Indonesia pada PISA 2025 adalah **365 poin**, dibandingkan **461 poin** rata-rata OECD. AnzaBook menguji gagasan yang terinspirasi dari Strava. Pembaca bisa memamerkan buku yang sedang dibaca, durasi, kutipan berizin, atau momen tamat lewat kartu **Flex Your Reading**. Teman yang melihatnya bisa membuka buku yang sama dan ikut membaca. [OECD, profil PISA 2025 Indonesia](https://gpseducation.oecd.org/CountryProfile?primaryCountry=IDN&topic=PI). [Strava, berbagi statistik aktivitas](https://support.strava.com/en-us/articles/15401840-sharing-your-strava-activities).
+3. **Community Enabler — Bantu komunitas mengadakan kegiatan berulang.** Badan Bahasa mendata **1.291 komunitas literasi di 32 provinsi** pada 2024 dan melaporkan bahwa sebagian besar membiayai kegiatan secara mandiri. AnzaBook akan membantu penggerak komunitas dan taman bacaan masyarakat menerbitkan agenda, mengelola pendaftaran, mencatat kehadiran, dan mengundang peserta ke kegiatan berikutnya. [Badan Bahasa, Pembekalan Komunitas Literasi 2024](https://badanbahasa.kemendikdasmen.go.id/berita-detail/4349/kemendikbudristek-salurkan-bantuan-pemerintah-kepada-340-komunitas-pegiat-literasi).
 
----
+**Status produk.** Fondasi katalog, reader, pemeriksaan hak baca, pencatatan progres, Share Studio, dan interaksi per buku sudah terlihat di repositori. Penguatan DRM, eksperimen kebiasaan baca, dan pilot alat komunitas masih menjadi pekerjaan berikutnya. Status di dokumen ini berdasarkan pemeriksaan kode, paket, dan dokumentasi repo.
 
-### 1.2 Riset Ekonomi Perbukuan: Mengapa Buku di India Sangat Murah dibanding AS & Indonesia?
+## 2. Visi, misi, dan sasaran pengguna
 
-Fenomena buku yang dijual seharga $30 hingga $150 di Amerika Serikat namun dijual hanya Rp25.000 hingga Rp60.000 (INR 150 hingga 400) di India bukan semata-mata karena subsidi pemerintah, melainkan kombinasi **strategi lisensi teritorial, rekayasa spesifikasi kertas, dan pemangkasan rantai distribusi**.
+**Visi.** Memperluas akses legal ke buku Indonesia, melindungi hak atas karya, dan menjadikan membaca kegiatan yang bisa dilakukan rutin, sendiri maupun bersama.
+
+**Misi.** Menyediakan akses digital dan opsi cetak yang terjangkau. Memberi penulis kendali atas distribusi digital karyanya. Membantu pembaca membangun kebiasaan lewat progres yang bisa mereka lihat dan bagikan. Memperkuat kegiatan komunitas, perpustakaan, dan taman baca yang sudah berjalan.
+
+**Tagline.** Aksara Tanpa Penjara Pikiran — Pustaka Digital & Edisi Cetak Rakyat.
+
+- **Pembaca awal.** Mahasiswa dan pembaca dewasa muda yang ingin kembali membaca secara rutin. Mereka perlu menemukan bacaan, lanjut tanpa mencari halaman lagi, dan punya cara membagikan momen baca kepada teman.
+- **Penulis dan penerbit awal.** Penulis independen dan penerbit kecil yang ingin menguji distribusi digital. Mereka perlu menetapkan bagian sampel, tahu siapa yang berhak membaca, dan punya jalur melaporkan dugaan kebocoran.
+- **Penggerak komunitas.** Pengurus klub buku, taman bacaan masyarakat (TBM), dan perpustakaan mitra yang sudah mengadakan kegiatan. Mereka perlu satu halaman kegiatan yang dapat dibagikan dan alur pendaftaran yang ringan bagi relawan.
+
+## 3. Riset masalah dan implikasi produk
+
+### 3.1 Pembajakan buku dan keputusan menerbitkan edisi digital
+
+- **Lokapasar dan PDF adalah jalur yang berbeda.** Survei IKAPI pada 2021 melibatkan lebih dari 130 penerbit. Sekitar 75% responden menemukan buku mereka dibajak dan dijual di lokapasar. Rilis IKAPI pada 2020 juga melaporkan kategori temuan selama pandemi: **54,2%** di lokapasar, **25%** melalui PDF gratis, dan **20,8%** mengalami keduanya. Rilis 2020 tidak menyebut ukuran sampelnya. Kedua survei menggambarkan pengalaman penerbit yang disurvei, tanpa mengukur persentase seluruh judul atau pembaca Indonesia. Perbedaan pertanyaan membuat keduanya kurang tepat dipakai sebagai tren. [IKAPI, survei 2021](https://www.ikapi.org/2023/05/20/pembajakan-buku-membunuh-kreativitas/). [IKAPI, rilis 2020](https://www.ikapi.org/2020/09/07/press-release-program-beli-buku-lokal/).
+- **Penanganan di luar reader memerlukan bukti.** DJKI menangani **lebih dari 20 sengketa** hak cipta e-book dan karya tulis digital melalui mediasi dari 2022 hingga awal 2024. Pada Juli 2025, setelah memverifikasi laporan satu penerbit, DJKI merekomendasikan penutupan **15 akun dan situs**. Jumlah tersebut menunjukkan penanganan yang tercatat. Pindaian buku cetak dan unggahan di kanal lain tetap membutuhkan pelaporan dan tindak lanjut pemegang hak. [DJKI, data mediasi](https://www.dgip.go.id/index.php/artikel/detail-artikel-berita/tegas-berantas-pembajakan-buku-djki-jalin-kolaborasi-lintas-sektor?kategori=liputan-penyidikan-ki). [DJKI, rekomendasi penutupan](https://www.dgip.go.id/index.php/artikel/detail-artikel-berita/djki-menerbitkan-rekomendasi-pemblokiran-situs-bajakan-hak-cipta-buku-yang-dilaporkan-gramedia?kategori=liputan-penyidikan-ki).
+
+#### Mengapa sebagian judul tetap terbit dalam format cetak
+
+- **Risiko kehilangan kendali atas salinan.** Dalam studi kasus SiPINTAR, kepala Perpustakaan Universitas Islam Bandung melaporkan bahwa kekhawatiran penerbit akan pembajakan menjadi hambatan kerja sama distribusi koleksi digital. Setelah file lengkap beredar di luar kanal resmi, pemegang hak harus menemukan dan melaporkan salinannya. Kasus ini menunjukkan satu hambatan di jalur perpustakaan digital. Survei pembajakan IKAPI di atas mengukur temuan pelanggaran, sedangkan keputusan menunda e-book perlu diteliti langsung pada pemegang hak. [UPI, wawancara studi kasus SiPINTAR](https://repository.upi.edu/86240/3/S_PSPI_1606701_Chapter%201.pdf).
+- **Pendapatan digital perlu sepadan dengan pekerjaan tambahan.** IKAPI menyebut penjualan buku digital masih di bawah **10%** dalam surveinya pada 2020. Angka historis itu memberi konteks mengapa penerbit bisa mengutamakan cetak. Untuk judul pilot, uji apakah perkiraan pendapatan dan kejelasan royalti sepadan dengan konversi format, pemeriksaan tata letak, dan pengelolaan distribusi digital. [IKAPI, Adaptasi Digitalisasi dan Tantangan Pembajakan](https://www.ikapi.org/2023/05/24/masa-depan-buku-di-indonesia-adaptasi-digitalisasi-dan-tantangan-pembajakan/).
+- **Izin cetak dan izin digital perlu diperiksa per judul.** Saat merekrut judul cetak, cek siapa pemegang hak, cakupan lisensi yang sudah ada, persetujuan untuk sampel, dan ketentuan pendapatan. Dalam pilot, bedakan judul yang tertahan karena risiko kebocoran, kesepakatan hak, atau perhitungan bisnis. [Padjadjaran Law Review, studi lisensi penerbitan buku](https://jurnal.fh.unpad.ac.id/index.php/plr/article/view/1657).
+
+**Batas DRM berbasis web.** Server dapat menolak permintaan yang tidak berhak dan membatasi bagian naskah yang dikirim. Peramban perlu menerima representasi konten untuk menampilkannya. Watermark dan overlay dapat menghambat penyalinan kasual. Standar Screen Capture W3C mengatur permintaan tangkap layar yang diajukan halaman dengan izin pengguna. Pembaca masih dapat merekam lewat sistem operasi atau kamera, menggunakan OCR, atau menginspeksi data yang diterima browser. [W3C, Screen Capture](https://www.w3.org/TR/2026/WD-screen-capture-20260716/).
+
+**Implikasi untuk AnzaBook.** Tawarkan uji coba per judul. Pemegang hak dapat memulai dari sampel, membuka akses untuk pemilik kode buku fisik, atau menyetujui akses penuh lewat Nakama. Saat wawancara, catat alasan judul masih cetak dan syarat yang perlu dipenuhi agar pemegang hak bersedia membuka salah satu tingkat akses.
+
+### 3.2 Kecakapan membaca, kegemaran membaca, dan kebiasaan
+
+#### Posisi Indonesia dan negara pembanding
+
+Dalam **PISA 2025**, skor rata-rata membaca siswa usia 15 tahun adalah **Indonesia 365**, **Thailand 392**, **Malaysia 393**, **rata-rata OECD 461**, **Finlandia 474**, **Estonia 499**, **Jepang 503**, dan **Singapura 535**. Indonesia terpaut **96 poin** dari rata-rata OECD dan **170 poin** dari Singapura. [OECD, PISA 2025, Tabel I.B1.2a.2](https://www.oecd.org/en/publications/pisa-2025-results-volume-i_73451bc5-en/full-report/results-for-countries-and-economies_33854635.html).
 
 ```mermaid
-flowchart LR
-    A["Harga Buku Mahal di Indonesia (Rp90rb - Rp250rb+)"] --> B["Komponen Kertas (60% HPP)"]
-    A --> C["Potongan Distributor & Toko (35% - 50% HET)"]
-    A --> D["Oplah Cetak Kecil (2.000 - 3.000 eks)"]
-    
-    E["Model Buku Terjangkau (Adaptasi India ke AnzaBook)"] --> F["Tiered Paper Spec (Kertas Koran / LWC / Bookpaper)"]
-    E --> G["Direct-to-Reader & Pre-Order Batch (Pangkas Margin Ritel)"]
-    E --> H["Lisensi Edisi Lokal & Bundling Digital"]
+xychart-beta
+    title "Skor rata-rata membaca PISA 2025"
+    x-axis ["Indonesia", "Thailand", "Malaysia", "OECD", "Finlandia", "Estonia", "Jepang", "Singapura"]
+    y-axis "Poin PISA" 0 --> 600
+    bar [365, 392, 393, 461, 474, 499, 503, 535]
 ```
 
-#### A. 4 Faktor Kunci Buku Murah di India (*Indian Subcontinent Edition*)
-1. **Spesifikasi Kertas & Cetak Ekonomis (*Engineered Downgrade*):**
-   * Edisi Barat memakai kertas bebas asam (*acid-free archival paper*) tebal (70 hingga 80 gsm) dan sampul *hardcover*.
-   * Edisi India (*Eastern Economy Edition*) menggunakan kertas ringan berbiaya rendah (45 hingga 55 gsm *newsprint* / kertas koran berkualitas baca atau *low-grade wood-free paper*), cetak isi hitam-putih penuh (*grayscale*), dan sampul *paperback* tipis dengan penjilidan lem panas standar. Biaya bahan baku turun hingga 50% sampai 65%.
-2. **Lisensi Teritorial (*Price Discrimination / Purchasing Power Parity*):**
-   * Penerbit global (Pearson, Penguin, HarperCollins) melisensikan pencetakan langsung di percetakan lokal India dengan label tegas: *"For Sale in the Indian Subcontinent Only"*. Daripada buku dibajak 100% karena tidak terjangkau, penerbit memilih margin tipis per eksemplar namun volume penjualan jutaan kopi.
-3. **Lembaga Penerbitan Publik & Regulasi Pajak:**
-   * Pemerintah India memiliki **National Book Trust (NBT)** dan **Publications Division** yang mencetak buku literasi dan sastra dengan harga sangat murah. Selain itu, buku cetak di India dibebaskan dari GST (0% GST untuk buku fisik).
-4. **Perbandingan dengan Masalah di Indonesia:**
-   * Di Indonesia, PMK Nomor 5/PMK.010/2020 membebaskan PPN untuk buku pelajaran umum, kitab suci, dan buku agama, namun buku umum/novel sering kali masih terkena beban pajak di hulu (bahan baku kertas & PPh royalti penulis).
-   * **Penyebab utama mahalnya buku di Indonesia (Rp90.000 hingga Rp250.000+):**
-     1. **Kertas memakan ~60% Biaya Produksi (HPP):** Penerbit lokal rata-rata hanya menawarkan satu jenis cetakan (Bookpaper 57.5/72 gsm impor atau HVS 70 gsm).
-     2. **Potongan Toko Buku & Distributor (35% hingga 50% dari harga jual):** Jika biaya cetak buku hanya Rp18.000, harga jual di toko fisik harus dipasang Rp90.000 hingga Rp100.000 agar menutup komisi distributor (40% hingga 50%), royalti penulis (10%), dan margin penerbit.
-     3. **Oplah Cetak Kecil (2.000 hingga 3.000 eksemplar):** Biaya persiapan cetak (*fixed cost* plat offset) dibagi ke jumlah buku yang sedikit.
+- **Kecakapan membaca.** **27%** siswa Indonesia mencapai minimal Level 2 pada PISA 2025, dibanding **69%** rata-rata OECD. Pada level itu siswa bisa menemukan gagasan utama dan informasi sesuai kriteria tertentu. Proporsi Indonesia pada 2022 adalah **25%**, dan OECD menilai skor rata-rata membaca Indonesia relatif sama antara kedua siklus. [OECD, PISA 2025 Indonesia](https://www.oecd.org/en/publications/pisa-2025-results-volume-i-country-notes_2d4ff9ea-en/indonesia_9c880f8a-en.html). [OECD, PISA 2022 Indonesia](https://www.oecd.org/en/publications/pisa-2022-results-volume-i-and-ii-country-notes_ed6fbcc5-en/indonesia_c2e1ae0e-en.html).
+- **Melek aksara.** BPS mencatat **96,67%** penduduk Indonesia usia 15 tahun ke atas melek huruf pada 2024. Indikator ini mengukur kemampuan dasar membaca dan menulis kalimat sederhana. PISA menilai kecakapan memahami dan menggunakan teks pada siswa usia 15 tahun. Perbedaan populasi dan keterampilan yang diukur menjelaskan mengapa kedua angka memberi gambaran berbeda. [BPS, Indikator Kesejahteraan Rakyat 2024](https://www.bps.go.id/assets/publication/2024/11/06/3ef10d3d82ed93f616ba9113/indikator-kesejahteraan-rakyat-2024.html). [BPS, definisi angka melek huruf](https://sirusa.bps.go.id/sirusa/index.php/indikator/313).
+- **Kegemaran membaca.** Survei Perpusnas 2025 yang dipublikasikan BPS mencatat indeks nasional **54,80**, dengan komponen pramembaca **50,05**, saat membaca **53,94**, dan pascamembaca **57,90**. Angka tersebut adalah skor indeks perilaku, dengan satuan yang berbeda dari persentase kecakapan PISA. PRD memakai data 2025 sebagai potret satu tahun. [BPS dan Perpusnas, Tingkat Kegemaran Membaca 2025](https://www.bps.go.id/id/statistics-table/3/TlROMldrTjVjVzEwVWtkbmRUSk5abkk0T0U5Q1FUMDkjMyMwMDAw/tingkat-kegemaran-membaca-masyarakat-dan-unsur-penyusunnya-menurut-provinsi.html?year=2025).
 
-#### B. Implementasi untuk Penerbitan AnzaBook (*Multi-Format & Tiered Paper Publishing*)
-AnzaBook memecahkan masalah harga buku mahal di Indonesia dengan menawarkan **3 Tier Fisik + 1 Tier Digital** saat penulis menerbitkan buku atau saat pembaca membeli:
+#### Apa yang dilakukan sistem pendidikan dengan skor lebih tinggi
 
-| Tier Format | Spesifikasi Material | Estimasi Harga Jual | Target Pembaca | Saluran Distribusi |
-| :--- | :--- | :--- | :--- | :--- |
-| **1. Digital / SaaS Access** | E-Book & Audiobook terenkripsi di Web App | Rp20.000/bln (Langganan) atau Rp25.000/judul | Komuter, pembaca digital, pelajar | Web App AnzaBook |
-| **2. Edisi Rakyat (Pocket / Economy Print)** | Kertas Koran Halus (*Novel Newsprint* 48.8 gsm) atau Bookpaper tipis 52 gsm, ukuran saku A6/B6, *softcover* ringan | **Rp29.000 - Rp45.000** | Pelajar, mahasiswa, gerakan literasi daerah | Direct-to-Consumer (Web App AnzaBook) & Komunitas (tanpa potongan 45% toko ritel) |
-| **3. Edisi Standar (Trade Paperback)** | Bookpaper 57.5 gsm / 72 gsm ramah mata, ukuran A5/UNESCO, *softcover* doff/glossy | **Rp75.000 - Rp99.000** | Pembaca umum & pembeli toko buku | Toko Buku Fisik (Gramedia, mitra) & Online |
-| **4. Edisi Kolektor (Hardcover / Special)** | Bookpaper 72/80 gsm / Art Paper, *hardcover*, pita pembatas, jaket buku, tanda tangan penulis | **Rp149.000 - Rp225.000** | Kolektor, penggemar berat penulis | Pre-order eksklusif & stok terbatas di toko |
+- **Singapura menggabungkan pengajaran dan dukungan dini.** Program STELLAR memakai cerita di kelas untuk melatih membaca, berdiskusi, dan menulis. Siswa kelas 1 dan 2 yang masih kesulitan mendapat dukungan tambahan dalam kelompok kecil. Sekolah dan National Library Board juga menyediakan daftar bacaan dan kegiatan membaca bersama melalui kidsREAD. [MOE Singapura, kurikulum dan dukungan literasi](https://www.moe.gov.sg/-/media/files/news/press/2023/annex-c---moe-pirls-2021.ashx). [MOE Singapura, kemitraan untuk membaca](https://www.moe.gov.sg/-/media/files/news/press/2023/annex-d---moe-pirls-2021.pdf).
+- **Jepang memperluas akses lewat sekolah dan perpustakaan.** Rencana pendidikan MEXT mendorong kerja sama sekolah dengan perpustakaan umum, penguatan perpustakaan sekolah, penyiapan guru pustakawan, dan lebih banyak kesempatan membaca bagi anak. [MEXT Jepang, Rencana Dasar Pendidikan Keempat](https://www.mext.go.jp/en/policy/education/lawandplan/20240311-ope_dev03-1.pdf).
+- **Finlandia memasukkan literasi lintas pelajaran.** Kurikulum melatih siswa memahami dan menilai beragam jenis teks di berbagai mata pelajaran. Strategi nasional juga mendorong pembiasaan membaca dan penguatan literasi sepanjang hayat. [Badan Pendidikan Finlandia, literasi lintas pelajaran](https://www.oph.fi/en/education-and-qualifications/multiliteracy-and-media-literacy). [Strategi Literasi Nasional 2030](https://www.oph.fi/en/statistics-and-publications/publications/national-literacy-strategy-2030).
 
----
+Contoh ini memperlihatkan tiga cara yang saling melengkapi: latihan memahami teks, akses ke bahan bacaan, dan kesempatan membaca bersama. PISA memberi pembanding hasil antarsistem. Kontribusi masing-masing program terhadap skor perlu dinilai dengan studi tersendiri. AnzaBook fokus pada akses legal dan kesempatan membaca rutin lewat reader, kartu Flex, dan agenda komunitas.
 
-### 1.3 Teardown Goodreads + "Strava for Reading" (Social & Habit Loop)
+#### Dari FOMO lari ke kebiasaan membaca
 
-Goodreads bertahan karena *database* buku, tetapi tampilannya usang dan kurang memicu kebanggaan sosial (*social flexing*) di era Instagram Story, X, dan Threads. AnzaBook menggabungkan fondasi katalog Goodreads dengan psikologi kebiasaan **Strava**:
+**Pengamatan pendiri.** Ketika unggahan jarak, durasi, dan progres lari muncul berulang kali di lingkaran teman, lari terasa seperti kegiatan yang bisa diikuti. Orang bisa mulai karena penasaran atau takut ketinggalan momen bersama, lalu punya alasan untuk mengulang saat bisa melihat progres sendiri. Strava memberi cara untuk mencatat aktivitas dan membagikan statistiknya ke media sosial, termasuk sebagai stiker di Instagram Stories. [Strava, berbagi aktivitas](https://support.strava.com/en-us/articles/15401840-sharing-your-strava-activities). [Strava, stiker untuk Stories](https://support.strava.com/en-us/articles/17718841-how-do-i-share-my-strava-activity-to-instagram-stories-as-a-transparent-sticker).
 
-| Pilar Fitur | Cara Kerja di Goodreads | Inovasi di AnzaBook (Goodreads + Strava Loop) |
-| :--- | :--- | :--- |
-| **Digital Shelves (Rak Buku)** | 3 rak wajib (*Want to Read, Currently Reading, Read*) + rak kustom | Rak otomatis sinkron dengan progres *in-app reader* dan buku fisik yang dipindai lewat ISBN/barcode |
-| **Flex Your Read (Strava-Style Share)** | Tidak ada fitur kartu visual aktivitas membaca harian | Selesai satu sesi baca, muncul ringkasan metrik (**Durasi Baca, Halaman Diselesaikan, Kecepatan Baca/WPM, Streak Harian**) yang bisa diekspor menjadi **Stiker PNG Transparan** (untuk ditempel di atas foto kopi/buku di IG Story) atau Kartu Editorial siap unggah |
-| **Rating & Review** | Skala 1 sampai 5 bintang bulat; rawan *review bombing* | Rating desimal (0.5 step), lencana **"Verified Reader"** (otomatis jika menyelesaikan >70% di app atau klaim kode unik buku cetak), dan *structured review* |
-| **Social Feed & Diskusi** | Forum grup model lama terpisah dari isi buku | **Inline Paragraph Discussion (Marginalia):** Pembaca bisa meninggalkan reaksi dan diskusi tepat di samping paragraf tertentu (dengan pelindung *spoiler*) |
+- **Sinyal dari Indonesia.** Strava melaporkan partisipasi klub lari naik **83%** di Indonesia pada 2024, dibanding **59%** secara global. Laporan perusahaan menggambarkan tren komunitas yang diamatinya. Besarnya pengaruh fitur berbagi statistik terhadap tren lari di Indonesia belum diukur oleh angka tersebut. [Strava, Year in Sport 2024](https://press.strava.com/articles/strava-merilis-year-in-sport-laporan-tren).
+- **Pengaruh teman punya bukti pada konteks lari.** Studi Aral dan Nicolaides menganalisis data sekitar **1,1 juta pelari** di sebuah jaringan sosial olahraga. Dengan memanfaatkan variasi cuaca, mereka memperkirakan tambahan **1 km** yang ditempuh teman berkaitan dengan tambahan **0,3 km** lari pada hari yang sama. Studi ini menguji perilaku di jaringan yang diteliti. Efek yang sama pada pengguna AnzaBook masih perlu diuji. [Aral dan Nicolaides, Nature Communications](https://www.nature.com/articles/ncomms14753).
+- **Pencatatan progres layak diuji.** Meta-analisis Harkin dkk. terhadap **138 studi eksperimental** dengan **19.951 peserta** menemukan bahwa intervensi untuk memantau progres membantu pencapaian target dengan ukuran efek terstandar **d = 0,40** (IK 95% **0,32–0,48**). Efek cenderung lebih besar saat hasil dicatat atau dilaporkan ke orang lain. Studi mencakup beragam tujuan. Pengaruh berbagi kartu terhadap kebiasaan membaca di AnzaBook masih berupa hipotesis. [Harkin dkk., Psychological Bulletin](https://www.apa.org/pubs/journals/releases/bul-bul0000025.pdf).
+- **Konteks berulang membantu rutinitas.** Dalam studi Lally dkk., **96 sukarelawan** memilih satu perilaku harian untuk diulang dalam konteks yang sama selama **12 minggu**. Estimasi waktu untuk mendekati tingkat otomatisasi maksimum bervariasi dari **18 sampai 254 hari** pada peserta dengan model yang sesuai. Perilaku yang diteliti mencakup makan, minum, atau aktivitas lain. Temuan ini mendukung pengujian rutinitas ringan dan ajakan kembali setelah melewatkan satu hari. [Lally dkk., European Journal of Social Psychology](https://doi.org/10.1002/ejsp.674).
 
----
+**Hipotesis AnzaBook.** FOMO adalah rasa takut melewatkan pengalaman menyenangkan yang sedang dijalani orang lain. Di Flex Your Reading, pemicunya bisa sesederhana melihat teman membagikan buku yang sedang dibaca dan ingin ikut membacanya. Kartu memberi jalan ke halaman buku dan sampel yang tersedia. Setelah sesi pertama, posisi tersimpan dan progres pribadi memberi alasan untuk kembali. Berbagi tetap pilihan pembaca, dengan ruang untuk merayakan sesi singkat tanpa peringkat publik atau hukuman saat absen. [Przybylski dkk., studi tentang FOMO](https://doi.org/10.1016/j.chb.2013.02.014).
 
-### 1.4 Arsitektur Pure Web DRM: Pre-Trigger Blur & Watermark AnzaBook
+### 3.3 Pemberdayaan komunitas dan ruang baca
 
-Karena AnzaBook dibangun sebagai **Pure Web App**, perlindungan terhadap *copy-paste* dan *screenshot* bekerja menggunakan mekanisme **Pre-Trigger Shield + Dynamic Watermark Overlay**:
+- **Ada jaringan penggerak yang sudah aktif.** Pada 2024 Badan Bahasa melaporkan **2.388 komunitas taman baca** tergabung dalam Forum TBM dan **1.291 komunitas literasi** terdata di 32 provinsi. Angka ini berasal dari dua pendataan dengan cakupan berbeda dan dapat beririsan. Program bantuan 2024 menjangkau **340 komunitas**, sementara sebagian besar komunitas yang disebut dalam laporan menjalankan kegiatan dengan dana mandiri. [Badan Bahasa, Pembekalan Komunitas Literasi 2024](https://badanbahasa.kemendikdasmen.go.id/berita-detail/4349/kemendikbudristek-salurkan-bantuan-pemerintah-kepada-340-komunitas-pegiat-literasi).
+- **Ruang fisik dapat menjadi pintu masuk.** Perpusnas melaporkan bahwa program Transformasi Perpustakaan Berbasis Inklusi Sosial (TPBIS) menjangkau sekitar **13,9 juta orang secara kumulatif** sejak 2018 hingga laporan Juli 2026. Pada 2026 program dilaksanakan di **750 lokus**. Ini angka jangkauan program pemerintah dan mitra, dengan cakupan yang berbeda dari tingkat partisipasi berulang di suatu klub buku. [Perpusnas, siaran pers TPBIS 2026](https://perpusnas.go.id/berita/siaran-pers-tpbis-telah-menjangkau-13-9-juta-masyarakat-dan-mengubah-cara-pandang-terhadap-perpustakaan).
+- **Menemukan kegiatan bisa menjadi hambatan lokal.** Laporan pendampingan TBM Matahari di Tulungagung mengaitkan rendahnya kunjungan dengan kurangnya promosi layanan. Kegiatan sosialisasinya melibatkan **40 orang tua dan anak**. Hasil dari satu lokasi memberi alasan untuk menguji apakah agenda yang mudah dibagikan membantu orang menemukan kegiatan setempat. [Juvitasari dkk., laporan pendampingan TBM Matahari](https://ejournal.unma.ac.id/index.php/bernas/article/view/16955).
+
+**Implikasi untuk AnzaBook.** Rekrut penyelenggara yang sudah punya agenda. Petakan waktu yang mereka habiskan untuk mengurus peserta, alat yang mereka pakai, dan data yang mereka perlukan setelah acara. Uji apakah halaman agenda, RSVP, dan daftar hadir mengurangi pekerjaan tersebut. Besarnya jaringan komunitas belum menjawab apakah relawan ingin menambah alat baru.
+
+## 4. Fitur inti dan kriteria penerimaan
+
+**P0** adalah kebutuhan menuju pilot. **P1** diuji setelah alur P0 berjalan. **P2** adalah pengembangan lanjutan. Kriteria di bawah mendefinisikan perilaku yang dituju.
+
+### 4.1 P0 · DRM dan hak akses baca
+
+**Ada di repo.** Reader web yang memerlukan login, pemeriksaan hak akses, sampel untuk buku premium, akses melalui Nakama atau klaim buku fisik, dan `Cache-Control: private, no-store` pada API. Respons reader saat ini mengirim teks bab yang diizinkan dalam JSON dan dapat memuat seluruh bab melalui mode baca kontinu untuk akun berhak. Jika diaktifkan dari reader, Shield menampilkan watermark berisi email, potongan ID akun, dan waktu, serta merespons beberapa interaksi browser. [Endpoint buku](apps/api/src/routes/books.routes.ts). [Layanan buku](apps/api/src/services/books.service.ts). [Kebijakan cache](apps/api/src/middleware/no-store.ts). [Komponen Shield](apps/web/src/features/reader/components/drm-shield.tsx).
+
+- **DRM-01 · Cek hak baca di server.** Tanpa sesi, endpoint reader menolak permintaan. Akun dengan akses sampel hanya menerima bagian yang diizinkan. Nakama aktif atau klaim sah membuka bagian sesuai kebijakan judul. Kedaluwarsa atau pencabutan hak berlaku untuk permintaan berikutnya. Uji akses langsung ke API, termasuk bab terkunci, mode kontinu, dan audio jika tersedia.
+- **DRM-02 · Batasi naskah yang dikirim.** Sajikan bab yang dibuka dengan jendela prefetch terbatas. Cegah naskah premium masuk ke payload publik, cache bersama, atau log. Batasi pengambilan berulang yang tidak wajar dengan ambang berdasarkan pengujian baca normal. Audio premium, bila disajikan lewat tautan bertanda tangan, mengikuti pemeriksaan hak akses dan masa berlaku.
+- **DRM-03 · Watermark dan laporan.** Ganti email pada tampilan dengan ID sesi acak yang dapat ditelusuri petugas berwenang. Pemegang hak dapat melaporkan URL dan bukti. Tim meninjau kecocokan judul, waktu, dan watermark sebelum menindaklanjuti. Kehilangan fokus dan shortcut browser tidak menjadi dasar tunggal untuk memblokir akun.
+- **DRM-04 · Lindungi pengalaman baca.** Keyboard, pembaca layar, highlight pribadi, dan kelanjutan posisi baca tetap berfungsi. Jika overlay aktif, fokus berpindah ke aksi **Lanjutkan membaca** dan kembali ke posisi semula sesudahnya. Uji pemicu keliru, pergantian tab, dan perangkat seluler.
+- **DRM-05 · Beri pemegang hak pilihan penerbitan.** Tim kurasi mencatat persetujuan dan tingkat akses per judul. Pilihan pilot mencakup sampel saja, akses penuh lewat klaim buku fisik, atau akses penuh lewat Nakama sesuai perjanjian. Catat batas sampel serta izin dan panjang kutipan secara terpisah. Untuk judul tanpa izin kutipan publik, kartu Flex menawarkan sampul yang diizinkan, judul, penulis, dan progres tanpa teks naskah. Portal mandiri penulis dan evaluasi batas sesi konkuren masuk P1.
 
 ```mermaid
 flowchart TD
-    A["Pembaca Membuka Halaman Buku (Canvas / Protected Layer)"] --> B{"Deteksi Sinyal Percobaan Screenshot / Copy"}
-    B -->|"1. Tekan Tombol Modifier (Win / Cmd / Shift / Alt)"| C["Trigger Instan (<16ms): Blur Teks + Tampilkan Overlay Logo & Watermark AnzaBook"]
-    B -->|"2. Klik Snipping Tool / Tab Kehilangan Fokus (window.onblur)"| C
-    B -->|"3. Sentuhan >= 2 Jari di Layar HP (Gestur Screenshot 3 Jari)"| C
-    B -->|"4. Tombol PrintScreen Dilepas (keyup PrtScn)"| D["Blur Layar + Kosongkan Isi Clipboard (navigator.clipboard.writeText)"]
-    B -->|"5. Mode Ketat (Buku Rawan Bajak): Jari Lepas dari Layar (touchend)"| C
-    C --> E["Hasil Tangkapan Layar Hanya Berisi Teks Blur + Watermark AnzaBook"]
+    A["Pembaca meminta bagian buku"] --> B{"Sesi valid?"}
+    B -->|Tidak| C["Masuk, lalu kembali ke buku"]
+    B -->|Ya| D{"Hak baca untuk bagian ini?"}
+    D -->|Sampel| E["Kirim bagian sampel"]
+    D -->|Akses penuh| F["Kirim bab yang diperlukan"]
+    D -->|Terkunci| G["Tawarkan akses sesuai kebijakan judul"]
+    E --> H["Tampilkan reader"]
+    F --> I["Pasang watermark dengan ID sesi"]
+    I --> H
 ```
 
-1. **Anti Copy-Paste & Inspect Element:**
-   * Seluruh area baca menggunakan `user-select: none`, pemblokiran event `copy`, `cut`, `contextmenu` (klik kanan), dan `Ctrl+P` (cetak halaman).
-   * Teks buku dikirim dari Express API dalam bentuk potongan terenkripsi (*encrypted chunks*) per halaman dan dirender ke dalam elemen `<canvas>` (atau *obfuscated DOM layer*), sehingga tidak bisa disalin lewat *Inspect Element*.
-2. **Pre-Trigger Screenshot Blur + Watermark AnzaBook:**
-   * **Desktop Shortcut Interception:** Saat pengguna menekan tombol awal kombinasi screenshot (`Meta`/`Win`, `Cmd`, `Shift`, `Alt`), state komponen baca langsung berubah dalam `<16ms` menjadi `filter: blur(18px)` disertai kemunculan lapisan **Logo AnzaBook + Teks Peringatan Hak Cipta + ID Akun Pembaca**.
-   * **Focus Loss Shield:** Saat pengguna mengklik aplikasi Snipping Tool atau berpindah jendela (`blur` / `visibilitychange`), layar baca otomatis ter-blur penuh dan menampilkan watermark AnzaBook.
-   * **Mobile Multi-Touch Shield:** Saat pengguna di browser HP menempelkan 2 atau 3 jari untuk melakukan gestur screenshot usap 3 jari (`touchstart` dengan `touches.length >= 2`), layar langsung mem-blur teks dan memunculkan watermark sebelum OS menangkap gambar.
-   * **PrintScreen Clipboard Wipe:** Jika tombol tunggal `PrintScreen` ditekan, begitu event terdeteksi, Web App langsung menimpa *clipboard* dengan teks peringatan hak cipta AnzaBook dan mem-blur layar.
-   * **Mode "Hold-to-Read / Spotlight" (Opsional untuk Buku Cetak Baru/Sensitif):** Untuk buku yang sangat rawan dibajak, teks hanya tajam ketika jari menyentuh layar atau kursor berada di area baca; begitu jari diangkat untuk menekan tombol fisik `Power + Volume Down` di HP, teks otomatis kembali blur beserta watermark AnzaBook.
+### 4.2 P0 · Flex Your Literacy / Flex Your Reading
 
----
+**Ada di repo.** Rak baca, penyimpanan posisi, sesi baca, highlight, dan ekspor visual berbasis Canvas. Share Studio memiliki templat stiker, struk, dan kutipan. Dukungan share sheet bergantung pada perangkat, dengan unduh gambar sebagai jalur cadangan. [Layanan baca](apps/api/src/services/reading.service.ts). [Share Studio](apps/web/src/features/share/components/share-studio-panel.tsx). [Dialog Flex Your Reading](apps/web/src/features/share/components/flex-reading-dialog.tsx).
 
-### 1.5 Arsitektur Live Tracking Stok Buku Cetak (Gramedia & Toko Mitra)
+- **FLEX-01 · Mulai kecil dan bisa lanjut.** Pembaca bisa membuka buku dari posisi terakhir dan melihat sesi terbaru. Hitung estimasi durasi dari waktu reader aktif dengan batas saat tidak ada aktivitas. Simpan sesi tanpa hitung ganda ketika pengiriman diulang. Progres tidak hilang jika tab ditutup sebelum kartu dibuat.
+- **FLEX-02 · Rayakan momen yang berbeda.** Pembaca bisa mengekspor kartu sedang baca, ringkasan sesi, atau momen tamat. Kartu kutipan tersedia sesuai DRM-05 dengan atribusi judul dan penulis. Ringkasan periodik masuk P1 setelah definisi sesi stabil.
+- **FLEX-03 · Pembaca memilih apa yang dibagikan.** Aktivitas bersifat privat secara default. Pratinjau menampilkan data yang akan masuk ke gambar dan pembaca bisa menyembunyikan durasi atau progres. Kartu tidak membawa email, ID akun, watermark internal, lokasi presisi, atau tautan yang membuka bab premium. Jika share sheet tidak mendukung gambar, tampilkan unduhan PNG.
+- **FLEX-04 · Ajak kembali membaca.** Setelah ekspor atau saat pengguna melewatinya, tampilkan aksi lanjut membaca. Streak, bila ditampilkan, berfungsi sebagai catatan pribadi. Pengukuran pilot memprioritaskan hari baca aktif dan retensi dibanding jumlah unggahan atau kecepatan membaca.
+- **FLEX-05 · Ubah rasa penasaran jadi sesi pertama.** Pembaca bisa menyertakan tautan buku publik saat membagikan kartu. Teman yang membuka tautan melihat judul yang sama dan aksi **Baca sampel** jika tersedia. Jika reader memerlukan login, bawa pembaca kembali ke judul tersebut setelah masuk. Sebagai contoh, kartu _“Hari ini baca 12 menit”_ cukup untuk memulai percakapan tanpa menunggu buku tamat.
 
 ```mermaid
-sequenceDiagram
-    participant U as Pembaca (Web App AnzaBook)
-    participant A as Express API (Inventory Engine)
-    participant G as Mitra Toko (Gramedia / Toko Independen)
-    participant W as Gudang Pusat AnzaBook
-
-    U->>A: Buka halaman buku & klik "Cek Stok Toko Terdekat"
-    A->>A: Deteksi lokasi kota/GPS pengguna
-    par Sumber Data Stok
-        A->>G: Query ketersediaan stok per cabang berdasarkan ISBN (Cached Sync / Partner POS)
-        A->>W: Cek stok langsung Gudang AnzaBook (Edisi Rakyat, Standar, Kolektor)
-    end
-    A-->>U: Tampilkan Daftar Cabang & Peta (Tersedia / Stok Menipis / Habis)
-    U->>A: Pilih "Pesan Ambil di Toko" atau "Beli Edisi Rakyat dari Gudang"
+flowchart LR
+    A["Pilih buku atau lanjutkan"] --> B["Baca dan simpan progres"]
+    B --> C["Lihat ringkasan sesi"]
+    C --> D{"Mau berbagi?"}
+    D -->|Ya| E["Pratinjau lalu ekspor kartu"]
+    D -->|Lewati| F["Kembali ke rak baca"]
+    E --> F
+    F --> A
+    E -.-> G["Teman melihat kartu dan membuka buku"]
+    G --> H["Teman mulai membaca sampel yang tersedia"]
+    H --> C
 ```
 
----
+### 4.3 P0 · Community Enabler
 
-## Bagian 2: Spesifikasi Teknis & Tech Stack (Starter Monorepo)
+**Ada di repo.** Ulasan dan marginalia, yaitu komentar per paragraf yang mengikuti batas akses reader. Agenda, pendaftaran, dan alat pengelolaan untuk host adalah lingkup pilot. [Endpoint buku dan interaksi](apps/api/src/routes/books.routes.ts). [Layanan komunitas](apps/api/src/services/community.service.ts).
 
-Sesuai referensi arsitektur yang dipilih, AnzaBook dibangun menggunakan struktur **Starter Monorepo (Express API + TanStack Start)**:
+- **COM-01 · Terbitkan agenda.** Host yang disetujui membuat profil komunitas dan draf acara gratis berisi jenis acara, waktu dan zona waktu, kuota, format, serta judul buku opsional. Mulai dari bedah buku dan baca bareng. Tim meninjau draf sebelum halaman publik terbit.
+- **COM-02 · Daftar dan batalkan.** Pembaca menemukan acara dari direktori atau tautan undangan. Satu akun punya satu pendaftaran aktif per acara. Dua permintaan serentak tidak boleh melampaui kuota. Setelah daftar, peserta menerima konfirmasi dan informasi bergabung. Peserta dapat membatalkan agar kursi kembali tersedia.
+- **COM-03 · Kelola acara dan privasi.** Host berwenang melihat daftar minimum peserta dan menandai kehadiran. Perubahan jadwal atau pembatalan memberi tahu peserta. Tautan rapat privat hanya ditampilkan ke peserta terdaftar. Halaman publik menyediakan cara melaporkan acara.
+- **COM-04 · Bantu host mengulang kegiatan.** Setelah acara selesai, tampilkan jumlah pendaftar dan peserta hadir serta aksi membuat agenda lanjutan. Pengingat H-1, Creator Stage untuk peluncuran buku dan Q&A, sesi nulis bareng, serta direktori Sudut Baca terkurasi masuk P1. Tiket berbayar dan check-in lokasi untuk kartu Flex masuk P2.
 
-| Komponen | Teknologi | Peran di Ekosistem AnzaBook |
-| :--- | :--- | :--- |
-| **Monorepo Manager** | **pnpm Workspaces + Turborepo** | Mengelola aplikasi frontend (`apps/web`), backend (`apps/api`), dan paket bersama (`packages/db`, `packages/shared`, `packages/ui`) dalam satu repositori. |
-| **Frontend Framework** | **TanStack Start** (React + TanStack Router + TanStack Query) | Menyediakan SSR untuk SEO halaman katalog buku & ulasan komunitas, *type-safe routing*, serta manajemen *cache* data stok dan progres baca yang responsif. |
-| **Styling & UI** | **Tailwind CSS** | Sistem desain berbasis token yang bersih, tipografi ruang baca yang nyaman, dan kepatuhan penuh terhadap standar anti-slop (`AGENTS.md`). |
-| **Backend API** | **Express.js (TypeScript)** | Melayani pengiriman potongan buku terenkripsi (*encrypted book chunks*), streaming metadata audiobook, kalkulator HPP percetakan, serta sinkronisasi stok toko buku. |
-| **Authentication** | **Better Auth** | Mengelola autentikasi multi-perangkat, pembatasan jumlah sesi aktif (mencegah 1 akun dipakai 20 orang bersama-sama), serta manajemen role (*Reader*, *Author*, *Publisher Admin*). |
-| **Database & ORM** | **PostgreSQL + Drizzle ORM** | Menyimpan katalog buku multi-format, varian kertas cetak, stok per lokasi cabang toko, log sesi baca (durasi/halaman/WPM), rak buku, ulasan, dan perhitungan royalti penulis. |
-| **Containerization** | **Docker & Docker Compose** | Menjalankan PostgreSQL lokal dan membungkus layanan `web` serta `api` agar konsisten saat pengembangan maupun *deployment*. |
+```mermaid
+flowchart TD
+    A["Host membuat draf kegiatan"] --> B{"Lolos kurasi?"}
+    B -->|Revisi| A
+    B -->|Ya| C["Agenda tayang dan tautan dibagikan"]
+    C --> D["Pembaca mendaftar"]
+    D --> E{"Kursi tersedia?"}
+    E -->|Ya| F["Konfirmasi dan info bergabung"]
+    E -->|Penuh| G["Tampilkan status penuh"]
+    F --> H["Host mencatat kehadiran"]
+    H --> I["Host melihat hasil dan membuat agenda lanjutan"]
+```
 
----
+## 5. Fitur pendukung dan lingkup
 
-## Bagian 3: Daftar Fitur Utama (Functional Requirements)
+- **Katalog dan reader.** Detail buku, rak pribadi, mode scroll dan halaman, serta preferensi tampilan. Mode dwibahasa, ringkasan, dan audio bergantung pada data dan hak yang tersedia per judul.
+- **Keanggotaan Nakama.** Paket 3, 6, dan 12 bulan, checkout Midtrans/QRIS, dan akses setelah verifikasi pembayaran di server. Dokumentasi pengujian memakai sandbox. Aktivasi produksi memerlukan konfigurasi dan verifikasi terpisah. [Panduan Nakama](docs/anzabook-membership.md).
+- **Cetak Rakyat.** Pertahankan opsi Cetak Rakyat, Standar, dan Kolektor pada judul yang menyediakan edisi fisik, serta klaim akses digital dengan kode sekali pakai untuk judul yang memenuhi syarat. Kalkulator penerbit membantu simulasi biaya. Harga dan margin publik perlu data biaya per judul. Tampilan stok memakai data cabang dan waktu pembaruan di basis data. Sinkronisasi otomatis menunggu konfirmasi mitra dan integrasi sumber inventori.
+- **Operasional penerbit dan komunitas.** Pilot memakai kurasi manual. CMS naskah, laporan royalti dan pencairan, inventori mitra, ulasan lokasi, tiket berbayar, serta akses premium offline memerlukan keputusan dan pengujian tersendiri.
 
-### Modul 1: Multi-Format Reader, Bilingual & Audiobook
-* **FR-1.1 Mode Baca Ganda (Full Book & 20-Minute Intisari):** Pembaca bisa membaca keseluruhan buku atau beralih ke mode ringkas (*Blueprint*) ala Malaka Books.
-* **FR-1.2 Multi-Bahasa & Bilingual Split View:**
-  * Pengganti bahasa buku (Indonesia, Inggris, bahasa asing/daerah lainnya jika tersedia).
-  * Mode berdampingan (*Paragraph-by-Paragraph Bilingual*) untuk belajar bahasa sambil membaca.
-* **FR-1.3 Audiobook Player dengan Highlight Sync:**
-  * Pemutar audio dengan kontrol kecepatan (0.75x hingga 2.0x) dan sinkronisasi posisi kalimat dengan teks bacaan.
-* **FR-1.4 Pre-Trigger Anti-Screenshot & Anti-Copy Engine:**
-  * Pemblokiran seleksi teks/salin, perenderan teks berbasis `<canvas>`/proteksi DOM, dan pemicu instan **Blur + Watermark Logo AnzaBook** saat terdeteksi aksi screenshot, kehilangan fokus jendela, atau gestur multi-jari.
+## 6. Pengukuran dan rencana validasi
 
-### Modul 2: "Flex Your Literacy" Share Studio (Strava for Reading)
-* **FR-2.1 Pencatat Telemetri Sesi Baca (Reading Session Tracker):**
-  * Sistem secara otomatis mencatat metrik setiap sesi membaca/mendengar:
-    * **Pages Read:** Jumlah halaman yang diselesaikan.
-    * **Duration:** Waktu fokus aktif membaca (menit & detik).
-    * **Reading Pace:** Kecepatan rata-rata (Kata Per Menit / WPM atau menit per halaman).
-    * **Current Streak:** Jumlah hari membaca berturut-turut.
-* **FR-2.2 Generator Kartu & Stiker Sosial (Strava-Style Templates):**
-  * Setelah selesai sesi baca atau saat menandai kutipan (*quote*), pembaca bisa memilih template visual buatan AnzaBook yang dirancang menggunakan `HTML5 Canvas` (dapat diunduh sebagai PNG resolusi tinggi atau langsung dibagikan via Web Share API):
-    1. **Strava Transparent Sticker (Background Transparan):** Menampilkan angka besar *Pages Read*, *Duration*, *Pace (WPM)*, mini grafik aktivitas 7 hari, dan logo AnzaBook. Pembaca bisa menempelkan stiker ini di atas foto mereka sendiri di Instagram Story, atau mengunggah foto latar langsung di dalam Web App AnzaBook.
-    2. **Quote Highlight Card:** Kartu kutipan estetis dari bagian buku yang baru dibaca (maksimal 280 karakter) lengkap dengan sampul, judul, penulis, dan *badge* halaman.
-    3. **Literacy Receipt (Struk Bacaan):** Tampilan ala struk kasir/tiket yang merangkum daftar buku yang selesai dibaca bulan ini beserta total halaman dan durasi jam baca.
-    4. **Milestone & Finish Poster:** Kartu perayaan ketika menyelesaikan 100% buku atau mencapai target *Reading Challenge*.
+**Metrik utama.** Persentase pembaca yang menyelesaikan sesi baca valid pertama, lalu membaca pada minimal **dua hari berbeda di minggu keempat** setelah aktivasi. Definisi awal sesi valid untuk pilot adalah minimal dua menit reader aktif dan ada kemajuan posisi. Gunakan zona waktu yang ditetapkan secara konsisten dan denominator berupa seluruh pembaca teraktivasi dalam kohor yang sudah menuntaskan jendela observasi. Laporkan ukuran kohor bersama hasil.
 
-### Modul 3: Penerbitan Buku Cetak Terjangkau (Tiered Paper) & Live Stock Tracker
-* **FR-3.1 Pemilih Format & Kertas Cetak (*Affordable Literacy Selector*):**
-  * Pembeli dapat memilih antara *Digital SaaS*, *Edisi Rakyat (Kertas Koran Halus/Newsprint 48.8 gsm - Harga Rp29rb-Rp45rb)*, *Edisi Standar (Bookpaper 57.5-72 gsm)*, atau *Edisi Kolektor (Hardcover)*.
-  * Dilengkapi informasi transparan mengenai tampilan kertas, berat pengiriman, dan alasan penghematan biaya.
-* **FR-3.2 Live Store & Gramedia Stock Tracker:**
-  * Menampilkan daftar ketersediaan stok buku fisik di Gudang AnzaBook dan jaringan toko buku (Gramedia & toko buku mitra) per kota/cabang.
-  * Status real-time (*Tersedia*, *Stok Menipis*, *Habis*), jarak lokasi, tautan petunjuk arah peta, serta opsi *Pick Up in Store* atau pesan antar dari gudang.
-* **FR-3.3 Kontrol Digitalisasi Buku Cetak (Anti-Fraud Windowing):**
-  * Penerbit/penulis dapat menentukan apakah sebuah buku cetak boleh langsung dibaca penuh di versi digital, hanya dibuka Bab 1-2 sebagai sampel pemicu beli cetak, atau dibuka khusus bagi pembeli buku fisik melalui **Kode Klaim Unik** di dalam buku.
+- **DRM.** Ukur kelulusan skenario akses, laporan dugaan kebocoran yang dapat ditelusuri, waktu peninjauan, dan gangguan overlay. Untuk melihat apakah DRM membantu judul cetak masuk ke digital, catat berapa judul cetak yang ditawari pilot, berapa yang akhirnya terbit di tiap tingkat akses, dan alasan penundaan atau penolakan. Gerbang pilot adalah nol skenario uji akses ilegal yang berhasil dalam matriks sesi, sampel, klaim, kedaluwarsa, dan akses langsung ke API.
+- **Flex · Teman yang melihat kartu.** Pantau alur kunjungan dari tautan Flex yang dapat diatribusikan, pembukaan sampel, dan sesi valid pertama. Untuk menguji pengaruh sosial secara terpisah, bagi peserta pilot secara acak. Satu kelompok melihat kartu progres asli yang dibagikan atas izin pembaca. Kelompok lain melihat informasi judul yang sama dengan aksi baca yang sama. Bandingkan persentase peserta yang mencapai sesi valid pertama. Klik tautan mengukur minat awal, sedangkan sesi valid mengukur apakah orang mulai membaca.
+- **Flex · Pembaca yang membuat kartu.** Acak akun setelah sesi valid pertama dan amati selama empat minggu. Kedua kelompok mendapat reader dan ringkasan progres yang sama, sementara satu kelompok mendapat kartu berbagi. Bandingkan jumlah hari baca dan retensi minggu keempat berdasarkan kelompok penugasan. Pantau rasio ekspor dan wawancarai pembaca soal alasan mereka kembali atau merasa tertekan. Gunakan hasil pilot kecil untuk menilai kelayakan dan menentukan ukuran studi berikutnya.
+- **Komunitas.** Mulai dengan **3–5 komunitas** yang sudah punya agenda rutin sebagai target rekrutmen pilot. Bandingkan waktu administrasi host sebelum dan selama pilot. Ukur kehadiran per pendaftar aktif, peserta yang kembali, dan proporsi host yang menerbitkan kegiatan kedua dalam 30 hari. Catat pembatalan dan variasi antarformat agar rata-rata tidak menyembunyikan masalah.
 
-### Modul 4: Komunitas & Katalog Sosial (Evolusi Goodreads)
-* **FR-4.1 Smart Shelves & Reading Challenge Multi-Metrik:**
-  * Rak buku otomatis (*Ingin Dibaca, Sedang Dibaca, Selesai, DNF*) serta tantangan membaca berdasarkan target **Jumlah Buku**, **Jumlah Halaman**, atau **Jam Membaca**.
-* **FR-4.2 Verified Reader Reviews & Inline Marginalia:**
-  * Rating 0.5 hingga 5.0 bintang dengan lencana *Verified Reader* dan fitur komentar langsung di paragraf buku (*Inline Discussion*).
+Angka sesi, kohor, dan rekrutmen di atas adalah usulan desain pilot. Target kenaikan retensi, tingkat kehadiran, dan penghematan waktu ditetapkan setelah pengukuran baseline serta sebelum evaluasi pilot.
 
-### Modul 5: AnzaBook Publisher Studio (Portal Penulis & Penerbit)
-* **FR-5.1 Kalkulator Produksi & Simulasi Harga Multi-Kertas:**
-  * Simulasi otomatis HPP cetak berdasarkan jumlah halaman dan pilihan kertas (*Newsprint*, *Bookpaper*, *Art Paper*) agar penulis bisa menetapkan harga *Edisi Rakyat* yang terjangkau namun tetap menguntungkan.
-* **FR-5.2 Dashboard Royalti & Distribusi Stok:**
-  * Pantauan pendapatan dari langganan SaaS (berdasarkan durasi/halaman dibaca) dan penjualan cetak per cabang toko buku.
+## 7. Arsitektur, stack, dan data
 
----
+- **Web — `apps/web`.** TanStack Start dengan SSR, React 19, TanStack Router dan Query, Tailwind CSS v4, shadcn/ui, serta Canvas untuk ekspor kartu.
+- **API — `apps/api`.** Express 5 dan TypeScript. Better Auth memakai sesi berbasis cookie. Route menangani autentikasi dan validasi, service memutuskan hak akses dan menjalankan logika produk, serta Drizzle mengakses PostgreSQL. Role yang dideklarasikan saat ini adalah `user` dan `admin`. Sebelum pilot, API perlu membatasi izin host ke komunitas yang dikelolanya dan membatasi kurasi ke moderator yang berwenang. Izin penulis ditetapkan saat portal penerbit dikembangkan.
+- **Data dan kontrak.** PostgreSQL 17 untuk lingkungan pengembangan melalui Docker Compose. Skema dan migrasi Drizzle berada di `apps/api`. `packages/shared` memuat validator Zod, tipe respons API, aturan bersama, dan RBAC. Workspace memakai pnpm dan Turborepo.
+- **Integrasi.** Midtrans/QRIS untuk Nakama. Penyedia rapat, peta, dan sinkronisasi stok dipilih sesuai kebutuhan pilot atau konfirmasi mitra. [Arsitektur repo](docs/architecture.md). [Paket web](apps/web/package.json). [Paket API](apps/api/package.json). [Konfigurasi PostgreSQL lokal](compose.dev.yaml). [Definisi izin](packages/shared/src/permissions.ts).
 
-## Bagian 4: Skema Data Inti (PostgreSQL + Drizzle ORM)
+**Model data.** Katalog sudah memiliki buku, bab, edisi fisik, kode klaim, cabang, dan inventori. Data baca mencakup sesi, progres, rak, highlight, ulasan, dan komentar per paragraf. Untuk pilot, tambahkan konsep komunitas, acara, RSVP, serta catatan watermark atau laporan seperlunya. Nama entitas di diagram berikut bersifat konseptual.
 
-Berikut gambaran entitas utama yang akan dibuat di `packages/db`:
+```mermaid
+erDiagram
+    USER ||--o{ READING_SESSION : mencatat
+    BOOK ||--o{ READING_SESSION : dibaca
+    BOOK ||--o{ CHAPTER : berisi
+    COMMUNITY ||--o{ EVENT : mengadakan
+    BOOK o|--o{ EVENT : dibahas
+    EVENT ||--o{ RSVP : menerima
+    USER ||--o{ RSVP : mendaftar
+```
 
-1. `users` & `sessions` (Dikelola oleh **Better Auth**, ditambah kolom `reading_streak`, `preferred_language`, `membership_tier`).
-2. `books` (`id`, `slug`, `title`, `author_id`, `synopsis`, `digital_policy` [`full_saas`, `sample_only`, `print_claim_only`], `security_level` [`standard_blur`, `strict_touch_focus`]).
-3. `book_translations` & `book_chapters` (`book_id`, `language_code`, `chapter_number`, `encrypted_content_payload`, `audio_url`, `audio_timestamps_json`).
-4. `book_print_editions` (`id`, `book_id`, `isbn`, `edition_tier` [`rakyat_economy`, `standard_trade`, `collector_hardcover`], `paper_type`, `paper_gsm`, `cover_type`, `price_idr`, `weight_grams`).
-5. `store_branches` & `store_inventories` (`branch_id`, `chain_name` [`Gramedia`, `AnzaWarehouse`, `MitraIndie`], `city`, `coordinates`, `edition_id`, `stock_count`, `stock_status`, `last_synced_at`).
-6. `reading_sessions` (`id`, `user_id`, `book_id`, `pages_read`, `duration_seconds`, `avg_wpm`, `created_at` -> sumber data untuk fitur **Strava-Style Share**).
-7. `shelves`, `reviews`, & `paragraph_comments` (Fitur komunitas Goodreads & diskusi per paragraf).
+## 8. Persyaratan nonfungsional dan gerbang rilis
 
----
+- **Privasi dan hak cipta.** Catat izin distribusi dan kutipan per judul. Minimalkan data di watermark, ekspor, dan daftar peserta. Tetapkan tujuan, durasi retensi, kontrol akses, dan proses penghapusan untuk data baca serta laporan sebelum pilot. Tinjau kewajiban terkait dengan pemegang hak dan tim yang bertanggung jawab. [UU No. 28 Tahun 2014 tentang Hak Cipta](https://peraturan.bpk.go.id/Details/38690/uu-no-28-tahun-2014). [UU No. 27 Tahun 2022 tentang Pelindungan Data Pribadi](https://peraturan.bpk.go.id/Details/229798/uu-no-27-tahun-2022.).
+- **Aksesibilitas dan perangkat.** Uji reader, ekspor kartu, dan RSVP dengan keyboard, pembaca layar, zoom, serta layar sempit. Cakup Chrome dan Edge di desktop, Safari di iOS, dan Chrome di Android. Ukur waktu buka reader dan ekspor pada ponsel serta koneksi pilot sebelum menetapkan target kinerja.
+- **Konsistensi.** Uji klaim ganda, pencatatan sesi setelah retry, pendaftaran serentak saat satu kursi tersisa, dan pembatalan acara. Posisi baca harus tetap tersedia ketika pengguna melanjutkan di perangkat lain. Uji alur ini dari browser ke API dan basis data.
+- **Gerbang rilis.** Selesaikan uji akses konten dan privasi kartu, verifikasi alur host hingga kehadiran, siapkan jalur bantuan bagi penerbit dan pembaca, dan pastikan pengukuran baseline bisa direproduksi. Untuk perubahan aplikasi, jalankan pemeriksaan repo serta uji end-to-end pada alur yang berubah.
 
-## Bagian 5: Cakupan MVP (Fase 1 Eksekusi Kode)
+## 9. Roadmap dan keputusan terbuka
 
-Agar pembangunan di monorepo berjalan terukur dan langsung bisa didemokan secara utuh:
-1. **Setup Monorepo:** Konfigurasi `pnpm` + Turborepo (`apps/web` dengan TanStack Start + Tailwind CSS, `apps/api` dengan Express TS, `packages/db` dengan Drizzle + PostgreSQL + Docker, dan autentikasi Better Auth).
-2. **Katalog & Halaman Detail Buku Multi-Format:** Dilengkapi pemilih spesifikasi kertas (*Edisi Rakyat vs Standar vs Kolektor*) dan fitur **Live Store / Gramedia Stock Tracker**.
-3. **Protected Web Reader & Audiobook:** Mendukung switch multibahasa/bilingual, pemutar audiobook sinkron, serta **Pre-Trigger Anti-Screenshot Blur + Watermark AnzaBook**.
-4. **"Flex Your Literacy" Share Studio (Strava for Reading):** Generator kartu statistik bacaan & stiker transparan siap unduh/bagikan ke media sosial.
-5. **Komunitas (Goodreads Core) & Simulasi Kalkulator Penerbitan.**
+1. **Fondasi saat ini.** Katalog, reader dan kontrol akses awal, Share Studio, progres baca, interaksi per buku, edisi cetak, serta integrasi Nakama di lingkungan yang dikonfigurasi.
+2. **Pilot tiga pilar.** Uji distribusi judul berizin dengan DRM yang diperkuat, pengaruh kartu Flex terhadap frekuensi membaca, dan alur agenda gratis dari publikasi sampai pencatatan kehadiran. Lanjutkan jika gerbang akses dan privasi lulus serta hasil pilot cukup untuk menentukan iterasi berikutnya.
+3. **Perluasan setelah pilot.** Uji Creator Stage, pengingat acara, dan Peta Sudut Baca terkurasi. Jadwalkan backoffice penerbit, royalti otomatis, tiket berbayar, integrasi POS, dan akses offline setelah kebijakan, hak, dan kesiapan mitra tervalidasi.
+
+Keputusan yang perlu dicatat sebelum pilot mencakup judul dan mitra awal, kebijakan sampel dan kutipan, definisi durasi aktif serta perlakuan untuk audiobook, retensi data, dan penanggung jawab kurasi serta penanganan laporan.

@@ -12,7 +12,12 @@ import {
   listParagraphCommentsQuerySchema,
 } from "@starter/shared/validators/community";
 import { HttpError } from "../lib/http-error";
-import { getAuth, getOptionalAuth, optionalAuth, requireAuth } from "../middleware/auth";
+import {
+  getAuth,
+  getOptionalAuth,
+  optionalAuth,
+  requireAuth,
+} from "../middleware/auth";
 import { jsonBody } from "../middleware/body";
 import { requireTrustedOrigin } from "../middleware/origin";
 import {
@@ -65,7 +70,8 @@ booksRouter.get("/:slug", optionalAuth, async (req, res) => {
   const { slug } = bookSlugSchema.parse({ slug: req.params.slug });
   const auth = getOptionalAuth(req);
   const book = await getBookBySlug(slug, auth?.user?.id);
-  if (!book) throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+  if (!book)
+    throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
   res.json({ data: book });
 });
 
@@ -110,7 +116,8 @@ booksRouter.post(
 booksRouter.get("/:slug/reviews", async (req, res) => {
   const { slug } = bookSlugSchema.parse({ slug: req.params.slug });
   const book = await getBookBySlug(slug);
-  if (!book) throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+  if (!book)
+    throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
   const reviews = await listReviews(book.id);
   res.json({ data: reviews });
 });
@@ -123,11 +130,16 @@ booksRouter.post(
   async (req, res) => {
     const { slug } = bookSlugSchema.parse({ slug: req.params.slug });
     const book = await getBookBySlug(slug);
-    if (!book) throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+    if (!book)
+      throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
     const auth = getAuth(req);
     const input = createReviewSchema.parse(req.body);
     if (input.bookId !== book.id) {
-      throw new HttpError(422, "REVIEW_BOOK_MISMATCH", "Ulasan tidak sesuai dengan buku.");
+      throw new HttpError(
+        422,
+        "REVIEW_BOOK_MISMATCH",
+        "Ulasan tidak sesuai dengan buku.",
+      );
     }
     const review = await createReview(
       auth.user.id,
@@ -143,7 +155,11 @@ booksRouter.post(
 booksRouter.get("/:slug/comments", requireAuth, async (req, res) => {
   const { slug } = bookSlugSchema.parse({ slug: req.params.slug });
   const query = listParagraphCommentsQuerySchema.parse(req.query);
-  const paragraphCount = await getReadableParagraphCount(slug, query.chapterId, getAuth(req).user.id);
+  const paragraphCount = await getReadableParagraphCount(
+    slug,
+    query.chapterId,
+    getAuth(req).user.id,
+  );
   const comments = await listComments(query.chapterId, paragraphCount);
   res.json({ data: comments });
 });
@@ -157,9 +173,17 @@ booksRouter.post(
     const { slug } = bookSlugSchema.parse({ slug: req.params.slug });
     const auth = getAuth(req);
     const input = createParagraphCommentSchema.parse(req.body);
-    const paragraphCount = await getReadableParagraphCount(slug, input.chapterId, auth.user.id);
+    const paragraphCount = await getReadableParagraphCount(
+      slug,
+      input.chapterId,
+      auth.user.id,
+    );
     if (input.paragraphIndex >= paragraphCount) {
-      throw new HttpError(422, "INVALID_PARAGRAPH", "Paragraf ini berada di luar bagian yang dapat dibaca.");
+      throw new HttpError(
+        422,
+        "INVALID_PARAGRAPH",
+        "Paragraf ini berada di luar bagian yang dapat dibaca.",
+      );
     }
     const comment = await createComment(auth.user.id, auth.user.name, input);
     res.status(201).json({ data: comment });

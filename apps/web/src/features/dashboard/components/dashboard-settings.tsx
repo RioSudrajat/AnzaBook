@@ -1,10 +1,7 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  LogOut,
-  QrCode,
-} from "lucide-react";
+import { Camera, Link as LinkIcon, Loader2, LogOut, QrCode, Trash2 } from "lucide-react";
 import { membershipUsernameSchema } from "@starter/shared/validators/membership";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,10 +29,52 @@ const membershipStatusLabel = {
   canceled: "Nakama dibatalkan",
 };
 
+async function resizeImageFile(
+  file: File,
+  maxDimension = 256,
+  quality = 0.85,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Gagal membaca berkas gambar."));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Format berkas gambar tidak valid."));
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > height) {
+          if (width > maxDimension) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          }
+        } else {
+          if (height > maxDimension) {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Gagal memproses gambar pada peramban."));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 type DashboardSettingsProps = {
   userName: string;
   userEmail: string;
   userRole?: string;
+  userImage?: string | null;
   memberSince?: string;
   emailVerified?: boolean;
 };
@@ -43,6 +82,7 @@ type DashboardSettingsProps = {
 export function DashboardSettings({
   userName,
   userEmail,
+  userImage,
   memberSince,
   emailVerified = false,
 }: DashboardSettingsProps) {
@@ -55,6 +95,16 @@ export function DashboardSettings({
     | "orders_history"
   >("account");
 
+  const [profileImage, setProfileImage] = useState<string | null>(
+    userImage ?? null,
+  );
+  const [isUpdatingImage, setIsUpdatingImage] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [imageSuccess, setImageSuccess] = useState<string | null>(null);
+  const [urlInput, setUrlInput] = useState("");
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [isQrOpen, setIsQrOpen] = useState(false);
   const [username, setUsername] = useState("");
   const [usernameError, setUsernameError] = useState<string>();
@@ -62,7 +112,9 @@ export function DashboardSettings({
   const cancelTrigger = useRef<HTMLButtonElement>(null);
   const [logoutPending, setLogoutPending] = useState(false);
   const [logoutError, setLogoutError] = useState(false);
-  const [verification, setVerification] = useState<"idle" | "pending" | "sent" | "error">("idle");
+  const [verification, setVerification] = useState<
+    "idle" | "pending" | "sent" | "error"
+  >("idle");
   const membership = useMembershipSummary();
   const cancelNakama = useCancelMembership();
   const orders = useMembershipOrders(activeSubTab === "dues_history");
@@ -91,8 +143,93 @@ export function DashboardSettings({
   function handleUsername(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const result = membershipUsernameSchema.safeParse({ username });
-    setUsernameError(result.success ? undefined : result.error.issues[0]?.message);
+    setUsernameError(
+      result.success ? undefined : result.error.issues[0]?.message,
+    );
     if (result.success) saveUsername.mutate(result.data.username);
+  }
+
+  async function updateProfileImage(newImageUrl: string) {
+    setIsUpdatingImage(true);
+    setImageError(null);
+    setImageSuccess(null);
+    try {
+      const { error } = await authClient.updateUser({
+        image: newImageUrl,
+      });
+      if (error) {
+        setImageError(error.message || "Gagal memperbarui foto profil.");
+      } else {
+        setProfileImage(newImageUrl || null);
+        setImageSuccess(
+          newImageUrl
+            ? "Foto profil berhasil diperbarui."
+            : "Foto profil berhasil dihapus.",
+        );
+        await router.invalidate();
+      }
+    } catch (err) {
+      setImageError(
+        err instanceof Error ? err.message : "Gagal memperbarui foto profil.",
+      );
+    } finally {
+      setIsUpdatingImage(false);
+    }
+  }
+
+  async function handleFileSelected(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setImageError("Pilih berkas gambar yang valid (JPG, PNG, atau WEBP).");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setImageError("Ukuran berkas gambar maksimal 5MB.");
+      return;
+    }
+
+    try {
+      setIsUpdatingImage(true);
+      setImageError(null);
+      const dataUrl = await resizeImageFile(file, 256, 0.85);
+      await updateProfileImage(dataUrl);
+    } catch (err) {
+      setImageError(
+        err instanceof Error ? err.message : "Gagal memproses gambar.",
+      );
+      setIsUpdatingImage(false);
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  }
+
+  async function handleUrlSubmit(e: FormEvent) {
+    e.preventDefault();
+    const trimmed = urlInput.trim();
+    if (!trimmed) {
+      setImageError("Masukkan tautan gambar yang valid.");
+      return;
+    }
+    if (
+      !trimmed.startsWith("http://") &&
+      !trimmed.startsWith("https://") &&
+      !trimmed.startsWith("data:image/")
+    ) {
+      setImageError("URL gambar harus dimulai dengan http:// atau https://.");
+      return;
+    }
+    await updateProfileImage(trimmed);
+    setUrlInput("");
+    setShowUrlInput(false);
+  }
+
+  async function handleRemoveImage() {
+    await updateProfileImage("");
   }
 
   async function sendVerification() {
@@ -119,19 +256,19 @@ export function DashboardSettings({
 
   return (
     <div className="space-y-8 pb-16">
-      {/* Header (per SS 5) */}
-      <div className="pb-4 border-b border-border">
-        <h1 className="font-serif text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-          Settings
-        </h1>
-        <p className="text-xs text-muted-foreground mt-0.5 font-sans">
+      {/* Header Subtitle */}
+      <div className="pb-3 border-b border-border">
+        <p className="text-xs text-muted-foreground font-sans">
           Kelola akun, hadiah, preferensi membaca, dan riwayat pembelianmu.
         </p>
       </div>
 
       {/* Horizontal Sub-Tabs (per SS 5) */}
       <div className="border-b border-border overflow-x-auto scrollbar-none">
-        <nav className="flex space-x-8 text-xs font-mono pb-px" aria-label="Sub Tabs Settings">
+        <nav
+          className="flex space-x-8 text-xs font-mono pb-px"
+          aria-label="Sub Tabs Settings"
+        >
           {subTabs.map((tab) => (
             <button
               key={tab.id}
@@ -153,13 +290,134 @@ export function DashboardSettings({
       {/* Sub-Tab 1: Akun (per SS 5) */}
       {activeSubTab === "account" && (
         <div className="space-y-8 max-w-2xl text-xs font-mono animate-in fade-in duration-100">
-          <div className="space-y-5">
+          <div className="space-y-6">
+            {/* Foto Profil */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-4 items-start pb-4 border-b border-border/60">
+              <span className="sm:col-span-3 text-muted-foreground pt-2">
+                Foto Profil
+              </span>
+              <div className="sm:col-span-9 space-y-3">
+                <div className="flex items-center gap-4">
+                  <div className="size-16 rounded-full overflow-hidden border border-border shrink-0 bg-muted flex items-center justify-center font-bold text-xl text-muted-foreground ring-2 ring-border/50">
+                    {profileImage ? (
+                      <img
+                        src={profileImage}
+                        alt={userName}
+                        className="size-full object-cover"
+                      />
+                    ) : (
+                      <span>{userName.slice(0, 1).toUpperCase()}</span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleFileSelected}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isUpdatingImage}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="min-h-9"
+                    >
+                      {isUpdatingImage ? (
+                        <Loader2 className="size-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <Camera className="size-3.5 mr-1.5" />
+                      )}
+                      {isUpdatingImage ? "Menyimpan..." : "Unggah Gambar"}
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={isUpdatingImage}
+                      onClick={() => setShowUrlInput(!showUrlInput)}
+                      className="min-h-9 text-muted-foreground hover:text-foreground"
+                    >
+                      <LinkIcon className="size-3.5 mr-1.5" />
+                      Tautan URL
+                    </Button>
+
+                    {profileImage && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={isUpdatingImage}
+                        onClick={handleRemoveImage}
+                        className="min-h-9 text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="size-3.5 mr-1.5" />
+                        Hapus
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {showUrlInput && (
+                  <form
+                    onSubmit={handleUrlSubmit}
+                    className="flex flex-col sm:flex-row gap-2 max-w-md pt-1"
+                  >
+                    <Input
+                      type="url"
+                      placeholder="https://example.com/foto-profil.jpg"
+                      value={urlInput}
+                      onChange={(e) => setUrlInput(e.target.value)}
+                      disabled={isUpdatingImage}
+                      className="text-xs h-9"
+                    />
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={isUpdatingImage || !urlInput.trim()}
+                      className="h-9 shrink-0"
+                    >
+                      Terapkan
+                    </Button>
+                  </form>
+                )}
+
+                <p className="text-[11px] text-muted-foreground font-sans">
+                  Pilih berkas dari perangkat (JPG, PNG, WEBP) atau masukkan URL foto. Gambar otomatis dikompres.
+                </p>
+
+                {imageError && (
+                  <p className="text-[11px] text-destructive font-sans font-medium">
+                    {imageError}
+                  </p>
+                )}
+
+                {imageSuccess && (
+                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-sans font-medium">
+                    {imageSuccess}
+                  </p>
+                )}
+              </div>
+            </div>
+
             {/* Nama */}
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-4 items-center">
               <span className="sm:col-span-3 text-muted-foreground">Nama</span>
               <div className="sm:col-span-9 flex items-center gap-3">
-                <div className="size-10 rounded-full overflow-hidden border border-border shrink-0 bg-muted flex items-center justify-center font-bold text-base text-muted-foreground">
-                  {userName.slice(0, 1)}
+                <div className="size-9 rounded-full overflow-hidden border border-border shrink-0 bg-muted flex items-center justify-center font-bold text-xs text-muted-foreground">
+                  {profileImage ? (
+                    <img
+                      src={profileImage}
+                      alt={userName}
+                      className="size-full object-cover"
+                    />
+                  ) : (
+                    <span>{userName.slice(0, 1).toUpperCase()}</span>
+                  )}
                 </div>
                 <span className="font-semibold text-foreground text-sm font-sans">
                   {userName}
@@ -183,80 +441,117 @@ export function DashboardSettings({
               <div className="sm:col-span-9 flex flex-wrap items-center gap-2">
                 {membership.data ? (
                   <>
-                    <span role="status" className="rounded bg-muted px-2 py-1 text-muted-foreground">
+                    <span
+                      role="status"
+                      className="rounded bg-muted px-2 py-1 text-muted-foreground"
+                    >
                       {membershipStatusLabel[membership.data.status]}
                     </span>
                     {membership.data.expiresAt && (
                       <span className="text-muted-foreground">
-                        {membership.data.status === "active" ? "Aktif hingga "
-                          : membership.data.status === "canceled" ? "Dibatalkan pada " : "Berakhir "}
+                        {membership.data.status === "active"
+                          ? "Aktif hingga "
+                          : membership.data.status === "canceled"
+                            ? "Dibatalkan pada "
+                            : "Berakhir "}
                         {formatMembershipDate(membership.data.expiresAt)}
                       </span>
                     )}
                     <Button asChild variant="link" className="min-h-11">
                       <Link to="/membership" search={{}}>
-                        {membership.data.status === "inactive" ? "Jadi Nakama"
-                          : membership.data.status === "canceled" ? "Gabung kembali" : "Perpanjang Nakama"}
+                        {membership.data.status === "inactive"
+                          ? "Jadi Nakama"
+                          : membership.data.status === "canceled"
+                            ? "Gabung kembali"
+                            : "Perpanjang Nakama"}
                       </Link>
                     </Button>
-                    {membership.data.status === "active" && membership.data.expiresAt && (
-                      <Button
-                        ref={cancelTrigger}
-                        type="button"
-                        variant="ghost"
-                        className="min-h-11 text-destructive hover:text-destructive"
-                        aria-expanded={cancelExpiry !== null}
-                        aria-controls="nakama-cancellation"
-                        disabled={cancelNakama.isPending}
-                        onClick={() => {
-                          cancelNakama.reset();
-                          setCancelExpiry(cancelExpiry === null ? membership.data?.expiresAt ?? null : null);
-                        }}
-                      >
-                        Batalkan keanggotaan
-                      </Button>
-                    )}
-                    {membership.data.status === "active" && cancelExpiry !== null && (
-                      <fieldset id="nakama-cancellation" className="mt-2 w-full min-w-0 space-y-3 rounded-md border border-border p-4">
-                        <legend className="px-1 font-semibold">Konfirmasi pembatalan Nakama</legend>
-                        <p className="font-sans text-muted-foreground">
-                          Akses Premium langsung dihentikan dan sisa masa aktif berakhir. Pengembalian dana ditangani terpisah.
-                        </p>
-                        {cancelNakama.isError && (
-                          <p role="alert" className="text-destructive">
-                            {cancelNakama.error instanceof ApiError ? cancelNakama.error.message : "Pembatalan gagal. Coba lagi."}
+                    {membership.data.status === "active" &&
+                      membership.data.expiresAt && (
+                        <Button
+                          ref={cancelTrigger}
+                          type="button"
+                          variant="ghost"
+                          className="min-h-11 text-destructive hover:text-destructive"
+                          aria-expanded={cancelExpiry !== null}
+                          aria-controls="nakama-cancellation"
+                          disabled={cancelNakama.isPending}
+                          onClick={() => {
+                            cancelNakama.reset();
+                            setCancelExpiry(
+                              cancelExpiry === null
+                                ? (membership.data?.expiresAt ?? null)
+                                : null,
+                            );
+                          }}
+                        >
+                          Batalkan keanggotaan
+                        </Button>
+                      )}
+                    {membership.data.status === "active" &&
+                      cancelExpiry !== null && (
+                        <fieldset
+                          id="nakama-cancellation"
+                          className="mt-2 w-full min-w-0 space-y-3 rounded-md border border-border p-4"
+                        >
+                          <legend className="px-1 font-semibold">
+                            Konfirmasi pembatalan Nakama
+                          </legend>
+                          <p className="font-sans text-muted-foreground">
+                            Akses Premium langsung dihentikan dan sisa masa
+                            aktif berakhir. Pengembalian dana ditangani
+                            terpisah.
                           </p>
-                        )}
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="min-h-11"
-                            disabled={cancelNakama.isPending}
-                            onClick={() => {
-                              setCancelExpiry(null);
-                              cancelTrigger.current?.focus();
-                            }}
-                          >
-                            Tetap jadi Nakama
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            className="min-h-11"
-                            disabled={cancelNakama.isPending}
-                            onClick={() => cancelNakama.mutate({ confirm: true, expiresAt: cancelExpiry }, {
-                              onSuccess: () => setCancelExpiry(null),
-                            })}
-                          >
-                            {cancelNakama.isPending ? "Membatalkan…" : "Ya, batalkan keanggotaan"}
-                          </Button>
-                        </div>
-                      </fieldset>
-                    )}
+                          {cancelNakama.isError && (
+                            <p role="alert" className="text-destructive">
+                              {cancelNakama.error instanceof ApiError
+                                ? cancelNakama.error.message
+                                : "Pembatalan gagal. Coba lagi."}
+                            </p>
+                          )}
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="min-h-11"
+                              disabled={cancelNakama.isPending}
+                              onClick={() => {
+                                setCancelExpiry(null);
+                                cancelTrigger.current?.focus();
+                              }}
+                            >
+                              Tetap jadi Nakama
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              className="min-h-11"
+                              disabled={cancelNakama.isPending}
+                              onClick={() =>
+                                cancelNakama.mutate(
+                                  { confirm: true, expiresAt: cancelExpiry },
+                                  {
+                                    onSuccess: () => setCancelExpiry(null),
+                                  },
+                                )
+                              }
+                            >
+                              {cancelNakama.isPending
+                                ? "Membatalkan…"
+                                : "Ya, batalkan keanggotaan"}
+                            </Button>
+                          </div>
+                        </fieldset>
+                      )}
                   </>
                 ) : membership.isError ? (
-                  <Button variant="link" className="min-h-11" onClick={() => void membership.refetch()}>Muat ulang status</Button>
+                  <Button
+                    variant="link"
+                    className="min-h-11"
+                    onClick={() => void membership.refetch()}
+                  >
+                    Muat ulang status
+                  </Button>
                 ) : (
                   <span role="status">Memuat status…</span>
                 )}
@@ -266,7 +561,9 @@ export function DashboardSettings({
             {/* Bergabung sejak */}
             {since && (
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-4 items-center">
-                <span className="sm:col-span-3 text-muted-foreground">Bergabung sejak</span>
+                <span className="sm:col-span-3 text-muted-foreground">
+                  Bergabung sejak
+                </span>
                 <div className="sm:col-span-9 text-foreground">{since}</div>
               </div>
             )}
@@ -301,7 +598,11 @@ export function DashboardSettings({
               <LogOut className="size-4" />
               <span>{logoutPending ? "Keluar…" : "Keluar"}</span>
             </button>
-            {logoutError && <p role="alert" className="text-destructive">Belum berhasil keluar. Coba lagi.</p>}
+            {logoutError && (
+              <p role="alert" className="text-destructive">
+                Belum berhasil keluar. Coba lagi.
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -310,14 +611,22 @@ export function DashboardSettings({
         <div className="max-w-md space-y-5 text-sm">
           <div className="space-y-1">
             <h2 className="font-serif text-xl font-bold">Hadiah Nakama</h2>
-            <p className="text-muted-foreground">Gunakan username AnzaBook temanmu untuk membelikan paket. Bagikan username-mu agar teman bisa mengirim hadiah ke akunmu.</p>
+            <p className="text-muted-foreground">
+              Gunakan username AnzaBook temanmu untuk membelikan paket. Bagikan
+              username-mu agar teman bisa mengirim hadiah ke akunmu.
+            </p>
           </div>
           {membership.data?.username ? (
-            <p>Username kamu <strong>@{membership.data.username}</strong></p>
+            <p>
+              Username kamu <strong>@{membership.data.username}</strong>
+            </p>
           ) : membership.data ? (
             <form onSubmit={handleUsername} className="space-y-2">
               <Label htmlFor="gift-username">Username kamu</Label>
-              <p id="username-hint" className="text-muted-foreground">Gunakan 3–24 huruf, angka, atau garis bawah. Username dapat ditetapkan sekali.</p>
+              <p id="username-hint" className="text-muted-foreground">
+                Gunakan 3–24 huruf, angka, atau garis bawah. Username dapat
+                ditetapkan sekali.
+              </p>
               <Input
                 id="gift-username"
                 className="h-11"
@@ -336,18 +645,39 @@ export function DashboardSettings({
               />
               {(usernameError || saveUsername.error) && (
                 <p role="alert" className="text-destructive">
-                  {usernameError ?? (saveUsername.error instanceof ApiError ? saveUsername.error.message : "Username belum tersimpan. Coba lagi.")}
+                  {usernameError ??
+                    (saveUsername.error instanceof ApiError
+                      ? saveUsername.error.message
+                      : "Username belum tersimpan. Coba lagi.")}
                 </p>
               )}
-              <Button type="submit" variant="outline" className="min-h-11" disabled={saveUsername.isPending}>
+              <Button
+                type="submit"
+                variant="outline"
+                className="min-h-11"
+                disabled={saveUsername.isPending}
+              >
                 {saveUsername.isPending ? "Menyimpan…" : "Simpan username"}
               </Button>
             </form>
           ) : membership.isError ? (
-            <Button type="button" variant="link" className="min-h-11" onClick={() => void membership.refetch()}>Muat ulang username</Button>
-          ) : <p role="status" className="text-muted-foreground">Memuat username…</p>}
+            <Button
+              type="button"
+              variant="link"
+              className="min-h-11"
+              onClick={() => void membership.refetch()}
+            >
+              Muat ulang username
+            </Button>
+          ) : (
+            <p role="status" className="text-muted-foreground">
+              Memuat username…
+            </p>
+          )}
           <Button asChild className="min-h-11">
-            <Link to="/membership" search={{}}>Lihat paket hadiah</Link>
+            <Link to="/membership" search={{}}>
+              Lihat paket hadiah
+            </Link>
           </Button>
           <p className="border-t border-border pt-4 text-muted-foreground">
             Kode buku cetak bisa diklaim dari halaman detail buku.
@@ -402,17 +732,47 @@ export function DashboardSettings({
               <span>Kirim pengingat masa aktif Nakama lewat email</span>
             </label>
           ) : membership.isError ? (
-            <Button variant="link" className="min-h-11" onClick={() => void membership.refetch()}>Muat ulang preferensi</Button>
-          ) : <p role="status" className="text-muted-foreground">Memuat preferensi…</p>}
-          {saveReminders.isError && <p role="alert" className="text-destructive">Preferensi belum tersimpan. Coba lagi.</p>}
+            <Button
+              variant="link"
+              className="min-h-11"
+              onClick={() => void membership.refetch()}
+            >
+              Muat ulang preferensi
+            </Button>
+          ) : (
+            <p role="status" className="text-muted-foreground">
+              Memuat preferensi…
+            </p>
+          )}
+          {saveReminders.isError && (
+            <p role="alert" className="text-destructive">
+              Preferensi belum tersimpan. Coba lagi.
+            </p>
+          )}
           {!emailVerified && (
             <div className="space-y-2 border-t border-border pt-4">
-              <p className="text-muted-foreground">Verifikasi email untuk menerima pengingat Nakama.</p>
-              <Button type="button" variant="outline" className="min-h-11" disabled={verification === "pending" || verification === "sent"} onClick={() => void sendVerification()}>
-                {verification === "pending" ? "Mengirim…" : "Kirim email verifikasi"}
+              <p className="text-muted-foreground">
+                Verifikasi email untuk menerima pengingat Nakama.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-11"
+                disabled={verification === "pending" || verification === "sent"}
+                onClick={() => void sendVerification()}
+              >
+                {verification === "pending"
+                  ? "Mengirim…"
+                  : "Kirim email verifikasi"}
               </Button>
-              {verification === "sent" && <p role="status">Tautan verifikasi dikirim ke {userEmail}.</p>}
-              {verification === "error" && <p role="alert" className="text-destructive">Email verifikasi belum terkirim. Coba lagi.</p>}
+              {verification === "sent" && (
+                <p role="status">Tautan verifikasi dikirim ke {userEmail}.</p>
+              )}
+              {verification === "error" && (
+                <p role="alert" className="text-destructive">
+                  Email verifikasi belum terkirim. Coba lagi.
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -420,12 +780,26 @@ export function DashboardSettings({
 
       {activeSubTab === "dues_history" && (
         <div className="max-w-2xl space-y-3 text-sm">
-          <h2 className="font-serif text-xl font-bold">Riwayat Pembayaran Iuran</h2>
-          {orders.isPending && <p role="status" className="text-muted-foreground">Memuat riwayat pembayaran…</p>}
-          {orders.isError && (
-            <Button variant="link" className="min-h-11" onClick={() => void orders.refetch()}>Muat ulang riwayat</Button>
+          <h2 className="font-serif text-xl font-bold">
+            Riwayat Pembayaran Iuran
+          </h2>
+          {orders.isPending && (
+            <p role="status" className="text-muted-foreground">
+              Memuat riwayat pembayaran…
+            </p>
           )}
-          {orders.data?.length === 0 && <p className="text-muted-foreground">Belum ada pembayaran iuran.</p>}
+          {orders.isError && (
+            <Button
+              variant="link"
+              className="min-h-11"
+              onClick={() => void orders.refetch()}
+            >
+              Muat ulang riwayat
+            </Button>
+          )}
+          {orders.data?.length === 0 && (
+            <p className="text-muted-foreground">Belum ada pembayaran iuran.</p>
+          )}
           {!!orders.data?.length && (
             <ul className="divide-y divide-border border-y border-border">
               {orders.data.map((order) => (
@@ -437,12 +811,19 @@ export function DashboardSettings({
                   >
                     <span>
                       <strong>Nakama {order.months} bulan</strong>
-                      {order.recipientUsername && ` · Hadiah untuk @${order.recipientUsername}`}
-                      <span className="block text-muted-foreground">{formatMembershipDate(order.createdAt)}</span>
+                      {order.recipientUsername &&
+                        ` · Hadiah untuk @${order.recipientUsername}`}
+                      <span className="block text-muted-foreground">
+                        {formatMembershipDate(order.createdAt)}
+                      </span>
                     </span>
                     <span>
-                      <strong className="tabular-nums">{formatRupiah(order.priceIdr)}</strong>
-                      <span className="block text-muted-foreground">{orderStatusLabel[order.status]}</span>
+                      <strong className="tabular-nums">
+                        {formatRupiah(order.priceIdr)}
+                      </strong>
+                      <span className="block text-muted-foreground">
+                        {orderStatusLabel[order.status]}
+                      </span>
                     </span>
                   </Link>
                 </li>

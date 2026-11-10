@@ -17,8 +17,17 @@ import {
   user,
 } from "../db/schema";
 import { HttpError } from "../lib/http-error";
-import { createMidtransGateway, type VerifiedPayment } from "./membership-payment";
-import { getMembershipStatus, membershipExpiresAt, membershipPlans, membershipTaxBreakdown, nextOrderStatus } from "./membership-policy";
+import {
+  createMidtransGateway,
+  type VerifiedPayment,
+} from "./membership-payment";
+import {
+  getMembershipStatus,
+  membershipExpiresAt,
+  membershipPlans,
+  membershipTaxBreakdown,
+  nextOrderStatus,
+} from "./membership-policy";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CHECKOUT_WINDOW_MS = 10 * 60 * 1000;
@@ -29,7 +38,8 @@ type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export function listMembershipPlans(): MembershipPlanDto[] {
   const rate = env.membershipTaxRateBps;
   return membershipPlans.map(({ subtotalIdr, ...plan }) => {
-    const tax = rate === null ? null : membershipTaxBreakdown(subtotalIdr, rate);
+    const tax =
+      rate === null ? null : membershipTaxBreakdown(subtotalIdr, rate);
     return { ...plan, priceIdr: subtotalIdr + (tax?.taxIdr ?? 0), tax };
   });
 }
@@ -37,7 +47,11 @@ export function listMembershipPlans(): MembershipPlanDto[] {
 function requireTaxRate() {
   const rate = env.membershipTaxRateBps;
   if (rate === null) {
-    throw new HttpError(503, "PAYMENT_UNAVAILABLE", "Perhitungan pajak pembayaran belum tersedia.");
+    throw new HttpError(
+      503,
+      "PAYMENT_UNAVAILABLE",
+      "Perhitungan pajak pembayaran belum tersedia.",
+    );
   }
   return rate;
 }
@@ -45,13 +59,17 @@ function requireTaxRate() {
 function legacyTaxSnapshot(totalIdr: number) {
   // Orders created before tax snapshots already have a fixed gross amount.
   const taxRateBps = requireTaxRate();
-  const taxIdr = Math.round(totalIdr * taxRateBps / (10_000 + taxRateBps));
+  const taxIdr = Math.round((totalIdr * taxRateBps) / (10_000 + taxRateBps));
   return { subtotalIdr: totalIdr - taxIdr, taxIdr, taxRateBps };
 }
 
 export function membershipGateway() {
   if (!env.MIDTRANS_SERVER_KEY) {
-    throw new HttpError(503, "PAYMENT_UNAVAILABLE", "Pembayaran QRIS belum tersedia.");
+    throw new HttpError(
+      503,
+      "PAYMENT_UNAVAILABLE",
+      "Pembayaran QRIS belum tersedia.",
+    );
   }
   return createMidtransGateway({
     key: env.MIDTRANS_SERVER_KEY,
@@ -61,20 +79,32 @@ export function membershipGateway() {
 }
 
 function toOrder(order: Order): MembershipOrderDto {
-  const awaitingPayment = order.status === "pending" || order.status === "failed";
-  const linkExpired = awaitingPayment && Boolean(
-    order.checkoutCreatedAt && Date.now() - order.checkoutCreatedAt.getTime() >= DAY_MS,
-  );
+  const awaitingPayment =
+    order.status === "pending" || order.status === "failed";
+  const linkExpired =
+    awaitingPayment &&
+    Boolean(
+      order.checkoutCreatedAt &&
+      Date.now() - order.checkoutCreatedAt.getTime() >= DAY_MS,
+    );
   return {
     id: order.id,
     planId: order.planId,
     months: order.months,
     priceIdr: order.priceIdr,
-    tax: order.subtotalIdr === null || order.taxIdr === null || order.taxRateBps === null
-      ? null
-      : { subtotalIdr: order.subtotalIdr, taxIdr: order.taxIdr, rateBps: order.taxRateBps },
+    tax:
+      order.subtotalIdr === null ||
+      order.taxIdr === null ||
+      order.taxRateBps === null
+        ? null
+        : {
+            subtotalIdr: order.subtotalIdr,
+            taxIdr: order.taxIdr,
+            rateBps: order.taxRateBps,
+          },
     status: linkExpired ? "expired" : order.status,
-    accessRevoked: order.buyerId === order.beneficiaryId && order.accessRevokedAt !== null,
+    accessRevoked:
+      order.buyerId === order.beneficiaryId && order.accessRevokedAt !== null,
     recipientUsername: order.recipientUsername,
     bookSlug: order.bookSlug,
     checkoutUrl: awaitingPayment && !linkExpired ? order.checkoutUrl : null,
@@ -87,7 +117,13 @@ export async function getActiveMembership(userId: string, now = new Date()) {
   const [membership] = await db
     .select({ expiresAt: memberships.expiresAt })
     .from(memberships)
-    .where(and(eq(memberships.userId, userId), gt(memberships.expiresAt, now), isNull(memberships.canceledAt)));
+    .where(
+      and(
+        eq(memberships.userId, userId),
+        gt(memberships.expiresAt, now),
+        isNull(memberships.canceledAt),
+      ),
+    );
   return membership ?? null;
 }
 
@@ -109,66 +145,119 @@ export async function getMembershipSummary(
   return {
     username: account?.username ?? null,
     expiresAt: expiresAt?.toISOString() ?? null,
-    status: account?.canceledAt ? "canceled" : getMembershipStatus(expiresAt, new Date()),
+    status: account?.canceledAt
+      ? "canceled"
+      : getMembershipStatus(expiresAt, new Date()),
     checkoutAvailable: Boolean(env.MIDTRANS_SERVER_KEY),
     reminderEmailsEnabled: account?.reminderEmailsEnabled ?? true,
   };
 }
 
-export async function cancelMembership(userId: string, expectedExpiry: Date): Promise<MembershipSummaryDto> {
+export async function cancelMembership(
+  userId: string,
+  expectedExpiry: Date,
+): Promise<MembershipSummaryDto> {
   return db.transaction(async (tx) => {
     // Payment reconciliation and reminder delivery take the same beneficiary lock.
-    await tx.select({ id: user.id }).from(user).where(eq(user.id, userId)).for("no key update");
+    await tx
+      .select({ id: user.id })
+      .from(user)
+      .where(eq(user.id, userId))
+      .for("no key update");
     const now = new Date();
-    const [current] = await tx.select({ expiresAt: memberships.expiresAt })
-      .from(memberships).where(and(
-        eq(memberships.userId, userId), gt(memberships.expiresAt, now), isNull(memberships.canceledAt),
-      ));
+    const [current] = await tx
+      .select({ expiresAt: memberships.expiresAt })
+      .from(memberships)
+      .where(
+        and(
+          eq(memberships.userId, userId),
+          gt(memberships.expiresAt, now),
+          isNull(memberships.canceledAt),
+        ),
+      );
     if (!current) return getMembershipSummary(userId, tx);
     if (current.expiresAt.getTime() !== expectedExpiry.getTime()) {
-      throw new HttpError(409, "MEMBERSHIP_CHANGED", "Masa aktif Nakama berubah. Buka konfirmasi baru untuk membatalkan.");
+      throw new HttpError(
+        409,
+        "MEMBERSHIP_CHANGED",
+        "Masa aktif Nakama berubah. Buka konfirmasi baru untuk membatalkan.",
+      );
     }
 
-    await tx.update(memberships).set({ expiresAt: now, canceledAt: now })
+    await tx
+      .update(memberships)
+      .set({ expiresAt: now, canceledAt: now })
       .where(eq(memberships.userId, userId));
-    await tx.update(membershipOrders).set({ accessRevokedAt: now }).where(and(
-      eq(membershipOrders.beneficiaryId, userId),
-      eq(membershipOrders.status, "paid"),
-      isNull(membershipOrders.accessRevokedAt),
-    ));
+    await tx
+      .update(membershipOrders)
+      .set({ accessRevokedAt: now })
+      .where(
+        and(
+          eq(membershipOrders.beneficiaryId, userId),
+          eq(membershipOrders.status, "paid"),
+          isNull(membershipOrders.accessRevokedAt),
+        ),
+      );
     await cancelPendingReminders(tx, userId, now);
     return getMembershipSummary(userId, tx);
   });
 }
 
-export async function setMembershipReminderEmails(userId: string, enabled: boolean) {
-  await db.update(user).set({ membershipReminderEmails: enabled }).where(eq(user.id, userId));
+export async function setMembershipReminderEmails(
+  userId: string,
+  enabled: boolean,
+) {
+  await db
+    .update(user)
+    .set({ membershipReminderEmails: enabled })
+    .where(eq(user.id, userId));
   return getMembershipSummary(userId);
 }
 
 export async function setMembershipUsername(userId: string, username: string) {
   try {
-    const [updated] = await db.update(user)
+    const [updated] = await db
+      .update(user)
       .set({ username })
       .where(and(eq(user.id, userId), isNull(user.username)))
       .returning({ username: user.username });
     if (updated) return { username };
   } catch (error) {
-    if (error instanceof Error && (error.cause as { code?: string } | undefined)?.code === "23505") {
+    if (
+      error instanceof Error &&
+      (error.cause as { code?: string } | undefined)?.code === "23505"
+    ) {
       throw new HttpError(409, "USERNAME_TAKEN", "Username sudah digunakan.");
     }
     throw error;
   }
-  const [account] = await db.select({ username: user.username }).from(user).where(eq(user.id, userId));
+  const [account] = await db
+    .select({ username: user.username })
+    .from(user)
+    .where(eq(user.id, userId));
   if (account?.username === username) return { username };
-  throw new HttpError(409, "USERNAME_ALREADY_SET", "Username akun ini sudah terdaftar.");
+  throw new HttpError(
+    409,
+    "USERNAME_ALREADY_SET",
+    "Username akun ini sudah terdaftar.",
+  );
 }
 
-async function findRecipient(connection: typeof db | Transaction, payerId: string, username: string) {
-  const [recipient] = await connection.select({ id: user.id, displayName: user.name })
+async function findRecipient(
+  connection: typeof db | Transaction,
+  payerId: string,
+  username: string,
+) {
+  const [recipient] = await connection
+    .select({ id: user.id, displayName: user.name })
     .from(user)
     .where(and(eq(user.username, username), ne(user.id, payerId)));
-  if (!recipient) throw new HttpError(404, "RECIPIENT_NOT_FOUND", "Username penerima tidak ditemukan.");
+  if (!recipient)
+    throw new HttpError(
+      404,
+      "RECIPIENT_NOT_FOUND",
+      "Username penerima tidak ditemukan.",
+    );
   return recipient;
 }
 
@@ -182,78 +271,145 @@ export async function getMembershipRecipient(
 
 async function reserveOrder(buyerId: string, input: MembershipCheckoutInput) {
   return db.transaction(async (tx) => {
-    await tx.select({ id: user.id }).from(user).where(eq(user.id, buyerId)).for("no key update");
-    const [existing] = await tx.select().from(membershipOrders)
-      .where(and(eq(membershipOrders.buyerId, buyerId), eq(membershipOrders.requestId, input.requestId)));
+    await tx
+      .select({ id: user.id })
+      .from(user)
+      .where(eq(user.id, buyerId))
+      .for("no key update");
+    const [existing] = await tx
+      .select()
+      .from(membershipOrders)
+      .where(
+        and(
+          eq(membershipOrders.buyerId, buyerId),
+          eq(membershipOrders.requestId, input.requestId),
+        ),
+      );
     if (existing) {
-      if (existing.planId !== input.planId ||
+      if (
+        existing.planId !== input.planId ||
         existing.recipientUsername !== (input.recipientUsername ?? null) ||
-        existing.bookSlug !== (input.bookSlug ?? null)) {
-        throw new HttpError(409, "CHECKOUT_CONFLICT", "Pilihan pesanan berubah. Buat pesanan baru.");
+        existing.bookSlug !== (input.bookSlug ?? null)
+      ) {
+        throw new HttpError(
+          409,
+          "CHECKOUT_CONFLICT",
+          "Pilihan pesanan berubah. Buat pesanan baru.",
+        );
       }
       return existing.id;
     }
 
-    const recent = await tx.select({ id: membershipOrders.id }).from(membershipOrders)
-      .where(and(eq(membershipOrders.buyerId, buyerId), gt(membershipOrders.createdAt, new Date(Date.now() - CHECKOUT_WINDOW_MS))))
+    const recent = await tx
+      .select({ id: membershipOrders.id })
+      .from(membershipOrders)
+      .where(
+        and(
+          eq(membershipOrders.buyerId, buyerId),
+          gt(
+            membershipOrders.createdAt,
+            new Date(Date.now() - CHECKOUT_WINDOW_MS),
+          ),
+        ),
+      )
       .limit(CHECKOUT_LIMIT);
     if (recent.length >= CHECKOUT_LIMIT) {
-      throw new HttpError(429, "CHECKOUT_RATE_LIMIT", "Terlalu banyak percobaan pembayaran. Coba lagi nanti.");
+      throw new HttpError(
+        429,
+        "CHECKOUT_RATE_LIMIT",
+        "Terlalu banyak percobaan pembayaran. Coba lagi nanti.",
+      );
     }
 
     const plan = membershipPlans.find((entry) => entry.id === input.planId);
-    if (!plan) throw new HttpError(404, "PLAN_NOT_FOUND", "Paket Nakama tidak ditemukan.");
+    if (!plan)
+      throw new HttpError(
+        404,
+        "PLAN_NOT_FOUND",
+        "Paket Nakama tidak ditemukan.",
+      );
     if (input.bookSlug) {
-      const [book] = await tx.select({ id: books.id }).from(books).where(eq(books.slug, input.bookSlug));
-      if (!book) throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+      const [book] = await tx
+        .select({ id: books.id })
+        .from(books)
+        .where(eq(books.slug, input.bookSlug));
+      if (!book)
+        throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
     }
     const recipient = input.recipientUsername
       ? await findRecipient(tx, buyerId, input.recipientUsername)
       : null;
     const tax = membershipTaxBreakdown(plan.subtotalIdr, requireTaxRate());
-    const [order] = await tx.insert(membershipOrders).values({
-      buyerId,
-      beneficiaryId: recipient?.id ?? buyerId,
-      recipientUsername: input.recipientUsername,
-      bookSlug: input.bookSlug,
-      requestId: input.requestId,
-      planId: plan.id,
-      months: plan.months,
-      priceIdr: tax.subtotalIdr + tax.taxIdr,
-      subtotalIdr: tax.subtotalIdr,
-      taxIdr: tax.taxIdr,
-      taxRateBps: tax.rateBps,
-    }).returning({ id: membershipOrders.id });
+    const [order] = await tx
+      .insert(membershipOrders)
+      .values({
+        buyerId,
+        beneficiaryId: recipient?.id ?? buyerId,
+        recipientUsername: input.recipientUsername,
+        bookSlug: input.bookSlug,
+        requestId: input.requestId,
+        planId: plan.id,
+        months: plan.months,
+        priceIdr: tax.subtotalIdr + tax.taxIdr,
+        subtotalIdr: tax.subtotalIdr,
+        taxIdr: tax.taxIdr,
+        taxRateBps: tax.rateBps,
+      })
+      .returning({ id: membershipOrders.id });
     return order.id;
   });
 }
 
-export async function startMembershipCheckout(buyerId: string, input: MembershipCheckoutInput) {
+export async function startMembershipCheckout(
+  buyerId: string,
+  input: MembershipCheckoutInput,
+) {
   const gateway = membershipGateway();
   const orderId = await reserveOrder(buyerId, input);
   return db.transaction(async (tx) => {
-    const [order] = await tx.select().from(membershipOrders)
-      .where(and(eq(membershipOrders.id, orderId), eq(membershipOrders.buyerId, buyerId)))
+    const [order] = await tx
+      .select()
+      .from(membershipOrders)
+      .where(
+        and(
+          eq(membershipOrders.id, orderId),
+          eq(membershipOrders.buyerId, buyerId),
+        ),
+      )
       .for("update");
-    if (!order) throw new HttpError(404, "ORDER_NOT_FOUND", "Pesanan tidak ditemukan.");
+    if (!order)
+      throw new HttpError(404, "ORDER_NOT_FOUND", "Pesanan tidak ditemukan.");
     if (order.checkoutUrl || order.status !== "pending") return toOrder(order);
 
     // Recreating a Snap token invalidates the previous token for this order.
-    const tax = order.subtotalIdr === null || order.taxIdr === null || order.taxRateBps === null
-      ? legacyTaxSnapshot(order.priceIdr)
-      : { subtotalIdr: order.subtotalIdr, taxIdr: order.taxIdr, taxRateBps: order.taxRateBps };
+    const tax =
+      order.subtotalIdr === null ||
+      order.taxIdr === null ||
+      order.taxRateBps === null
+        ? legacyTaxSnapshot(order.priceIdr)
+        : {
+            subtotalIdr: order.subtotalIdr,
+            taxIdr: order.taxIdr,
+            taxRateBps: order.taxRateBps,
+          };
     const checkoutUrl = await gateway.createCheckout({ ...order, ...tax });
-    const [updated] = await tx.update(membershipOrders).set({
-      ...tax,
-      checkoutUrl,
-      checkoutCreatedAt: new Date(),
-    }).where(eq(membershipOrders.id, orderId)).returning();
+    const [updated] = await tx
+      .update(membershipOrders)
+      .set({
+        ...tax,
+        checkoutUrl,
+        checkoutCreatedAt: new Date(),
+      })
+      .where(eq(membershipOrders.id, orderId))
+      .returning();
     return toOrder(updated);
   });
 }
 
 export async function listMembershipOrders(buyerId: string) {
-  const orders = await db.select().from(membershipOrders)
+  const orders = await db
+    .select()
+    .from(membershipOrders)
     .where(eq(membershipOrders.buyerId, buyerId))
     .orderBy(desc(membershipOrders.createdAt))
     .limit(50);
@@ -261,100 +417,179 @@ export async function listMembershipOrders(buyerId: string) {
 }
 
 export async function getMembershipOrder(buyerId: string, orderId: string) {
-  const [order] = await db.select().from(membershipOrders)
-    .where(and(eq(membershipOrders.id, orderId), eq(membershipOrders.buyerId, buyerId)));
-  if (!order) throw new HttpError(404, "ORDER_NOT_FOUND", "Pesanan tidak ditemukan.");
+  const [order] = await db
+    .select()
+    .from(membershipOrders)
+    .where(
+      and(
+        eq(membershipOrders.id, orderId),
+        eq(membershipOrders.buyerId, buyerId),
+      ),
+    );
+  if (!order)
+    throw new HttpError(404, "ORDER_NOT_FOUND", "Pesanan tidak ditemukan.");
   return toOrder(order);
 }
 
 export async function membershipOrderExists(orderId: string) {
-  const [order] = await db.select({ id: membershipOrders.id }).from(membershipOrders)
+  const [order] = await db
+    .select({ id: membershipOrders.id })
+    .from(membershipOrders)
     .where(eq(membershipOrders.id, orderId));
   return Boolean(order);
 }
 
-async function cancelPendingReminders(tx: Transaction, userId: string, now: Date, keepExpiry?: Date | null) {
-  await tx.update(membershipReminders).set({ canceledAt: now }).where(and(
-    eq(membershipReminders.userId, userId),
-    isNull(membershipReminders.sentAt),
-    isNull(membershipReminders.canceledAt),
-    keepExpiry ? ne(membershipReminders.expiresAt, keepExpiry) : undefined,
-  ));
+async function cancelPendingReminders(
+  tx: Transaction,
+  userId: string,
+  now: Date,
+  keepExpiry?: Date | null,
+) {
+  await tx
+    .update(membershipReminders)
+    .set({ canceledAt: now })
+    .where(
+      and(
+        eq(membershipReminders.userId, userId),
+        isNull(membershipReminders.sentAt),
+        isNull(membershipReminders.canceledAt),
+        keepExpiry ? ne(membershipReminders.expiresAt, keepExpiry) : undefined,
+      ),
+    );
 }
 
 async function refreshEntitlement(tx: Transaction, userId: string) {
-  const orders = await tx.select({ months: membershipOrders.months, paidAt: membershipOrders.paidAt })
+  const orders = await tx
+    .select({
+      months: membershipOrders.months,
+      paidAt: membershipOrders.paidAt,
+    })
     .from(membershipOrders)
-    .where(and(
-      eq(membershipOrders.beneficiaryId, userId),
-      eq(membershipOrders.status, "paid"),
-      isNotNull(membershipOrders.paidAt),
-      isNull(membershipOrders.accessRevokedAt),
-    ))
+    .where(
+      and(
+        eq(membershipOrders.beneficiaryId, userId),
+        eq(membershipOrders.status, "paid"),
+        isNotNull(membershipOrders.paidAt),
+        isNull(membershipOrders.accessRevokedAt),
+      ),
+    )
     .orderBy(asc(membershipOrders.paidAt), asc(membershipOrders.id));
-  const expiresAt = membershipExpiresAt(orders.flatMap(({ months, paidAt }) =>
-    paidAt ? [{ months, paidAt }] : [],
-  ));
+  const expiresAt = membershipExpiresAt(
+    orders.flatMap(({ months, paidAt }) =>
+      paidAt ? [{ months, paidAt }] : [],
+    ),
+  );
 
   await cancelPendingReminders(tx, userId, new Date(), expiresAt);
   if (!expiresAt) {
-    await tx.delete(memberships).where(and(eq(memberships.userId, userId), isNull(memberships.canceledAt)));
+    await tx
+      .delete(memberships)
+      .where(
+        and(eq(memberships.userId, userId), isNull(memberships.canceledAt)),
+      );
     return;
   }
 
-  await tx.insert(memberships).values({ userId, expiresAt }).onConflictDoUpdate({
-    target: memberships.userId,
-    set: { expiresAt, canceledAt: null },
-  });
-  await tx.insert(membershipReminders).values([
-    { userId, expiresAt, kind: "expiring", dueAt: new Date(expiresAt.getTime() - 7 * DAY_MS) },
-    { userId, expiresAt, kind: "expired", dueAt: expiresAt },
-  ]).onConflictDoUpdate({
-    target: [membershipReminders.userId, membershipReminders.expiresAt, membershipReminders.kind],
-    set: { canceledAt: null },
-  });
+  await tx
+    .insert(memberships)
+    .values({ userId, expiresAt })
+    .onConflictDoUpdate({
+      target: memberships.userId,
+      set: { expiresAt, canceledAt: null },
+    });
+  await tx
+    .insert(membershipReminders)
+    .values([
+      {
+        userId,
+        expiresAt,
+        kind: "expiring",
+        dueAt: new Date(expiresAt.getTime() - 7 * DAY_MS),
+      },
+      { userId, expiresAt, kind: "expired", dueAt: expiresAt },
+    ])
+    .onConflictDoUpdate({
+      target: [
+        membershipReminders.userId,
+        membershipReminders.expiresAt,
+        membershipReminders.kind,
+      ],
+      set: { canceledAt: null },
+    });
 }
 
 export async function reconcileMembershipPayment(payment: VerifiedPayment) {
   await db.transaction(async (tx) => {
-    const [reference] = await tx.select({ beneficiaryId: membershipOrders.beneficiaryId }).from(membershipOrders)
+    const [reference] = await tx
+      .select({ beneficiaryId: membershipOrders.beneficiaryId })
+      .from(membershipOrders)
       .where(eq(membershipOrders.id, payment.orderId));
     if (!reference) return;
 
     // Serialize grants, refunds, and reminder checks for the same beneficiary.
     if (reference.beneficiaryId) {
-      await tx.select({ id: user.id }).from(user).where(eq(user.id, reference.beneficiaryId)).for("no key update");
+      await tx
+        .select({ id: user.id })
+        .from(user)
+        .where(eq(user.id, reference.beneficiaryId))
+        .for("no key update");
     }
-    const [order] = await tx.select().from(membershipOrders)
-      .where(eq(membershipOrders.id, payment.orderId)).for("update");
+    const [order] = await tx
+      .select()
+      .from(membershipOrders)
+      .where(eq(membershipOrders.id, payment.orderId))
+      .for("update");
     if (!order) return;
-    if (order.priceIdr !== payment.priceIdr || order.currency !== payment.currency) {
-      throw new HttpError(409, "PAYMENT_AMOUNT_MISMATCH", "Nominal pembayaran tidak cocok dengan pesanan.");
+    if (
+      order.priceIdr !== payment.priceIdr ||
+      order.currency !== payment.currency
+    ) {
+      throw new HttpError(
+        409,
+        "PAYMENT_AMOUNT_MISMATCH",
+        "Nominal pembayaran tidak cocok dengan pesanan.",
+      );
     }
-    if (order.paidTransactionId && order.paidTransactionId !== payment.transactionId) {
+    if (
+      order.paidTransactionId &&
+      order.paidTransactionId !== payment.transactionId
+    ) {
       return;
     }
 
-    const [event] = await tx.insert(membershipPaymentEvents).values({
-      orderId: order.id,
-      transactionId: payment.transactionId,
-      status: payment.status,
-    }).onConflictDoNothing().returning({ orderId: membershipPaymentEvents.orderId });
+    const [event] = await tx
+      .insert(membershipPaymentEvents)
+      .values({
+        orderId: order.id,
+        transactionId: payment.transactionId,
+        status: payment.status,
+      })
+      .onConflictDoNothing()
+      .returning({ orderId: membershipPaymentEvents.orderId });
     if (!event) return;
 
     const status = nextOrderStatus(order.status, payment.status);
     if (status === order.status) return;
 
     const changedToPaid = status === "paid";
-    const paidAt = changedToPaid ? new Date(Math.max(
-      order.createdAt.getTime(),
-      Math.min(payment.paidAt?.getTime() ?? Date.now(), Date.now()),
-    )) : order.paidAt;
-    await tx.update(membershipOrders).set({
-      status,
-      paidAt,
-      paidTransactionId: changedToPaid ? payment.transactionId : order.paidTransactionId,
-    }).where(eq(membershipOrders.id, order.id));
+    const paidAt = changedToPaid
+      ? new Date(
+          Math.max(
+            order.createdAt.getTime(),
+            Math.min(payment.paidAt?.getTime() ?? Date.now(), Date.now()),
+          ),
+        )
+      : order.paidAt;
+    await tx
+      .update(membershipOrders)
+      .set({
+        status,
+        paidAt,
+        paidTransactionId: changedToPaid
+          ? payment.transactionId
+          : order.paidTransactionId,
+      })
+      .where(eq(membershipOrders.id, order.id));
 
     if (order.beneficiaryId && (changedToPaid || status === "refunded")) {
       await refreshEntitlement(tx, order.beneficiaryId);

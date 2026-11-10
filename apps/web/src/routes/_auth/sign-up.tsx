@@ -9,5 +9,11 @@ export const Route = createFileRoute("/_auth/sign-up")({
 
 function SignUp() {
   const search = Route.useSearch();
-  return <AuthForm mode="sign-up" redirectTo={search.redirect} socialError={!!search.error} />;
+  return (
+    <AuthForm
+      mode="sign-up"
+      redirectTo={search.redirect}
+      socialError={!!search.error}
+    />
+  );
 }

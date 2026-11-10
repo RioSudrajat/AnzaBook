@@ -38,8 +38,8 @@ export function FlexReadingDialog({
 
   // Mock pace rhythm waveform bars (mimicking Strava cadence/elevation graph)
   const paceWaveform = [
-    35, 45, 60, 85, 70, 95, 80, 65, 90, 100, 75, 85, 60, 70, 90, 85, 95, 65,
-    50, 75,
+    35, 45, 60, 85, 70, 95, 80, 65, 90, 100, 75, 85, 60, 70, 90, 85, 95, 65, 50,
+    75,
   ];
 
   // WhatsApp Share
@@ -162,9 +162,9 @@ export function FlexReadingDialog({
             <div className="flex items-center justify-between border-b border-white/10 pb-3 z-10">
               <div className="flex items-center gap-2">
                 <img
-                  src="/logo-mark.svg"
+                  src="/icon.svg"
                   alt="AnzaBook"
-                  className="size-5 object-contain"
+                  className="size-5 rounded-[4px] object-contain border border-white/20 shadow-xs"
                 />
                 <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-white">
                   AnzaBook
@@ -285,7 +285,9 @@ export function FlexReadingDialog({
             className="w-full gap-2 text-muted-foreground hover:text-foreground h-9 text-[11px]"
           >
             <Download className="size-3.5" />
-            {isExporting ? "Menyiapkan Gambar Flex..." : "Unduh Gambar Kartu (High-Res PNG)"}
+            {isExporting
+              ? "Menyiapkan Gambar Flex..."
+              : "Unduh Gambar Kartu (High-Res PNG)"}
           </Button>
         </div>
       </div>

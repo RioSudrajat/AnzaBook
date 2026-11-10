@@ -1,4 +1,11 @@
-import { ChevronRight, Maximize2, Minimize2, Share2, Sparkles, Trash2, X } from "lucide-react";
+import {
+  ChevronRight,
+  Maximize2,
+  Minimize2,
+  Share2,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useState } from "react";
 import type { BookHighlightDto } from "@starter/shared/types";
 import { Button } from "@/components/ui/button";
@@ -106,9 +113,12 @@ export function HighlightsSidebar({
             <div className="size-10 rounded-full bg-white/5 mx-auto flex items-center justify-center text-muted-foreground">
               <Share2 className="size-5" />
             </div>
-            <p className="font-serif text-sm">Belum ada kutipan yang distabilo.</p>
+            <p className="font-serif text-sm">
+              Belum ada kutipan yang distabilo.
+            </p>
             <p className="text-xs font-mono opacity-70 max-w-xs mx-auto">
-              Pilih teks di dalam naskah untuk memunculkan warna stabilo dan menyimpannya ke catatan.
+              Pilih teks di dalam naskah untuk memunculkan warna stabilo dan
+              menyimpannya ke catatan.
             </p>
           </div>
         ) : (
@@ -179,7 +189,7 @@ export function HighlightsSidebar({
                         className="h-6 px-2.5 text-[11px] font-mono gap-1 bg-white/10 hover:bg-[var(--color-accent)] hover:text-white text-white/90 border border-white/10 rounded-[6px]"
                         title="Flex kalimat ini ke Instagram Story atau WhatsApp"
                       >
-                        <Sparkles className="size-3 text-[var(--color-accent)] group-hover:text-white" />
+                        <Share2 className="size-3 text-[var(--color-accent)] group-hover:text-white" />
                         <span>Flex</span>
                       </Button>
                     </div>

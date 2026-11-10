@@ -6,7 +6,6 @@ import {
   Feather,
   Layers,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 import type { BookDetailDto, EditionTier } from "@starter/shared/types";
 import { BookCover } from "./book-cover";
@@ -21,9 +20,7 @@ export function PaperTierSelector({ book }: PaperTierSelectorProps) {
     "rakyat_economy",
   );
 
-  const rakyatEdition = book.editions.find(
-    (e) => e.tier === "rakyat_economy",
-  );
+  const rakyatEdition = book.editions.find((e) => e.tier === "rakyat_economy");
   const standardEdition = book.editions.find(
     (e) => e.tier === "standard_trade",
   );
@@ -56,7 +53,9 @@ export function PaperTierSelector({ book }: PaperTierSelectorProps) {
             className="w-[180px] sm:w-[210px]"
             edition={{
               paperColor: paperEdgeColor,
-              label: activeEdition ? `${activeEdition.weightGrams} g` : "Dwibahasa",
+              label: activeEdition
+                ? `${activeEdition.weightGrams} g`
+                : "Dwibahasa",
               priceIdr: activeEdition?.priceIdr ?? null,
             }}
           />
@@ -85,7 +84,10 @@ export function PaperTierSelector({ book }: PaperTierSelectorProps) {
             </div>
 
             {/* 4 Options Grid */}
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3" role="radiogroup">
+            <div
+              className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3"
+              role="radiogroup"
+            >
               {/* Option 1: Edisi Rakyat Newsprint (Featured) */}
               {rakyatEdition && (
                 <button
@@ -101,7 +103,7 @@ export function PaperTierSelector({ book }: PaperTierSelectorProps) {
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-serif font-bold text-sm text-foreground flex items-center gap-1.5">
-                      <Sparkles className="size-3.5 text-[var(--color-accent)]" />
+                      <Feather className="size-3.5 text-[var(--color-accent)]" />
                       Edisi Rakyat
                     </span>
                     <span className="font-mono text-xs font-bold text-[var(--color-accent)]">
@@ -109,11 +111,18 @@ export function PaperTierSelector({ book }: PaperTierSelectorProps) {
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Newsprint 48.8 gsm buram halus, enteng di mata & tas komuter.
+                    Newsprint 48.8 gsm buram halus, enteng di mata & tas
+                    komuter.
                   </p>
                   <div className="mt-2 text-[11px] font-mono text-emerald-800 dark:text-emerald-300 font-semibold flex items-center gap-1">
                     <Check className="size-3" />
-                    <span>Hemat {rakyatEdition.savingsPercent}% (Ritel: Rp{rakyatEdition.traditionalStorePriceIdr.toLocaleString("id-ID")})</span>
+                    <span>
+                      Hemat {rakyatEdition.savingsPercent}% (Ritel: Rp
+                      {rakyatEdition.traditionalStorePriceIdr.toLocaleString(
+                        "id-ID",
+                      )}
+                      )
+                    </span>
                   </div>
                 </button>
               )}
@@ -140,7 +149,8 @@ export function PaperTierSelector({ book }: PaperTierSelectorProps) {
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Baca dwibahasa split view, audiobook audio sync, dan akses catatan.
+                  Baca dwibahasa split view, audiobook audio sync, dan akses
+                  catatan.
                 </p>
                 <div className="mt-2 text-[11px] font-mono text-muted-foreground flex items-center gap-1">
                   <ShieldCheck className="size-3 text-emerald-600" />
@@ -174,7 +184,11 @@ export function PaperTierSelector({ book }: PaperTierSelectorProps) {
                     Bookpaper Krem 72 gsm, laminasi doff, jahit benang rapi.
                   </p>
                   <div className="mt-2 text-[11px] font-mono text-muted-foreground">
-                    Hemat {standardEdition.savingsPercent}% (Ritel: Rp{standardEdition.traditionalStorePriceIdr.toLocaleString("id-ID")})
+                    Hemat {standardEdition.savingsPercent}% (Ritel: Rp
+                    {standardEdition.traditionalStorePriceIdr.toLocaleString(
+                      "id-ID",
+                    )}
+                    )
                   </div>
                 </button>
               )}
@@ -194,7 +208,7 @@ export function PaperTierSelector({ book }: PaperTierSelectorProps) {
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-serif font-bold text-sm text-foreground flex items-center gap-1.5">
-                      <Sparkles className="size-3.5 text-amber-500" />
+                      <Layers className="size-3.5 text-amber-500" />
                       Edisi Kolektor
                     </span>
                     <span className="font-mono text-xs font-bold text-foreground">
@@ -202,7 +216,8 @@ export function PaperTierSelector({ book }: PaperTierSelectorProps) {
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Hardcover Board No. 30, foil emas, pita pembatas, bookpaper 80 gsm.
+                    Hardcover Board No. 30, foil emas, pita pembatas, bookpaper
+                    80 gsm.
                   </p>
                   <div className="mt-2 text-[11px] font-mono text-muted-foreground">
                     Eksklusif &bull; {kolektorEdition.weightGrams}g

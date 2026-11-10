@@ -16,7 +16,9 @@ describe("catalog filters", () => {
     ]);
     expect(filtered.body.meta.hasMore).toBe(false);
 
-    const unavailable = await client.get("/api/books").query({ language: "fr" });
+    const unavailable = await client
+      .get("/api/books")
+      .query({ language: "fr" });
     expect(unavailable.status).toBe(200);
     expect(unavailable.body.data).toEqual([]);
   });

@@ -15,7 +15,11 @@ import {
   simulatePrintEconomics,
   upsertShelf,
 } from "./api";
-import { communityKeys, readingSessionsQuery, userShelvesQuery } from "./queries";
+import {
+  communityKeys,
+  readingSessionsQuery,
+  userShelvesQuery,
+} from "./queries";
 
 export function useUserShelves() {
   return useSuspenseQuery(userShelvesQuery());
@@ -43,8 +47,13 @@ export function useCreateReadingSession() {
     onSuccess: async (session) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: communityKeys.sessions() }),
-        queryClient.invalidateQueries({ queryKey: booksKeys.sessions(session.bookId) }),
-        queryClient.invalidateQueries({ queryKey: communityKeys.shelves(), refetchType: "all" }),
+        queryClient.invalidateQueries({
+          queryKey: booksKeys.sessions(session.bookId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: communityKeys.shelves(),
+          refetchType: "all",
+        }),
       ]);
     },
   });

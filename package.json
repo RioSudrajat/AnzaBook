@@ -32,6 +32,7 @@
     "test": "node scripts/test.mjs unit",
     "test:e2e": "node scripts/test.mjs e2e",
     "test:setup": "node scripts/test-setup.mjs",
+    "pay:sandbox": "node scripts/simulate-pay.mjs",
     "create:variant": "node scripts/create-variant.mjs"
   },
   "devDependencies": {

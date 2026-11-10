@@ -12,13 +12,17 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as ProtectedRouteImport } from './routes/_protected'
+import { Route as AboutRouteImport } from './routes/about'
 import { Route as MembershipRouteImport } from './routes/membership'
 import { Route as AuthSignInRouteImport } from './routes/_auth/sign-in'
 import { Route as AuthSignUpRouteImport } from './routes/_auth/sign-up'
 import { Route as ProtectedAdminRouteImport } from './routes/_protected/admin'
 import { Route as ProtectedAppRouteImport } from './routes/_protected/app'
 import { Route as ProtectedNotesRouteImport } from './routes/_protected/notes'
+import { Route as BookPreviewSlugRouteImport } from './routes/book-preview.$slug'
 import { Route as BooksSlugRouteImport } from './routes/books.$slug'
+import { Route as CSlugRouteImport } from './routes/c.$slug'
+import { Route as EventsSlugRouteImport } from './routes/events.$slug'
 import { Route as ProtectedReadSlugRouteImport } from './routes/_protected/read.$slug'
 import { Route as ProtectedMembershipCheckoutOrderIdRouteImport } from './routes/_protected/membership.checkout.$orderId'
 
@@ -33,6 +37,11 @@ const AuthRoute = AuthRouteImport.update({
 } as any)
 const ProtectedRoute = ProtectedRouteImport.update({
   id: '/_protected',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MembershipRoute = MembershipRouteImport.update({
@@ -65,9 +74,24 @@ const ProtectedNotesRoute = ProtectedNotesRouteImport.update({
   path: '/notes',
   getParentRoute: () => ProtectedRoute,
 } as any)
+const BookPreviewSlugRoute = BookPreviewSlugRouteImport.update({
+  id: '/book-preview/$slug',
+  path: '/book-preview/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BooksSlugRoute = BooksSlugRouteImport.update({
   id: '/books/$slug',
   path: '/books/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CSlugRoute = CSlugRouteImport.update({
+  id: '/c/$slug',
+  path: '/c/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EventsSlugRoute = EventsSlugRouteImport.update({
+  id: '/events/$slug',
+  path: '/events/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProtectedReadSlugRoute = ProtectedReadSlugRouteImport.update({
@@ -84,25 +108,33 @@ const ProtectedMembershipCheckoutOrderIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/membership': typeof MembershipRoute
   '/sign-in': typeof AuthSignInRoute
   '/sign-up': typeof AuthSignUpRoute
   '/admin': typeof ProtectedAdminRoute
   '/app': typeof ProtectedAppRoute
   '/notes': typeof ProtectedNotesRoute
+  '/book-preview/$slug': typeof BookPreviewSlugRoute
   '/books/$slug': typeof BooksSlugRoute
+  '/c/$slug': typeof CSlugRoute
+  '/events/$slug': typeof EventsSlugRoute
   '/read/$slug': typeof ProtectedReadSlugRoute
   '/membership/checkout/$orderId': typeof ProtectedMembershipCheckoutOrderIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/membership': typeof MembershipRoute
   '/sign-in': typeof AuthSignInRoute
   '/sign-up': typeof AuthSignUpRoute
   '/admin': typeof ProtectedAdminRoute
   '/app': typeof ProtectedAppRoute
   '/notes': typeof ProtectedNotesRoute
+  '/book-preview/$slug': typeof BookPreviewSlugRoute
   '/books/$slug': typeof BooksSlugRoute
+  '/c/$slug': typeof CSlugRoute
+  '/events/$slug': typeof EventsSlugRoute
   '/read/$slug': typeof ProtectedReadSlugRoute
   '/membership/checkout/$orderId': typeof ProtectedMembershipCheckoutOrderIdRoute
 }
@@ -111,13 +143,17 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_auth': typeof AuthRouteWithChildren
   '/_protected': typeof ProtectedRouteWithChildren
+  '/about': typeof AboutRoute
   '/membership': typeof MembershipRoute
   '/_auth/sign-in': typeof AuthSignInRoute
   '/_auth/sign-up': typeof AuthSignUpRoute
   '/_protected/admin': typeof ProtectedAdminRoute
   '/_protected/app': typeof ProtectedAppRoute
   '/_protected/notes': typeof ProtectedNotesRoute
+  '/book-preview/$slug': typeof BookPreviewSlugRoute
   '/books/$slug': typeof BooksSlugRoute
+  '/c/$slug': typeof CSlugRoute
+  '/events/$slug': typeof EventsSlugRoute
   '/_protected/read/$slug': typeof ProtectedReadSlugRoute
   '/_protected/membership/checkout/$orderId': typeof ProtectedMembershipCheckoutOrderIdRoute
 }
@@ -125,25 +161,33 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/about'
     | '/membership'
     | '/sign-in'
     | '/sign-up'
     | '/admin'
     | '/app'
     | '/notes'
+    | '/book-preview/$slug'
     | '/books/$slug'
+    | '/c/$slug'
+    | '/events/$slug'
     | '/read/$slug'
     | '/membership/checkout/$orderId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/about'
     | '/membership'
     | '/sign-in'
     | '/sign-up'
     | '/admin'
     | '/app'
     | '/notes'
+    | '/book-preview/$slug'
     | '/books/$slug'
+    | '/c/$slug'
+    | '/events/$slug'
     | '/read/$slug'
     | '/membership/checkout/$orderId'
   id:
@@ -151,13 +195,17 @@ export interface FileRouteTypes {
     | '/'
     | '/_auth'
     | '/_protected'
+    | '/about'
     | '/membership'
     | '/_auth/sign-in'
     | '/_auth/sign-up'
     | '/_protected/admin'
     | '/_protected/app'
     | '/_protected/notes'
+    | '/book-preview/$slug'
     | '/books/$slug'
+    | '/c/$slug'
+    | '/events/$slug'
     | '/_protected/read/$slug'
     | '/_protected/membership/checkout/$orderId'
   fileRoutesById: FileRoutesById
@@ -166,8 +214,12 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRouteWithChildren
   ProtectedRoute: typeof ProtectedRouteWithChildren
+  AboutRoute: typeof AboutRoute
   MembershipRoute: typeof MembershipRoute
+  BookPreviewSlugRoute: typeof BookPreviewSlugRoute
   BooksSlugRoute: typeof BooksSlugRoute
+  CSlugRoute: typeof CSlugRoute
+  EventsSlugRoute: typeof EventsSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -191,6 +243,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof ProtectedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/membership': {
@@ -235,11 +294,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProtectedNotesRouteImport
       parentRoute: typeof ProtectedRoute
     }
+    '/book-preview/$slug': {
+      id: '/book-preview/$slug'
+      path: '/book-preview/$slug'
+      fullPath: '/book-preview/$slug'
+      preLoaderRoute: typeof BookPreviewSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/books/$slug': {
       id: '/books/$slug'
       path: '/books/$slug'
       fullPath: '/books/$slug'
       preLoaderRoute: typeof BooksSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/c/$slug': {
+      id: '/c/$slug'
+      path: '/c/$slug'
+      fullPath: '/c/$slug'
+      preLoaderRoute: typeof CSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events/$slug': {
+      id: '/events/$slug'
+      path: '/events/$slug'
+      fullPath: '/events/$slug'
+      preLoaderRoute: typeof EventsSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_protected/read/$slug': {
@@ -296,8 +376,12 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRouteWithChildren,
   ProtectedRoute: ProtectedRouteWithChildren,
+  AboutRoute: AboutRoute,
   MembershipRoute: MembershipRoute,
+  BookPreviewSlugRoute: BookPreviewSlugRoute,
   BooksSlugRoute: BooksSlugRoute,
+  CSlugRoute: CSlugRoute,
+  EventsSlugRoute: EventsSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

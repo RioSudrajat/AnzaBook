@@ -30,19 +30,23 @@ describe("Midtrans membership payments", () => {
   it("creates only a QRIS checkout and uses an internal return path", async () => {
     const request = vi.fn<typeof fetch>().mockResolvedValue(
       Response.json({
-        redirect_url: "https://app.sandbox.midtrans.com/snap/v4/redirection/token",
+        redirect_url:
+          "https://app.sandbox.midtrans.com/snap/v4/redirection/token",
       }),
     );
-    const gateway = createMidtransGateway({ key, mode: "sandbox", webUrl: "https://anzabook.test" }, request);
-    await expect(gateway.createCheckout({
-      id: orderId,
-      months: 3,
-      priceIdr: 60_000,
-      subtotalIdr: 54_054,
-      taxIdr: 5_946,
-    })).resolves.toContain(
-      "app.sandbox.midtrans.com",
+    const gateway = createMidtransGateway(
+      { key, mode: "sandbox", webUrl: "https://anzabook.test" },
+      request,
     );
+    await expect(
+      gateway.createCheckout({
+        id: orderId,
+        months: 3,
+        priceIdr: 60_000,
+        subtotalIdr: 54_054,
+        taxIdr: 5_946,
+      }),
+    ).resolves.toContain("app.sandbox.midtrans.com");
     const [url, options] = request.mock.calls[0];
     expect(url).toBe("https://app.sandbox.midtrans.com/snap/v1/transactions");
     expect(JSON.parse(String(options?.body))).toMatchObject({
@@ -52,7 +56,9 @@ describe("Midtrans membership payments", () => {
         { id: "tax", name: "Pajak", price: 5_946, quantity: 1 },
       ],
       enabled_payments: ["other_qris"],
-      callbacks: { finish: "https://anzabook.test/membership/checkout/" + orderId },
+      callbacks: {
+        finish: "https://anzabook.test/membership/checkout/" + orderId,
+      },
     });
   });
 
@@ -68,10 +74,16 @@ describe("Midtrans membership payments", () => {
       settlement_time: "2026-11-05 05:00:00",
       fraud_status: "accept",
     };
-    const request = vi.fn<typeof fetch>()
+    const request = vi
+      .fn<typeof fetch>()
       .mockResolvedValueOnce(Response.json(payment))
-      .mockResolvedValueOnce(Response.json({ ...payment, payment_type: "credit_card" }));
-    const gateway = createMidtransGateway({ key, mode: "sandbox", webUrl: "https://anzabook.test" }, request);
+      .mockResolvedValueOnce(
+        Response.json({ ...payment, payment_type: "credit_card" }),
+      );
+    const gateway = createMidtransGateway(
+      { key, mode: "sandbox", webUrl: "https://anzabook.test" },
+      request,
+    );
     await expect(gateway.getPayment(orderId)).resolves.toMatchObject({
       orderId,
       transactionId: payment.transaction_id,

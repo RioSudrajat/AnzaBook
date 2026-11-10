@@ -10,7 +10,9 @@ describe("AnzaBook Print Economics & Shared Validators", () => {
       authorRoyaltyPct: 12,
     });
     const rakyat = result.tiers.find((t) => t.editionTier === "rakyat_economy");
-    const standard = result.tiers.find((t) => t.editionTier === "standard_trade");
+    const standard = result.tiers.find(
+      (t) => t.editionTier === "standard_trade",
+    );
     expect(rakyat).toBeDefined();
     expect(standard).toBeDefined();
     expect(rakyat!.recommendedPriceIdr).toBeGreaterThanOrEqual(25000);

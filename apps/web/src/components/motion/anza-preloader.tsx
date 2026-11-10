@@ -119,12 +119,16 @@ export function AnzaPreloader() {
             alt=""
             width={28}
             height={28}
-            className="size-7 rounded-[4px] invert"
+            className="size-7 rounded-[6px] shrink-0 border border-white/20 shadow-xs"
           />
-          <span className="font-serif text-sm font-semibold tracking-wide uppercase text-white/90">
-            AnzaBook
+          <span className="flex flex-col leading-none">
+            <span className="font-serif text-sm font-semibold tracking-tight text-white">
+              AnzaBook
+            </span>
+            <span className="text-[9px] uppercase font-mono tracking-wider text-white/60 mt-0.5">
+              Pustaka & Cetak Rakyat
+            </span>
           </span>
-          <span className="text-white/40 text-xs font-mono">/ Pustaka Rakyat</span>
         </div>
 
         <button
@@ -144,8 +148,8 @@ export function AnzaPreloader() {
           ref={quoteRef}
           className="font-serif text-2xl md:text-4xl lg:text-5xl font-medium tracking-tight leading-[1.3] text-balance text-[#F6F2E9]"
         >
-          &ldquo;Buku tidak boleh menjadi barang mewah kaum ningrat. Dengan memotong
-          perantara, kita kembalikan aksara ke tangan rakyat.&rdquo;
+          &ldquo;Buku tidak boleh menjadi barang mewah kaum ningrat. Dengan
+          memotong perantara, kita kembalikan aksara ke tangan rakyat.&rdquo;
         </div>
 
         <div

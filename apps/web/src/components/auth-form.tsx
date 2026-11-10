@@ -22,22 +22,32 @@ export function AuthForm({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState(socialError ? "Login Google gagal. Coba lagi atau masuk dengan email." : "");
+  const [error, setError] = useState(
+    socialError ? "Login Google gagal. Coba lagi atau masuk dengan email." : "",
+  );
 
   async function signInWithGoogle() {
     setPending(true);
     setError("");
-    const errorUrl = new URL(signingUp ? "/sign-up" : "/sign-in", window.location.origin);
+    const errorUrl = new URL(
+      signingUp ? "/sign-up" : "/sign-in",
+      window.location.origin,
+    );
     if (redirectTo) errorUrl.searchParams.set("redirect", redirectTo);
     try {
       const result = await authClient.signIn.social({
         provider: "google",
-        callbackURL: new URL(redirectTo ?? siteConfig.homePath, window.location.origin).href,
+        callbackURL: new URL(
+          redirectTo ?? siteConfig.homePath,
+          window.location.origin,
+        ).href,
         errorCallbackURL: errorUrl.href,
       });
       if (result.error) throw new Error("Google sign-in unavailable");
     } catch {
-      setError("Login Google belum tersedia atau gagal. Coba masuk dengan email.");
+      setError(
+        "Login Google belum tersedia atau gagal. Coba masuk dengan email.",
+      );
       setPending(false);
     }
   }
@@ -70,7 +80,10 @@ export function AuthForm({
       }
       queryClient.clear();
       await router.invalidate();
-      await navigate({ href: redirectTo ?? siteConfig.homePath, replace: true });
+      await navigate({
+        href: redirectTo ?? siteConfig.homePath,
+        replace: true,
+      });
     } catch {
       setError(
         "We couldn't reach the server. Check your connection and try again.",

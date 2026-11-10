@@ -17,8 +17,12 @@ export function HighlightPopover({
   onSaveHighlight,
 }: HighlightPopoverProps) {
   const [selectedText, setSelectedText] = useState("");
-  const [selectedChapterNumber, setSelectedChapterNumber] = useState<number | undefined>(undefined);
-  const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
+  const [selectedChapterNumber, setSelectedChapterNumber] = useState<
+    number | undefined
+  >(undefined);
+  const [position, setPosition] = useState<{ x: number; y: number } | null>(
+    null,
+  );
   const [note, setNote] = useState("");
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -115,10 +119,26 @@ export function HighlightPopover({
   };
 
   const colors: { id: HighlightColor; bg: string; label: string }[] = [
-    { id: "yellow", bg: "bg-amber-400 hover:bg-amber-300 ring-amber-500", label: "Kuning" },
-    { id: "green", bg: "bg-emerald-400 hover:bg-emerald-300 ring-emerald-500", label: "Hijau" },
-    { id: "coral", bg: "bg-rose-400 hover:bg-rose-300 ring-rose-500", label: "Karang" },
-    { id: "blue", bg: "bg-sky-400 hover:bg-sky-300 ring-sky-500", label: "Biru" },
+    {
+      id: "yellow",
+      bg: "bg-amber-400 hover:bg-amber-300 ring-amber-500",
+      label: "Kuning",
+    },
+    {
+      id: "green",
+      bg: "bg-emerald-400 hover:bg-emerald-300 ring-emerald-500",
+      label: "Hijau",
+    },
+    {
+      id: "coral",
+      bg: "bg-rose-400 hover:bg-rose-300 ring-rose-500",
+      label: "Karang",
+    },
+    {
+      id: "blue",
+      bg: "bg-sky-400 hover:bg-sky-300 ring-sky-500",
+      label: "Biru",
+    },
   ];
 
   return (

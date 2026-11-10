@@ -35,11 +35,18 @@ membershipRouter.get("/plans", (_req, res) => {
 
 membershipRouter.post("/webhooks/midtrans", jsonBody, async (req, res) => {
   if (!env.MIDTRANS_SERVER_KEY) {
-    throw new HttpError(503, "PAYMENT_UNAVAILABLE", "Pembayaran QRIS belum tersedia.");
+    throw new HttpError(
+      503,
+      "PAYMENT_UNAVAILABLE",
+      "Pembayaran QRIS belum tersedia.",
+    );
   }
-  const providerOrderId = verifyMidtransNotification(req.body, env.MIDTRANS_SERVER_KEY);
+  const providerOrderId = verifyMidtransNotification(
+    req.body,
+    env.MIDTRANS_SERVER_KEY,
+  );
   const result = membershipOrderId.safeParse(providerOrderId);
-  if (result.success && await membershipOrderExists(result.data)) {
+  if (result.success && (await membershipOrderExists(result.data))) {
     const payment = await membershipGateway().getPayment(result.data);
     if (payment) await reconcileMembershipPayment(payment);
   }
@@ -54,20 +61,30 @@ membershipRouter.get("/", async (req, res) => {
 
 membershipRouter.post("/cancel", jsonBody, async (req, res) => {
   const { expiresAt } = membershipCancelSchema.parse(req.body);
-  res.json({ data: await cancelMembership(getAuth(req).user.id, new Date(expiresAt)) });
+  res.json({
+    data: await cancelMembership(getAuth(req).user.id, new Date(expiresAt)),
+  });
 });
 
 membershipRouter.post("/username", jsonBody, async (req, res) => {
   const { username } = membershipUsernameSchema.parse(req.body);
-  res.json({ data: await setMembershipUsername(getAuth(req).user.id, username) });
+  res.json({
+    data: await setMembershipUsername(getAuth(req).user.id, username),
+  });
 });
 
 membershipRouter.post("/reminders", jsonBody, async (req, res) => {
   const { enabled } = membershipRemindersSchema.parse(req.body);
-  res.json({ data: await setMembershipReminderEmails(getAuth(req).user.id, enabled) });
+  res.json({
+    data: await setMembershipReminderEmails(getAuth(req).user.id, enabled),
+  });
 });
 
-function membershipRequestLimiter(limit: number, code: string, message: string) {
+function membershipRequestLimiter(
+  limit: number,
+  code: string,
+  message: string,
+) {
   const requests = new Map<string, { count: number; until: number }>();
   return (userId: string) => {
     const now = Date.now();
@@ -84,8 +101,16 @@ function membershipRequestLimiter(limit: number, code: string, message: string) 
   };
 }
 
-const limitRecipientLookups = membershipRequestLimiter(20, "RECIPIENT_RATE_LIMIT", "Terlalu banyak pencarian penerima. Coba lagi nanti.");
-const limitStatusRefresh = membershipRequestLimiter(20, "STATUS_RATE_LIMIT", "Terlalu banyak pemeriksaan pembayaran. Coba lagi nanti.");
+const limitRecipientLookups = membershipRequestLimiter(
+  20,
+  "RECIPIENT_RATE_LIMIT",
+  "Terlalu banyak pencarian penerima. Coba lagi nanti.",
+);
+const limitStatusRefresh = membershipRequestLimiter(
+  20,
+  "STATUS_RATE_LIMIT",
+  "Terlalu banyak pemeriksaan pembayaran. Coba lagi nanti.",
+);
 
 membershipRouter.post("/recipient", jsonBody, async (req, res) => {
   const userId = getAuth(req).user.id;
@@ -97,7 +122,10 @@ membershipRouter.post("/recipient", jsonBody, async (req, res) => {
 membershipRouter.post("/checkout", jsonBody, async (req, res) => {
   const input = membershipCheckoutSchema.parse(req.body);
   const order = await startMembershipCheckout(getAuth(req).user.id, input);
-  res.status(201).location("/api/membership/orders/" + order.id).json({ data: order });
+  res
+    .status(201)
+    .location("/api/membership/orders/" + order.id)
+    .json({ data: order });
 });
 
 membershipRouter.get("/orders", async (req, res) => {
@@ -113,7 +141,11 @@ membershipRouter.post("/orders/:orderId/refresh", async (req, res) => {
   const buyerId = getAuth(req).user.id;
   const orderId = membershipOrderId.parse(req.params.orderId);
   const order = await getMembershipOrder(buyerId, orderId);
-  if (order.status === "pending" || order.status === "failed" || order.status === "expired") {
+  if (
+    order.status === "pending" ||
+    order.status === "failed" ||
+    order.status === "expired"
+  ) {
     limitStatusRefresh(buyerId);
     const payment = await membershipGateway().getPayment(orderId);
     if (payment) await reconcileMembershipPayment(payment);

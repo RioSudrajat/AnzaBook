@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-router";
 import { siteConfig } from "@/config/site";
 import { Providers } from "@/components/providers";
+import { SiteFooter } from "@/components/site-footer";
 import { Button } from "@/components/ui/button";
 import { getSessionFn, type Session } from "@/lib/session";
 import globalsCss from "@/styles/globals.css?url";
@@ -58,7 +59,7 @@ function RootDocument({ children }: { children: ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <body suppressHydrationWarning>
+      <body suppressHydrationWarning className="min-h-screen overflow-x-clip">
         <Providers>
           <a
             href="#main-content"
@@ -76,31 +77,36 @@ function RootDocument({ children }: { children: ReactNode }) {
 
 function NotFound() {
   return (
-    <main id="main-content" className="mx-auto max-w-lg px-6 py-24">
-      <p className="mb-3 font-mono text-sm text-primary">404</p>
-      <h1 className="text-3xl font-semibold tracking-tight">
-        This page isn’t here
-      </h1>
-      <p className="my-4 text-muted-foreground">
-        Head back to your starting point.
-      </p>
-      <Button asChild>
-        <Link to="/">Go home</Link>
-      </Button>
-    </main>
+    <div className="min-h-screen flex flex-col justify-between">
+      <main id="main-content" className="mx-auto max-w-lg px-6 py-24 flex-1">
+        <p className="mb-3 font-mono text-sm text-primary">404</p>
+        <h1 className="text-3xl font-semibold tracking-tight">
+          Halaman Tidak Ditemukan
+        </h1>
+        <p className="my-4 text-muted-foreground">
+          Naskah atau tautan yang Anda tuju tidak tersedia di katalog ini.
+        </p>
+        <Button asChild>
+          <Link to="/">Kembali ke Beranda</Link>
+        </Button>
+      </main>
+      <SiteFooter />
+    </div>
   );
 }
 
 function ErrorPage() {
   const router = useRouter();
   return (
-    <main id="main-content" className="mx-auto max-w-lg px-6 py-24">
-      <h1 className="text-2xl font-semibold">Something went wrong</h1>
-      <p className="my-4 leading-7 text-muted-foreground">
-        Try loading this page again. If it keeps happening, check the terminal
-        running <code>pnpm dev</code> for details.
-      </p>
-      <Button onClick={() => router.invalidate()}>Try again</Button>
-    </main>
+    <div className="min-h-screen flex flex-col justify-between">
+      <main id="main-content" className="mx-auto max-w-lg px-6 py-24 flex-1">
+        <h1 className="text-2xl font-semibold">Terjadi Kendala Memuat Halaman</h1>
+        <p className="my-4 leading-7 text-muted-foreground">
+          Silakan muat ulang halaman ini.
+        </p>
+        <Button onClick={() => router.invalidate()}>Muat Ulang</Button>
+      </main>
+      <SiteFooter />
+    </div>
   );
 }

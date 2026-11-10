@@ -1,34 +1,68 @@
 import { expect, test } from "@playwright/test";
 import { API_URL, fitsWidth, signUp } from "./helpers";
 
-test("shows the same membership plans on landing and the membership page", async ({ page }) => {
+test("shows the same membership plans on landing and the membership page", async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/");
   await page.getByRole("link", { name: "Lihat paket Nakama" }).click();
-  await expect(page.getByRole("heading", { name: "Jadi Nakama" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Jadi Nakama" }),
+  ).toBeVisible();
   await expect(page.getByRole("heading", { name: "3 bulan" })).toBeVisible();
   await expect(page.getByText("Rp60.000", { exact: true })).toBeVisible();
-  await expect(page.getByText("Rp66.600 setelah pajak", { exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Beli sebagai hadiah", exact: true }).first()).toBeVisible();
+  await expect(
+    page.getByText("Rp66.600 setelah pajak", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("link", { name: "Beli sebagai hadiah", exact: true })
+      .first(),
+  ).toBeVisible();
   expect(await fitsWidth(page)).toBe(true);
 });
 
-test("adds tax to the package price and verifies the gift recipient before checkout", async ({ page }) => {
+test("adds tax to the package price and verifies the gift recipient before checkout", async ({
+  page,
+}) => {
   await signUp(page.request, "Pembeli hadiah");
   const slug = "sains-logika-seni-hidup-bermutu";
   await page.route(`${API_URL}/api/membership`, (route) =>
-    route.fulfill({ json: { data: { username: null, expiresAt: null, status: "inactive", checkoutAvailable: true, reminderEmailsEnabled: true } } }),
+    route.fulfill({
+      json: {
+        data: {
+          username: null,
+          expiresAt: null,
+          status: "inactive",
+          checkoutAvailable: true,
+          reminderEmailsEnabled: true,
+        },
+      },
+    }),
   );
   await page.route(`${API_URL}/api/membership/recipient`, async (route) => {
     expect(route.request().postDataJSON()).toEqual({ username: "nakama_uji" });
-    await route.fulfill({ json: { data: { username: "nakama_uji", displayName: "Nakama Uji" } } });
+    await route.fulfill({
+      json: { data: { username: "nakama_uji", displayName: "Nakama Uji" } },
+    });
   });
   const orderId = "ae8f7246-ec9d-4ad9-abfc-2b7b59f75689";
-  const checkoutUrl = "https://app.sandbox.midtrans.com/snap/v4/redirection/test-transaction";
+  const checkoutUrl =
+    "https://app.sandbox.midtrans.com/snap/v4/redirection/test-transaction";
   const checkout = {
-    id: orderId, status: "pending", accessRevoked: false, checkoutUrl, planId: "quarterly", priceIdr: 66600,
-    months: 3, recipientUsername: "nakama_uji", bookSlug: null, createdAt: new Date().toISOString(),
-    paidAt: null, tax: { subtotalIdr: 60000, taxIdr: 6600, rateBps: 1100 },
+    id: orderId,
+    status: "pending",
+    accessRevoked: false,
+    checkoutUrl,
+    planId: "quarterly",
+    priceIdr: 66600,
+    months: 3,
+    recipientUsername: "nakama_uji",
+    bookSlug: null,
+    createdAt: new Date().toISOString(),
+    paidAt: null,
+    tax: { subtotalIdr: 60000, taxIdr: 6600, rateBps: 1100 },
   };
   await page.route(`${API_URL}/api/membership/checkout`, async (route) => {
     expect(route.request().postDataJSON()).toEqual({
@@ -38,10 +72,14 @@ test("adds tax to the package price and verifies the gift recipient before check
     });
     await route.fulfill({ status: 201, json: { data: checkout } });
   });
-  await page.route(checkoutUrl, (route) => route.fulfill({ body: "Midtrans sandbox" }));
+  await page.route(checkoutUrl, (route) =>
+    route.fulfill({ body: "Midtrans sandbox" }),
+  );
 
   await page.goto(`/membership?book=${slug}&plan=quarterly&gift=true`);
-  await expect(page.getByText("Harga sebelum pajak", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Harga sebelum pajak", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("Pajak (11%)", { exact: true })).toBeVisible();
   await expect(page.getByText("Rp6.600", { exact: true })).toBeVisible();
   await expect(page.getByText("Rp66.600", { exact: true })).toBeVisible();
@@ -55,17 +93,38 @@ test("adds tax to the package price and verifies the gift recipient before check
   await expect(page).toHaveURL(checkoutUrl);
 });
 
-test("returns to the saved book only after a verified self-payment", async ({ page }) => {
+test("returns to the saved book only after a verified self-payment", async ({
+  page,
+}) => {
   await signUp(page.request, "Pembaca Nakama");
   const slug = "sains-logika-seni-hidup-bermutu";
   const orderId = "40e5cf3d-60c3-4cb9-8a4c-4ec057922026";
   const checkout = {
-    id: orderId, status: "pending", accessRevoked: false, checkoutUrl: null, planId: "quarterly", priceIdr: 66600,
-    months: 3, recipientUsername: null, bookSlug: slug, createdAt: new Date().toISOString(),
-    paidAt: null, tax: { subtotalIdr: 60000, taxIdr: 6600, rateBps: 1100 },
+    id: orderId,
+    status: "pending",
+    accessRevoked: false,
+    checkoutUrl: null,
+    planId: "quarterly",
+    priceIdr: 66600,
+    months: 3,
+    recipientUsername: null,
+    bookSlug: slug,
+    createdAt: new Date().toISOString(),
+    paidAt: null,
+    tax: { subtotalIdr: 60000, taxIdr: 6600, rateBps: 1100 },
   };
   await page.route(`${API_URL}/api/membership`, (route) =>
-    route.fulfill({ json: { data: { username: null, expiresAt: null, status: "inactive", checkoutAvailable: true, reminderEmailsEnabled: true } } }),
+    route.fulfill({
+      json: {
+        data: {
+          username: null,
+          expiresAt: null,
+          status: "inactive",
+          checkoutAvailable: true,
+          reminderEmailsEnabled: true,
+        },
+      },
+    }),
   );
   await page.route(`${API_URL}/api/membership/checkout`, async (route) => {
     expect(route.request().postDataJSON().bookSlug).toBe(slug);
@@ -75,53 +134,94 @@ test("returns to the saved book only after a verified self-payment", async ({ pa
     route.fulfill({ json: { data: checkout } }),
   );
   let verify = false;
-  await page.route(`${API_URL}/api/membership/orders/${orderId}/refresh`, (route) =>
-    route.fulfill({ json: { data: verify ? { ...checkout, status: "paid", paidAt: new Date().toISOString() } : checkout } }),
+  await page.route(
+    `${API_URL}/api/membership/orders/${orderId}/refresh`,
+    (route) =>
+      route.fulfill({
+        json: {
+          data: verify
+            ? { ...checkout, status: "paid", paidAt: new Date().toISOString() }
+            : checkout,
+        },
+      }),
   );
 
   await page.goto(`/membership?book=${slug}&plan=quarterly`);
   await page.getByRole("button", { name: "Bayar dengan QRIS" }).click();
   await expect(page).toHaveURL(new RegExp(`/membership/checkout/${orderId}`));
-  await expect(page.getByRole("heading", { name: "Menunggu pembayaran" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Menunggu pembayaran" }),
+  ).toBeVisible();
   verify = true;
   await page.getByRole("button", { name: "Periksa pembayaran" }).click();
   await expect(page).toHaveURL(new RegExp(`/read/${slug}$`));
 });
 
-test("confirms immediate membership cancellation in Settings and updates the account", async ({ page }) => {
+test("confirms immediate membership cancellation in Settings and updates the account", async ({
+  page,
+}) => {
   await signUp(page.request, "Pembaca berhenti Nakama");
   let summary = {
-    username: null, expiresAt: new Date(Date.now() + 86400_000 * 90).toISOString(),
-    status: "active", checkoutAvailable: true, reminderEmailsEnabled: true,
+    username: null,
+    expiresAt: new Date(Date.now() + 86400_000 * 90).toISOString(),
+    status: "active",
+    checkoutAvailable: true,
+    reminderEmailsEnabled: true,
   };
-  await page.route(`${API_URL}/api/membership`, (route) => route.fulfill({ json: { data: summary } }));
+  await page.route(`${API_URL}/api/membership`, (route) =>
+    route.fulfill({ json: { data: summary } }),
+  );
   let calls = 0;
   await page.route(`${API_URL}/api/membership/cancel`, async (route) => {
     calls++;
-    expect(route.request().postDataJSON()).toEqual({ confirm: true, expiresAt: summary.expiresAt });
-    summary = { ...summary, status: "canceled", expiresAt: new Date().toISOString() };
+    expect(route.request().postDataJSON()).toEqual({
+      confirm: true,
+      expiresAt: summary.expiresAt,
+    });
+    summary = {
+      ...summary,
+      status: "canceled",
+      expiresAt: new Date().toISOString(),
+    };
     await route.fulfill({ json: { data: summary } });
   });
   await page.goto("/app?tab=settings");
-  const cancel = page.getByRole("button", { name: "Batalkan keanggotaan", exact: true });
+  const cancel = page.getByRole("button", {
+    name: "Batalkan keanggotaan",
+    exact: true,
+  });
   await expect(cancel).toBeVisible();
   expect(await fitsWidth(page)).toBe(true);
   await page.setViewportSize({ width: 375, height: 812 });
   await cancel.focus();
   await page.keyboard.press("Enter");
-  const confirmation = page.getByRole("group", { name: "Konfirmasi pembatalan Nakama" });
+  const confirmation = page.getByRole("group", {
+    name: "Konfirmasi pembatalan Nakama",
+  });
   await expect(confirmation).toContainText("Akses Premium langsung dihentikan");
   expect(await fitsWidth(page)).toBe(true);
   await confirmation.getByRole("button", { name: "Tetap jadi Nakama" }).click();
   await expect(cancel).toBeFocused();
   expect(calls).toBe(0);
-  await page.getByRole("button", { name: "Batalkan keanggotaan", exact: true }).click();
-  await confirmation.getByRole("button", { name: "Ya, batalkan keanggotaan" }).click();
-  await expect(page.getByText("Nakama dibatalkan", { exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Gabung kembali" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Batalkan keanggotaan", exact: true })).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Batalkan keanggotaan", exact: true })
+    .click();
+  await confirmation
+    .getByRole("button", { name: "Ya, batalkan keanggotaan" })
+    .click();
+  await expect(
+    page.getByText("Nakama dibatalkan", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Gabung kembali" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Batalkan keanggotaan", exact: true }),
+  ).toHaveCount(0);
   expect(calls).toBe(1);
   expect(await fitsWidth(page)).toBe(true);
   await page.reload();
-  await expect(page.getByText("Nakama dibatalkan", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Nakama dibatalkan", { exact: true }),
+  ).toBeVisible();
 });

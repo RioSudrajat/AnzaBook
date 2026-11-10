@@ -29,13 +29,10 @@ export async function getUserShelves(signal?: AbortSignal) {
 }
 
 export async function upsertShelf(input: UpsertShelfInput) {
-  const { data } = await apiFetch<DataResponse<ShelfItemDto>>(
-    "/api/shelves",
-    {
-      method: "POST",
-      body: input,
-    },
-  );
+  const { data } = await apiFetch<DataResponse<ShelfItemDto>>("/api/shelves", {
+    method: "POST",
+    body: input,
+  });
   return data;
 }
 

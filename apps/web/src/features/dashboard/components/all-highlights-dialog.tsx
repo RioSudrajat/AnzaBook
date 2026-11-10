@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Sparkles, Trash2, X } from "lucide-react";
+import { Highlighter, Share2, Trash2, X } from "lucide-react";
 import type { BookHighlightDto, HighlightColor } from "@starter/shared/types";
 import { Button } from "@/components/ui/button";
 import { useAllHighlights, useDeleteHighlight } from "@/features/books/hooks";
@@ -64,7 +64,7 @@ export function AllHighlightsDialog({
         <div className="flex items-center justify-between pb-3 border-b border-border shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="size-8 rounded-full bg-amber-500/15 text-amber-500 flex items-center justify-center">
-              <Sparkles className="size-4" />
+              <Highlighter className="size-4" />
             </div>
             <div>
               <h2
@@ -82,7 +82,7 @@ export function AllHighlightsDialog({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted"
+            className="min-h-11 min-w-11 inline-flex items-center justify-center text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
             aria-label="Tutup"
           >
             <X className="size-4" />
@@ -90,14 +90,14 @@ export function AllHighlightsDialog({
         </div>
 
         {/* Filter Bar */}
-        <div className="flex items-center gap-2 shrink-0 text-xs font-mono">
+        <div className="flex flex-wrap items-center gap-2 shrink-0 text-xs font-mono">
           <span className="text-muted-foreground text-[11px]">Filter:</span>
           {(["all", "yellow", "green", "coral", "blue"] as const).map((col) => (
             <button
               key={col}
               type="button"
               onClick={() => setFilterColor(col)}
-              className={`px-2.5 py-1 rounded-[5px] transition-colors capitalize text-[11px] ${
+              className={`min-h-9 px-3 py-1.5 rounded-[5px] transition-colors capitalize text-[11px] font-medium cursor-pointer focus-visible:outline-2 focus-visible:outline-ring ${
                 filterColor === col
                   ? "bg-foreground text-background font-bold"
                   : "bg-muted/50 text-muted-foreground hover:text-foreground"
@@ -119,12 +119,13 @@ export function AllHighlightsDialog({
             </div>
           ) : filteredHighlights.length === 0 ? (
             <div className="py-16 text-center text-muted-foreground space-y-2">
-              <Sparkles className="size-8 mx-auto opacity-40" />
+              <Highlighter className="size-8 mx-auto opacity-40" />
               <p className="text-xs font-sans">
                 Belum ada kutipan yang ditandai dengan stabilo.
               </p>
               <p className="text-[11px] font-mono opacity-70">
-                Pilih teks saat membaca di reader untuk menandainya dengan warna stabilo.
+                Pilih teks saat membaca di reader untuk menandainya dengan warna
+                stabilo.
               </p>
             </div>
           ) : (
@@ -161,7 +162,7 @@ export function AllHighlightsDialog({
                         onClick={() => onOpenStory(hl)}
                         className="h-6 px-2 text-[10px] font-mono gap-1 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
                       >
-                        <Sparkles className="size-3" />
+                        <Share2 className="size-3" />
                         Flex Story
                       </Button>
 

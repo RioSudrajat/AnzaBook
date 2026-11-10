@@ -9,7 +9,8 @@ import { useCatalogBooks, useCategories } from "@/features/books/hooks";
 
 type ExploreFilters = Pick<ListBooksInput, "category" | "collection">;
 const pageSize = 12;
-const selectClassName = "min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring";
+const selectClassName =
+  "min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring";
 
 export function DashboardExplore({ category, collection }: ExploreFilters) {
   const navigate = useNavigate();
@@ -17,9 +18,13 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
   const [searchDraft, setSearchDraft] = useState("");
   const [search, setSearch] = useState("");
   const [language, setLanguage] = useState("");
-  const [accessTier, setAccessTier] = useState<ListBooksInput["accessTier"]>("all");
+  const [accessTier, setAccessTier] =
+    useState<ListBooksInput["accessTier"]>("all");
   const [page, setPage] = useState({ category, collection, offset: 0 });
-  const offset = page.category === category && page.collection === collection ? page.offset : 0;
+  const offset =
+    page.category === category && page.collection === collection
+      ? page.offset
+      : 0;
   const catalog = useCatalogBooks({
     category,
     collection,
@@ -42,19 +47,34 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
 
   function selectCategory(value?: string) {
     goToPage(0);
-    void navigate({ to: "/app", search: { tab: "explore", category: value, collection } });
+    void navigate({
+      to: "/app",
+      search: { tab: "explore", category: value, collection },
+    });
   }
 
   return (
     <div className="space-y-8 pb-16">
-      <section aria-labelledby="explore-categories-heading" className="space-y-3">
-        <h2 id="explore-categories-heading" className="font-serif text-xl font-bold">
+      <section
+        aria-labelledby="explore-categories-heading"
+        className="space-y-3"
+      >
+        <h2
+          id="explore-categories-heading"
+          className="font-serif text-xl font-bold"
+        >
           Jelajahi Berdasarkan Kategori
         </h2>
         {categories.isPending ? (
-          <p role="status" className="text-sm text-muted-foreground">Memuat kategori…</p>
+          <p role="status" className="text-sm text-muted-foreground">
+            Memuat kategori…
+          </p>
         ) : categories.isError ? (
-          <Button type="button" variant="outline" onClick={() => void categories.refetch()}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void categories.refetch()}
+          >
             Muat ulang kategori
           </Button>
         ) : (
@@ -84,8 +104,16 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
         )}
       </section>
 
-      <section aria-labelledby="explore-results-heading" className="space-y-4 border-t pt-6">
-        <h2 id="explore-results-heading" className="font-serif text-xl font-bold">Buku di katalog</h2>
+      <section
+        aria-labelledby="explore-results-heading"
+        className="space-y-4 border-t pt-6"
+      >
+        <h2
+          id="explore-results-heading"
+          className="font-serif text-xl font-bold"
+        >
+          Buku di katalog
+        </h2>
         {collection && (
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm">Koleksi {collection}</span>
@@ -95,7 +123,10 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
               className="min-h-11"
               onClick={() => {
                 goToPage(0);
-                void navigate({ to: "/app", search: { tab: "explore", category } });
+                void navigate({
+                  to: "/app",
+                  search: { tab: "explore", category },
+                });
               }}
             >
               Hapus filter koleksi
@@ -125,7 +156,9 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
               value={accessTier}
               onChange={(event) => {
                 const value = event.target.value;
-                setAccessTier(value === "free" || value === "premium" ? value : "all");
+                setAccessTier(
+                  value === "free" || value === "premium" ? value : "all",
+                );
                 goToPage(0);
               }}
             >
@@ -134,8 +167,13 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
               <option value="premium">Premium</option>
             </select>
           </label>
-          <form onSubmit={submitSearch} className="space-y-1 sm:col-span-2 lg:col-span-1">
-            <label htmlFor="explore-search" className="text-sm font-medium">Cari judul atau penulis</label>
+          <form
+            onSubmit={submitSearch}
+            className="space-y-1 sm:col-span-2 lg:col-span-1"
+          >
+            <label htmlFor="explore-search" className="text-sm font-medium">
+              Cari judul atau penulis
+            </label>
             <div className="flex gap-2">
               <Input
                 id="explore-search"
@@ -153,11 +191,17 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
         </div>
 
         {catalog.isPending ? (
-          <p role="status" className="text-sm text-muted-foreground">Memuat katalog…</p>
+          <p role="status" className="text-sm text-muted-foreground">
+            Memuat katalog…
+          </p>
         ) : catalog.isError ? (
           <div className="space-y-2">
-            <p role="alert" className="text-sm text-muted-foreground">Katalog gagal dimuat.</p>
-            <Button variant="outline" onClick={() => void catalog.refetch()}>Coba lagi</Button>
+            <p role="alert" className="text-sm text-muted-foreground">
+              Katalog gagal dimuat.
+            </p>
+            <Button variant="outline" onClick={() => void catalog.refetch()}>
+              Coba lagi
+            </Button>
           </div>
         ) : (
           <>
@@ -168,7 +212,9 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
             ) : (
               <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {catalog.data.data.map((book) => (
-                  <li key={book.id}><BookCatalogCard book={book} /></li>
+                  <li key={book.id}>
+                    <BookCatalogCard book={book} />
+                  </li>
                 ))}
               </ul>
             )}

@@ -8,28 +8,29 @@ type FlagIconProps = {
   title?: string;
 };
 
-const FLAG_CONFIG: Record<string, { src: string; alt: string; label: string }> = {
-  id: {
-    src: "/flags/id.svg",
-    alt: "Bendera Indonesia",
-    label: "Bahasa Indonesia",
-  },
-  en: {
-    src: "/flags/en.svg",
-    alt: "Bendera Inggris (English)",
-    label: "English",
-  },
-  gb: {
-    src: "/flags/en.svg",
-    alt: "Bendera Inggris (English)",
-    label: "English",
-  },
-  us: {
-    src: "/flags/us.svg",
-    alt: "Bendera Amerika Serikat",
-    label: "English (US)",
-  },
-};
+const FLAG_CONFIG: Record<string, { src: string; alt: string; label: string }> =
+  {
+    id: {
+      src: "/flags/id.svg",
+      alt: "Bendera Indonesia",
+      label: "Bahasa Indonesia",
+    },
+    en: {
+      src: "/flags/en.svg",
+      alt: "Bendera Inggris (English)",
+      label: "English",
+    },
+    gb: {
+      src: "/flags/en.svg",
+      alt: "Bendera Inggris (English)",
+      label: "English",
+    },
+    us: {
+      src: "/flags/us.svg",
+      alt: "Bendera Amerika Serikat",
+      label: "English (US)",
+    },
+  };
 
 const SIZE_CLASSES = {
   sm: "w-4 h-2.5",
@@ -62,7 +63,7 @@ export function FlagIcon({
       className={cn(
         SIZE_CLASSES[size],
         "object-cover rounded-[2px] shadow-xs ring-1 ring-black/15 dark:ring-white/20 inline-block align-middle shrink-0 transition-transform select-none",
-        className
+        className,
       )}
     />
   );

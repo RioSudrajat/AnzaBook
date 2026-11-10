@@ -30,7 +30,9 @@ test("signup, persisted session, signout, rejected password, and signin work acr
     .getByRole("button", { name: "Create account", exact: true })
     .click();
   await expect(page).toHaveURL(/\/app$/);
-  const settings = page.getByRole("navigation", { name: "Navigasi Utama" }).getByRole("button", { name: "Settings" });
+  const settings = page
+    .getByRole("navigation", { name: "Navigasi Utama" })
+    .getByRole("button", { name: "Settings" });
   await expect(settings).toBeVisible();
   // A full reload is rendered by the web server, which reads the session
   // from the API with the browser's cookie.

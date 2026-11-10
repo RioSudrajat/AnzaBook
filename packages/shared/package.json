@@ -7,6 +7,7 @@
   "exports": {
     "./permissions": "./src/permissions.ts",
     "./reading-progress": "./src/reading-progress.ts",
+    "./chapter-pagination": "./src/chapter-pagination.ts",
     "./validators/notes": "./src/validators/notes.ts",
     "./validators/books": "./src/validators/books.ts",
     "./validators/reading": "./src/validators/reading.ts",

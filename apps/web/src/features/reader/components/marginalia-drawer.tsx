@@ -1,12 +1,5 @@
 import { useState } from "react";
-import {
-  Eye,
-  EyeOff,
-  Loader2,
-  MessageSquare,
-  Send,
-  X,
-} from "lucide-react";
+import { Eye, EyeOff, Loader2, MessageSquare, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useChapterComments, useCreateComment } from "@/features/books/hooks";
@@ -30,7 +23,10 @@ export function MarginaliaDrawer({
   const [revealedCommentIds, setRevealedCommentIds] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const { data: comments = [], isLoading } = useChapterComments(slug, chapterId);
+  const { data: comments = [], isLoading } = useChapterComments(
+    slug,
+    chapterId,
+  );
   const createCommentMutation = useCreateComment(slug);
 
   const paragraphComments = comments.filter(
@@ -80,7 +76,10 @@ export function MarginaliaDrawer({
         <div className="flex items-center gap-2">
           <MessageSquare className="size-4 text-[var(--color-accent)]" />
           <div>
-            <h2 id="marginalia-title" className="font-serif text-sm font-bold text-foreground">
+            <h2
+              id="marginalia-title"
+              className="font-serif text-sm font-bold text-foreground"
+            >
               Marjinalia Paragraf {paragraphIndex + 1}
             </h2>
             <p className="text-[10px] font-mono text-muted-foreground">
@@ -112,7 +111,8 @@ export function MarginaliaDrawer({
               Belum ada catatan tepi di paragraf ini.
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Tulis impresi atau anotasi pertama Anda untuk memperkaya pemahaman bersama.
+              Tulis impresi atau anotasi pertama Anda untuk memperkaya pemahaman
+              bersama.
             </p>
           </div>
         ) : (
@@ -140,7 +140,9 @@ export function MarginaliaDrawer({
                 <div className="relative">
                   <p
                     className={`text-xs font-sans text-foreground/90 leading-relaxed transition-all ${
-                      isLong && !isRevealed ? "line-clamp-3 blur-[2px] select-none" : ""
+                      isLong && !isRevealed
+                        ? "line-clamp-3 blur-[2px] select-none"
+                        : ""
                     }`}
                   >
                     {comment.content}
@@ -175,7 +177,10 @@ export function MarginaliaDrawer({
       </div>
 
       {/* Submission Form */}
-      <form onSubmit={handleSubmit} className="p-4 border-t border-border bg-muted/20 space-y-2">
+      <form
+        onSubmit={handleSubmit}
+        className="p-4 border-t border-border bg-muted/20 space-y-2"
+      >
         <Textarea
           rows={2}
           placeholder="Tulis catatan atau pertanyaan Anda pada paragraf ini..."
@@ -188,7 +193,9 @@ export function MarginaliaDrawer({
         />
 
         {errorMessage && (
-          <p className="text-[11px] text-destructive font-mono">{errorMessage}</p>
+          <p className="text-[11px] text-destructive font-mono">
+            {errorMessage}
+          </p>
         )}
 
         <div className="flex items-center justify-between">

@@ -22,7 +22,10 @@ export const bookSlugSchema = z
       .string()
       .min(1)
       .max(120)
-      .regex(/^[a-z0-9-]+$/, "Slug hanya boleh berisi huruf kecil, angka, dan tanda hubung"),
+      .regex(
+        /^[a-z0-9-]+$/,
+        "Slug hanya boleh berisi huruf kecil, angka, dan tanda hubung",
+      ),
   })
   .strict();
 
@@ -60,7 +63,8 @@ export type ListBooksInput = {
   language?: string;
   accessTier?: "all" | "free" | "premium";
   collection?: string;
-  paperTier?: "all" | "rakyat_economy" | "standard_trade" | "kolektor_hardcover";
+  paperTier?:
+    "all" | "rakyat_economy" | "standard_trade" | "kolektor_hardcover";
   limit?: number;
   offset?: number;
 };

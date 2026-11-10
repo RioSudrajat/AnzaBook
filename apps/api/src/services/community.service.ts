@@ -34,7 +34,8 @@ export async function upsertShelf(
     .where(eq(books.id, input.bookId))
     .limit(1);
 
-  if (!book) throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+  if (!book)
+    throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
 
   const progressPercent = input.shelfStatus === "finished" ? 100 : 0;
   const [shelfRow] = await db
@@ -49,9 +50,10 @@ export async function upsertShelf(
     .onConflictDoUpdate({
       target: [userShelves.userId, userShelves.bookId],
       set: {
-        shelfStatus: input.shelfStatus === "want_to_read"
-          ? sql`case when ${userShelves.shelfStatus} in ('reading', 'finished') then ${userShelves.shelfStatus} else 'want_to_read' end`
-          : input.shelfStatus,
+        shelfStatus:
+          input.shelfStatus === "want_to_read"
+            ? sql`case when ${userShelves.shelfStatus} in ('reading', 'finished') then ${userShelves.shelfStatus} else 'want_to_read' end`
+            : input.shelfStatus,
         favorite: input.favorite,
         progressPercent: sql`greatest(${userShelves.progressPercent}, ${progressPercent})`,
       },
@@ -120,10 +122,7 @@ export async function createReview(
     .select({ progressPercent: userShelves.progressPercent })
     .from(userShelves)
     .where(
-      and(
-        eq(userShelves.userId, userId),
-        eq(userShelves.bookId, input.bookId),
-      ),
+      and(eq(userShelves.userId, userId), eq(userShelves.bookId, input.bookId)),
     )
     .limit(1);
 
@@ -162,7 +161,8 @@ export async function createReview(
   const totalReviews = allBookReviews.length;
   const avg =
     totalReviews > 0
-      ? allBookReviews.reduce((sum, r) => sum + r.ratingHalfSteps / 2, 0) / totalReviews
+      ? allBookReviews.reduce((sum, r) => sum + r.ratingHalfSteps / 2, 0) /
+        totalReviews
       : input.rating;
 
   await db
@@ -239,7 +239,10 @@ export async function createComment(
   };
 }
 
-export async function listComments(chapterId: string, paragraphCount: number): Promise<ParagraphCommentDto[]> {
+export async function listComments(
+  chapterId: string,
+  paragraphCount: number,
+): Promise<ParagraphCommentDto[]> {
   const rows = await db
     .select({
       id: paragraphComments.id,
@@ -251,8 +254,16 @@ export async function listComments(chapterId: string, paragraphCount: number): P
     })
     .from(paragraphComments)
     .innerJoin(user, eq(paragraphComments.userId, user.id))
-    .where(and(eq(paragraphComments.chapterId, chapterId), lt(paragraphComments.paragraphIndex, paragraphCount)))
-    .orderBy(paragraphComments.paragraphIndex, desc(paragraphComments.createdAt));
+    .where(
+      and(
+        eq(paragraphComments.chapterId, chapterId),
+        lt(paragraphComments.paragraphIndex, paragraphCount),
+      ),
+    )
+    .orderBy(
+      paragraphComments.paragraphIndex,
+      desc(paragraphComments.createdAt),
+    );
 
   return rows.map((r) => ({
     id: r.id,

@@ -1,7 +1,7 @@
 {
   "id": "express-tanstack-postgres",
   "name": "AnzaBook",
-  "description": "Platform baca digital dwibahasa, buku cetak Edisi Rakyat terjangkau, dan komunitas literasi Indonesia.",
+  "description": "Pustaka digital kurasi sastra dan pemikiran, edisi cetak fisik Newsprint terjangkau, dan gerakan literasi mandiri.",
   "baseVersion": "0.1.0",
   "framework": "express+tanstack-start",
   "database": "postgresql"

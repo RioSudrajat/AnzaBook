@@ -19,6 +19,7 @@ import {
   listHighlights,
   listReadingSessions,
   listSessionsForBook,
+  restartBookReading,
   saveReadingProgress,
 } from "../services/reading.service";
 
@@ -42,7 +43,11 @@ readingRouter.post("/", requireTrustedOrigin, jsonBody, async (req, res) => {
 readingRouter.get("/progress/:bookId", async (req, res) => {
   const { bookId } = readingBookParamsSchema.parse(req.params);
   const { scope } = readingProgressQuerySchema.parse(req.query);
-  const progress = await getReadingProgress(getAuth(req).user.id, bookId, scope);
+  const progress = await getReadingProgress(
+    getAuth(req).user.id,
+    bookId,
+    scope,
+  );
   res.json({ data: progress });
 });
 
@@ -103,3 +108,14 @@ readingRouter.get("/sessions/:bookId", async (req, res) => {
   const sessions = await listSessionsForBook(getAuth(req).user.id, bookId);
   res.json({ data: sessions });
 });
+
+// Restart book reading (re-read from beginning)
+readingRouter.post(
+  "/restart/:bookId",
+  requireTrustedOrigin,
+  async (req, res) => {
+    const { bookId } = readingBookParamsSchema.parse(req.params);
+    const result = await restartBookReading(getAuth(req).user.id, bookId);
+    res.json({ data: result });
+  },
+);

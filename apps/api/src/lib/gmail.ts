@@ -25,7 +25,8 @@ export function createGmailSender(config: GmailConfig, request = fetch) {
   let cachedToken: { value: string; expiresAt: number } | undefined;
 
   async function authorize() {
-    if (cachedToken && cachedToken.expiresAt > Date.now()) return cachedToken.value;
+    if (cachedToken && cachedToken.expiresAt > Date.now())
+      return cachedToken.value;
     const response = await request("https://oauth2.googleapis.com/token", {
       method: "POST",
       body: new URLSearchParams({
@@ -39,7 +40,8 @@ export function createGmailSender(config: GmailConfig, request = fetch) {
     });
     if (!response.ok) throw new Error("Gmail authorization failed");
     const token = accessToken.safeParse(await response.json());
-    if (!token.success) throw new Error("Gmail authorization response was invalid");
+    if (!token.success)
+      throw new Error("Gmail authorization response was invalid");
     cachedToken = {
       value: token.data.access_token,
       expiresAt: Date.now() + (token.data.expires_in - 30) * 1000,
@@ -48,8 +50,12 @@ export function createGmailSender(config: GmailConfig, request = fetch) {
   }
 
   return async ({ to, subject, text, messageId }: GmailMessage) => {
-    if (!emailAddress.safeParse(to).success) throw new Error("Invalid reminder recipient");
-    if (/[\r\n]/.test(subject) || (messageId && !/^[\w.-]+@[\w.-]+$/.test(messageId))) {
+    if (!emailAddress.safeParse(to).success)
+      throw new Error("Invalid reminder recipient");
+    if (
+      /[\r\n]/.test(subject) ||
+      (messageId && !/^[\w.-]+@[\w.-]+$/.test(messageId))
+    ) {
       throw new Error("Invalid email header");
     }
     const encodedSubject = /^[\x20-\x7e]*$/.test(subject)
@@ -69,13 +75,19 @@ export function createGmailSender(config: GmailConfig, request = fetch) {
     ].join("\r\n");
 
     const token = await authorize();
-    const response = await request("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ raw: Buffer.from(mime).toString("base64url") }),
-      redirect: "error",
-      signal: AbortSignal.timeout(5000),
-    });
+    const response = await request(
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ raw: Buffer.from(mime).toString("base64url") }),
+        redirect: "error",
+        signal: AbortSignal.timeout(5000),
+      },
+    );
     if (response.status === 401) cachedToken = undefined;
     if (!response.ok) throw new Error("Gmail delivery failed");
   };

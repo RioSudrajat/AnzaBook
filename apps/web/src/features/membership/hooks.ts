@@ -34,7 +34,8 @@ export function useCancelMembership() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: cancelMembership,
-    onMutate: () => queryClient.cancelQueries({ queryKey: membershipKeys.summary }),
+    onMutate: () =>
+      queryClient.cancelQueries({ queryKey: membershipKeys.summary }),
     onSuccess: async (summary) => {
       queryClient.setQueryData(membershipKeys.summary, summary);
       await Promise.all([
@@ -44,7 +45,9 @@ export function useCancelMembership() {
     },
     onError: (error) => {
       if (error instanceof ApiError && error.code === "MEMBERSHIP_CHANGED") {
-        return queryClient.invalidateQueries({ queryKey: membershipKeys.summary });
+        return queryClient.invalidateQueries({
+          queryKey: membershipKeys.summary,
+        });
       }
     },
   });
@@ -57,7 +60,8 @@ export function useMembershipOrders(enabled = true) {
 export function useMembershipOrder(orderId: string) {
   return useQuery({
     ...membershipOrderQuery(orderId),
-    refetchInterval: (query) => query.state.data?.status === "pending" ? 5000 : false,
+    refetchInterval: (query) =>
+      query.state.data?.status === "pending" ? 5000 : false,
   });
 }
 
@@ -66,8 +70,9 @@ export function useSaveMembershipUsername() {
   return useMutation({
     mutationFn: saveMembershipUsername,
     onSuccess: ({ username }) => {
-      queryClient.setQueryData(membershipSummaryQuery().queryKey, (summary) =>
-        summary && { ...summary, username },
+      queryClient.setQueryData(
+        membershipSummaryQuery().queryKey,
+        (summary) => summary && { ...summary, username },
       );
     },
   });
@@ -93,7 +98,10 @@ export function useStartMembershipCheckout() {
     mutationFn: startMembershipCheckout,
     onSuccess: (order) => {
       queryClient.setQueryData(membershipOrderQuery(order.id).queryKey, order);
-      void queryClient.invalidateQueries({ queryKey: membershipKeys.orders, exact: true });
+      void queryClient.invalidateQueries({
+        queryKey: membershipKeys.orders,
+        exact: true,
+      });
     },
   });
 }
@@ -102,12 +110,23 @@ export function useRefreshMembershipOrder(orderId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => refreshMembershipOrder(orderId),
-    onMutate: () => queryClient.cancelQueries({ queryKey: membershipKeys.order(orderId), exact: true }),
+    onMutate: () =>
+      queryClient.cancelQueries({
+        queryKey: membershipKeys.order(orderId),
+        exact: true,
+      }),
     onSuccess: (order) => {
-      queryClient.setQueryData(membershipOrderQuery(orderId).queryKey, (current) =>
-        current && current.status !== "pending" && order.status === "pending" ? current : order,
+      queryClient.setQueryData(
+        membershipOrderQuery(orderId).queryKey,
+        (current) =>
+          current && current.status !== "pending" && order.status === "pending"
+            ? current
+            : order,
       );
-      void queryClient.invalidateQueries({ queryKey: membershipKeys.orders, exact: true });
+      void queryClient.invalidateQueries({
+        queryKey: membershipKeys.orders,
+        exact: true,
+      });
     },
   });
 }

@@ -35,17 +35,19 @@ describe("membership policy", () => {
   });
 
   it("counts calendar months in Jakarta at the local month boundary", () => {
-    expect(membershipExpiresAt([
-      { paidAt: new Date("2026-01-31T00:30:00+07:00"), months: 3 },
-    ])?.toISOString()).toBe("2026-04-29T17:30:00.000Z");
+    expect(
+      membershipExpiresAt([
+        { paidAt: new Date("2026-01-31T00:30:00+07:00"), months: 3 },
+      ])?.toISOString(),
+    ).toBe("2026-04-29T17:30:00.000Z");
   });
 
   it("expires at the exact boundary and distinguishes no purchase", () => {
     const expiration = new Date("2026-05-01T00:00:00Z");
     expect(getMembershipStatus(null, expiration)).toBe("inactive");
-    expect(getMembershipStatus(expiration, new Date(expiration.getTime() - 1))).toBe(
-      "active",
-    );
+    expect(
+      getMembershipStatus(expiration, new Date(expiration.getTime() - 1)),
+    ).toBe("active");
     expect(getMembershipStatus(expiration, expiration)).toBe("expired");
   });
 

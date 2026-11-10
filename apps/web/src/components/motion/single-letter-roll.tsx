@@ -24,7 +24,10 @@ export function SingleLetterRoll({
       aria-label={text}
     >
       {icon && <span className="shrink-0">{icon}</span>}
-      <span className="relative inline-flex overflow-hidden leading-tight" aria-hidden="true">
+      <span
+        className="relative inline-flex overflow-hidden leading-tight"
+        aria-hidden="true"
+      >
         {/* Top line (slides up on hover) */}
         <span className="inline-flex">
           {letters.map((char, i) => (

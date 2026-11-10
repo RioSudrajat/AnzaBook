@@ -88,10 +88,7 @@ export async function listBookReviews(slug: string, signal?: AbortSignal) {
   return data;
 }
 
-export async function createBookReview(
-  slug: string,
-  input: CreateReviewInput,
-) {
+export async function createBookReview(slug: string, input: CreateReviewInput) {
   const { data } = await apiFetch<DataResponse<BookReviewDto>>(
     `/api/books/${encodeURIComponent(slug)}/reviews`,
     {
@@ -218,5 +215,14 @@ export async function listBookSessions(bookId: string, signal?: AbortSignal) {
     `/api/reading/sessions/${encodeURIComponent(bookId)}`,
     { signal },
   );
+  return data;
+}
+
+export async function restartBookReading(bookId: string) {
+  const { data } = await apiFetch<
+    DataResponse<{ success: boolean; shelfStatus: string; progressPercent: number }>
+  >(`/api/reading/restart/${encodeURIComponent(bookId)}`, {
+    method: "POST",
+  });
   return data;
 }

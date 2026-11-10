@@ -23,12 +23,22 @@ const PARTNER_OPTIONS: { label: string; value: "all" | PartnerType }[] = [
   { label: "Gudang Komunitas", value: "komunitas" },
 ];
 
-export function LiveStockTracker({ slug, initialStocks }: LiveStockTrackerProps) {
+export function LiveStockTracker({
+  slug,
+  initialStocks,
+}: LiveStockTrackerProps) {
   const [selectedCity, setSelectedCity] = useState("Semua Kota");
-  const [selectedPartner, setSelectedPartner] = useState<"all" | PartnerType>("all");
+  const [selectedPartner, setSelectedPartner] = useState<"all" | PartnerType>(
+    "all",
+  );
 
   const queryCity = selectedCity === "Semua Kota" ? undefined : selectedCity;
-  const { data: stockItems, isLoading, isError, refetch } = useBookStock(slug, {
+  const {
+    data: stockItems,
+    isLoading,
+    isError,
+    refetch,
+  } = useBookStock(slug, {
     city: queryCity,
     partner: selectedPartner,
   });
@@ -49,7 +59,8 @@ export function LiveStockTracker({ slug, initialStocks }: LiveStockTrackerProps)
             </h3>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Lihat stok yang tercatat dan lokasi toko. Konfirmasi ketersediaan ke toko sebelum berkunjung.
+            Lihat stok yang tercatat dan lokasi toko. Konfirmasi ketersediaan ke
+            toko sebelum berkunjung.
           </p>
         </div>
 
@@ -65,7 +76,11 @@ export function LiveStockTracker({ slug, initialStocks }: LiveStockTrackerProps)
               aria-label="Filter Kota"
             >
               {CITY_OPTIONS.map((city) => (
-                <option key={city} value={city} className="bg-background text-foreground">
+                <option
+                  key={city}
+                  value={city}
+                  className="bg-background text-foreground"
+                >
                   {city}
                 </option>
               ))}
@@ -77,7 +92,9 @@ export function LiveStockTracker({ slug, initialStocks }: LiveStockTrackerProps)
             <Filter className="size-3.5 text-muted-foreground" />
             <select
               value={selectedPartner}
-              onChange={(e) => setSelectedPartner(e.target.value as "all" | PartnerType)}
+              onChange={(e) =>
+                setSelectedPartner(e.target.value as "all" | PartnerType)
+              }
               className="bg-transparent text-foreground font-medium text-xs focus:outline-none cursor-pointer"
               aria-label="Filter Mitra Toko"
             >
@@ -100,7 +117,9 @@ export function LiveStockTracker({ slug, initialStocks }: LiveStockTrackerProps)
             className="h-8 px-2 text-xs"
             title="Segarkan Stok"
           >
-            <RefreshCw className={`size-3.5 ${isLoading ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`size-3.5 ${isLoading ? "animate-spin" : ""}`}
+            />
             <span className="sr-only">Segarkan</span>
           </Button>
         </div>
@@ -137,7 +156,8 @@ export function LiveStockTracker({ slug, initialStocks }: LiveStockTrackerProps)
               Stok Belum Tersedia di Lokasi Ini
             </h4>
             <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-              Cobalah ubah filter kota ke &quot;Semua Kota&quot; atau Anda dapat membaca edisi digital dwibahasa secara instan melalui web reader.
+              Cobalah ubah filter kota ke &quot;Semua Kota&quot; atau Anda dapat
+              membaca edisi digital dwibahasa secara instan melalui web reader.
             </p>
           </div>
         ) : (
@@ -147,15 +167,20 @@ export function LiveStockTracker({ slug, initialStocks }: LiveStockTrackerProps)
                 <tr className="border-b border-border/70 text-muted-foreground font-mono uppercase text-[10px] tracking-wider">
                   <th className="py-2.5 px-3">Toko & Lokasi</th>
                   <th className="py-2.5 px-3">Edisi Rakyat</th>
-                  <th className="py-2.5 px-3 hidden md:table-cell">Edisi Standar</th>
-                  <th className="py-2.5 px-3 hidden sm:table-cell">Sinkronisasi</th>
+                  <th className="py-2.5 px-3 hidden md:table-cell">
+                    Edisi Standar
+                  </th>
+                  <th className="py-2.5 px-3 hidden sm:table-cell">
+                    Sinkronisasi
+                  </th>
                   <th className="py-2.5 px-3 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40 font-sans">
                 {displayItems.map((item) => {
                   const hasRakyatStock = item.rakyatStock > 0;
-                  const isLowRakyatStock = item.rakyatStock > 0 && item.rakyatStock <= 5;
+                  const isLowRakyatStock =
+                    item.rakyatStock > 0 && item.rakyatStock <= 5;
 
                   return (
                     <tr
@@ -188,7 +213,9 @@ export function LiveStockTracker({ slug, initialStocks }: LiveStockTrackerProps)
                           <div className="inline-flex items-center gap-1.5">
                             <span
                               className={`size-2 rounded-full ${
-                                isLowRakyatStock ? "bg-amber-500" : "bg-emerald-500"
+                                isLowRakyatStock
+                                  ? "bg-amber-500"
+                                  : "bg-emerald-500"
                               }`}
                             />
                             <span
@@ -225,17 +252,25 @@ export function LiveStockTracker({ slug, initialStocks }: LiveStockTrackerProps)
                         <div className="flex items-center gap-1">
                           <Clock className="size-3 opacity-60" />
                           <span>
-                            {new Date(item.lastStockCheck).toLocaleDateString("id-ID", {
-                              day: "numeric",
-                              month: "short",
-                            })}
+                            {new Date(item.lastStockCheck).toLocaleDateString(
+                              "id-ID",
+                              {
+                                day: "numeric",
+                                month: "short",
+                              },
+                            )}
                           </span>
                         </div>
                       </td>
 
                       {/* Action */}
                       <td className="py-3 px-3 align-top text-right whitespace-nowrap">
-                        <Button asChild variant="outline" size="sm" className="min-h-11">
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className="min-h-11"
+                        >
                           <a
                             href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${item.branchName} ${item.address}`)}`}
                             target="_blank"

@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { Check, Download, MessageCircle, Share2, Sparkles, X } from "lucide-react";
+import {
+  Check,
+  Download,
+  MessageCircle,
+  Share2,
+  X,
+} from "lucide-react";
 import type { HighlightColor } from "@starter/shared/types";
 import { Button } from "@/components/ui/button";
 
@@ -125,7 +131,7 @@ export function HighlightStoryDialog({
         <div className="flex items-center justify-between pb-3 border-b border-border">
           <div className="flex items-center gap-2">
             <div className="size-8 rounded-full bg-[var(--color-accent)]/15 text-[var(--color-accent)] flex items-center justify-center">
-              <Sparkles className="size-4" />
+              <Share2 className="size-4" />
             </div>
             <div>
               <h2
@@ -166,9 +172,9 @@ export function HighlightStoryDialog({
             <div className="pt-4 flex items-center justify-between z-10 border-b border-white/10 pb-3">
               <div className="flex items-center gap-2">
                 <img
-                  src="/logo-mark.svg"
+                  src="/icon.svg"
                   alt="AnzaBook Logo"
-                  className="size-5 object-contain"
+                  className="size-5 rounded-[4px] object-contain border border-white/20 shadow-xs"
                 />
                 <span className="font-mono text-[10px] tracking-wider uppercase font-bold text-white/90">
                   AnzaBook
@@ -237,9 +243,7 @@ export function HighlightStoryDialog({
                 <span className="text-[9px] text-amber-400/90 block">
                   {readerName}
                 </span>
-                <span className="text-[8px] text-white/40">
-                  anzabook.id
-                </span>
+                <span className="text-[8px] text-white/40">anzabook.id</span>
               </div>
             </div>
           </div>
@@ -285,7 +289,9 @@ export function HighlightStoryDialog({
             className="w-full gap-2 text-muted-foreground hover:text-foreground h-9 text-[11px]"
           >
             <Download className="size-3.5" />
-            {downloading ? "Menyiapkan Kartu 9:16..." : "Unduh Gambar 9:16 (High-Res PNG)"}
+            {downloading
+              ? "Menyiapkan Kartu 9:16..."
+              : "Unduh Gambar 9:16 (High-Res PNG)"}
           </Button>
         </div>
       </div>

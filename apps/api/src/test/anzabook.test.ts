@@ -5,12 +5,20 @@ describe("AnzaBook Core API", () => {
   it("returns continuous manuscript chapters only when the reader has full access", async () => {
     const client = agent();
     await signUp(client, "Pembaca Scroll");
-    const full = await client.get("/api/books/revolusi-cetak-kedaulatan-membaca/read?continuous=true");
+    const full = await client.get(
+      "/api/books/revolusi-cetak-kedaulatan-membaca/read?continuous=true",
+    );
     expect(full.status).toBe(200);
-    expect(full.body.data.chapters.map((chapter: { chapterNumber: number }) => chapter.chapterNumber)).toEqual([1, 2]);
+    expect(
+      full.body.data.chapters.map(
+        (chapter: { chapterNumber: number }) => chapter.chapterNumber,
+      ),
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     expect(full.body.data.chapters[1].contentId).toBeTruthy();
 
-    const preview = await client.get("/api/books/sains-logika-seni-hidup-bermutu/read?continuous=true");
+    const preview = await client.get(
+      "/api/books/sains-logika-seni-hidup-bermutu/read?continuous=true",
+    );
     expect(preview.status).toBe(200);
     expect(preview.body.data.hasFullAccess).toBe(false);
     expect(preview.body.data.chapters).toHaveLength(1);
@@ -34,7 +42,9 @@ describe("AnzaBook Core API", () => {
     expect(searchRes.body.data[0].slug).toBe("madilog-tan-malaka");
 
     // 3. Book detail
-    const detailRes = await client.get("/api/books/revolusi-cetak-kedaulatan-membaca");
+    const detailRes = await client.get(
+      "/api/books/revolusi-cetak-kedaulatan-membaca",
+    );
     expect(detailRes.status).toBe(200);
     expect(detailRes.body.data.title).toContain("Revolusi Cetak");
     expect(detailRes.body.data.editions.length).toBe(3);
@@ -63,22 +73,30 @@ describe("AnzaBook Core API", () => {
     const slug = "sains-logika-seni-hidup-bermutu";
 
     // Chapter 1 (sample) is permitted
-    const chap1Res = await client.get(`/api/books/${slug}/read?chapter=1&mode=full`);
+    const chap1Res = await client.get(
+      `/api/books/${slug}/read?chapter=1&mode=full`,
+    );
     expect(chap1Res.status).toBe(200);
     expect(chap1Res.body.data.currentChapter.chapterNumber).toBe(1);
     expect(chap1Res.body.data.watermark).toBeDefined();
 
     // Blueprint mode is permitted
-    const blueprintRes = await client.get(`/api/books/${slug}/read?chapter=1&mode=blueprint`);
+    const blueprintRes = await client.get(
+      `/api/books/${slug}/read?chapter=1&mode=blueprint`,
+    );
     expect(blueprintRes.status).toBe(200);
     expect(blueprintRes.body.data.mode).toBe("blueprint");
 
     expect(chap1Res.body.data.hasFullAccess).toBe(false);
     expect(chap1Res.body.data.currentChapter.audioUrl).toBeNull();
-    expect(chap1Res.body.data.currentChapter.contentId.split(/\n\n+/).length).toBeLessThanOrEqual(3);
+    expect(
+      chap1Res.body.data.currentChapter.contentId.split(/\n\n+/).length,
+    ).toBeLessThanOrEqual(3);
 
     for (const mode of ["full", "blueprint", "audio"]) {
-      const locked = await client.get(`/api/books/${slug}/read?chapter=2&mode=${mode}`);
+      const locked = await client.get(
+        `/api/books/${slug}/read?chapter=2&mode=${mode}`,
+      );
       expect(locked.status).toBe(403);
       expect(locked.body.error.code).toBe("FORBIDDEN_DIGITAL_ACCESS");
     }
@@ -106,7 +124,9 @@ describe("AnzaBook Core API", () => {
     expect(reusedClaim.status).toBe(409);
 
     // Now Chapter 2 is accessible!
-    const chap2Unlocked = await client.get(`/api/books/${slug}/read?chapter=2&mode=full`);
+    const chap2Unlocked = await client.get(
+      `/api/books/${slug}/read?chapter=2&mode=full`,
+    );
     // Note: if book has only 1 chapter seeded, it responds with 200 or 404 if chapter doesn't exist,
     // but not 403 FORBIDDEN_DIGITAL_ACCESS.
     expect(chap2Unlocked.status).not.toBe(403);
@@ -117,25 +137,55 @@ describe("AnzaBook Core API", () => {
     const client = agent();
     const details = await client.get(`/api/books/${slug}`);
     const [first, second] = details.body.data.chapters;
-    expect((await client.get(`/api/books/${slug}/comments?chapterId=${first.id}`)).status).toBe(401);
+    expect(
+      (await client.get(`/api/books/${slug}/comments?chapterId=${first.id}`))
+        .status,
+    ).toBe(401);
     await signUp(client, "Pembaca Catatan");
-    expect((await client.get(`/api/books/${slug}/comments?chapterId=${second.id}`)).status).toBe(403);
-    expect((await client.get(`/api/books/madilog-tan-malaka/comments?chapterId=${first.id}`)).status).toBe(404);
-    const outsidePreview = await client.post(`/api/books/${slug}/comments`).set(originHeader)
-      .send({ chapterId: first.id, paragraphIndex: 4, content: "Catatan di luar cuplikan." });
+    expect(
+      (await client.get(`/api/books/${slug}/comments?chapterId=${second.id}`))
+        .status,
+    ).toBe(403);
+    expect(
+      (
+        await client.get(
+          `/api/books/madilog-tan-malaka/comments?chapterId=${first.id}`,
+        )
+      ).status,
+    ).toBe(404);
+    const outsidePreview = await client
+      .post(`/api/books/${slug}/comments`)
+      .set(originHeader)
+      .send({
+        chapterId: first.id,
+        paragraphIndex: 4,
+        content: "Catatan di luar cuplikan.",
+      });
     expect(outsidePreview.status).toBe(422);
-    const allowed = await client.post(`/api/books/${slug}/comments`).set(originHeader)
-      .send({ chapterId: first.id, paragraphIndex: 0, content: "Catatan di cuplikan." });
+    const allowed = await client
+      .post(`/api/books/${slug}/comments`)
+      .set(originHeader)
+      .send({
+        chapterId: first.id,
+        paragraphIndex: 0,
+        content: "Catatan di cuplikan.",
+      });
     expect(allowed.status).toBe(201);
-    const comments = await client.get(`/api/books/${slug}/comments?chapterId=${first.id}`);
-    expect(comments.body.data.map((comment: { id: string }) => comment.id)).toContain(allowed.body.data.id);
+    const comments = await client.get(
+      `/api/books/${slug}/comments?chapterId=${first.id}`,
+    );
+    expect(
+      comments.body.data.map((comment: { id: string }) => comment.id),
+    ).toContain(allowed.body.data.id);
   });
 
   it("records reading sessions and calculates telemetry summary for Strava studio", async () => {
     const client = agent();
     await signUp(client, "Pelari Literasi");
 
-    const detailRes = await client.get("/api/books/revolusi-cetak-kedaulatan-membaca");
+    const detailRes = await client.get(
+      "/api/books/revolusi-cetak-kedaulatan-membaca",
+    );
     const bookId = detailRes.body.data.id;
 
     // Reject invalid WPM
@@ -169,7 +219,9 @@ describe("AnzaBook Core API", () => {
     const telemetryRes = await client.get("/api/reading-sessions");
     expect(telemetryRes.status).toBe(200);
     expect(telemetryRes.body.summary.totalPagesRead).toBeGreaterThanOrEqual(15);
-    expect(telemetryRes.body.summary.totalMinutesRead).toBeGreaterThanOrEqual(20);
+    expect(telemetryRes.body.summary.totalMinutesRead).toBeGreaterThanOrEqual(
+      20,
+    );
     expect(telemetryRes.body.data.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -179,29 +231,32 @@ describe("AnzaBook Core API", () => {
     await signUp(clientA, "User A");
     await signUp(clientB, "User B");
 
-    const detailRes = await clientA.get("/api/books/revolusi-cetak-kedaulatan-membaca");
+    const detailRes = await clientA.get(
+      "/api/books/revolusi-cetak-kedaulatan-membaca",
+    );
     const bookId = detailRes.body.data.id;
 
     // User A adds to shelf
-    const addShelf = await clientA
-      .post("/api/shelves")
-      .set(originHeader)
-      .send({
-        bookId,
-        shelfStatus: "reading",
-        favorite: true,
-      });
+    const addShelf = await clientA.post("/api/shelves").set(originHeader).send({
+      bookId,
+      shelfStatus: "reading",
+      favorite: true,
+    });
     expect([200, 201]).toContain(addShelf.status);
 
     // User A sees book in shelf
     const shelfARes = await clientA.get("/api/shelves");
     expect(shelfARes.status).toBe(200);
-    expect(shelfARes.body.data.some((s: { bookId: string }) => s.bookId === bookId)).toBe(true);
+    expect(
+      shelfARes.body.data.some((s: { bookId: string }) => s.bookId === bookId),
+    ).toBe(true);
 
     // User B does NOT see User A's shelf
     const shelfBRes = await clientB.get("/api/shelves");
     expect(shelfBRes.status).toBe(200);
-    expect(shelfBRes.body.data.some((s: { bookId: string }) => s.bookId === bookId)).toBe(false);
+    expect(
+      shelfBRes.body.data.some((s: { bookId: string }) => s.bookId === bookId),
+    ).toBe(false);
 
     // User A writes a review
     const reviewRes = await clientA
@@ -210,13 +265,16 @@ describe("AnzaBook Core API", () => {
       .send({
         bookId,
         rating: 4.5,
-        content: "Kertas newsprint 48.8 gsm ini sangat nyaman di mata, tidak silau dan enteng dibawa!",
+        content:
+          "Kertas newsprint 48.8 gsm ini sangat nyaman di mata, tidak silau dan enteng dibawa!",
         editionTierReviewed: "rakyat_economy",
       });
     expect(reviewRes.status).toBe(201);
 
     // Reviews list contains User A's review
-    const reviewsList = await clientA.get("/api/books/revolusi-cetak-kedaulatan-membaca/reviews");
+    const reviewsList = await clientA.get(
+      "/api/books/revolusi-cetak-kedaulatan-membaca/reviews",
+    );
     expect(reviewsList.status).toBe(200);
     expect(reviewsList.body.data.length).toBeGreaterThanOrEqual(1);
     expect(reviewsList.body.data[0].rating).toBe(4.5);

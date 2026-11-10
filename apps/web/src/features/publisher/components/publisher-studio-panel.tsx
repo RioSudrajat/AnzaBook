@@ -3,7 +3,6 @@ import {
   Calculator,
   CheckCircle2,
   Printer,
-  Sparkles,
   TrendingUp,
 } from "lucide-react";
 import { calculatePrintEconomics } from "@starter/shared/print-economics";
@@ -41,7 +40,8 @@ export function PublisherStudioPanel() {
             </h3>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Hitung biaya riil cetak buku per eksemplar, royalti penulis, titik impas (break-even), dan pemangkasan margin distributor 55%.
+            Hitung biaya riil cetak buku per eksemplar, royalti penulis, titik
+            impas (break-even), dan pemangkasan margin distributor 55%.
           </p>
         </div>
 
@@ -63,7 +63,9 @@ export function PublisherStudioPanel() {
           <div>
             <div className="flex items-center justify-between text-xs font-mono mb-1.5">
               <span className="text-muted-foreground">Jumlah Halaman</span>
-              <span className="font-bold text-foreground">{pageCount} Halaman</span>
+              <span className="font-bold text-foreground">
+                {pageCount} Halaman
+              </span>
             </div>
             <input
               type="range"
@@ -109,7 +111,9 @@ export function PublisherStudioPanel() {
           <div>
             <div className="flex items-center justify-between text-xs font-mono mb-1.5">
               <span className="text-muted-foreground">Royalti Penulis</span>
-              <span className="font-bold text-[var(--color-accent)]">{royaltyPct}%</span>
+              <span className="font-bold text-[var(--color-accent)]">
+                {royaltyPct}%
+              </span>
             </div>
             <input
               type="range"
@@ -131,7 +135,8 @@ export function PublisherStudioPanel() {
             <span className="font-bold text-foreground block mb-1">
               Tesis Biaya AnzaBook:
             </span>
-            Kertas newsprint 48.8 gsm menekan ongkos bahan baku hingga 58% tanpa mengorbankan keterbacaan tipografi dan kontras naskah.
+            Kertas newsprint 48.8 gsm menekan ongkos bahan baku hingga 58% tanpa
+            mengorbankan keterbacaan tipografi dan kontras naskah.
           </div>
         </div>
 
@@ -144,7 +149,7 @@ export function PublisherStudioPanel() {
               <div className="p-4 rounded-[8px] border-2 border-[var(--color-accent)] bg-[var(--color-accent)]/5 relative flex flex-col justify-between">
                 <div>
                   <div className="inline-flex items-center gap-1 font-mono text-[10px] uppercase font-bold text-[var(--color-accent)] px-2 py-0.5 bg-[var(--color-accent)]/15 rounded-[3px] mb-2">
-                    <Sparkles className="size-3" />
+                    <CheckCircle2 className="size-3" />
                     Pilihan Rakyat
                   </div>
                   <h4 className="font-serif font-bold text-base text-foreground">
@@ -162,13 +167,20 @@ export function PublisherStudioPanel() {
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Royalti ({royaltyPct}%):</span>
+                      <span className="text-muted-foreground">
+                        Royalti ({royaltyPct}%):
+                      </span>
                       <span className="font-semibold text-emerald-700 dark:text-emerald-400">
-                        Rp{rakyatTier.authorRoyaltyPerUnitIdr.toLocaleString("id-ID")}
+                        Rp
+                        {rakyatTier.authorRoyaltyPerUnitIdr.toLocaleString(
+                          "id-ID",
+                        )}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Titik Impas:</span>
+                      <span className="text-muted-foreground">
+                        Titik Impas:
+                      </span>
                       <span className="font-semibold text-foreground">
                         {rakyatTier.breakEvenUnits} Eks
                       </span>
@@ -184,7 +196,12 @@ export function PublisherStudioPanel() {
                     Rp{rakyatTier.recommendedPriceIdr.toLocaleString("id-ID")}
                   </div>
                   <div className="mt-1 text-[11px] font-mono text-emerald-700 dark:text-emerald-400 font-semibold">
-                    Hemat {rakyatTier.savingsPercentVsTraditional}% vs Toko Konvensional (Rp{rakyatTier.traditionalRetailPriceIdr.toLocaleString("id-ID")})
+                    Hemat {rakyatTier.savingsPercentVsTraditional}% vs Toko
+                    Konvensional (Rp
+                    {rakyatTier.traditionalRetailPriceIdr.toLocaleString(
+                      "id-ID",
+                    )}
+                    )
                   </div>
                 </div>
               </div>
@@ -212,13 +229,20 @@ export function PublisherStudioPanel() {
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Royalti ({royaltyPct}%):</span>
+                      <span className="text-muted-foreground">
+                        Royalti ({royaltyPct}%):
+                      </span>
                       <span className="font-semibold text-foreground">
-                        Rp{standardTier.authorRoyaltyPerUnitIdr.toLocaleString("id-ID")}
+                        Rp
+                        {standardTier.authorRoyaltyPerUnitIdr.toLocaleString(
+                          "id-ID",
+                        )}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Titik Impas:</span>
+                      <span className="text-muted-foreground">
+                        Titik Impas:
+                      </span>
                       <span className="font-semibold text-foreground">
                         {standardTier.breakEvenUnits} Eks
                       </span>
@@ -262,13 +286,20 @@ export function PublisherStudioPanel() {
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Royalti ({royaltyPct}%):</span>
+                      <span className="text-muted-foreground">
+                        Royalti ({royaltyPct}%):
+                      </span>
                       <span className="font-semibold text-foreground">
-                        Rp{kolektorTier.authorRoyaltyPerUnitIdr.toLocaleString("id-ID")}
+                        Rp
+                        {kolektorTier.authorRoyaltyPerUnitIdr.toLocaleString(
+                          "id-ID",
+                        )}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Titik Impas:</span>
+                      <span className="text-muted-foreground">
+                        Titik Impas:
+                      </span>
                       <span className="font-semibold text-foreground">
                         {kolektorTier.breakEvenUnits} Eks
                       </span>
@@ -298,7 +329,11 @@ export function PublisherStudioPanel() {
               <span className="font-serif font-bold text-foreground block mb-0.5">
                 Mengapa Buku Konvensional di Indonesia Sangat Mahal?
               </span>
-              Di toko buku besar biasa, harga jual ritel dibebani potongan konsinyasi distributor sebesar 50% hingga 55%, ditambah biaya retur gudang dan margin distributor bertingkat. AnzaBook memotong seluruh mata rantai perantara ini dan menyalurkan buku langsung melalui toko rekanan dan komunitas pembaca berdaulat.
+              Di toko buku besar biasa, harga jual ritel dibebani potongan
+              konsinyasi distributor sebesar 50% hingga 55%, ditambah biaya
+              retur gudang dan margin distributor bertingkat. AnzaBook memotong
+              seluruh mata rantai perantara ini dan menyalurkan buku langsung
+              melalui toko rekanan dan komunitas pembaca berdaulat.
             </div>
           </div>
         </div>

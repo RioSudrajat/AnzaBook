@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Lock, ShieldAlert, Sparkles } from "lucide-react";
+import { Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Brand } from "@/components/brand";
 
 type DrmShieldProps = {
   watermarkText: string;
@@ -8,7 +9,11 @@ type DrmShieldProps = {
   children: React.ReactNode;
 };
 
-export function DrmShield({ watermarkText, enabled = false, children }: DrmShieldProps) {
+export function DrmShield({
+  watermarkText,
+  enabled = false,
+  children,
+}: DrmShieldProps) {
   const [isShieldActive, setIsShieldActive] = useState(false);
   const [shieldReason, setShieldReason] = useState<string>(
     "Aktivitas tangkapan layar atau kehilangan fokus terdeteksi.",
@@ -25,7 +30,9 @@ export function DrmShield({ watermarkText, enabled = false, children }: DrmShiel
 
     const handleCopyCut = (e: ClipboardEvent) => {
       e.preventDefault();
-      setShieldReason("Penyalinan teks naskah dinonaktifkan demi perlindungan hak cipta.");
+      setShieldReason(
+        "Penyalinan teks naskah dinonaktifkan demi perlindungan hak cipta.",
+      );
       setIsShieldActive(true);
       return false;
     };
@@ -126,7 +133,9 @@ export function DrmShield({ watermarkText, enabled = false, children }: DrmShiel
       {/* Actual Content with Blur Filter on Shield Active */}
       <div
         className={`transition-all duration-150 ${
-          isEffectiveShieldActive ? "blur-2xl opacity-10 pointer-events-none filter" : "blur-none opacity-100"
+          isEffectiveShieldActive
+            ? "blur-2xl opacity-10 pointer-events-none filter"
+            : "blur-none opacity-100"
         }`}
       >
         {children}
@@ -141,17 +150,9 @@ export function DrmShield({ watermarkText, enabled = false, children }: DrmShiel
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-md animate-in fade-in duration-100"
         >
           <div className="max-w-md w-full bg-card border border-border rounded-[10px] p-6 shadow-2xl text-center space-y-4">
-            {/* AnzaBook Official Logo */}
-            <div className="flex justify-center mb-2">
-              <img
-                src="/logo-mark.svg"
-                alt="AnzaBook Logo"
-                className="size-10 object-contain drop-shadow-sm"
-              />
-            </div>
-
-            <div className="size-10 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mx-auto">
-              <ShieldAlert className="size-5" />
+            {/* AnzaBook Official Logo & Identity */}
+            <div className="flex justify-center mb-1">
+              <Brand asLink={false} />
             </div>
 
             <div className="space-y-1.5">
@@ -159,13 +160,18 @@ export function DrmShield({ watermarkText, enabled = false, children }: DrmShiel
                 <Lock className="size-3" />
                 Perlindungan Hak Cipta Aktif (DRM)
               </span>
-              <h2 id="drm-title" className="font-serif text-lg font-bold text-foreground">
+              <h2
+                id="drm-title"
+                className="font-serif text-lg font-bold text-foreground"
+              >
                 Tampilan Naskah Terkunci Sementara
               </h2>
             </div>
 
             <p className="text-xs text-muted-foreground leading-relaxed">
-              {shieldReason} Demi melindungi hak cipta penulis dan penerjemah, naskah disembunyikan secara otomatis saat jendela tidak aktif atau terdeteksi pintasan tangkapan layar.
+              {shieldReason} Demi melindungi hak cipta penulis dan penerjemah,
+              naskah disembunyikan secara otomatis saat jendela tidak aktif atau
+              terdeteksi pintasan tangkapan layar.
             </p>
 
             <div className="p-3 bg-muted/40 rounded-[6px] border border-border text-[11px] font-mono text-muted-foreground text-left break-all">
@@ -178,9 +184,8 @@ export function DrmShield({ watermarkText, enabled = false, children }: DrmShiel
             <div className="pt-2">
               <Button
                 onClick={() => setIsShieldActive(false)}
-                className="w-full gap-2 font-mono text-xs"
+                className="w-full font-mono text-xs"
               >
-                <Sparkles className="size-3.5" />
                 Lanjutkan Membaca
               </Button>
             </div>

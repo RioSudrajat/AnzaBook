@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { roleHasPermission } from "@starter/shared/permissions";
 import { Brand } from "@/components/brand";
+import { SiteFooter } from "@/components/site-footer";
 import { SignOutButton } from "@/components/sign-out-button";
 import { authDestination } from "@/lib/auth-destination";
 
@@ -16,7 +17,10 @@ import { authDestination } from "@/lib/auth-destination";
 export const Route = createFileRoute("/_protected")({
   beforeLoad: ({ context, location }) => {
     if (!context.session) {
-      throw redirect({ to: "/sign-in", search: { redirect: authDestination(location.href) } });
+      throw redirect({
+        to: "/sign-in",
+        search: { redirect: authDestination(location.href) },
+      });
     }
     return { session: context.session };
   },
@@ -40,7 +44,7 @@ function ProtectedLayout() {
   const canAdmin = roleHasPermission(user.role, { notes: ["read-any"] });
 
   return (
-    <>
+    <div className="min-h-screen flex flex-col">
       <header className="border-b bg-card">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-5 sm:px-10">
           <div className="flex flex-wrap items-center gap-6">
@@ -64,10 +68,11 @@ function ProtectedLayout() {
       </header>
       <main
         id="main-content"
-        className="mx-auto max-w-6xl px-6 py-12 sm:px-10 sm:py-16"
+        className="flex-1 mx-auto max-w-6xl px-6 py-12 sm:px-10 sm:py-16 w-full"
       >
         <Outlet />
       </main>
-    </>
+      <SiteFooter />
+    </div>
   );
 }

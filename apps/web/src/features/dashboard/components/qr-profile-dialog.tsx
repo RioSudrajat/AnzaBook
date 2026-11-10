@@ -1,4 +1,4 @@
-import { Sparkles, X } from "lucide-react";
+import { QrCode, X } from "lucide-react";
 
 type QrProfileDialogProps = {
   isOpen: boolean;
@@ -28,14 +28,14 @@ export function QrProfileDialog({
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-3.5 top-3.5 p-1 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted"
+          className="absolute right-3 top-3 min-h-11 min-w-11 inline-flex items-center justify-center text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
           aria-label="Tutup"
         >
           <X className="size-4" />
         </button>
 
         <div className="flex items-center justify-center gap-1.5 text-xs font-mono text-[var(--color-accent)] font-semibold">
-          <Sparkles className="size-3.5" />
+          <QrCode className="size-3.5" />
           <span>Kartu Identitas Pembaca</span>
         </div>
 
