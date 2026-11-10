@@ -6,6 +6,18 @@ export const listBooksQuerySchema = z
     category: z.string().max(50).optional(),
     language: z.string().max(10).optional(),
     accessTier: z.enum(["all", "free", "premium"]).optional().default("all"),
+    digitalPolicy: z
+      .enum([
+        "all",
+        "free_open",
+        "print_claim_only",
+        "sample_only",
+        "alacarte_only",
+        "hybrid_nakama_alacarte",
+      ])
+      .optional()
+      .default("all"),
+    publisher: z.string().max(100).optional(),
     collection: z.string().max(120).optional(),
     paperTier: z
       .enum(["all", "rakyat_economy", "standard_trade", "kolektor_hardcover"])
@@ -62,6 +74,14 @@ export type ListBooksInput = {
   category?: string;
   language?: string;
   accessTier?: "all" | "free" | "premium";
+  digitalPolicy?:
+    | "all"
+    | "free_open"
+    | "print_claim_only"
+    | "sample_only"
+    | "alacarte_only"
+    | "hybrid_nakama_alacarte";
+  publisher?: string;
   collection?: string;
   paperTier?:
     "all" | "rakyat_economy" | "standard_trade" | "kolektor_hardcover";

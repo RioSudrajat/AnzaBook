@@ -2,6 +2,8 @@ import { queryOptions } from "@tanstack/react-query";
 import type { ListEventsInput } from "@starter/shared/validators/community";
 import {
   getCalendar,
+  getCalendarMembers,
+  getCommunityWallet,
   getEvent,
   getEventAttendees,
   getLocationSuggestions,
@@ -19,6 +21,9 @@ export const eventsKeys = {
   attendees: (slug: string) => [...eventsKeys.all, "attendees", slug] as const,
   calendars: () => [...eventsKeys.all, "calendars"] as const,
   calendar: (slug: string) => [...eventsKeys.calendars(), slug] as const,
+  calendarMembers: (slug: string) =>
+    [...eventsKeys.calendars(), "members", slug] as const,
+  wallet: (slug: string) => [...eventsKeys.calendars(), "wallet", slug] as const,
   locations: () => [...eventsKeys.all, "locations"] as const,
 };
 
@@ -56,6 +61,22 @@ export function calendarDetailQuery(slug: string) {
   return queryOptions({
     queryKey: eventsKeys.calendar(slug),
     queryFn: ({ signal }) => getCalendar(slug, signal),
+    enabled: Boolean(slug),
+  });
+}
+
+export function calendarMembersQuery(slug: string) {
+  return queryOptions({
+    queryKey: eventsKeys.calendarMembers(slug),
+    queryFn: ({ signal }) => getCalendarMembers(slug, signal),
+    enabled: Boolean(slug),
+  });
+}
+
+export function communityWalletQuery(slug: string) {
+  return queryOptions({
+    queryKey: eventsKeys.wallet(slug),
+    queryFn: ({ signal }) => getCommunityWallet(slug, signal),
     enabled: Boolean(slug),
   });
 }

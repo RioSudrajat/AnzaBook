@@ -1,7 +1,9 @@
 import type {
   CommunityCalendarDto,
+  CommunityCalendarMemberDto,
   CommunityEventDetailDto,
   CommunityEventSummaryDto,
+  CommunityWalletDto,
   DataResponse,
   EventRsvpDto,
   LocationSuggestionDto,
@@ -185,6 +187,42 @@ export async function toggleFollowCalendar(slug: string) {
     {
       method: "POST",
     },
+  );
+  return data;
+}
+
+export async function joinCalendar(slug: string) {
+  const { data } = await apiFetch<DataResponse<{ success: boolean; role: string }>>(
+    `/api/events/calendars/${encodeURIComponent(slug)}/join`,
+    {
+      method: "POST",
+    },
+  );
+  return data;
+}
+
+export async function leaveCalendar(slug: string) {
+  const { data } = await apiFetch<DataResponse<{ success: boolean; message: string }>>(
+    `/api/events/calendars/${encodeURIComponent(slug)}/leave`,
+    {
+      method: "DELETE",
+    },
+  );
+  return data;
+}
+
+export async function getCalendarMembers(slug: string, signal?: AbortSignal) {
+  const { data } = await apiFetch<DataResponse<CommunityCalendarMemberDto[]>>(
+    `/api/events/calendars/${encodeURIComponent(slug)}/members`,
+    { signal },
+  );
+  return data;
+}
+
+export async function getCommunityWallet(slug: string, signal?: AbortSignal) {
+  const { data } = await apiFetch<DataResponse<CommunityWalletDto>>(
+    `/api/events/calendars/${encodeURIComponent(slug)}/wallet`,
+    { signal },
   );
   return data;
 }

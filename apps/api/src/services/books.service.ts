@@ -11,6 +11,7 @@ import {
   communityEvents,
   communityWalletLedgers,
   eventRsvps,
+  publishers,
   storeBranches,
   storeInventories,
   userShelves,
@@ -453,6 +454,9 @@ export function toBookSummary(row: typeof books.$inferSelect): BookSummaryDto {
     categories: (row.categories as string[]) || [],
     collectionName: row.collectionName,
     genres: (row.genres as string[]) || [],
+    publisherId: row.publisherId,
+    authorUserId: row.authorUserId,
+    alacartePriceIdr: row.alacartePriceIdr,
   };
 }
 
@@ -477,8 +481,25 @@ export async function listBooks(query: ListBooksQuery) {
   if (query.accessTier && query.accessTier !== "all") {
     conditions.push(eq(books.accessTier, query.accessTier));
   }
+  if (query.digitalPolicy && query.digitalPolicy !== "all") {
+    conditions.push(eq(books.digitalPolicy, query.digitalPolicy));
+  }
   if (query.collection) {
     conditions.push(eq(books.collectionName, query.collection));
+  }
+  if (query.publisher) {
+    const [pub] = await db
+      .select({ id: publishers.id })
+      .from(publishers)
+      .where(
+        or(eq(publishers.id, query.publisher), eq(publishers.slug, query.publisher)),
+      )
+      .limit(1);
+    if (pub) {
+      conditions.push(eq(books.publisherId, pub.id));
+    } else {
+      conditions.push(sql`1 = 0`);
+    }
   }
 
   const rows = await db
@@ -519,6 +540,16 @@ export async function getBookBySlug(
     .limit(1);
 
   if (!book) return null;
+
+  let publisherSlug: string | null = null;
+  if (book.publisherId) {
+    const [pub] = await db
+      .select({ slug: publishers.slug })
+      .from(publishers)
+      .where(eq(publishers.id, book.publisherId))
+      .limit(1);
+    if (pub) publisherSlug = pub.slug;
+  }
 
   const editions = await db
     .select()
@@ -624,6 +655,7 @@ export async function getBookBySlug(
 
   return {
     ...toBookSummary(book),
+    publisherSlug,
     chapters,
     editions: editions.map((e) => ({
       id: e.id,

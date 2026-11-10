@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   books,
@@ -140,6 +140,59 @@ export async function listVerifiedPublishers(
   }
 
   return results;
+}
+
+export async function getPublisherBySlug(
+  slug: string,
+  currentUserId?: string,
+): Promise<PublisherDto | null> {
+  const [pub] = await db
+    .select()
+    .from(publishers)
+    .where(or(eq(publishers.slug, slug), sql`${publishers.id}::text = ${slug}`))
+    .limit(1);
+
+  if (!pub) return null;
+
+  const [bookCountRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(books)
+    .where(eq(books.publisherId, pub.id));
+
+  let currentUserRole = null;
+  if (currentUserId) {
+    const [member] = await db
+      .select({ role: publisherMembers.role })
+      .from(publisherMembers)
+      .where(
+        and(
+          eq(publisherMembers.publisherId, pub.id),
+          eq(publisherMembers.userId, currentUserId),
+        ),
+      )
+      .limit(1);
+    if (member) currentUserRole = member.role;
+  }
+
+  return {
+    id: pub.id,
+    slug: pub.slug,
+    name: pub.name,
+    ikapiNumber: pub.ikapiNumber,
+    description: pub.description,
+    logoUrl: pub.logoUrl,
+    city: pub.city,
+    address: pub.address,
+    contactEmail: pub.contactEmail,
+    verificationStatus: pub.verificationStatus,
+    verifiedAt: pub.verifiedAt ? pub.verifiedAt.toISOString() : null,
+    freeClaimCodeQuotaPerBook: pub.freeClaimCodeQuotaPerBook,
+    claimCodeFeeIdr: pub.claimCodeFeeIdr,
+    totalBooks: Number(bookCountRow?.count || 0),
+    currentUserRole,
+    createdAt: pub.createdAt.toISOString(),
+    updatedAt: pub.updatedAt.toISOString(),
+  };
 }
 
 export async function submitManuscript(

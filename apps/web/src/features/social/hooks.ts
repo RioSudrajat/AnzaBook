@@ -28,6 +28,7 @@ import {
   socialKeys,
   userProfileQuery,
   verifiedPublishersQuery,
+  publisherDetailQuery,
 } from "./queries";
 
 export function useMySocialProfile() {
@@ -111,6 +112,10 @@ export function useApplyPublisher() {
 
 export function useVerifiedPublishers() {
   return useQuery(verifiedPublishersQuery());
+}
+
+export function usePublisher(slug: string) {
+  return useQuery(publisherDetailQuery(slug));
 }
 
 export function useSubmitManuscript() {

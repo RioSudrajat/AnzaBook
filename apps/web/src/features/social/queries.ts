@@ -4,6 +4,7 @@ import {
   exploreReaders,
   getMyManuscripts,
   getMySocialProfile,
+  getPublisherBySlug,
   getUserProfile,
   listVerifiedPublishers,
 } from "./api";
@@ -21,6 +22,7 @@ export const socialKeys = {
 export const publisherKeys = {
   all: ["publisher"] as const,
   verified: () => [...publisherKeys.all, "verified"] as const,
+  detail: (slug: string) => [...publisherKeys.all, "detail", slug] as const,
   myManuscripts: () => [...publisherKeys.all, "manuscripts", "mine"] as const,
 };
 
@@ -56,6 +58,14 @@ export function verifiedPublishersQuery() {
   return queryOptions({
     queryKey: publisherKeys.verified(),
     queryFn: ({ signal }) => listVerifiedPublishers(signal),
+  });
+}
+
+export function publisherDetailQuery(slug: string) {
+  return queryOptions({
+    queryKey: publisherKeys.detail(slug),
+    queryFn: ({ signal }) => getPublisherBySlug(slug, signal),
+    enabled: Boolean(slug),
   });
 }
 

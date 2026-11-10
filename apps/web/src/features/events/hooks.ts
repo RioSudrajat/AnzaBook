@@ -16,6 +16,8 @@ import {
   createEvent,
   deleteEvent,
   getEventAttendees,
+  joinCalendar,
+  leaveCalendar,
   rejectRsvp,
   reportEvent,
   rsvpEvent,
@@ -24,7 +26,9 @@ import {
 } from "./api";
 import {
   calendarDetailQuery,
+  calendarMembersQuery,
   calendarsQuery,
+  communityWalletQuery,
   eventAttendeesQuery,
   eventDetailQuery,
   eventsKeys,
@@ -170,6 +174,42 @@ export function useToggleFollowCalendar(slug: string) {
     mutationFn: () => toggleFollowCalendar(slug),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: eventsKeys.calendar(slug) });
+      queryClient.invalidateQueries({ queryKey: eventsKeys.calendars() });
+    },
+  });
+}
+
+export function useCalendarMembers(slug: string) {
+  return useQuery(calendarMembersQuery(slug));
+}
+
+export function useCommunityWallet(slug: string) {
+  return useQuery(communityWalletQuery(slug));
+}
+
+export function useJoinCalendar(slug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => joinCalendar(slug),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: eventsKeys.calendar(slug) });
+      queryClient.invalidateQueries({
+        queryKey: eventsKeys.calendarMembers(slug),
+      });
+      queryClient.invalidateQueries({ queryKey: eventsKeys.calendars() });
+    },
+  });
+}
+
+export function useLeaveCalendar(slug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => leaveCalendar(slug),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: eventsKeys.calendar(slug) });
+      queryClient.invalidateQueries({
+        queryKey: eventsKeys.calendarMembers(slug),
+      });
       queryClient.invalidateQueries({ queryKey: eventsKeys.calendars() });
     },
   });

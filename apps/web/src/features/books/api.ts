@@ -2,6 +2,7 @@ import type {
   AuthorSummaryDto,
   BookDetailDto,
   BookHighlightDto,
+  BookPurchaseDto,
   BookReaderPayloadDto,
   BookReviewDto,
   BookSummaryDto,
@@ -27,6 +28,7 @@ import type {
   CreateHighlightInput,
   SaveReadingProgressInput,
 } from "@starter/shared/validators/reading";
+import type { PurchaseBookAlacarteInput } from "@starter/shared/validators/publisher";
 import { apiFetch } from "@/lib/api/client";
 
 export type BooksListResponse = {
@@ -224,5 +226,19 @@ export async function restartBookReading(bookId: string) {
   >(`/api/reading/restart/${encodeURIComponent(bookId)}`, {
     method: "POST",
   });
+  return data;
+}
+
+export async function purchaseBookAlacarte(
+  slug: string,
+  input?: PurchaseBookAlacarteInput,
+) {
+  const { data } = await apiFetch<DataResponse<BookPurchaseDto>>(
+    `/api/books/${encodeURIComponent(slug)}/purchase`,
+    {
+      method: "POST",
+      body: input || {},
+    },
+  );
   return data;
 }

@@ -25,6 +25,7 @@ import type {
 } from "@starter/shared/validators/community";
 import type {
   CommunityCalendarDto,
+  CommunityCalendarMemberDto,
   CommunityEventDetailDto,
   CommunityEventSummaryDto,
   CommunityWalletDto,
@@ -40,6 +41,8 @@ function toCalendarDto(
   followerCount = 0,
   isFollowing = false,
   isManager = false,
+  isMember = false,
+  memberRole: "owner" | "admin" | "checkin_staff" | "member" | null = null,
 ): CommunityCalendarDto {
   return {
     id: cal.id,
@@ -60,6 +63,8 @@ function toCalendarDto(
     followerCount,
     isFollowing,
     isManager,
+    isMember,
+    memberRole,
     createdAt: cal.createdAt.toISOString(),
   };
 }
@@ -193,6 +198,8 @@ export async function getCalendarBySlug(
 
   let isFollowing = false;
   let isManager = false;
+  let isMember = false;
+  let memberRole: "owner" | "admin" | "checkin_staff" | "member" | null = null;
 
   if (currentUserId) {
     const [follow] = await db
@@ -206,7 +213,23 @@ export async function getCalendarBySlug(
       )
       .limit(1);
     isFollowing = !!follow;
-    isManager = await isCalendarManager(cal.id, currentUserId);
+
+    const [membership] = await db
+      .select({ role: communityCalendarMembers.role })
+      .from(communityCalendarMembers)
+      .where(
+        and(
+          eq(communityCalendarMembers.calendarId, cal.id),
+          eq(communityCalendarMembers.userId, currentUserId),
+        ),
+      )
+      .limit(1);
+
+    if (membership) {
+      isMember = true;
+      memberRole = membership.role;
+      isManager = membership.role === "owner" || membership.role === "admin";
+    }
   }
 
   return toCalendarDto(
@@ -214,7 +237,46 @@ export async function getCalendarBySlug(
     Number(followers[0]?.count || 0),
     isFollowing,
     isManager,
+    isMember,
+    memberRole,
   );
+}
+
+export async function getCalendarMembers(
+  slug: string,
+): Promise<CommunityCalendarMemberDto[]> {
+  const [cal] = await db
+    .select({ id: communityCalendars.id })
+    .from(communityCalendars)
+    .where(eq(communityCalendars.slug, slug))
+    .limit(1);
+
+  if (!cal) {
+    throw new HttpError(
+      404,
+      "CALENDAR_NOT_FOUND",
+      "Kalender komunitas tidak ditemukan.",
+    );
+  }
+
+  const rows = await db
+    .select({
+      id: communityCalendarMembers.id,
+      userId: communityCalendarMembers.userId,
+      name: user.name,
+      image: user.image,
+      role: communityCalendarMembers.role,
+      createdAt: communityCalendarMembers.createdAt,
+    })
+    .from(communityCalendarMembers)
+    .innerJoin(user, eq(communityCalendarMembers.userId, user.id))
+    .where(eq(communityCalendarMembers.calendarId, cal.id))
+    .orderBy(desc(communityCalendarMembers.createdAt));
+
+  return rows.map((r) => ({
+    ...r,
+    createdAt: r.createdAt.toISOString(),
+  }));
 }
 
 export async function verifyCalendar(

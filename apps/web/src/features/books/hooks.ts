@@ -29,9 +29,11 @@ import {
   createChapterComment,
   createHighlight,
   deleteHighlight,
+  purchaseBookAlacarte,
   restartBookReading,
   saveReadingProgress,
 } from "./api";
+import type { PurchaseBookAlacarteInput } from "@starter/shared/validators/publisher";
 import {
   allHighlightsQuery,
   authorsQuery,
@@ -234,6 +236,20 @@ export function useCreateBookReview(slug: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: booksKeys.reviewList(slug) });
       queryClient.invalidateQueries({ queryKey: booksKeys.detail(slug) });
+    },
+  });
+}
+
+export function usePurchaseBookAlacarte(slug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input?: PurchaseBookAlacarteInput) =>
+      purchaseBookAlacarte(slug, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: booksKeys.detail(slug) });
+      queryClient.invalidateQueries({
+        queryKey: booksKeys.readers(),
+      });
     },
   });
 }

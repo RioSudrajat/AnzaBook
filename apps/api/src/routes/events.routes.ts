@@ -26,6 +26,7 @@ import {
   createEvent,
   deleteEvent,
   getCalendarBySlug,
+  getCalendarMembers,
   getCommunityWallet,
   getEventAttendees,
   getEventBySlug,
@@ -129,6 +130,13 @@ eventsRouter.delete(
     res.json({ data: result });
   },
 );
+
+// List community calendar members
+eventsRouter.get("/calendars/:slug/members", optionalAuth, async (req, res) => {
+  const slug = String(req.params.slug);
+  const members = await getCalendarMembers(slug);
+  res.json({ data: members });
+});
 
 // Community Wallet balance and ledgers (Owner/Admin only)
 eventsRouter.get("/calendars/:slug/wallet", requireAuth, async (req, res) => {

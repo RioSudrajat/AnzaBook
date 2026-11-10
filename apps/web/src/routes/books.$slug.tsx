@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeft,
@@ -13,9 +13,10 @@ import {
   MessageSquare,
   Package,
   ShoppingBag,
+  Sparkles,
   Star,
 } from "lucide-react";
-import type { BookSummaryDto, EditionTier } from "@starter/shared/types";
+import type { BookDetailDto, BookSummaryDto, EditionTier } from "@starter/shared/types";
 import { SiteFooter } from "@/components/site-footer";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,6 +37,7 @@ import {
   useBookReviews,
   useBooks,
   useCreateReview,
+  usePurchaseBookAlacarte,
 } from "@/features/books/hooks";
 import { bookDetailQuery } from "@/features/books/queries";
 import { useUpsertShelf } from "@/features/community/hooks";
@@ -83,6 +85,291 @@ export const Route = createFileRoute("/books/$slug")({
   component: BookDetailPage,
 });
 
+function formatIdr(amount: number): string {
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function B2B2CActionButtons({
+  book,
+  isLoggedIn,
+  onStartReading,
+  onReadSample,
+  onSaveToLibrary,
+  onPurchaseAlacarte,
+  shelfSaved,
+  shelfError,
+  isSavingShelf,
+  isPurchasing,
+  purchaseError,
+  purchaseSuccess,
+}: {
+  book: BookDetailDto;
+  isLoggedIn: boolean;
+  onStartReading: () => void;
+  onReadSample: () => void;
+  onSaveToLibrary: () => void;
+  onPurchaseAlacarte: () => void;
+  shelfSaved: boolean;
+  shelfError: boolean;
+  isSavingShelf: boolean;
+  isPurchasing: boolean;
+  purchaseError: string | null;
+  purchaseSuccess: boolean;
+}) {
+  const policy = book.digitalPolicy;
+  const isClaimOnly = policy === "print_claim_only";
+  const isSampleOnly = policy === "sample_only";
+  const isAlacarteOnly = policy === "alacarte_only";
+  const isHybrid = policy === "hybrid_nakama_alacarte";
+  const isFree = policy === "free_open";
+
+  const priceFormatted = book.alacartePriceIdr
+    ? formatIdr(book.alacartePriceIdr)
+    : "Rp25.000";
+
+  return (
+    <div className="w-full max-w-[280px] space-y-3 font-mono text-left">
+      {/* 1. Policy Context Notice / Badge */}
+      {isClaimOnly && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] font-sans leading-snug text-amber-900 dark:text-amber-200">
+          <div className="font-bold flex items-center gap-1 text-amber-700 dark:text-amber-300 font-mono text-[10px] uppercase">
+            <span>🛡️ Eksklusif Cetak Fisik</span>
+          </div>
+          <p className="mt-1 text-[11px]">
+            Eksklusif Pemilik Buku Cetak Resmi — Tidak Dijual Eceran Digital. Masukkan kode unik buku fisik Anda untuk membuka akses.
+          </p>
+        </div>
+      )}
+
+      {isSampleOnly && (
+        <div className="rounded-lg border border-border/80 bg-muted/40 p-2.5 text-[11px] font-sans leading-snug text-foreground/80">
+          <div className="font-bold flex items-center gap-1 font-mono text-[10px] uppercase text-foreground">
+            <span>👑 Nakama Reader Pool</span>
+          </div>
+          <p className="mt-1 text-[11px]">
+            Buka Penuh dengan Langganan Nakama — Buku ini termasuk dalam Ekosistem Nakama Club Reader.
+          </p>
+        </div>
+      )}
+
+      {/* 2. Primary B2B2C Action Scheme Buttons */}
+      {/* Scheme A: print_claim_only */}
+      {isClaimOnly && (
+        <>
+          {isLoggedIn ? (
+            <ClaimCodeDialog
+              slug={book.slug}
+              bookTitle={book.title}
+              hasClaimedDigital={book.hasClaimedDigital}
+            />
+          ) : (
+            <Button
+              asChild
+              size="lg"
+              className="w-full h-12 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs gap-2 shadow-md transition-all active:scale-95"
+            >
+              <Link to="/sign-in" search={{ redirect: `/books/${book.slug}` }}>
+                🔑 Klaim Kode Buku Cetak Asli
+              </Link>
+            </Button>
+          )}
+
+          <Button
+            onClick={onReadSample}
+            variant="outline"
+            size="lg"
+            className="w-full h-11 bg-background text-foreground border-border hover:bg-muted font-medium text-xs gap-2 transition-all active:scale-95"
+          >
+            <BookOpen className="size-4" />
+            Baca Sampel Bab 1
+          </Button>
+        </>
+      )}
+
+      {/* Scheme B: sample_only */}
+      {isSampleOnly && (
+        <>
+          <Button
+            onClick={onStartReading}
+            size="lg"
+            className="w-full h-12 bg-red-600 hover:bg-red-500 text-white font-bold text-xs gap-2 shadow-md transition-all active:scale-95"
+          >
+            <BookOpen className="size-4" />
+            Mulai Membaca
+          </Button>
+
+          <Button
+            asChild
+            variant="outline"
+            size="lg"
+            className="w-full h-11 border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 dark:text-amber-200 font-medium text-xs gap-2 transition-all active:scale-95"
+          >
+            <Link to="/membership">
+              <Sparkles className="size-4 text-amber-500" />
+              Buka Penuh dengan Nakama
+            </Link>
+          </Button>
+
+          {book.hasPhysical && (
+            isLoggedIn ? (
+              <ClaimCodeDialog
+                slug={book.slug}
+                bookTitle={book.title}
+                hasClaimedDigital={book.hasClaimedDigital}
+              />
+            ) : (
+              <Button asChild variant="outline" size="sm" className="w-full h-10 text-xs">
+                <Link to="/sign-in" search={{ redirect: `/books/${book.slug}` }}>
+                  Klaim Kode Buku Fisik
+                </Link>
+              </Button>
+            )
+          )}
+        </>
+      )}
+
+      {/* Scheme C: alacarte_only */}
+      {isAlacarteOnly && (
+        <>
+          <Button
+            onClick={onPurchaseAlacarte}
+            disabled={isPurchasing}
+            size="lg"
+            className="w-full h-12 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs gap-2 shadow-md transition-all active:scale-95"
+          >
+            {isPurchasing ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Memproses Pembelian...
+              </>
+            ) : purchaseSuccess ? (
+              <>
+                <Check className="size-4" />
+                Akses Berhasil Dibeli!
+              </>
+            ) : (
+              <>
+                <ShoppingBag className="size-4" />
+                Beli Akses Digital Selamanya ({priceFormatted})
+              </>
+            )}
+          </Button>
+
+          <Button
+            onClick={onReadSample}
+            variant="outline"
+            size="lg"
+            className="w-full h-11 bg-background text-foreground border-border hover:bg-muted font-medium text-xs gap-2 transition-all active:scale-95"
+          >
+            <BookOpen className="size-4" />
+            Baca Sampel Bab 1
+          </Button>
+
+          {purchaseError && (
+            <p role="alert" className="text-xs text-destructive font-sans">
+              {purchaseError}
+            </p>
+          )}
+        </>
+      )}
+
+      {/* Scheme Hybrid: hybrid_nakama_alacarte */}
+      {isHybrid && (
+        <>
+          <Button
+            onClick={onPurchaseAlacarte}
+            disabled={isPurchasing}
+            size="lg"
+            className="w-full h-12 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs gap-2 shadow-md transition-all active:scale-95"
+          >
+            {isPurchasing ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <ShoppingBag className="size-4" />
+            )}
+            Beli Akses Digital ({priceFormatted})
+          </Button>
+
+          <Button
+            asChild
+            variant="outline"
+            size="lg"
+            className="w-full h-11 border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 dark:text-amber-200 font-medium text-xs gap-2 transition-all active:scale-95"
+          >
+            <Link to="/membership">
+              <Sparkles className="size-4 text-amber-500" />
+              Buka dengan Nakama (Rp39rb/bln)
+            </Link>
+          </Button>
+
+          <Button
+            onClick={onReadSample}
+            variant="outline"
+            size="sm"
+            className="w-full h-10 bg-background text-foreground text-xs gap-2 transition-all active:scale-95"
+          >
+            <BookOpen className="size-3.5" />
+            Baca Sampel Bab 1
+          </Button>
+        </>
+      )}
+
+      {/* Scheme Free: free_open */}
+      {isFree && (
+        <Button
+          onClick={onStartReading}
+          size="lg"
+          className="w-full h-12 bg-red-600 hover:bg-red-500 text-white font-bold text-xs gap-2 shadow-md transition-all active:scale-95"
+        >
+          <BookOpen className="size-4" />
+          Mulai Membaca
+        </Button>
+      )}
+
+      {/* Save to Library Button (common for all) */}
+      <Button
+        onClick={onSaveToLibrary}
+        variant="outline"
+        size="lg"
+        disabled={isSavingShelf || shelfSaved}
+        className="w-full h-11 bg-background text-foreground border-border hover:bg-muted font-medium text-xs gap-2 transition-all active:scale-95"
+      >
+        {shelfSaved ? (
+          <>
+            <Check className="size-4 text-emerald-600" />
+            Tersimpan di Rak!
+          </>
+        ) : (
+          <>
+            <BookMarked className="size-4" />
+            Save to Library
+          </>
+        )}
+      </Button>
+
+      {shelfError && (
+        <p role="alert" className="text-sm text-destructive font-sans">
+          Buku belum tersimpan. Coba lagi.
+        </p>
+      )}
+
+      {/* Physical Stock Button */}
+      {book.hasPhysical && (
+        <Button asChild variant="outline" size="lg" className="w-full min-h-11 font-mono text-xs">
+          <a href="#stok-buku">
+            <Package className="size-4 mr-1.5" />
+            Lihat Stok Buku Fisik
+          </a>
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export default function BookDetailPage() {
   const { slug } = Route.useParams();
   const navigate = useNavigate();
@@ -106,8 +393,23 @@ export default function BookDetailPage() {
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewSuccess, setReviewSuccess] = useState(false);
 
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
+  const [purchaseSuccess, setPurchaseSuccess] = useState(false);
+
   const upsertShelfMutation = useUpsertShelf();
   const createReviewMutation = useCreateReview(slug);
+  const purchaseMutation = usePurchaseBookAlacarte(slug);
+
+  // Capture Affiliate Referral ref=cal_<slug> to sessionStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get("ref");
+      if (ref) {
+        sessionStorage.setItem("anzabook_affiliate_ref", ref);
+      }
+    }
+  }, []);
 
   const handleStartReading = () => {
     navigate({
@@ -115,6 +417,53 @@ export default function BookDetailPage() {
       params: { slug: book.slug },
       search: {},
     });
+  };
+
+  const handleReadSample = () => {
+    navigate({
+      to: "/read/$slug",
+      params: { slug: book.slug },
+      search: { chapter: 1 },
+    });
+  };
+
+  const handlePurchaseAlacarte = async () => {
+    if (!isLoggedIn) {
+      navigate({
+        to: "/sign-in",
+        search: { redirect: `/books/${book.slug}` },
+      });
+      return;
+    }
+
+    setPurchaseError(null);
+    try {
+      const affiliateRef =
+        typeof window !== "undefined"
+          ? sessionStorage.getItem("anzabook_affiliate_ref")
+          : null;
+      const affiliateCalendarSlug = affiliateRef
+        ? affiliateRef.replace(/^cal_/, "")
+        : undefined;
+
+      await purchaseMutation.mutateAsync({
+        bookId: book.id,
+        affiliateCalendarSlug,
+      });
+      setPurchaseSuccess(true);
+      setTimeout(() => {
+        navigate({
+          to: "/read/$slug",
+          params: { slug: book.slug },
+          search: {},
+        });
+      }, 1000);
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      setPurchaseError(
+        error?.message || "Gagal memproses pembelian buku. Silakan coba lagi.",
+      );
+    }
   };
 
   // Action 2: Save to Library
@@ -225,35 +574,73 @@ export default function BookDetailPage() {
                 {/* Author */}
                 <div className="flex items-center gap-2.5">
                   <span className="text-xs font-mono text-muted-foreground">Penulis:</span>
-                  <div className="flex items-center gap-2">
-                    {book.authorAvatar ? (
-                      <img
-                        src={book.authorAvatar}
-                        alt={book.author}
-                        className="size-6 rounded-full object-cover border border-border"
-                      />
-                    ) : (
-                      <div className="size-6 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">
-                        {book.author.slice(0, 1)}
-                      </div>
-                    )}
-                    <span className="font-semibold">{book.author}</span>
-                  </div>
+                  {book.authorUserId ? (
+                    <Link
+                      to="/u/$username"
+                      params={{ username: book.authorUserId }}
+                      className="flex items-center gap-2 hover:underline group cursor-pointer"
+                    >
+                      {book.authorAvatar ? (
+                        <img
+                          src={book.authorAvatar}
+                          alt={book.author}
+                          className="size-6 rounded-full object-cover border border-border"
+                        />
+                      ) : (
+                        <div className="size-6 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">
+                          {book.author.slice(0, 1)}
+                        </div>
+                      )}
+                      <span className="font-semibold group-hover:text-[var(--color-accent)]">{book.author}</span>
+                    </Link>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      {book.authorAvatar ? (
+                        <img
+                          src={book.authorAvatar}
+                          alt={book.author}
+                          className="size-6 rounded-full object-cover border border-border"
+                        />
+                      ) : (
+                        <div className="size-6 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">
+                          {book.author.slice(0, 1)}
+                        </div>
+                      )}
+                      <span className="font-semibold">{book.author}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Publisher */}
                 <div className="flex items-center gap-2.5">
                   <span className="text-xs font-mono text-muted-foreground">Penerbit:</span>
-                  <div className="flex items-center gap-2">
-                    <img
-                      src={book.editorAvatar || "/icon.svg"}
-                      alt={book.editor || "Anza Book"}
-                      className="size-6 rounded-[5px] object-contain border border-border/40 shadow-xs"
-                    />
-                    <span className="font-semibold text-foreground/90">
-                      {book.editor || "Anza Book"}
-                    </span>
-                  </div>
+                  {book.publisherSlug || book.publisherId ? (
+                    <Link
+                      to="/p/$slug"
+                      params={{ slug: (book.publisherSlug || book.publisherId)! }}
+                      className="flex items-center gap-2 hover:underline group cursor-pointer"
+                    >
+                      <img
+                        src={book.editorAvatar || "/icon.svg"}
+                        alt={book.editor || "Anza Book"}
+                        className="size-6 rounded-[5px] object-contain border border-border/40 shadow-xs"
+                      />
+                      <span className="font-semibold text-foreground/90 group-hover:text-[var(--color-accent)]">
+                        {book.editor || "Anza Book"}
+                      </span>
+                    </Link>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <img
+                        src={book.editorAvatar || "/icon.svg"}
+                        alt={book.editor || "Anza Book"}
+                        className="size-6 rounded-[5px] object-contain border border-border/40 shadow-xs"
+                      />
+                      <span className="font-semibold text-foreground/90">
+                        {book.editor || "Anza Book"}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -316,48 +703,20 @@ export default function BookDetailPage() {
               {/* Mobile Cover & Action Buttons Block */}
               <div className="block lg:hidden my-6 p-4 rounded-xl border border-border/80 bg-card/60 flex flex-col items-center">
                 <BookCover book={book} className="mb-6 w-[200px] max-w-full sm:w-[240px]" />
-                <div className="w-full max-w-[280px] space-y-3 font-mono">
-                  <Button
-                    onClick={handleStartReading}
-                    size="lg"
-                    className="w-full h-12 bg-red-600 hover:bg-red-500 text-white font-bold text-xs gap-2 shadow-md transition-all active:scale-95"
-                  >
-                    <BookOpen className="size-4" />
-                    Start Reading
-                  </Button>
-
-                  <Button
-                    onClick={handleSaveToLibrary}
-                    variant="outline"
-                    size="lg"
-                    disabled={upsertShelfMutation.isPending || shelfSaved}
-                    className="w-full h-11 bg-background text-foreground border-border hover:bg-muted font-medium text-xs gap-2 transition-all active:scale-95"
-                  >
-                    {shelfSaved ? (
-                      <>
-                        <Check className="size-4 text-emerald-600" />
-                        Tersimpan di Rak!
-                      </>
-                    ) : (
-                      <>
-                        <BookMarked className="size-4" />
-                        Save to Library
-                      </>
-                    )}
-                  </Button>
-                  {shelfError && (
-                    <p role="alert" className="text-sm text-destructive">Buku belum tersimpan. Coba lagi.</p>
-                  )}
-
-                  {book.hasPhysical && (
-                    <Button asChild variant="outline" size="lg" className="w-full min-h-11">
-                      <a href="#stok-buku">
-                        <ShoppingBag className="size-4" aria-hidden="true" />
-                        Lihat stok buku fisik
-                      </a>
-                    </Button>
-                  )}
-                </div>
+                <B2B2CActionButtons
+                  book={book}
+                  isLoggedIn={isLoggedIn}
+                  onStartReading={handleStartReading}
+                  onReadSample={handleReadSample}
+                  onSaveToLibrary={handleSaveToLibrary}
+                  onPurchaseAlacarte={handlePurchaseAlacarte}
+                  shelfSaved={shelfSaved}
+                  shelfError={shelfError}
+                  isSavingShelf={upsertShelfMutation.isPending}
+                  isPurchasing={purchaseMutation.isPending}
+                  purchaseError={purchaseError}
+                  purchaseSuccess={purchaseSuccess}
+                />
               </div>
             </div>
 
@@ -628,53 +987,20 @@ export default function BookDetailPage() {
           <div className="hidden lg:flex lg:col-span-4 sticky top-28 flex-col items-center">
             <BookCover book={book} className="mb-8 w-[240px] max-w-full sm:w-[280px]" />
 
-            {/* 3 Smart Action Buttons */}
-            <div className="w-full max-w-[280px] space-y-3 font-mono">
-              {/* Button 1: Start Reading */}
-              <Button
-                onClick={handleStartReading}
-                size="lg"
-                className="w-full h-12 bg-red-600 hover:bg-red-500 text-white font-bold text-xs gap-2 shadow-md transition-all active:scale-95"
-              >
-                <BookOpen className="size-4" />
-                Start Reading
-              </Button>
-
-              {/* Button 2: Save to Library */}
-              <Button
-                onClick={handleSaveToLibrary}
-                variant="outline"
-                size="lg"
-                disabled={upsertShelfMutation.isPending || shelfSaved}
-                className="w-full h-11 bg-background text-foreground border-border hover:bg-muted font-medium text-xs gap-2 transition-all active:scale-95"
-              >
-                {shelfSaved ? (
-                  <>
-                    <Check className="size-4 text-emerald-600" />
-                    Tersimpan di Rak!
-                  </>
-                ) : (
-                  <>
-                    <BookMarked className="size-4" />
-                    Save to Library
-                  </>
-                )}
-              </Button>
-              {shelfError && (
-                <p role="alert" className="text-sm text-destructive">Buku belum tersimpan. Coba lagi.</p>
-              )}
-
-              {book.hasPhysical && (
-                <>
-                  <Button asChild variant="outline" size="lg" className="w-full min-h-11">
-                    <a href="#stok-buku">
-                      <ShoppingBag className="size-4" aria-hidden="true" />
-                      Lihat stok buku fisik
-                    </a>
-                  </Button>
-                </>
-              )}
-            </div>
+            <B2B2CActionButtons
+              book={book}
+              isLoggedIn={isLoggedIn}
+              onStartReading={handleStartReading}
+              onReadSample={handleReadSample}
+              onSaveToLibrary={handleSaveToLibrary}
+              onPurchaseAlacarte={handlePurchaseAlacarte}
+              shelfSaved={shelfSaved}
+              shelfError={shelfError}
+              isSavingShelf={upsertShelfMutation.isPending}
+              isPurchasing={purchaseMutation.isPending}
+              purchaseError={purchaseError}
+              purchaseSuccess={purchaseSuccess}
+            />
           </div>
         </div>
 

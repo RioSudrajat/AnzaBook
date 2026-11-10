@@ -127,6 +127,17 @@ export async function listVerifiedPublishers(
   return data;
 }
 
+export async function getPublisherBySlug(
+  slug: string,
+  signal?: AbortSignal,
+): Promise<PublisherDto> {
+  const { data } = await apiFetch<DataResponse<PublisherDto>>(
+    `/api/publisher/${encodeURIComponent(slug)}`,
+    { signal },
+  );
+  return data;
+}
+
 export async function applyPublisher(
   input: ApplyPublisherInput,
 ): Promise<PublisherDto> {

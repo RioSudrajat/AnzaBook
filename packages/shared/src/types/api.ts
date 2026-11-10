@@ -104,6 +104,7 @@ export type BookSummaryDto = {
   collectionName: string | null;
   genres: string[];
   publisherId?: string | null;
+  publisherSlug?: string | null;
   authorUserId?: string | null;
   alacartePriceIdr?: number | null;
 };
@@ -252,6 +253,15 @@ export type LocationSuggestionDto = {
   isStoreBranch?: boolean;
 };
 
+export type CommunityCalendarMemberDto = {
+  id: string;
+  userId: string;
+  name: string;
+  image: string | null;
+  role: "owner" | "admin" | "checkin_staff" | "member";
+  createdAt: string;
+};
+
 export type CommunityCalendarDto = {
   id: string;
   slug: string;
@@ -271,6 +281,8 @@ export type CommunityCalendarDto = {
   followerCount: number;
   isFollowing?: boolean;
   isManager?: boolean;
+  isMember?: boolean;
+  memberRole?: "owner" | "admin" | "checkin_staff" | "member" | null;
   createdAt: string;
 };
 
