@@ -143,8 +143,8 @@ export async function listAdminCalendars(query: AdminListQueryInput) {
     .leftJoin(user, eq(communityCalendars.createdByUserId, user.id))
     .where(whereClause)
     .orderBy(desc(communityCalendars.createdAt))
-    .limit(query.limit)
-    .offset(query.offset);
+    .limit(query.limit ?? 50)
+    .offset(query.offset ?? 0);
 
   return rows.map((r) => ({
     ...r,
@@ -209,8 +209,8 @@ export async function listAdminAuthorApplications(query: AdminListQueryInput) {
     .leftJoin(books, eq(authorApplications.claimedBookId, books.id))
     .where(whereClause)
     .orderBy(desc(authorApplications.createdAt))
-    .limit(query.limit)
-    .offset(query.offset);
+    .limit(query.limit ?? 50)
+    .offset(query.offset ?? 0);
 
   return rows.map((r) => ({
     ...r,
@@ -289,8 +289,8 @@ export async function listAdminPublishers(
     .from(publishers)
     .where(whereClause)
     .orderBy(desc(publishers.createdAt))
-    .limit(query.limit)
-    .offset(query.offset);
+    .limit(query.limit ?? 50)
+    .offset(query.offset ?? 0);
 
   return rows.map((p) => ({
     ...p,
@@ -367,8 +367,8 @@ export async function listAdminManuscripts(
     .leftJoin(publishers, eq(manuscriptSubmissions.publisherId, publishers.id))
     .where(whereClause)
     .orderBy(desc(manuscriptSubmissions.createdAt))
-    .limit(query.limit)
-    .offset(query.offset);
+    .limit(query.limit ?? 50)
+    .offset(query.offset ?? 0);
 
   return rows.map((r) => ({
     ...r,

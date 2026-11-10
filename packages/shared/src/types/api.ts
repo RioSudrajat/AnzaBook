@@ -566,6 +566,66 @@ export type AdminOverviewDto = {
   totalNetAnzabookIdr: number;
 };
 
+export type AdminCalendarDto = {
+  id: string;
+  slug: string;
+  name: string;
+  type: string;
+  description: string | null;
+  avatarUrl: string | null;
+  coverUrl: string | null;
+  city: string | null;
+  contactEmail: string | null;
+  socialLinks: Record<string, string> | null;
+  verificationStatus: "pending" | "verified" | "trusted" | "rejected";
+  createdByUserId: string;
+  creatorName: string | null;
+  creatorEmail: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminAuthorApplicationDto = {
+  id: string;
+  userId: string;
+  penName: string;
+  bio: string | null;
+  portfolioUrl: string | null;
+  claimedBookId: string | null;
+  claimedBookTitle: string | null;
+  claimedBookCover: string | null;
+  status: "pending" | "verified" | "rejected";
+  reviewedByUserId: string | null;
+  reviewNotes: string | null;
+  userName: string | null;
+  userEmail: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminPublishManuscriptResultDto = {
+  publishedBookId: string;
+  book: Record<string, unknown>;
+  claimBatch: BookClaimBatchDto | null;
+};
+
+export type AdminCreateClaimBatchResultDto = {
+  batch: BookClaimBatchDto;
+  codes: string[];
+};
+
+export type AdminClaimBatchCodesDto = {
+  batch: BookClaimBatchDto;
+  codes: {
+    id: string;
+    code: string;
+    isDemo: boolean;
+    claimedByUserId: string | null;
+    claimedAt: string | null;
+    createdAt: string;
+  }[];
+};
+
 export type {
   PrintEconomicsResult,
   PrintTierResult,

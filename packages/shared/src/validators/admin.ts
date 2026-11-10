@@ -106,8 +106,16 @@ export type AdminReviewAuthorApplicationInput = z.infer<
 export type AdminVerifyPublisherInput = z.infer<
   typeof adminVerifyPublisherSchema
 >;
+export type AdminEditManuscriptChapterInput = z.infer<
+  typeof adminEditManuscriptChapterSchema
+>;
 export type AdminEditManuscriptInput = z.infer<typeof adminEditManuscriptSchema>;
 export type AdminPublishManuscriptInput = z.infer<
   typeof adminPublishManuscriptSchema
 >;
-export type AdminListQueryInput = z.infer<typeof adminListQuerySchema>;
+export type AdminListQueryInput = {
+  status?: string;
+  limit?: number;
+  offset?: number;
+};
+export type AdminListQueryOutput = z.infer<typeof adminListQuerySchema>;
