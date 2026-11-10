@@ -11,6 +11,7 @@ import {
   createReviewSchema,
   listParagraphCommentsQuerySchema,
 } from "@starter/shared/validators/community";
+import { purchaseBookAlacarteSchema } from "@starter/shared/validators/publisher";
 import { HttpError } from "../lib/http-error";
 import {
   getAuth,
@@ -30,6 +31,7 @@ import {
   listCategories,
   listCollections,
   listBooks,
+  purchaseBookAlacarte,
 } from "../services/books.service";
 import {
   createComment,
@@ -109,6 +111,33 @@ booksRouter.post(
     const { code } = claimPrintCodeSchema.parse(req.body);
     const result = await claimPrintCode(slug, auth.user.id, code);
     res.json({ data: result });
+  },
+);
+
+// Protected: Purchase book ala carte (75% publisher, 10% community affiliate, 15% AnzaBook)
+booksRouter.post(
+  "/:slug/purchase",
+  requireAuth,
+  requireTrustedOrigin,
+  jsonBody,
+  async (req, res) => {
+    const { slug } = bookSlugSchema.parse({ slug: req.params.slug });
+    const auth = getAuth(req);
+    const input = purchaseBookAlacarteSchema.parse({
+      ...req.body,
+      affiliateCalendarSlug:
+        req.body?.affiliateCalendarSlug ??
+        (typeof req.query.affiliateCalendarSlug === "string"
+          ? req.query.affiliateCalendarSlug
+          : undefined),
+      affiliateCalendarId:
+        req.body?.affiliateCalendarId ??
+        (typeof req.query.affiliateCalendarId === "string"
+          ? req.query.affiliateCalendarId
+          : undefined),
+    });
+    const result = await purchaseBookAlacarte(auth.user.id, slug, input);
+    res.status(201).json({ data: result });
   },
 );
 

@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, isNull, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import { env } from "../config/env";
 import {
@@ -6,8 +6,10 @@ import {
   bookChapters,
   bookPrintEditions,
   bookClaimCodes,
+  bookPurchases,
   communityCalendars,
   communityEvents,
+  communityWalletLedgers,
   eventRsvps,
   storeBranches,
   storeInventories,
@@ -20,10 +22,12 @@ import type {
   ReadBookQuery,
   StockQuery,
 } from "@starter/shared/validators/books";
+import type { PurchaseBookAlacarteInput } from "@starter/shared/validators/publisher";
 import type {
   AccessTier,
   BookChapterSummaryDto,
   BookDetailDto,
+  BookPurchaseDto,
   BookReaderPayloadDto,
   BookSummaryDto,
   DigitalPolicy,
@@ -96,6 +100,24 @@ async function hasClaimedBook(
   return !!claim;
 }
 
+export async function hasPurchasedBook(
+  bookId: string,
+  userId: string,
+): Promise<boolean> {
+  const [purchase] = await db
+    .select({ id: bookPurchases.id })
+    .from(bookPurchases)
+    .where(
+      and(
+        eq(bookPurchases.bookId, bookId),
+        eq(bookPurchases.userId, userId),
+        eq(bookPurchases.status, "paid"),
+      ),
+    )
+    .limit(1);
+  return !!purchase;
+}
+
 export async function getBookReadAccess(
   book: Pick<typeof books.$inferSelect, "id" | "digitalPolicy">,
   userId: string,
@@ -104,23 +126,238 @@ export async function getBookReadAccess(
   accessExpiresAt: string | null;
   hasEventSampleAccess: boolean;
 }> {
-  const hasEventSampleAccess = await hasActiveEventBookSampleAccess(book.id, userId);
+  const hasEventSampleAccess = await hasActiveEventBookSampleAccess(
+    book.id,
+    userId,
+  );
 
-  if (
-    book.digitalPolicy === "free_open" ||
-    (await hasClaimedBook(book.id, userId))
-  ) {
+  // 1. free_open is open for everyone logged in
+  if (book.digitalPolicy === "free_open") {
     return { hasFullAccess: true, accessExpiresAt: null, hasEventSampleAccess };
   }
+
+  // 2. Physical claim code unlocks all digital policies
+  const isClaimed = await hasClaimedBook(book.id, userId);
+  if (isClaimed) {
+    return { hasFullAccess: true, accessExpiresAt: null, hasEventSampleAccess };
+  }
+
+  // 3. Skema A: print_claim_only requires physical claim code redemption. Nakama does not unlock.
+  if (book.digitalPolicy === "print_claim_only") {
+    return { hasFullAccess: false, accessExpiresAt: null, hasEventSampleAccess };
+  }
+
+  // 4. Check ala carte purchase for alacarte_only and hybrid_nakama_alacarte
+  const isPurchased =
+    book.digitalPolicy === "alacarte_only" ||
+    book.digitalPolicy === "hybrid_nakama_alacarte"
+      ? await hasPurchasedBook(book.id, userId)
+      : false;
+
+  if (isPurchased) {
+    return { hasFullAccess: true, accessExpiresAt: null, hasEventSampleAccess };
+  }
+
+  // 5. Skema C: alacarte_only requires purchase or physical claim. Nakama does not unlock.
+  if (book.digitalPolicy === "alacarte_only") {
+    return { hasFullAccess: false, accessExpiresAt: null, hasEventSampleAccess };
+  }
+
+  // 6. Skema B (sample_only) and Skema Hibrida (hybrid_nakama_alacarte) check active Nakama membership
   const membership =
-    book.digitalPolicy === "sample_only"
+    book.digitalPolicy === "sample_only" ||
+    book.digitalPolicy === "hybrid_nakama_alacarte"
       ? await getActiveMembership(userId)
       : null;
+
   return {
     hasFullAccess: !!membership,
     accessExpiresAt: membership?.expiresAt.toISOString() ?? null,
     hasEventSampleAccess,
   };
+}
+
+export async function resolveCommunityAffiliateAttribution(
+  userId: string,
+  input?: {
+    affiliateCalendarSlug?: string | null;
+    affiliateCalendarId?: string | null;
+  },
+): Promise<string | null> {
+  // Priority 1: Explicit calendar ID
+  if (input?.affiliateCalendarId) {
+    const [cal] = await db
+      .select({ id: communityCalendars.id })
+      .from(communityCalendars)
+      .where(eq(communityCalendars.id, input.affiliateCalendarId))
+      .limit(1);
+    if (cal) return cal.id;
+  }
+
+  // Priority 1 (alt): Explicit calendar slug
+  if (input?.affiliateCalendarSlug) {
+    const [cal] = await db
+      .select({ id: communityCalendars.id })
+      .from(communityCalendars)
+      .where(eq(communityCalendars.slug, input.affiliateCalendarSlug))
+      .limit(1);
+    if (cal) return cal.id;
+  }
+
+  // Priority 2: Published community events attended by user (status: "going") within last 14 days
+  const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+  const [recentRsvp] = await db
+    .select({ calendarId: communityEvents.calendarId })
+    .from(eventRsvps)
+    .innerJoin(communityEvents, eq(eventRsvps.eventId, communityEvents.id))
+    .where(
+      and(
+        eq(eventRsvps.userId, userId),
+        eq(eventRsvps.status, "going"),
+        eq(communityEvents.status, "published"),
+        or(
+          gte(communityEvents.startsAt, fourteenDaysAgo),
+          gte(eventRsvps.createdAt, fourteenDaysAgo),
+        ),
+      ),
+    )
+    .orderBy(desc(eventRsvps.createdAt))
+    .limit(1);
+
+  if (recentRsvp?.calendarId) {
+    return recentRsvp.calendarId;
+  }
+
+  return null;
+}
+
+function toBookPurchaseDto(
+  purchase: typeof bookPurchases.$inferSelect,
+  book?: Pick<typeof books.$inferSelect, "title" | "coverUrl">,
+): BookPurchaseDto {
+  return {
+    id: purchase.id,
+    userId: purchase.userId,
+    bookId: purchase.bookId,
+    bookTitle: book?.title,
+    bookCoverUrl: book?.coverUrl,
+    priceIdr: purchase.priceIdr,
+    publisherShareIdr: purchase.publisherShareIdr,
+    affiliateCalendarId: purchase.affiliateCalendarId,
+    affiliateCommissionIdr: purchase.affiliateCommissionIdr,
+    anzabookNetIdr: purchase.anzabookNetIdr,
+    status: purchase.status as "pending" | "paid" | "failed",
+    paymentMethod: purchase.paymentMethod,
+    createdAt: purchase.createdAt.toISOString(),
+  };
+}
+
+export async function purchaseBookAlacarte(
+  userId: string,
+  slug: string,
+  input?: PurchaseBookAlacarteInput,
+): Promise<BookPurchaseDto> {
+  const [book] = await db
+    .select()
+    .from(books)
+    .where(eq(books.slug, slug))
+    .limit(1);
+
+  if (!book) {
+    throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+  }
+
+  if (
+    book.alacartePriceIdr === null ||
+    book.alacartePriceIdr <= 0 ||
+    (book.digitalPolicy !== "alacarte_only" &&
+      book.digitalPolicy !== "hybrid_nakama_alacarte")
+  ) {
+    throw new HttpError(
+      400,
+      "BOOK_NOT_ALACARTE",
+      "Buku ini tidak tersedia untuk pembelian satuan ala carte.",
+    );
+  }
+
+  // If bookId is provided in body, verify it matches
+  if (input?.bookId && input.bookId !== book.id) {
+    throw new HttpError(
+      422,
+      "BOOK_ID_MISMATCH",
+      "ID buku tidak cocok dengan slug buku.",
+    );
+  }
+
+  const alreadyPurchased = await hasPurchasedBook(book.id, userId);
+  if (alreadyPurchased) {
+    throw new HttpError(
+      409,
+      "BOOK_ALREADY_PURCHASED",
+      "Buku ini sudah Anda beli.",
+    );
+  }
+
+  const priceIdr = book.alacartePriceIdr;
+  const publisherShareIdr = Math.round(priceIdr * 0.75);
+  const affiliateCalendarId = await resolveCommunityAffiliateAttribution(
+    userId,
+    input,
+  );
+  const affiliateCommissionIdr = affiliateCalendarId
+    ? Math.round(priceIdr * 0.1)
+    : 0;
+  const anzabookNetIdr = priceIdr - publisherShareIdr - affiliateCommissionIdr;
+
+  const purchase = await db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select({ id: bookPurchases.id })
+      .from(bookPurchases)
+      .where(
+        and(
+          eq(bookPurchases.bookId, book.id),
+          eq(bookPurchases.userId, userId),
+          eq(bookPurchases.status, "paid"),
+        ),
+      );
+
+    if (existing) {
+      throw new HttpError(
+        409,
+        "BOOK_ALREADY_PURCHASED",
+        "Buku ini sudah Anda beli.",
+      );
+    }
+
+    const [inserted] = await tx
+      .insert(bookPurchases)
+      .values({
+        userId,
+        bookId: book.id,
+        priceIdr,
+        publisherShareIdr,
+        affiliateCalendarId,
+        affiliateCommissionIdr,
+        anzabookNetIdr,
+        status: "paid",
+        paymentMethod: input?.paymentMethod || "manual_or_midtrans",
+      })
+      .returning();
+
+    if (affiliateCalendarId && affiliateCommissionIdr > 0) {
+      await tx.insert(communityWalletLedgers).values({
+        calendarId: affiliateCalendarId,
+        entryType: "affiliate_book_purchase",
+        amountIdr: affiliateCommissionIdr,
+        sourceBookPurchaseId: inserted.id,
+        description: `Komisi afiliasi pembelian buku "${book.title}"`,
+      });
+    }
+
+    return inserted;
+  });
+
+  return toBookPurchaseDto(purchase, book);
 }
 
 function splitParagraphs(text: string): string[] {

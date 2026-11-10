@@ -154,6 +154,7 @@ export type ReadingSessionDto = {
   durationSeconds: number;
   avgWpm: number;
   mode: ReadingMode;
+  isValidForRoyalty?: boolean;
   createdAt: string;
 };
 

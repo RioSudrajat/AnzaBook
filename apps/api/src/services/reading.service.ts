@@ -11,6 +11,7 @@ import {
 } from "../db/schema";
 import { HttpError } from "../lib/http-error";
 import { getBookReadAccess, getPreviewParagraphCount } from "./books.service";
+import { getActiveMembership } from "./membership.service";
 import type {
   CreateHighlightInput,
   CreateReadingSessionInput,
@@ -40,13 +41,24 @@ export async function createReadingSession(
   input: CreateReadingSessionInput,
 ): Promise<ReadingSessionDto> {
   const [book] = await db
-    .select({ title: books.title })
+    .select({ title: books.title, digitalPolicy: books.digitalPolicy })
     .from(books)
     .where(eq(books.id, input.bookId))
     .limit(1);
 
   if (!book)
     throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+
+  const hasMembership = !!(await getActiveMembership(userId));
+  const isNakamaEligible =
+    book.digitalPolicy === "sample_only" ||
+    book.digitalPolicy === "hybrid_nakama_alacarte";
+  const isWpmValid = input.avgWpm >= 80 && input.avgWpm <= 600;
+  const isDurationValid =
+    input.durationSeconds >= 120 && input.durationSeconds <= 3600;
+
+  const isValidForRoyalty =
+    hasMembership && isNakamaEligible && isWpmValid && isDurationValid;
 
   const session = await db.transaction(async (tx) => {
     const [inserted] = await tx
@@ -59,6 +71,7 @@ export async function createReadingSession(
         durationSeconds: input.durationSeconds,
         avgWpm: input.avgWpm,
         mode: input.mode,
+        isValidForRoyalty,
       })
       .onConflictDoNothing({ target: readingSessions.id })
       .returning();
@@ -127,9 +140,12 @@ export async function createReadingSession(
     durationSeconds: session.durationSeconds,
     avgWpm: session.avgWpm,
     mode: session.mode as ReadingMode,
+    isValidForRoyalty: session.isValidForRoyalty,
     createdAt: session.createdAt.toISOString(),
   };
 }
+
+export const recordReadingSession = createReadingSession;
 
 export async function listReadingSessions(
   userId: string,

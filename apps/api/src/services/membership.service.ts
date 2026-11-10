@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, gt, isNotNull, isNull, ne } from "drizzle-orm";
 import type {
   MembershipCheckoutInput,
@@ -10,6 +11,8 @@ import { env } from "../config/env";
 import { db } from "../db";
 import {
   books,
+  communityCalendars,
+  communityWalletLedgers,
   membershipOrders,
   membershipPaymentEvents,
   membershipReminders,
@@ -17,6 +20,7 @@ import {
   user,
 } from "../db/schema";
 import { HttpError } from "../lib/http-error";
+import { resolveCommunityAffiliateAttribution } from "./books.service";
 import {
   createMidtransGateway,
   type VerifiedPayment,
@@ -340,6 +344,20 @@ async function reserveOrder(buyerId: string, input: MembershipCheckoutInput) {
       ? await findRecipient(tx, buyerId, input.recipientUsername)
       : null;
     const tax = membershipTaxBreakdown(plan.subtotalIdr, requireTaxRate());
+
+    let affiliateCalendarId = input.affiliateCalendarId ?? null;
+    if (!affiliateCalendarId && input.affiliateCalendarSlug) {
+      const [cal] = await tx
+        .select({ id: communityCalendars.id })
+        .from(communityCalendars)
+        .where(eq(communityCalendars.slug, input.affiliateCalendarSlug))
+        .limit(1);
+      if (cal) affiliateCalendarId = cal.id;
+    }
+    if (!affiliateCalendarId) {
+      affiliateCalendarId = await resolveCommunityAffiliateAttribution(buyerId);
+    }
+
     const [order] = await tx
       .insert(membershipOrders)
       .values({
@@ -354,6 +372,7 @@ async function reserveOrder(buyerId: string, input: MembershipCheckoutInput) {
         subtotalIdr: tax.subtotalIdr,
         taxIdr: tax.taxIdr,
         taxRateBps: tax.rateBps,
+        affiliateCalendarId,
       })
       .returning({ id: membershipOrders.id });
     return order.id;
@@ -594,5 +613,54 @@ export async function reconcileMembershipPayment(payment: VerifiedPayment) {
     if (order.beneficiaryId && (changedToPaid || status === "refunded")) {
       await refreshEntitlement(tx, order.beneficiaryId);
     }
+
+    // Idempotent 10% community affiliate commission on paid Nakama membership
+    if (order.affiliateCalendarId && changedToPaid) {
+      const [existingLedger] = await tx
+        .select({ id: communityWalletLedgers.id })
+        .from(communityWalletLedgers)
+        .where(
+          and(
+            eq(communityWalletLedgers.calendarId, order.affiliateCalendarId),
+            eq(communityWalletLedgers.entryType, "affiliate_nakama"),
+            eq(communityWalletLedgers.sourceOrderId, order.id),
+          ),
+        )
+        .limit(1);
+
+      if (!existingLedger) {
+        const commissionIdr = Math.round(order.priceIdr * 0.1);
+        if (commissionIdr > 0) {
+          await tx.insert(communityWalletLedgers).values({
+            calendarId: order.affiliateCalendarId,
+            entryType: "affiliate_nakama",
+            amountIdr: commissionIdr,
+            sourceOrderId: order.id,
+            description: "Komisi afiliasi langganan Nakama",
+          });
+        }
+      }
+    }
+  });
+}
+
+export async function confirmMembershipOrder(
+  orderId: string,
+  transactionId = "manual-" + randomUUID(),
+) {
+  const [order] = await db
+    .select()
+    .from(membershipOrders)
+    .where(eq(membershipOrders.id, orderId));
+  if (!order) {
+    throw new HttpError(404, "ORDER_NOT_FOUND", "Pesanan tidak ditemukan.");
+  }
+  await reconcileMembershipPayment({
+    orderId: order.id,
+    transactionId,
+    priceIdr: order.priceIdr,
+    currency: "IDR",
+    status: "paid",
+    paidAt: new Date(),
   });
 }

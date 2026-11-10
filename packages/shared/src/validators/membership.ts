@@ -48,6 +48,8 @@ export const membershipCheckoutSchema = z.strictObject({
   requestId: z.uuid(),
   recipientUsername: username.optional(),
   bookSlug: bookSlugSchema.shape.slug.optional(),
+  affiliateCalendarId: z.string().uuid().optional().nullable(),
+  affiliateCalendarSlug: z.string().optional().nullable(),
 });
 
 export type MembershipPlanId = z.infer<typeof membershipPlanId>;

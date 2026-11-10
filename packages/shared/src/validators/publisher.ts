@@ -122,8 +122,13 @@ export const createClaimBatchSchema = z
 
 export const purchaseBookAlacarteSchema = z
   .object({
-    bookId: z.string().uuid("ID buku tidak valid"),
-    affiliateCalendarId: z.string().uuid("ID kalender afiliasi tidak valid").optional().nullable(),
+    bookId: z.string().uuid("ID buku tidak valid").optional(),
+    affiliateCalendarId: z
+      .string()
+      .uuid("ID kalender afiliasi tidak valid")
+      .optional()
+      .nullable(),
+    affiliateCalendarSlug: z.string().optional().nullable(),
     paymentMethod: z
       .enum(["manual_or_midtrans", "qris", "credit_card", "bank_transfer"])
       .default("manual_or_midtrans")
