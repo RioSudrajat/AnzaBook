@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Bell, Calendar, Gift, Home, Library, Moon, Search, Settings, ShoppingCart, Sun } from "lucide-react";
+import { Bell, Calendar, Gift, Home, Library, Moon, Search, Settings, ShoppingCart, Sun, User } from "lucide-react";
 import { z } from "zod";
 import type {
   BookHighlightDto,
@@ -18,6 +18,7 @@ import { DashboardEvents } from "@/features/events/components/dashboard-events";
 import { DashboardExplore } from "@/features/dashboard/components/dashboard-explore";
 import { DashboardHome } from "@/features/dashboard/components/dashboard-home";
 import { DashboardLibrary } from "@/features/dashboard/components/dashboard-library";
+import { DashboardProfile } from "@/features/dashboard/components/dashboard-profile";
 import { DashboardSettings } from "@/features/dashboard/components/dashboard-settings";
 import { GiftVoucherDialog } from "@/features/dashboard/components/gift-voucher-dialog";
 import { NotificationsDialog } from "@/features/dashboard/components/notifications-dialog";
@@ -31,6 +32,7 @@ export type AppTab =
   | "explore"
   | "events"
   | "library"
+  | "profile"
   | "settings"
   | "shelves"
   | "history"
@@ -44,6 +46,7 @@ const appSearchSchema = z.object({
       "explore",
       "events",
       "library",
+      "profile",
       "settings",
       "shelves",
       "history",
@@ -177,7 +180,7 @@ export default function AppPage() {
         onToggleCollapse={handleToggleSidebar}
         onOpenVoucher={() => setIsVoucherOpen(true)}
         onOpenAppDownload={(platform) => setAppDownloadPlatform(platform)}
-        onOpenProfile={() => setIsQrProfileOpen(true)}
+        onOpenProfile={() => handleTabChange("profile")}
       />
 
       {/* 2. Main Content Canvas */}
@@ -199,7 +202,9 @@ export default function AppPage() {
                     ? "Agenda"
                     : activeTab === "library"
                       ? "My Library"
-                      : "Settings"}
+                      : activeTab === "profile"
+                        ? "Profil Saya"
+                        : "Settings"}
             </h1>
           </div>
 
@@ -315,6 +320,20 @@ export default function AppPage() {
             />
           )}
 
+          {activeTab === "profile" && (
+            <DashboardProfile
+              isOwnProfile
+              onNavigateSettings={() => handleTabChange("settings")}
+              onOpenFlexStory={(session, bookTitle) => {
+                setFlexStoryState({
+                  isOpen: true,
+                  session,
+                  bookTitle,
+                });
+              }}
+            />
+          )}
+
           {activeTab === "settings" && (
             <DashboardSettings
               userName={user.name}
@@ -396,15 +415,15 @@ export default function AppPage() {
 
         <button
           type="button"
-          onClick={() => handleTabChange("settings")}
+          onClick={() => handleTabChange("profile")}
           className={`flex flex-col items-center justify-center min-h-[48px] min-w-[56px] px-2 py-1 text-[11px] font-mono cursor-pointer rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
-            activeTab === "settings"
+            activeTab === "profile"
               ? "text-[var(--color-accent)] font-bold bg-muted/40"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          <Settings className="size-5" />
-          <span>Settings</span>
+          <User className="size-5" />
+          <span>Profile</span>
         </button>
       </nav>
 

@@ -23,6 +23,7 @@ import { Route as BookPreviewSlugRouteImport } from './routes/book-preview.$slug
 import { Route as BooksSlugRouteImport } from './routes/books.$slug'
 import { Route as CSlugRouteImport } from './routes/c.$slug'
 import { Route as EventsSlugRouteImport } from './routes/events.$slug'
+import { Route as UUsernameRouteImport } from './routes/u.$username'
 import { Route as ProtectedReadSlugRouteImport } from './routes/_protected/read.$slug'
 import { Route as ProtectedMembershipCheckoutOrderIdRouteImport } from './routes/_protected/membership.checkout.$orderId'
 
@@ -94,6 +95,11 @@ const EventsSlugRoute = EventsSlugRouteImport.update({
   path: '/events/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UUsernameRoute = UUsernameRouteImport.update({
+  id: '/u/$username',
+  path: '/u/$username',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProtectedReadSlugRoute = ProtectedReadSlugRouteImport.update({
   id: '/read/$slug',
   path: '/read/$slug',
@@ -119,6 +125,7 @@ export interface FileRoutesByFullPath {
   '/books/$slug': typeof BooksSlugRoute
   '/c/$slug': typeof CSlugRoute
   '/events/$slug': typeof EventsSlugRoute
+  '/u/$username': typeof UUsernameRoute
   '/read/$slug': typeof ProtectedReadSlugRoute
   '/membership/checkout/$orderId': typeof ProtectedMembershipCheckoutOrderIdRoute
 }
@@ -135,6 +142,7 @@ export interface FileRoutesByTo {
   '/books/$slug': typeof BooksSlugRoute
   '/c/$slug': typeof CSlugRoute
   '/events/$slug': typeof EventsSlugRoute
+  '/u/$username': typeof UUsernameRoute
   '/read/$slug': typeof ProtectedReadSlugRoute
   '/membership/checkout/$orderId': typeof ProtectedMembershipCheckoutOrderIdRoute
 }
@@ -154,6 +162,7 @@ export interface FileRoutesById {
   '/books/$slug': typeof BooksSlugRoute
   '/c/$slug': typeof CSlugRoute
   '/events/$slug': typeof EventsSlugRoute
+  '/u/$username': typeof UUsernameRoute
   '/_protected/read/$slug': typeof ProtectedReadSlugRoute
   '/_protected/membership/checkout/$orderId': typeof ProtectedMembershipCheckoutOrderIdRoute
 }
@@ -172,6 +181,7 @@ export interface FileRouteTypes {
     | '/books/$slug'
     | '/c/$slug'
     | '/events/$slug'
+    | '/u/$username'
     | '/read/$slug'
     | '/membership/checkout/$orderId'
   fileRoutesByTo: FileRoutesByTo
@@ -188,6 +198,7 @@ export interface FileRouteTypes {
     | '/books/$slug'
     | '/c/$slug'
     | '/events/$slug'
+    | '/u/$username'
     | '/read/$slug'
     | '/membership/checkout/$orderId'
   id:
@@ -206,6 +217,7 @@ export interface FileRouteTypes {
     | '/books/$slug'
     | '/c/$slug'
     | '/events/$slug'
+    | '/u/$username'
     | '/_protected/read/$slug'
     | '/_protected/membership/checkout/$orderId'
   fileRoutesById: FileRoutesById
@@ -220,6 +232,7 @@ export interface RootRouteChildren {
   BooksSlugRoute: typeof BooksSlugRoute
   CSlugRoute: typeof CSlugRoute
   EventsSlugRoute: typeof EventsSlugRoute
+  UUsernameRoute: typeof UUsernameRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -322,6 +335,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EventsSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/u/$username': {
+      id: '/u/$username'
+      path: '/u/$username'
+      fullPath: '/u/$username'
+      preLoaderRoute: typeof UUsernameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_protected/read/$slug': {
       id: '/_protected/read/$slug'
       path: '/read/$slug'
@@ -382,6 +402,7 @@ const rootRouteChildren: RootRouteChildren = {
   BooksSlugRoute: BooksSlugRoute,
   CSlugRoute: CSlugRoute,
   EventsSlugRoute: EventsSlugRoute,
+  UUsernameRoute: UUsernameRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

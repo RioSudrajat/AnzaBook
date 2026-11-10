@@ -6,10 +6,18 @@ import {
   Sailboat,
   Search,
   Settings,
+  Shield,
+  User,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 
-export type AppTab = "home" | "explore" | "events" | "library" | "settings";
+export type AppTab =
+  | "home"
+  | "explore"
+  | "events"
+  | "library"
+  | "profile"
+  | "settings";
 
 type AppSidebarProps = {
   activeTab: AppTab;
@@ -315,22 +323,22 @@ export function AppSidebar({
               </AnimatePresence>
             </button>
 
-            {/* Settings */}
+            {/* Profile */}
             <button
               type="button"
-              onClick={() => onTabChange("settings")}
+              onClick={() => onTabChange("profile")}
               className={`flex items-center gap-3.5 rounded-xl transition-all cursor-pointer ${
                 isCollapsed
                   ? "size-11 justify-center mx-auto"
                   : "px-3.5 py-2.5 text-sm w-full text-left"
               } ${
-                activeTab === "settings"
+                activeTab === "profile"
                   ? "bg-neutral-900 dark:bg-zinc-800 text-white font-medium shadow-xs"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
               }`}
-              title="Settings"
+              title="Profil Saya"
             >
-              <Settings className="size-5 shrink-0" />
+              <User className="size-5 shrink-0" />
               <AnimatePresence initial={false}>
                 {!isCollapsed && (
                   <motion.span
@@ -340,7 +348,7 @@ export function AppSidebar({
                     transition={{ duration: 0.15 }}
                     className="truncate whitespace-nowrap"
                   >
-                    Settings
+                    Profil Saya
                   </motion.span>
                 )}
               </AnimatePresence>
@@ -473,6 +481,34 @@ export function AppSidebar({
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* CMS Internal (/admin) Quick Link for Admin */}
+        {user.role === "admin" && (
+          <Link
+            to="/admin"
+            className={`flex items-center gap-3 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 transition-all cursor-pointer ${
+              isCollapsed
+                ? "size-11 justify-center mx-auto p-0"
+                : "px-3.5 py-2 text-xs font-semibold w-full text-left font-mono"
+            }`}
+            title="CMS Internal (/admin)"
+          >
+            <Shield className="size-4 shrink-0" />
+            <AnimatePresence initial={false}>
+              {!isCollapsed && (
+                <motion.span
+                  initial={{ opacity: 0, x: -6 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -6 }}
+                  transition={{ duration: 0.15 }}
+                  className="truncate whitespace-nowrap"
+                >
+                  CMS Internal (/admin)
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </Link>
+        )}
 
         {/* Hairline Divider before profile in collapsed mode */}
         {isCollapsed && (
