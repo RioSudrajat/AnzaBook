@@ -79,7 +79,7 @@ export const communityCalendarMembers = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     role: varchar("role", { length: 32 })
-      .$type<"owner" | "admin" | "checkin_staff">()
+      .$type<"owner" | "admin" | "checkin_staff" | "member">()
       .notNull()
       .default("admin"),
     createdAt: timestamp("created_at", { withTimezone: true })

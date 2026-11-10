@@ -1,4 +1,4 @@
-import { boolean, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, jsonb, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -10,6 +10,19 @@ export const user = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
+  bio: text("bio").notNull().default(""),
+  locationCity: varchar("location_city", { length: 80 }),
+  socialLinks: jsonb("social_links").$type<{
+    instagram?: string;
+    twitter?: string;
+    website?: string;
+    goodreads?: string;
+  }>(),
+  authorStatus: varchar("author_status", { length: 20 })
+    .$type<"none" | "pending" | "verified" | "rejected">()
+    .notNull()
+    .default("none"),
+  authorPenName: varchar("author_pen_name", { length: 160 }),
   // Better Auth admin plugin. `role` holds one name, or several separated by
   // commas. Signup cannot set it; see packages/shared/src/permissions.ts.
   role: text("role"),

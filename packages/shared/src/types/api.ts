@@ -27,7 +27,13 @@ export type AdminNoteDto = NoteDto & { ownerName: string; ownerEmail: string };
 
 // ---------------- AnzaBook DTOs ---------------- //
 
-export type DigitalPolicy = "free_open" | "sample_only" | "print_claim_only";
+export type DigitalPolicy =
+  | "free_open"
+  | "print_claim_only"
+  | "sample_only"
+  | "alacarte_only"
+  | "hybrid_nakama_alacarte";
+export type AuthorStatus = "none" | "pending" | "verified" | "rejected";
 export type AccessTier = "free" | "premium" | "premium_physical";
 export type EditionTier =
   "rakyat_economy" | "standard_trade" | "kolektor_hardcover";
@@ -97,6 +103,9 @@ export type BookSummaryDto = {
   categories: string[];
   collectionName: string | null;
   genres: string[];
+  publisherId?: string | null;
+  authorUserId?: string | null;
+  alacartePriceIdr?: number | null;
 };
 
 export type BookDetailDto = BookSummaryDto & {
@@ -356,6 +365,179 @@ export type HostEventAnalyticsDto = {
   pendingCount: number;
   waitlistCount: number;
   checkedInCount: number;
+};
+
+// ---------------- Social Profile & Directory DTOs ---------------- //
+
+export type SocialProfileDto = {
+  id: string;
+  name: string;
+  username: string | null;
+  image: string | null;
+  bio: string;
+  locationCity: string | null;
+  socialLinks: {
+    instagram?: string;
+    twitter?: string;
+    website?: string;
+    goodreads?: string;
+  } | null;
+  authorStatus: AuthorStatus;
+  authorPenName: string | null;
+  followersCount: number;
+  followingCount: number;
+  isFollowing?: boolean;
+  booksPublishedCount?: number;
+  totalReadingMinutes?: number;
+  createdAt: string;
+};
+
+export type AuthorDirectoryItemDto = {
+  id: string;
+  name: string;
+  penName: string;
+  username: string | null;
+  image: string | null;
+  bio: string;
+  locationCity: string | null;
+  authorStatus: AuthorStatus;
+  bookCount: number;
+  followerCount: number;
+  isFollowing?: boolean;
+};
+
+export type ReaderDirectoryItemDto = {
+  id: string;
+  name: string;
+  username: string | null;
+  image: string | null;
+  bio: string;
+  locationCity: string | null;
+  booksReadCount: number;
+  streakDays: number;
+  followerCount: number;
+  isFollowing?: boolean;
+};
+
+// ---------------- Publisher & B2B2C DTOs ---------------- //
+
+export type PublisherVerificationStatus = "pending" | "verified" | "rejected";
+export type PublisherMemberRole = "owner" | "editor" | "finance";
+
+export type PublisherDto = {
+  id: string;
+  slug: string;
+  name: string;
+  ikapiNumber: string | null;
+  description: string | null;
+  logoUrl: string | null;
+  city: string | null;
+  address: string | null;
+  contactEmail: string | null;
+  verificationStatus: PublisherVerificationStatus;
+  verifiedAt: string | null;
+  freeClaimCodeQuotaPerBook: number;
+  claimCodeFeeIdr: number;
+  totalBooks?: number;
+  currentUserRole?: PublisherMemberRole | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ManuscriptSubmissionStatus =
+  | "pending_review"
+  | "in_editing"
+  | "published"
+  | "rejected";
+
+export type ManuscriptChapterDto = {
+  id: string;
+  manuscriptId: string;
+  chapterNumber: number;
+  titleId: string;
+  contentId: string;
+  contentEn: string | null;
+  blueprintContent: string | null;
+  estimatedMinutes: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ManuscriptSubmissionDto = {
+  id: string;
+  authorUserId: string;
+  authorName?: string;
+  authorPenName?: string | null;
+  publisherId: string | null;
+  publisherName?: string | null;
+  title: string;
+  synopsis: string;
+  proposedDigitalPolicy: DigitalPolicy;
+  proposedAlacartePriceIdr: number | null;
+  printSimJson: Record<string, unknown> | null;
+  status: ManuscriptSubmissionStatus;
+  rejectionReason: string | null;
+  publishedBookId: string | null;
+  chapters?: ManuscriptChapterDto[];
+  totalChapters?: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type BookClaimBatchDto = {
+  id: string;
+  bookId: string;
+  bookTitle?: string;
+  publisherId: string;
+  publisherName?: string;
+  batchName: string;
+  totalCodes: number;
+  unitFeeIdr: number;
+  billingStatus: "free_tier" | "unbilled" | "paid";
+  createdAt: string;
+};
+
+export type BookPurchaseDto = {
+  id: string;
+  userId: string;
+  bookId: string;
+  bookTitle?: string;
+  bookCoverUrl?: string;
+  priceIdr: number;
+  publisherShareIdr: number;
+  affiliateCalendarId: string | null;
+  affiliateCommissionIdr: number;
+  anzabookNetIdr: number;
+  status: "pending" | "paid" | "failed";
+  paymentMethod: string;
+  createdAt: string;
+};
+
+export type CommunityWalletLedgerDto = {
+  id: string;
+  calendarId: string;
+  entryType:
+    | "affiliate_nakama"
+    | "affiliate_book_purchase"
+    | "paid_event_ticket"
+    | "payout_withdrawal";
+  amountIdr: number;
+  sourceOrderId: string | null;
+  sourceEventId: string | null;
+  sourceBookPurchaseId: string | null;
+  description: string;
+  createdAt: string;
+};
+
+export type CommunityWalletDto = {
+  calendarId: string;
+  calendarName: string;
+  balanceIdr: number;
+  totalAffiliateNakamaIdr: number;
+  totalAffiliateBookPurchasesIdr: number;
+  totalPaidEventTicketsIdr: number;
+  totalPayoutsWithdrawnIdr: number;
+  recentLedgers: CommunityWalletLedgerDto[];
 };
 
 export type {

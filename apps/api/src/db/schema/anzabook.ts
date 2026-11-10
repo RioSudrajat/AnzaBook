@@ -11,7 +11,9 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+import type { DigitalPolicy } from "@starter/shared/types";
 import { user } from "./user";
+import { publishers } from "./publishers";
 
 export const books = pgTable(
   "books",
@@ -39,8 +41,16 @@ export const books = pgTable(
       .notNull()
       .default(0),
     digitalPolicy: varchar("digital_policy", { length: 32 })
+      .$type<DigitalPolicy>()
       .notNull()
       .default("sample_only"),
+    publisherId: uuid("publisher_id").references(() => publishers.id, {
+      onDelete: "set null",
+    }),
+    authorUserId: text("author_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    alacartePriceIdr: integer("alacarte_price_idr"),
     accessTier: varchar("access_tier", { length: 32 })
       .$type<"free" | "premium" | "premium_physical">()
       .notNull()
@@ -69,7 +79,11 @@ export const books = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [index("books_bulletin_idx").on(table.isWeeklyBulletin)],
+  (table) => [
+    index("books_bulletin_idx").on(table.isWeeklyBulletin),
+    index("books_publisher_idx").on(table.publisherId),
+    index("books_author_user_idx").on(table.authorUserId),
+  ],
 );
 
 export const bookChapters = pgTable(
@@ -231,6 +245,7 @@ export const readingSessions = pgTable(
     durationSeconds: integer("duration_seconds").notNull(),
     avgWpm: integer("avg_wpm").notNull(),
     mode: varchar("mode", { length: 32 }).notNull().default("full"),
+    isValidForRoyalty: boolean("is_valid_for_royalty").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),

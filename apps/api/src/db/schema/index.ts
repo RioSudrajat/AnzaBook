@@ -7,3 +7,5 @@ export * from "./notes";
 export * from "./anzabook";
 export * from "./membership";
 export * from "./events";
+export * from "./publishers";
+export * from "./social";

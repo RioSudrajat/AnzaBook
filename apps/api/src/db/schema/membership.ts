@@ -15,6 +15,7 @@ import type {
   MembershipPlanId,
 } from "@starter/shared/validators/membership";
 import { user } from "./user";
+import { communityCalendars, communityEvents } from "./events";
 
 export const membershipOrders = pgTable(
   "membership_orders",
@@ -43,6 +44,14 @@ export const membershipOrders = pgTable(
     checkoutUrl: text("checkout_url"),
     checkoutCreatedAt: timestamp("checkout_created_at", { withTimezone: true }),
     paidTransactionId: text("paid_transaction_id").unique(),
+    affiliateCalendarId: uuid("affiliate_calendar_id").references(
+      () => communityCalendars.id,
+      { onDelete: "set null" },
+    ),
+    affiliateEventId: uuid("affiliate_event_id").references(
+      () => communityEvents.id,
+      { onDelete: "set null" },
+    ),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -71,6 +80,8 @@ export const membershipOrders = pgTable(
       table.beneficiaryId,
       table.paidAt,
     ),
+    index("membership_orders_affiliate_cal_idx").on(table.affiliateCalendarId),
+    index("membership_orders_affiliate_event_idx").on(table.affiliateEventId),
   ],
 );
 

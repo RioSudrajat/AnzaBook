@@ -14,6 +14,7 @@
     "./validators/community": "./src/validators/community.ts",
     "./validators/membership": "./src/validators/membership.ts",
     "./validators/publisher": "./src/validators/publisher.ts",
+    "./validators/social": "./src/validators/social.ts",
     "./print-economics": "./src/print-economics.ts",
     "./types": "./src/types/api.ts",
     "./site": "./src/site.ts"
