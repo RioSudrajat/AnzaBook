@@ -388,6 +388,7 @@ export type SocialProfileDto = {
   followersCount: number;
   followingCount: number;
   isFollowing?: boolean;
+  isSubscribedUpdates?: boolean;
   booksPublishedCount?: number;
   totalReadingMinutes?: number;
   createdAt: string;

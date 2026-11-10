@@ -26,9 +26,12 @@ import {
   createEvent,
   deleteEvent,
   getCalendarBySlug,
+  getCommunityWallet,
   getEventAttendees,
   getEventBySlug,
   getLocationSuggestions,
+  joinCalendar,
+  leaveCalendar,
   listCalendars,
   listEvents,
   rejectRsvp,
@@ -102,6 +105,38 @@ eventsRouter.post(
     res.json({ data: result });
   },
 );
+
+// Join community calendar
+eventsRouter.post(
+  "/calendars/:slug/join",
+  requireAuth,
+  requireTrustedOrigin,
+  async (req, res) => {
+    const slug = String(req.params.slug);
+    const result = await joinCalendar(getAuth(req).user.id, slug);
+    res.json({ data: result });
+  },
+);
+
+// Leave community calendar
+eventsRouter.delete(
+  "/calendars/:slug/leave",
+  requireAuth,
+  requireTrustedOrigin,
+  async (req, res) => {
+    const slug = String(req.params.slug);
+    const result = await leaveCalendar(getAuth(req).user.id, slug);
+    res.json({ data: result });
+  },
+);
+
+// Community Wallet balance and ledgers (Owner/Admin only)
+eventsRouter.get("/calendars/:slug/wallet", requireAuth, async (req, res) => {
+  const slug = String(req.params.slug);
+  const user = getAuth(req).user;
+  const wallet = await getCommunityWallet(user.id, slug, user.role ?? undefined);
+  res.json({ data: wallet });
+});
 
 // ==========================================
 // 2. Location Suggestions (AnzaBook stores / popular spots)

@@ -7,6 +7,7 @@ import {
   communityCalendarFollowers,
   communityCalendarMembers,
   communityEvents,
+  communityWalletLedgers,
   eventReports,
   eventRsvps,
   storeBranches,
@@ -26,6 +27,8 @@ import type {
   CommunityCalendarDto,
   CommunityEventDetailDto,
   CommunityEventSummaryDto,
+  CommunityWalletDto,
+  CommunityWalletLedgerDto,
   EventAttendeePreviewDto,
   EventRsvpDto,
   LocationSuggestionDto,
@@ -134,6 +137,7 @@ export async function listCalendars(
   const cals = await db
     .select()
     .from(communityCalendars)
+    .where(inArray(communityCalendars.verificationStatus, ["verified", "trusted"]))
     .orderBy(desc(communityCalendars.createdAt));
 
   const results: CommunityCalendarDto[] = [];
@@ -1243,4 +1247,198 @@ export async function deleteEvent(
   await db.delete(communityEvents).where(eq(communityEvents.id, event.id));
 
   return { success: true, message: "Acara berhasil dihapus." };
+}
+
+export async function joinCalendar(
+  userId: string,
+  slug: string,
+): Promise<{ success: boolean; role: string }> {
+  const [cal] = await db
+    .select({ id: communityCalendars.id })
+    .from(communityCalendars)
+    .where(eq(communityCalendars.slug, slug))
+    .limit(1);
+
+  if (!cal) {
+    throw new HttpError(
+      404,
+      "CALENDAR_NOT_FOUND",
+      "Kalender komunitas tidak ditemukan.",
+    );
+  }
+
+  const [existingMember] = await db
+    .select({ role: communityCalendarMembers.role })
+    .from(communityCalendarMembers)
+    .where(
+      and(
+        eq(communityCalendarMembers.calendarId, cal.id),
+        eq(communityCalendarMembers.userId, userId),
+      ),
+    )
+    .limit(1);
+
+  if (existingMember) {
+    throw new HttpError(
+      400,
+      "ALREADY_A_MEMBER",
+      "Anda sudah bergabung dengan komunitas ini.",
+    );
+  }
+
+  await db.insert(communityCalendarMembers).values({
+    calendarId: cal.id,
+    userId,
+    role: "member",
+  });
+
+  return { success: true, role: "member" };
+}
+
+export async function leaveCalendar(
+  userId: string,
+  slug: string,
+): Promise<{ success: boolean; message: string }> {
+  const [cal] = await db
+    .select({ id: communityCalendars.id })
+    .from(communityCalendars)
+    .where(eq(communityCalendars.slug, slug))
+    .limit(1);
+
+  if (!cal) {
+    throw new HttpError(
+      404,
+      "CALENDAR_NOT_FOUND",
+      "Kalender komunitas tidak ditemukan.",
+    );
+  }
+
+  const [existingMember] = await db
+    .select({ role: communityCalendarMembers.role })
+    .from(communityCalendarMembers)
+    .where(
+      and(
+        eq(communityCalendarMembers.calendarId, cal.id),
+        eq(communityCalendarMembers.userId, userId),
+      ),
+    )
+    .limit(1);
+
+  if (!existingMember) {
+    throw new HttpError(
+      400,
+      "NOT_A_MEMBER",
+      "Anda belum bergabung dengan komunitas ini.",
+    );
+  }
+
+  if (existingMember.role === "owner") {
+    throw new HttpError(
+      400,
+      "OWNER_CANNOT_LEAVE",
+      "Pemilik komunitas tidak dapat keluar tanpa mentransfer kepemilikan.",
+    );
+  }
+
+  await db
+    .delete(communityCalendarMembers)
+    .where(
+      and(
+        eq(communityCalendarMembers.calendarId, cal.id),
+        eq(communityCalendarMembers.userId, userId),
+      ),
+    );
+
+  return { success: true, message: "Berhasil keluar dari keanggotaan komunitas." };
+}
+
+export async function getCommunityWallet(
+  userId: string,
+  slug: string,
+  userRole?: string,
+): Promise<CommunityWalletDto> {
+  const [cal] = await db
+    .select({ id: communityCalendars.id, name: communityCalendars.name })
+    .from(communityCalendars)
+    .where(eq(communityCalendars.slug, slug))
+    .limit(1);
+
+  if (!cal) {
+    throw new HttpError(
+      404,
+      "CALENDAR_NOT_FOUND",
+      "Kalender komunitas tidak ditemukan.",
+    );
+  }
+
+  const isSysAdmin = userRole === "admin";
+  const [membership] = await db
+    .select({ role: communityCalendarMembers.role })
+    .from(communityCalendarMembers)
+    .where(
+      and(
+        eq(communityCalendarMembers.calendarId, cal.id),
+        eq(communityCalendarMembers.userId, userId),
+      ),
+    )
+    .limit(1);
+
+  const isLeader =
+    membership && (membership.role === "owner" || membership.role === "admin");
+
+  if (!isSysAdmin && !isLeader) {
+    throw new HttpError(
+      403,
+      "FORBIDDEN_CALENDAR_ADMIN",
+      "Hanya pemilik atau admin komunitas yang dapat mengakses kas.",
+    );
+  }
+
+  const ledgers = await db
+    .select()
+    .from(communityWalletLedgers)
+    .where(eq(communityWalletLedgers.calendarId, cal.id))
+    .orderBy(desc(communityWalletLedgers.createdAt));
+
+  let balanceIdr = 0;
+  let totalAffiliateNakamaIdr = 0;
+  let totalAffiliateBookPurchasesIdr = 0;
+  let totalPaidEventTicketsIdr = 0;
+  let totalPayoutsWithdrawnIdr = 0;
+
+  for (const item of ledgers) {
+    balanceIdr += item.amountIdr;
+    if (item.entryType === "affiliate_nakama") {
+      totalAffiliateNakamaIdr += item.amountIdr;
+    } else if (item.entryType === "affiliate_book_purchase") {
+      totalAffiliateBookPurchasesIdr += item.amountIdr;
+    } else if (item.entryType === "paid_event_ticket") {
+      totalPaidEventTicketsIdr += item.amountIdr;
+    } else if (item.entryType === "payout_withdrawal") {
+      totalPayoutsWithdrawnIdr += Math.abs(item.amountIdr);
+    }
+  }
+
+  const recentLedgers: CommunityWalletLedgerDto[] = ledgers.slice(0, 20).map((l) => ({
+    id: l.id,
+    calendarId: l.calendarId,
+    entryType: l.entryType,
+    amountIdr: l.amountIdr,
+    sourceOrderId: l.sourceOrderId,
+    sourceEventId: l.sourceEventId,
+    sourceBookPurchaseId: l.sourceBookPurchaseId,
+    description: l.description,
+    createdAt: l.createdAt.toISOString(),
+  }));
+
+  return {
+    calendarId: cal.id,
+    calendarName: cal.name,
+    balanceIdr,
+    totalAffiliateNakamaIdr,
+    totalAffiliateBookPurchasesIdr,
+    totalPaidEventTicketsIdr,
+    totalPayoutsWithdrawnIdr,
+    recentLedgers,
+  };
 }
