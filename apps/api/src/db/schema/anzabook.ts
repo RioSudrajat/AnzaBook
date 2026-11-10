@@ -13,7 +13,7 @@ import {
 } from "drizzle-orm/pg-core";
 import type { DigitalPolicy } from "@starter/shared/types";
 import { user } from "./user";
-import { publishers } from "./publishers";
+import { publishers, bookClaimBatches } from "./publishers";
 
 export const books = pgTable(
   "books",
@@ -167,6 +167,9 @@ export const bookClaimCodes = pgTable(
     bookId: uuid("book_id")
       .notNull()
       .references(() => books.id, { onDelete: "cascade" }),
+    batchId: uuid("batch_id").references(() => bookClaimBatches.id, {
+      onDelete: "cascade",
+    }),
     code: varchar("code", { length: 32 }).notNull().unique(),
     isDemo: boolean("is_demo").notNull().default(false),
     claimedByUserId: text("claimed_by_user_id").references(() => user.id, {
@@ -177,7 +180,10 @@ export const bookClaimCodes = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [index("book_claim_codes_user_idx").on(table.claimedByUserId)],
+  (table) => [
+    index("book_claim_codes_user_idx").on(table.claimedByUserId),
+    index("book_claim_codes_batch_idx").on(table.batchId),
+  ],
 );
 
 export const storeBranches = pgTable(

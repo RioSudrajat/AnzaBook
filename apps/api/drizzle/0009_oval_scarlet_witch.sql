@@ -1,0 +1,3 @@
+ALTER TABLE "book_claim_codes" ADD COLUMN "batch_id" uuid;--> statement-breakpoint
+ALTER TABLE "book_claim_codes" ADD CONSTRAINT "book_claim_codes_batch_id_book_claim_batches_id_fk" FOREIGN KEY ("batch_id") REFERENCES "public"."book_claim_batches"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "book_claim_codes_batch_idx" ON "book_claim_codes" USING btree ("batch_id");

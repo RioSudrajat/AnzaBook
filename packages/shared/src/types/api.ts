@@ -542,6 +542,18 @@ export type CommunityWalletDto = {
   recentLedgers: CommunityWalletLedgerDto[];
 };
 
+export type AdminOverviewDto = {
+  pendingCalendarsCount: number;
+  pendingAuthorsCount: number;
+  pendingPublishersCount: number;
+  pendingManuscriptsCount: number;
+  estimatedNakamaRoyaltyPoolIdr: number;
+  totalAlacarteSalesIdr: number;
+  totalPublisherShareIdr: number;
+  totalAffiliateCommissionsIdr: number;
+  totalNetAnzabookIdr: number;
+};
+
 export type {
   PrintEconomicsResult,
   PrintTierResult,
