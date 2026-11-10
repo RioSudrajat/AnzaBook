@@ -18,6 +18,11 @@ import {
   Pencil,
   Trash2,
   Sparkles,
+  Ticket,
+  Video,
+  Copy,
+  Check,
+  Info,
 } from "lucide-react";
 import type {
   CommunityEventDetailDto,
@@ -27,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import {
   useCancelRsvp,
   useDeleteEvent,
+  useEventDetail,
   useReportEvent,
   useRsvpEvent,
 } from "../hooks";
@@ -38,7 +44,12 @@ interface EventDetailViewProps {
   isDrawer?: boolean;
 }
 
-export function EventDetailView({ event, isDrawer = false }: EventDetailViewProps) {
+export function EventDetailView({ event: initialEvent, isDrawer = false }: EventDetailViewProps) {
+  const { data: fullDetail } = useEventDetail(initialEvent.slug);
+  const event = fullDetail || initialEvent;
+  const detail = event as Partial<CommunityEventDetailDto>;
+
+  const [copiedTicket, setCopiedTicket] = React.useState(false);
   const [reportModalOpen, setReportModalOpen] = React.useState(false);
   const [reportReason, setReportReason] = React.useState("");
   const [reportSent, setReportSent] = React.useState(false);
@@ -326,6 +337,89 @@ export function EventDetailView({ event, isDrawer = false }: EventDetailViewProp
                   </div>
                 </div>
               </div>
+
+              {/* Detail Akses Khusus Peserta 'Going' */}
+              {isGoing && (
+                <>
+                  {/* Kode Tiket Check-in */}
+                  {detail.userRsvp?.checkinCode && (
+                    <div className="rounded-xl border border-white/10 bg-black/40 p-3 space-y-2">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="flex items-center gap-1.5 font-medium text-white/90">
+                          <Ticket className="size-3.5 text-amber-400" />
+                          Kode Tiket Check-in
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (detail.userRsvp?.checkinCode) {
+                              navigator.clipboard.writeText(detail.userRsvp.checkinCode);
+                              setCopiedTicket(true);
+                              setTimeout(() => setCopiedTicket(false), 2000);
+                            }
+                          }}
+                          className="flex items-center gap-1 text-[10px] text-amber-300 hover:text-amber-200 transition-colors"
+                        >
+                          {copiedTicket ? (
+                            <>
+                              <Check className="size-3 text-emerald-400" />
+                              <span className="text-emerald-300">Tersalin</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="size-3" />
+                              <span>Salin Kode</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div className="font-mono text-base font-bold tracking-widest text-amber-300 text-center py-2 bg-white/5 rounded-lg border border-white/5">
+                        {detail.userRsvp.checkinCode}
+                      </div>
+                      <p className="text-[10px] text-white/40 text-center">
+                        Tunjukkan kode tiket ini kepada host saat verifikasi kedatangan
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Tautan Rapat Virtual */}
+                  {detail.onlineMeetingUrl && (
+                    <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-3.5 space-y-2">
+                      <div className="flex items-center justify-between text-xs font-semibold text-blue-300">
+                        <span className="flex items-center gap-1.5">
+                          <Video className="size-4 text-blue-400" />
+                          Tautan Sesi Virtual
+                        </span>
+                      </div>
+                      <a
+                        href={detail.onlineMeetingUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 py-2 px-3 text-xs font-semibold text-white transition-colors shadow-sm"
+                      >
+                        <span>Gabung Ruang Rapat</span>
+                        <ExternalLink className="size-3.5" />
+                      </a>
+                      <p className="text-[10px] text-blue-200/60 truncate text-center">
+                        {detail.onlineMeetingUrl}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Catatan Logistik Peserta */}
+                  {detail.logisticsNotes && (
+                    <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3.5 space-y-1.5">
+                      <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-300">
+                        <Info className="size-3.5 text-amber-400 shrink-0" />
+                        Catatan Logistik & Ketentuan Peserta
+                      </span>
+                      <p className="text-xs text-white/80 leading-relaxed whitespace-pre-line">
+                        {detail.logisticsNotes}
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
 
               <Button
                 type="button"

@@ -4,6 +4,7 @@ import type {
   CommunityEventSummaryDto,
   DataResponse,
   EventRsvpDto,
+  LocationSuggestionDto,
   PageMeta,
 } from "@starter/shared/types";
 import type {
@@ -23,16 +24,7 @@ export type EventsListResponse = {
   meta: PageMeta;
 };
 
-export type LocationSuggestion = {
-  id: string;
-  name: string;
-  address: string;
-  district?: string;
-  city: string;
-  latitude: number;
-  longitude: number;
-  isStoreBranch?: boolean;
-};
+export type LocationSuggestion = LocationSuggestionDto;
 
 // ==========================================
 // 1. Events API

@@ -40,6 +40,8 @@ export function useEvent(slug: string) {
   return useQuery(eventDetailQuery(slug));
 }
 
+export const useEventDetail = useEvent;
+
 export function useCalendars() {
   return useQuery(calendarsQuery());
 }

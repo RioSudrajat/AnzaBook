@@ -262,7 +262,7 @@ export function LocationPickerPopover({
                           lat: sug.latitude,
                           lng: sug.longitude,
                           city: sug.city,
-                          district: sug.district,
+                          district: sug.district || undefined,
                         })
                       }
                       className="flex w-full items-start justify-between gap-2 rounded-lg px-2.5 py-2 text-left hover:bg-white/10 transition-colors"

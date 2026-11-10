@@ -134,6 +134,7 @@ export type BookReaderPayloadDto = {
   allChapters: BookChapterSummaryDto[];
   hasFullAccess: boolean;
   accessExpiresAt: string | null;
+  hasEventSampleAccess?: boolean;
 };
 
 export type ReadingSessionDto = {
@@ -227,6 +228,19 @@ export type CollectionSummaryDto = {
 };
 
 // ---------------- Community Calendars & Events DTOs ---------------- //
+
+export type LocationSuggestionDto = {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  district?: string | null;
+  latitude: number;
+  longitude: number;
+  mapsUrl?: string | null;
+  source: "partner_store" | "recent_venue";
+  isStoreBranch?: boolean;
+};
 
 export type CommunityCalendarDto = {
   id: string;

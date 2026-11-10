@@ -14,6 +14,7 @@ import type {
   CommunityEventSummaryDto,
 } from "@starter/shared/types";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
+import { useEventDetail } from "../hooks";
 import { EventDetailView } from "./event-detail-view";
 
 interface EventDetailDrawerProps {
@@ -29,7 +30,7 @@ interface EventDetailDrawerProps {
 export function EventDetailDrawer({
   open,
   onClose,
-  event,
+  event: initialEvent,
   onNextEvent,
   onPrevEvent,
   hasNextEvent = false,
@@ -38,6 +39,8 @@ export function EventDetailDrawer({
   useBodyScrollLock(open);
 
   const [copied, setCopied] = React.useState(false);
+  const { data: fullEvent } = useEventDetail(initialEvent?.slug || "");
+  const event = fullEvent || initialEvent;
 
   if (!open || !event) return null;
 

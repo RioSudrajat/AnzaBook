@@ -28,6 +28,7 @@ import type {
   CommunityEventSummaryDto,
   EventAttendeePreviewDto,
   EventRsvpDto,
+  LocationSuggestionDto,
   PageMeta,
 } from "@starter/shared/types";
 
@@ -291,6 +292,19 @@ export async function createEvent(
     );
   }
 
+  if (input.visibility === "public") {
+    const isVerified =
+      calendar.verificationStatus === "verified" ||
+      calendar.verificationStatus === "trusted";
+    if (!isVerified && userRole !== "admin") {
+      throw new HttpError(
+        403,
+        "CALENDAR_NOT_VERIFIED",
+        "Kalender harus terverifikasi untuk mempublikasikan acara publik.",
+      );
+    }
+  }
+
   // Create slug from title
   const baseSlug = input.title
     .toLowerCase()
@@ -413,7 +427,7 @@ export async function listEvents(
 
   // Filter published for public viewing, unless query is hosting or viewer manages calendar
   if (query.filter !== "hosting") {
-    if (currentUserId) {
+    if (currentUserId && currentUserRole !== "admin") {
       conditions.push(
         or(
           eq(communityEvents.status, "published"),
@@ -425,8 +439,27 @@ export async function listEvents(
           )`,
         ),
       );
-    } else {
+    } else if (!currentUserId) {
       conditions.push(eq(communityEvents.status, "published"));
+    }
+  }
+
+  // Filter visibility: private_link events must not leak in public directory
+  if (query.filter !== "hosting" && query.filter !== "my_rsvps") {
+    if (currentUserId && currentUserRole !== "admin") {
+      conditions.push(
+        or(
+          eq(communityEvents.visibility, "public"),
+          sql`EXISTS (
+            SELECT 1 FROM ${communityCalendarMembers}
+            WHERE ${communityCalendarMembers.calendarId} = ${communityEvents.calendarId}
+              AND ${communityCalendarMembers.userId} = ${currentUserId}
+              AND ${communityCalendarMembers.role} IN ('owner', 'admin')
+          )`,
+        ),
+      );
+    } else if (!currentUserId) {
+      conditions.push(eq(communityEvents.visibility, "public"));
     }
   }
 
@@ -980,28 +1013,14 @@ export async function reportEvent(
   return { success: true };
 }
 
-export async function getLocationSuggestions(): Promise<{
-  recentVenues: {
-    venueName: string;
-    venueAddress: string;
-    district: string | null;
-    city: string | null;
-    latitude: number | null;
-    longitude: number | null;
-  }[];
-  partnerVenues: {
-    branchName: string;
-    address: string;
-    city: string;
-    latitude: number;
-    longitude: number;
-  }[];
-}> {
+export async function getLocationSuggestions(): Promise<LocationSuggestionDto[]> {
   const branches = await db
     .select({
+      id: storeBranches.id,
       branchName: storeBranches.branchName,
       address: storeBranches.address,
       city: storeBranches.city,
+      mapUrl: storeBranches.mapUrl,
       latitude: storeBranches.latitude,
       longitude: storeBranches.longitude,
     })
@@ -1010,6 +1029,7 @@ export async function getLocationSuggestions(): Promise<{
 
   const venues = await db
     .selectDistinctOn([communityEvents.venueName], {
+      id: communityEvents.id,
       venueName: communityEvents.venueName,
       venueAddress: communityEvents.venueAddress,
       district: communityEvents.district,
@@ -1021,10 +1041,38 @@ export async function getLocationSuggestions(): Promise<{
     .where(sql`${communityEvents.venueName} is not null`)
     .limit(10);
 
-  return {
-    recentVenues: venues.filter((v): v is typeof v & { venueName: string; venueAddress: string } => !!v.venueName && !!v.venueAddress),
-    partnerVenues: branches,
-  };
+  const partnerSuggestions: LocationSuggestionDto[] = branches.map((b) => ({
+    id: b.id,
+    name: b.branchName,
+    address: b.address,
+    city: b.city,
+    district: null,
+    latitude: b.latitude,
+    longitude: b.longitude,
+    mapsUrl: b.mapUrl || null,
+    source: "partner_store",
+    isStoreBranch: true,
+  }));
+
+  const recentSuggestions: LocationSuggestionDto[] = venues
+    .filter(
+      (v): v is typeof v & { venueName: string; venueAddress: string } =>
+        !!v.venueName && !!v.venueAddress,
+    )
+    .map((v) => ({
+      id: v.id,
+      name: v.venueName,
+      address: v.venueAddress,
+      city: v.city || "Jakarta",
+      district: v.district || null,
+      latitude: v.latitude ?? -6.2088,
+      longitude: v.longitude ?? 106.8456,
+      mapsUrl: null,
+      source: "recent_venue",
+      isStoreBranch: false,
+    }));
+
+  return [...recentSuggestions, ...partnerSuggestions];
 }
 
 export async function getEventAttendees(

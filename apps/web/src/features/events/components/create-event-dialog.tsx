@@ -16,11 +16,13 @@ import {
   Pencil,
   Ticket,
   Check,
+  Video,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
+import { useCatalogBooks } from "@/features/books/hooks";
 import { useCalendars, useCreateEvent } from "../hooks";
 import {
   LocationPickerPopover,
@@ -104,11 +106,24 @@ export function CreateEventDialog({
     format: "offline",
     hideAddressUntilApproved: false,
   });
+  const [onlineMeetingUrl, setOnlineMeetingUrl] = React.useState("");
+
+  // Sync virtual meeting URL when chosen in location picker
+  React.useEffect(() => {
+    if (locationState.onlineMeetingUrl && !onlineMeetingUrl) {
+      setOnlineMeetingUrl(locationState.onlineMeetingUrl);
+    }
+  }, [locationState.onlineMeetingUrl]);
 
   const [description, setDescription] = React.useState("");
   const [logisticsNotes, setLogisticsNotes] = React.useState("");
 
+  // Catalog Books for linking
+  const { data: catalogBooksData } = useCatalogBooks({ limit: 50 });
+  const booksList = catalogBooksData?.data || [];
+
   // Featured Work / Book
+  const [selectedBookId, setSelectedBookId] = React.useState<string>("");
   const [isLinkingWork, setIsLinkingWork] = React.useState(false);
   const [workMediaType, setWorkMediaType] = React.useState<
     "book" | "film" | "article" | "other"
@@ -209,6 +224,7 @@ export function CreateEventDialog({
     try {
       const payload: any = {
         calendarId: selectedCalendarId,
+        bookId: selectedBookId || undefined,
         title: title.trim(),
         description: description.trim(),
         logisticsNotes: logisticsNotes.trim() || undefined,
@@ -224,7 +240,7 @@ export function CreateEventDialog({
         district: locationState.district,
         latitude: locationState.latitude,
         longitude: locationState.longitude,
-        onlineMeetingUrl: locationState.onlineMeetingUrl,
+        onlineMeetingUrl: onlineMeetingUrl.trim() || locationState.onlineMeetingUrl || undefined,
         hideAddressUntilApproved: locationState.hideAddressUntilApproved,
         startsAt: startIso,
         endsAt: endIso,
@@ -536,6 +552,35 @@ export function CreateEventDialog({
               onChange={setLocationState}
             />
 
+            {/* Input Tautan Rapat Virtual */}
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3.5 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 font-medium text-white/80">
+                  <Video className="size-4 text-blue-400" />
+                  Tautan Rapat Virtual
+                </span>
+                <span className="text-[10px] text-white/40">
+                  Zoom, Google Meet, YouTube Live, dll.
+                </span>
+              </div>
+              <Input
+                type="url"
+                value={onlineMeetingUrl}
+                onChange={(e) => {
+                  setOnlineMeetingUrl(e.target.value);
+                  setLocationState((prev) => ({
+                    ...prev,
+                    onlineMeetingUrl: e.target.value,
+                  }));
+                }}
+                placeholder="https://meet.google.com/... atau https://zoom.us/j/..."
+                className="bg-black/30 border-white/10 text-white placeholder-white/30 text-xs"
+              />
+              <p className="text-[10px] text-white/40">
+                Tautan hanya diberikan otomatis kepada peserta yang telah disetujui (Going).
+              </p>
+            </div>
+
             {/* Description Row (matching Screenshot 1: opens rich modal Screenshot 2) */}
             <div
               onClick={() => setIsDescDialogOpen(true)}
@@ -582,7 +627,12 @@ export function CreateEventDialog({
                       <button
                         key={mt}
                         type="button"
-                        onClick={() => setWorkMediaType(mt)}
+                        onClick={() => {
+                          setWorkMediaType(mt);
+                          if (mt !== "book") {
+                            setSelectedBookId("");
+                          }
+                        }}
                         className={`rounded px-2.5 py-1 text-[11px] font-medium capitalize transition-colors cursor-pointer ${
                           workMediaType === mt
                             ? "bg-amber-400/20 text-amber-300 border border-amber-400/40"
@@ -593,6 +643,40 @@ export function CreateEventDialog({
                       </button>
                     ))}
                   </div>
+
+                  {workMediaType === "book" && (
+                    <div className="space-y-1.5 rounded-lg border border-white/10 bg-black/30 p-2.5">
+                      <label className="text-[11px] font-medium text-amber-300 flex items-center gap-1.5">
+                        <BookOpen className="size-3.5" />
+                        <span>Pilih Buku Katalog AnzaBook (Auto-Unlock Sampel)</span>
+                      </label>
+                      <select
+                        value={selectedBookId}
+                        onChange={(e) => {
+                          const bookId = e.target.value;
+                          setSelectedBookId(bookId);
+                          const chosen = booksList.find((b) => b.id === bookId);
+                          if (chosen) {
+                            setWorkTitle(chosen.title);
+                            setWorkCreator(chosen.author);
+                          }
+                        }}
+                        className="w-full rounded-lg border border-white/10 bg-[#1e2025] px-3 py-2 text-xs text-white outline-none cursor-pointer focus:border-amber-400/50"
+                      >
+                        <option value="">-- Pilih Buku dari Katalog (Opsional) --</option>
+                        {booksList.map((b) => (
+                          <option key={b.id} value={b.id} className="bg-[#1e2025] text-white">
+                            {b.title} — {b.author}
+                          </option>
+                        ))}
+                      </select>
+                      {selectedBookId && (
+                        <p className="text-[10px] text-emerald-400">
+                          ✓ Peserta yang terdaftar & disetujui otomatis mendapatkan akses baca Bab 1 & 2 buku ini.
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <Input

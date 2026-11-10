@@ -32,8 +32,9 @@ import type {
   StoreStockItemDto,
 } from "@starter/shared/types";
 
-async function listBookChapters(
+export async function listBookChapters(
   bookId: string,
+  userId?: string,
 ): Promise<BookChapterSummaryDto[]> {
   const chapters = await db
     .select({
@@ -45,10 +46,36 @@ async function listBookChapters(
     .where(eq(bookChapters.bookId, bookId))
     .orderBy(bookChapters.chapterNumber);
 
+  const hasEventAccess = userId
+    ? await hasActiveEventBookSampleAccess(bookId, userId)
+    : false;
+
   return chapters.map((chapter) => ({
     ...chapter,
-    isSample: chapter.chapterNumber === 1,
+    isSample:
+      chapter.chapterNumber === 1 ||
+      (hasEventAccess && chapter.chapterNumber === 2),
   }));
+}
+
+export async function hasActiveEventBookSampleAccess(
+  bookId: string,
+  userId: string,
+): Promise<boolean> {
+  const [activeRsvp] = await db
+    .select({ id: eventRsvps.id })
+    .from(eventRsvps)
+    .innerJoin(communityEvents, eq(eventRsvps.eventId, communityEvents.id))
+    .where(
+      and(
+        eq(eventRsvps.userId, userId),
+        eq(eventRsvps.status, "going"),
+        eq(communityEvents.bookId, bookId),
+      ),
+    )
+    .limit(1);
+
+  return !!activeRsvp;
 }
 
 async function hasClaimedBook(
@@ -72,12 +99,18 @@ async function hasClaimedBook(
 export async function getBookReadAccess(
   book: Pick<typeof books.$inferSelect, "id" | "digitalPolicy">,
   userId: string,
-): Promise<{ hasFullAccess: boolean; accessExpiresAt: string | null }> {
+): Promise<{
+  hasFullAccess: boolean;
+  accessExpiresAt: string | null;
+  hasEventSampleAccess: boolean;
+}> {
+  const hasEventSampleAccess = await hasActiveEventBookSampleAccess(book.id, userId);
+
   if (
     book.digitalPolicy === "free_open" ||
     (await hasClaimedBook(book.id, userId))
   ) {
-    return { hasFullAccess: true, accessExpiresAt: null };
+    return { hasFullAccess: true, accessExpiresAt: null, hasEventSampleAccess };
   }
   const membership =
     book.digitalPolicy === "sample_only"
@@ -86,6 +119,7 @@ export async function getBookReadAccess(
   return {
     hasFullAccess: !!membership,
     accessExpiresAt: membership?.expiresAt.toISOString() ?? null,
+    hasEventSampleAccess,
   };
 }
 
@@ -136,8 +170,11 @@ export async function getReadableParagraphCount(
 
   if (!chapter)
     throw new HttpError(404, "CHAPTER_NOT_FOUND", "Bab tidak ditemukan.");
-  const { hasFullAccess } = await getBookReadAccess(chapter, userId);
+  const { hasFullAccess, hasEventSampleAccess } = await getBookReadAccess(chapter, userId);
   if (hasFullAccess) return splitParagraphs(chapter.contentId).length;
+  if (hasEventSampleAccess && (chapter.chapterNumber === 1 || chapter.chapterNumber === 2)) {
+    return splitParagraphs(chapter.contentId).length;
+  }
   if (chapter.chapterNumber === 1)
     return getPreviewParagraphCount(chapter.contentId);
   throw new HttpError(
@@ -519,7 +556,11 @@ export async function getBookReaderPayload(
 
   const access = await getBookReadAccess(book, userId);
   const requestedChapterNum = query.chapter;
-  if (!access.hasFullAccess && requestedChapterNum !== 1) {
+  const isSampleAllowed =
+    requestedChapterNum === 1 ||
+    (access.hasEventSampleAccess && requestedChapterNum === 2);
+
+  if (!access.hasFullAccess && !isSampleAllowed) {
     throw new HttpError(
       403,
       "FORBIDDEN_DIGITAL_ACCESS",
@@ -545,16 +586,21 @@ export async function getBookReaderPayload(
     .orderBy(bookChapters.chapterNumber);
 
   const chapters = rows.map((row) => {
-    const previewCount = access.hasFullAccess
+    const isUnlockedSample =
+      access.hasEventSampleAccess &&
+      (row.chapterNumber === 1 || row.chapterNumber === 2);
+    const isFullChapter = access.hasFullAccess || isUnlockedSample;
+
+    const previewCount = isFullChapter
       ? 0
       : getPreviewParagraphCount(row.contentId);
-    const contentId = access.hasFullAccess
+    const contentId = isFullChapter
       ? row.contentId
       : (previewText(row.contentId, previewCount) ?? "");
-    const contentEn = access.hasFullAccess
+    const contentEn = isFullChapter
       ? row.contentEn
       : previewText(row.contentEn, previewCount);
-    const canPlayAudio = access.hasFullAccess && query.mode !== "blueprint";
+    const canPlayAudio = isFullChapter && query.mode !== "blueprint";
     return {
       id: row.id,
       chapterNumber: row.chapterNumber,
@@ -573,12 +619,14 @@ export async function getBookReaderPayload(
     throw new HttpError(404, "CHAPTER_NOT_FOUND", "Bab tidak ditemukan.");
   }
 
+  const allChapters = await listBookChapters(book.id, userId);
+
   return {
     book: toBookSummary(book),
     mode: query.mode,
     currentChapter,
     chapters,
-    allChapters: await listBookChapters(book.id),
+    allChapters,
     ...access,
     watermark: `${userEmail} : ${userId.slice(0, 8)} : ${new Date().toISOString()}`,
   };

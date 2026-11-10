@@ -9,9 +9,10 @@ describe("Community Calendars & Events API", () => {
     const creator = agent();
     const creatorEmail = await signUp(creator, "Pegiat Komunitas");
 
+    const calSlug = `klub-diskusi-senja-${Date.now()}`;
     const calPayload = {
       name: "Klub Diskusi Senja",
-      slug: "klub-diskusi-senja",
+      slug: calSlug,
       type: "community",
       description: "Komunitas diskusi buku dan literasi alternatif senja.",
       city: "Jakarta Selatan",
@@ -23,7 +24,7 @@ describe("Community Calendars & Events API", () => {
       .send(calPayload);
 
     expect(createRes.status).toBe(201);
-    expect(createRes.body.data.slug).toBe("klub-diskusi-senja");
+    expect(createRes.body.data.slug).toBe(calSlug);
     expect(createRes.body.data.verificationStatus).toBe("pending");
 
     // Admin verifies calendar
@@ -45,12 +46,13 @@ describe("Community Calendars & Events API", () => {
     const hostEmail = await signUp(hostClient, "Host Penulis");
     await setRole(hostEmail, "admin"); // admin can publish directly
 
+    const sinemaSlug = `sinema-aksara-${Date.now()}`;
     const calRes = await hostClient
       .post("/api/events/calendars")
       .set(originHeader)
       .send({
         name: "Sinema & Aksara",
-        slug: "sinema-aksara",
+        slug: sinemaSlug,
         type: "community",
         description: "Diskusi adaptasi naskah.",
       });
@@ -273,7 +275,8 @@ describe("Community Calendars & Events API", () => {
 
   it("allows attendees to submit reports against an event", async () => {
     const host = agent();
-    await signUp(host, "Host Report");
+    const hostEmail = await signUp(host, "Host Report");
+    await setRole(hostEmail, "admin");
 
     const calRes = await host
       .post("/api/events/calendars")
@@ -364,7 +367,7 @@ describe("Community Calendars & Events API", () => {
     expect(rsvpA.status).toBe(201);
 
     // User A checks upcoming: sees both
-    const upcomingRes = await userA.get("/api/events?filter=upcoming");
+    const upcomingRes = await userA.get(`/api/events?filter=upcoming&calendarSlug=${calRes.body.data.slug}`);
     const upcomingSlugs = upcomingRes.body.data.map((e: any) => e.slug);
     expect(upcomingSlugs).toContain(slug1);
     expect(upcomingSlugs).toContain(slug2);
@@ -399,15 +402,25 @@ describe("Community Calendars & Events API", () => {
     await signUp(host, "Host Mandiri");
 
     // Host creates calendar
+    const calSlug = `klub-mandiri-${Date.now()}`;
     const calRes = await host
       .post("/api/events/calendars")
       .set(originHeader)
       .send({
         name: "Klub Mandiri",
-        slug: `klub-mandiri-${Date.now()}`,
+        slug: calSlug,
       });
     expect(calRes.status).toBe(201);
     const calId = calRes.body.data.id;
+
+    // Admin verifies calendar so that non-admin host can publish public events
+    const admin = agent();
+    const adminEmail = await signUp(admin, "Admin Verifier Mandiri");
+    await setRole(adminEmail, "admin");
+    await admin
+      .patch(`/api/events/calendars/${calSlug}/verify`)
+      .set(originHeader)
+      .send({ status: "verified" });
 
     // Host creates event -> MUST be published immediately
     const evRes = await host
@@ -429,7 +442,7 @@ describe("Community Calendars & Events API", () => {
     const slug = evRes.body.data.slug;
 
     // Check upcoming feed -> event is visible to everyone
-    const upcomingRes = await host.get("/api/events?filter=upcoming");
+    const upcomingRes = await host.get(`/api/events?filter=upcoming&calendarSlug=${calSlug}`);
     const upcomingSlugs = upcomingRes.body.data.map((e: any) => e.slug);
     expect(upcomingSlugs).toContain(slug);
 
@@ -476,5 +489,218 @@ describe("Community Calendars & Events API", () => {
     // After deletion, event is gone
     const getRes = await host.get(`/api/events/${slug}`);
     expect(getRes.status).toBe(404);
+  });
+
+  it("excludes private_link events from public directory (GET /api/events)", async () => {
+    const admin = agent();
+    const adminEmail = await signUp(admin, "Admin Privacy");
+    await setRole(adminEmail, "admin");
+
+    const calRes = await admin
+      .post("/api/events/calendars")
+      .set(originHeader)
+      .send({
+        name: "Kalender Privacy Test",
+        slug: `cal-privacy-${Date.now()}`,
+      });
+    const calId = calRes.body.data.id;
+
+    // Create private_link event
+    const privateRes = await admin
+      .post("/api/events")
+      .set(originHeader)
+      .send({
+        calendarId: calId,
+        title: "Acara Private Link Rahasia",
+        description: "Acara ini tidak boleh bocor ke publik.",
+        coverUrl: "https://example.com/banner-priv.jpg",
+        format: "online",
+        onlineMeetingUrl: "https://meet.google.com/private",
+        visibility: "private_link",
+        startsAt: new Date(Date.now() + 700000000).toISOString(),
+        endsAt: new Date(Date.now() + 710000000).toISOString(),
+      });
+    expect(privateRes.status).toBe(201);
+    const privateSlug = privateRes.body.data.slug;
+
+    // Create public event
+    const publicRes = await admin
+      .post("/api/events")
+      .set(originHeader)
+      .send({
+        calendarId: calId,
+        title: "Acara Publik Terbuka",
+        description: "Acara ini terbuka untuk semua orang.",
+        coverUrl: "https://example.com/banner-pub.jpg",
+        format: "online",
+        onlineMeetingUrl: "https://meet.google.com/public",
+        visibility: "public",
+        startsAt: new Date(Date.now() + 720000000).toISOString(),
+        endsAt: new Date(Date.now() + 730000000).toISOString(),
+      });
+    expect(publicRes.status).toBe(201);
+    const publicSlug = publicRes.body.data.slug;
+
+    // Anonymous visitor queries public directory
+    const anon = agent();
+    const listRes = await anon.get(`/api/events?calendarSlug=${calRes.body.data.slug}`);
+    expect(listRes.status).toBe(200);
+    const slugs = listRes.body.data.map((e: any) => e.slug);
+    expect(slugs).toContain(publicSlug);
+    expect(slugs).not.toContain(privateSlug);
+
+    // Another normal user queries public directory
+    const normalUser = agent();
+    await signUp(normalUser, "User Biasa");
+    const userListRes = await normalUser.get(`/api/events?calendarSlug=${calRes.body.data.slug}`);
+    const userSlugs = userListRes.body.data.map((e: any) => e.slug);
+    expect(userSlugs).toContain(publicSlug);
+    expect(userSlugs).not.toContain(privateSlug);
+
+    // But private_link is directly accessible by its slug
+    const directRes = await anon.get(`/api/events/${privateSlug}`);
+    expect(directRes.status).toBe(200);
+    expect(directRes.body.data.title).toBe("Acara Private Link Rahasia");
+  });
+
+  it("rejects public events if calendar is unverified with HTTP 403 CALENDAR_NOT_VERIFIED", async () => {
+    const creator = agent();
+    await signUp(creator, "Creator Non Admin");
+
+    const calRes = await creator
+      .post("/api/events/calendars")
+      .set(originHeader)
+      .send({
+        name: "Kalender Belum Diverifikasi",
+        slug: `unverified-cal-${Date.now()}`,
+      });
+    expect(calRes.status).toBe(201);
+    expect(calRes.body.data.verificationStatus).toBe("pending");
+    const calendarId = calRes.body.data.id;
+
+    // Try to create public event -> should fail with 403 CALENDAR_NOT_VERIFIED
+    const failRes = await creator
+      .post("/api/events")
+      .set(originHeader)
+      .send({
+        calendarId,
+        title: "Acara Publik Tidak Sah",
+        description: "Mencoba membuat acara publik dari kalender pending.",
+        coverUrl: "https://example.com/banner-unverified.jpg",
+        format: "online",
+        onlineMeetingUrl: "https://meet.google.com/test",
+        visibility: "public",
+        startsAt: new Date(Date.now() + 800000000).toISOString(),
+        endsAt: new Date(Date.now() + 810000000).toISOString(),
+      });
+    expect(failRes.status).toBe(403);
+    expect(failRes.body.error.code).toBe("CALENDAR_NOT_VERIFIED");
+
+    // But creating private_link event is allowed even when pending
+    const privRes = await creator
+      .post("/api/events")
+      .set(originHeader)
+      .send({
+        calendarId,
+        title: "Acara Internal Kalender",
+        description: "Acara tautan pribadi tetap diizinkan.",
+        coverUrl: "https://example.com/banner-unverified.jpg",
+        format: "online",
+        onlineMeetingUrl: "https://meet.google.com/test-priv",
+        visibility: "private_link",
+        startsAt: new Date(Date.now() + 800000000).toISOString(),
+        endsAt: new Date(Date.now() + 810000000).toISOString(),
+      });
+    expect(privRes.status).toBe(201);
+    expect(privRes.body.data.visibility).toBe("private_link");
+  });
+
+  it("returns proper array of LocationSuggestionDto[] for location suggestions", async () => {
+    const userClient = agent();
+    await signUp(userClient, "User Cari Lokasi");
+
+    const res = await userClient.get("/api/events/locations/suggestions");
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body.data.length).toBeGreaterThan(0);
+
+    const first = res.body.data[0];
+    expect(first).toHaveProperty("id");
+    expect(first).toHaveProperty("name");
+    expect(first).toHaveProperty("address");
+    expect(first).toHaveProperty("city");
+    expect(first).toHaveProperty("latitude");
+    expect(first).toHaveProperty("longitude");
+    expect(first).toHaveProperty("mapsUrl");
+    expect(first).toHaveProperty("source");
+    expect(["partner_store", "recent_venue"]).toContain(first.source);
+  });
+
+  it("unlocks sample reading access (chapter 1 and 2) for attendees with going RSVP on linked book event", async () => {
+    // 1. Get book id for sample_only book "sains-logika-seni-hidup-bermutu"
+    const bookSlug = "sains-logika-seni-hidup-bermutu";
+    const anon = agent();
+    const bookRes = await anon.get(`/api/books/${bookSlug}`);
+    expect(bookRes.status).toBe(200);
+    const bookId = bookRes.body.data.id;
+
+    // 2. Admin creates a verified calendar and an event linked to bookId
+    const admin = agent();
+    const adminEmail = await signUp(admin, "Admin Bedah Buku");
+    await setRole(adminEmail, "admin");
+
+    const calRes = await admin
+      .post("/api/events/calendars")
+      .set(originHeader)
+      .send({
+        name: "Klub Bedah Buku",
+        slug: `klub-bedah-buku-${Date.now()}`,
+      });
+    const calendarId = calRes.body.data.id;
+
+    const eventRes = await admin
+      .post("/api/events")
+      .set(originHeader)
+      .send({
+        calendarId,
+        bookId,
+        title: "Sesi Diskusi: Sains Logika Seni Hidup Bermutu",
+        description: "Membahas bab 1 dan bab 2 buku bersama komunitas.",
+        coverUrl: "https://example.com/banner-book.jpg",
+        format: "online",
+        onlineMeetingUrl: "https://meet.google.com/bedah-buku",
+        visibility: "public",
+        startsAt: new Date(Date.now() + 900000000).toISOString(),
+        endsAt: new Date(Date.now() + 910000000).toISOString(),
+      });
+    expect(eventRes.status).toBe(201);
+    const eventSlug = eventRes.body.data.slug;
+
+    // 3. Attendee signs up and has not RSVPed yet
+    const attendee = agent();
+    await signUp(attendee, "Peserta Bedah Buku");
+
+    // Before RSVP: Chapter 2 is locked (HTTP 403)
+    const lockedRes = await attendee.get(`/api/books/${bookSlug}/read?chapter=2&mode=full`);
+    expect(lockedRes.status).toBe(403);
+    expect(lockedRes.body.error.code).toBe("FORBIDDEN_DIGITAL_ACCESS");
+
+    // 4. Attendee RSVPs to the event -> status "going"
+    const rsvpRes = await attendee
+      .post(`/api/events/${eventSlug}/rsvp`)
+      .set(originHeader)
+      .send({});
+    expect(rsvpRes.status).toBe(201);
+    expect(rsvpRes.body.data.status).toBe("going");
+
+    // 5. After RSVP "going": Chapter 2 is UNLOCKED (HTTP 200)
+    const unlockedRes = await attendee.get(`/api/books/${bookSlug}/read?chapter=2&mode=full`);
+    expect(unlockedRes.status).toBe(200);
+    expect(unlockedRes.body.data.currentChapter.chapterNumber).toBe(2);
+    expect(unlockedRes.body.data.hasEventSampleAccess).toBe(true);
+
+    // Chapter 3 is still locked (HTTP 403)
+    const chap3Res = await attendee.get(`/api/books/${bookSlug}/read?chapter=3&mode=full`);
+    expect(chap3Res.status).toBe(403);
   });
 });
