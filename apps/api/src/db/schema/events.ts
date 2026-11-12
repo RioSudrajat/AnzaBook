@@ -45,11 +45,18 @@ export const communityCalendars = pgTable(
       instagram?: string;
       twitter?: string;
       website?: string;
+      discord?: string;
+      telegram?: string;
+      whatsapp?: string;
     }>(),
     verificationStatus: varchar("verification_status", { length: 32 })
       .$type<"pending" | "verified" | "trusted" | "rejected">()
       .notNull()
       .default("pending"),
+    rejectionReason: text("rejection_reason"),
+    verificationDocuments: jsonb("verification_documents").$type<
+      Array<{ title: string; url: string; fileType?: string }>
+    >(),
     createdByUserId: text("created_by_user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),

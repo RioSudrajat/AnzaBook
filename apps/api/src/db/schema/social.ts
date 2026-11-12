@@ -1,6 +1,7 @@
 import {
   boolean,
   index,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -60,6 +61,10 @@ export const authorApplications = pgTable(
       .$type<AuthorStatus>()
       .notNull()
       .default("pending"),
+    rejectionReason: text("rejection_reason"),
+    verificationDocuments: jsonb("verification_documents").$type<
+      Array<{ title: string; url: string; fileType?: string }>
+    >(),
     reviewedByUserId: text("reviewed_by_user_id").references(() => user.id, {
       onDelete: "set null",
     }),

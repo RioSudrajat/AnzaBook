@@ -17,6 +17,8 @@ export const user = pgTable("user", {
     twitter?: string;
     website?: string;
     goodreads?: string;
+    linkedin?: string;
+    headerImage?: string;
   }>(),
   authorStatus: varchar("author_status", { length: 20 })
     .$type<"none" | "pending" | "verified" | "rejected">()

@@ -21,6 +21,7 @@ import type {
   CreateEventInput,
   ListEventsQuery,
   RsvpEventInput,
+  UpdateCalendarInput,
   UpdateEventInput,
 } from "@starter/shared/validators/community";
 import type {
@@ -60,6 +61,8 @@ function toCalendarDto(
       | "verified"
       | "trusted"
       | "rejected",
+    rejectionReason: cal.rejectionReason,
+    verificationDocuments: cal.verificationDocuments,
     followerCount,
     isFollowing,
     isManager,
@@ -122,6 +125,7 @@ export async function createCalendar(
       city: input.city,
       contactEmail: input.contactEmail || null,
       socialLinks: input.socialLinks,
+      verificationDocuments: input.verificationDocuments,
       verificationStatus: "pending",
       createdByUserId: userId,
     })
@@ -134,6 +138,56 @@ export async function createCalendar(
   });
 
   return toCalendarDto(cal, 0, false, true);
+}
+
+export async function updateCalendar(
+  userId: string,
+  slug: string,
+  input: UpdateCalendarInput,
+  userRole?: string,
+): Promise<CommunityCalendarDto> {
+  const [cal] = await db
+    .select()
+    .from(communityCalendars)
+    .where(eq(communityCalendars.slug, slug))
+    .limit(1);
+
+  if (!cal) {
+    throw new HttpError(
+      404,
+      "CALENDAR_NOT_FOUND",
+      "Kalender komunitas tidak ditemukan.",
+    );
+  }
+
+  const canManage = await isCalendarManager(cal.id, userId, userRole);
+  if (!canManage) {
+    throw new HttpError(
+      403,
+      "FORBIDDEN",
+      "Hanya pengelola yang dapat mengubah profil komunitas.",
+    );
+  }
+
+  const patch: Partial<typeof communityCalendars.$inferInsert> = {
+    updatedAt: new Date(),
+  };
+  if (input.name !== undefined) patch.name = input.name;
+  if (input.description !== undefined) patch.description = input.description;
+  if (input.avatarUrl !== undefined) patch.avatarUrl = input.avatarUrl;
+  if (input.coverUrl !== undefined) patch.coverUrl = input.coverUrl;
+  if (input.city !== undefined) patch.city = input.city;
+  if (input.contactEmail !== undefined)
+    patch.contactEmail = input.contactEmail || null;
+  if (input.socialLinks !== undefined) patch.socialLinks = input.socialLinks;
+
+  const [updated] = await db
+    .update(communityCalendars)
+    .set(patch)
+    .where(eq(communityCalendars.id, cal.id))
+    .returning();
+
+  return (await getCalendarBySlug(updated.slug, userId))!;
 }
 
 export async function listCalendars(
@@ -366,7 +420,7 @@ export async function createEvent(
       throw new HttpError(
         403,
         "CALENDAR_NOT_VERIFIED",
-        "Kalender harus terverifikasi untuk mempublikasikan acara publik.",
+        "Komunitas harus terverifikasi oleh kurasi admin sebelum dapat mempublikasikan acara publik.",
       );
     }
   }

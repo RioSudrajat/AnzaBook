@@ -150,7 +150,7 @@ export function createVariant(slug, destination, sourceRoot = root) {
     description: `${title}, built on the base starter.`,
   });
   const pkg = readJson("package.json");
-  pkg.name = `ngodingpakeai-${slug}`;
+  pkg.name = `anzabook-${slug}`;
   writeJson("package.json", pkg);
   const readme = readFileSync(resolve(target, "README.md"), "utf8");
   writeFileSync(

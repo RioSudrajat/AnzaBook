@@ -34,9 +34,16 @@ function ProtectedLayout() {
   const { user } = Route.useRouteContext().session;
   const location = useLocation();
   const isReader = location.pathname.startsWith("/read");
-  const isApp = location.pathname === "/app";
+  const isApp =
+    location.pathname === "/app" || location.pathname.startsWith("/admin");
+  const isStandalone =
+    isReader ||
+    isApp ||
+    location.pathname.startsWith("/publishers/new") ||
+    location.pathname.startsWith("/authors/new") ||
+    location.pathname.startsWith("/communities/new");
 
-  if (isReader || isApp) {
+  if (isStandalone) {
     return <Outlet />;
   }
 

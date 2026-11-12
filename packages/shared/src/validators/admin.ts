@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { manuscriptStatusEnum } from "./publisher";
 
 export const adminVerifyCalendarSchema = z
   .object({
@@ -8,6 +9,7 @@ export const adminVerifyCalendarSchema = z
     status: z
       .enum(["pending", "verified", "trusted", "rejected"])
       .optional(),
+    rejectionReason: z.string().max(1000).optional().nullable(),
   })
   .refine(
     (data) => data.verificationStatus !== undefined || data.status !== undefined,
@@ -20,6 +22,7 @@ export const adminReviewAuthorApplicationSchema = z
   .object({
     status: z.enum(["verified", "rejected"]),
     reviewNotes: z.string().max(1000).optional().nullable(),
+    rejectionReason: z.string().max(1000).optional().nullable(),
   })
   .strict();
 
@@ -31,6 +34,7 @@ export const adminVerifyPublisherSchema = z
     status: z
       .enum(["pending", "verified", "rejected"])
       .optional(),
+    rejectionReason: z.string().max(1000).optional().nullable(),
   })
   .refine(
     (data) => data.verificationStatus !== undefined || data.status !== undefined,
@@ -65,9 +69,7 @@ export const adminEditManuscriptSchema = z
       ])
       .optional(),
     proposedAlacartePriceIdr: z.number().int().min(0).optional().nullable(),
-    status: z
-      .enum(["pending_review", "in_editing", "published", "rejected"])
-      .optional(),
+    status: manuscriptStatusEnum.optional(),
     rejectionReason: z.string().max(1000).optional().nullable(),
     chapters: z.array(adminEditManuscriptChapterSchema).optional(),
   })

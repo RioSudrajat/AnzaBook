@@ -46,6 +46,79 @@ export function slideParagraphText(raw: string) {
   return raw.replace(/<!--\s*pagebreak\s*-->|---pagebreak---/gi, "").trim();
 }
 
+export function extractCleanSlideParagraphs(content?: string | null): string[] {
+  if (!content) return [];
+
+  // 1. Tiptap JSON AST support (Industry Standard)
+  const trimmed = content.trim();
+  if (trimmed.startsWith("{") && trimmed.includes('"type"')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      const paras: string[] = [];
+      const traverse = (node: any) => {
+        if (!node) return;
+        if (node.type === "chapterBreak" || node.type === "pageBreak") return;
+        if (node.type === "text" && node.text) {
+          paras.push(node.text);
+        } else if (node.content && Array.isArray(node.content)) {
+          const directText = node.content
+            .filter((c: any) => c.type === "text")
+            .map((c: any) => c.text || "")
+            .join("")
+            .trim();
+          if (directText) {
+            paras.push(directText);
+          } else {
+            node.content.forEach(traverse);
+          }
+        }
+      };
+      if (parsed.content && Array.isArray(parsed.content)) {
+        parsed.content.forEach(traverse);
+      }
+      if (paras.length > 0) return paras;
+    } catch {
+      // Fallback
+    }
+  }
+
+  if (!trimmed.includes("<")) {
+    return trimmed
+      .split(/\n\n+/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+  }
+  // Content contains HTML from rich text / Tiptap
+  if (typeof document !== "undefined") {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(trimmed, "text/html");
+    // Strip chapter break and decorative nodes from text content
+    doc
+      .querySelectorAll(
+        '[data-type="chapter-break"], [data-type="page-break"], .tiptap-chapter-break, .tiptap-page-break',
+      )
+      .forEach((el) => el.remove());
+
+    const blocks: string[] = [];
+    doc.body
+      .querySelectorAll("p, h1, h2, h3, h4, blockquote, li")
+      .forEach((el) => {
+        const text = el.textContent?.trim();
+        if (text) blocks.push(text);
+      });
+
+    if (blocks.length > 0) return blocks;
+    const bodyText = doc.body.textContent?.trim();
+    return bodyText ? [bodyText] : [];
+  }
+
+  return trimmed
+    .replace(/<[^>]*>/g, "\n\n")
+    .split(/\n\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+}
+
 function paginate(
   probe: HTMLElement,
   chapters: readonly BookReaderChapterDto[],
@@ -79,10 +152,7 @@ function paginate(
 
     const content =
       english && chapter.contentEn ? chapter.contentEn : chapter.contentId;
-    const paragraphs = content
-      .split(/\n\n+/)
-      .map((part) => part.trim())
-      .filter(Boolean);
+    const paragraphs = extractCleanSlideParagraphs(content);
     for (const [paragraph, raw] of paragraphs.entries()) {
       const source = slideParagraphText(raw);
       const ends = Array.from(

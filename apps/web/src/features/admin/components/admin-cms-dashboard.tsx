@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent } from "react";
+import { useState, useEffect, type ChangeEvent } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   ArrowLeft,
@@ -8,15 +8,18 @@ import {
   Coins,
   Download,
   ExternalLink,
+  Eye,
   FileCheck,
   FileCode,
   FileText,
   Library,
   LoaderCircle,
+  Moon,
   Plus,
   RefreshCw,
   Search,
   ShieldCheck,
+  Sun,
   Trash2,
   Upload,
   UserCheck,
@@ -29,6 +32,7 @@ import type {
   AdminOverviewDto,
   BookClaimBatchDto,
   ManuscriptSubmissionDto,
+  ManuscriptSubmissionStatus,
   PublisherDto,
 } from "@starter/shared/types";
 import { roleHasPermission } from "@starter/shared/permissions";
@@ -37,7 +41,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { SiteFooter } from "@/components/site-footer";
 import { useCatalogBooks } from "@/features/books/hooks";
+import { AdminSidebar, type AdminTab } from "./admin-sidebar";
 import {
   useAdminAuthorApplications,
   useAdminCalendars,
@@ -56,13 +62,7 @@ import {
   useVerifyPublisher,
 } from "../hooks";
 
-type TabId =
-  | "calendars"
-  | "partners"
-  | "manuscripts"
-  | "claim-batches"
-  | "financials"
-  | "notes";
+export type TabId = AdminTab;
 
 function formatIdr(amount: number) {
   return new Intl.NumberFormat("id-ID", {
@@ -134,11 +134,55 @@ function downloadClaimCodesCsv(
 
 export function AdminCmsDashboard({
   currentUser,
+  activeTabProp,
+  onTabChangeProp,
 }: {
   currentUser: { id: string; name: string; email: string; role?: string | null };
+  activeTabProp?: TabId;
+  onTabChangeProp?: (tab: TabId) => void;
 }) {
-  const [activeTab, setActiveTab] = useState<TabId>("calendars");
-  const { data: overview, isLoading: overviewLoading } = useAdminOverview();
+  const [internalTab, setInternalTab] = useState<TabId>("calendars");
+  const activeTab = activeTabProp || internalTab;
+  const setActiveTab = onTabChangeProp || setInternalTab;
+
+  const { data: overview } = useAdminOverview();
+
+  // Sidebar collapse state
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("anzabook_sidebar_collapsed") === "true";
+  });
+
+  const handleToggleSidebar = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("anzabook_sidebar_collapsed", String(next));
+      return next;
+    });
+  };
+
+  // Theme dark mode state: default is LIGHT!
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const savedTheme = localStorage.getItem("anzabook-theme");
+    return savedTheme === "dark";
+  });
+
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [isDark]);
+
+  const handleToggleTheme = () => {
+    setIsDark((prev) => {
+      const next = !prev;
+      localStorage.setItem("anzabook-theme", next ? "dark" : "light");
+      return next;
+    });
+  };
 
   const pendingCalendars = overview?.pendingCalendarsCount ?? 0;
   const pendingAuthors = overview?.pendingAuthorsCount ?? 0;
@@ -147,232 +191,634 @@ export function AdminCmsDashboard({
   const totalPending =
     pendingCalendars + pendingAuthors + pendingPublishers + pendingManuscripts;
 
+  const tabTitles: Record<TabId, string> = {
+    calendars: "Komunitas & Acara",
+    partners: "Penulis & Penerbit",
+    manuscripts: "Kurasi Naskah",
+    "claim-batches": "Kode Klaim Phygital",
+    financials: "Keuangan & Royalti",
+    notes: "Catatan Sistem",
+  };
+
   return (
-    <div className="mx-auto max-w-6xl space-y-8 overflow-x-clip py-4 sm:py-6">
-      {/* Top Bar Header */}
-      <header className="border-b border-border pb-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-md border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
-                <ShieldCheck className="size-4" aria-hidden="true" />
-                CMS Redaksi &amp; Ekosistem
-              </span>
-              {totalPending > 0 ? (
-                <span className="inline-flex items-center rounded-md bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">
-                  {totalPending} antrean memerlukan kurasi
-                </span>
-              ) : (
-                <span className="inline-flex items-center rounded-md bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                  Semua antrean kurasi beres
-                </span>
-              )}
+    <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row">
+      {/* 1. Left Collapsible Admin Sidebar matching AppSidebar */}
+      <AdminSidebar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        user={currentUser}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={handleToggleSidebar}
+        pendingCounts={{
+          calendars: pendingCalendars,
+          partners: pendingAuthors + pendingPublishers,
+          manuscripts: pendingManuscripts,
+        }}
+      />
+
+      {/* 2. Main Content Canvas */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Top Header Bar per App Layout */}
+        <header className="sticky top-0 z-30 border-b border-border/80 bg-background/95 backdrop-blur-md px-6 py-3.5 flex items-center justify-between select-none">
+          <div className="flex items-center gap-3 min-w-0">
+            <img
+              src="/icon.svg"
+              alt="AnzaBook"
+              className="size-6 rounded-[5px] object-contain md:hidden border border-border/40 shadow-xs shrink-0"
+            />
+            <div className="min-w-0">
+              <h1 className="font-serif text-xl sm:text-2xl font-bold truncate">
+                {tabTitles[activeTab]}
+              </h1>
+              <p className="hidden sm:block text-xs text-muted-foreground truncate">
+                Studio Redaksi AnzaBook &bull; Masuk sebagai {currentUser.name} ({currentUser.email})
+              </p>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl text-foreground">
-              Panel Pengelola Redaksi &amp; Kemitraan AnzaBook
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Masuk sebagai <strong className="text-foreground">{currentUser.name}</strong> ({currentUser.email}).
-              Kelola kurasi kalender literasi, validasi hak cipta penulis, izin terbit mitra, dan kode klaim phygital.
-            </p>
           </div>
 
-          <Button variant="outline" asChild size="sm" className="min-h-[44px]">
-            <Link to="/app">
-              <ArrowLeft className="size-4" aria-hidden="true" />
-              Kembali ke Aplikasi Pembaca
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Quick Status Pill */}
+            {totalPending > 0 ? (
+              <span className="hidden sm:inline-flex items-center gap-1.5 rounded-md border border-border/80 bg-muted px-2.5 py-1 text-xs font-mono font-medium text-foreground">
+                <span className="size-2 rounded-full bg-[var(--color-accent)] animate-pulse" />
+                {totalPending} antrean kurasi
+              </span>
+            ) : (
+              <span className="hidden sm:inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-muted px-2.5 py-1 text-xs font-mono font-medium text-muted-foreground">
+                <span className="size-2 rounded-full bg-foreground/60" />
+                Semua antrean beres
+              </span>
+            )}
+
+            {/* Back to Reader App */}
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              className="min-h-9 gap-1.5 text-xs font-medium border-border/80"
+            >
+              <Link to="/app">
+                <ArrowLeft className="size-3.5" />
+                <span className="hidden sm:inline">Aplikasi Pembaca</span>
+                <span className="sm:hidden">App</span>
+              </Link>
+            </Button>
+
+            {/* Dark/Light Mode Moon Toggle */}
+            <button
+              type="button"
+              onClick={handleToggleTheme}
+              className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
+              title={isDark ? "Ganti ke Mode Terang" : "Ganti ke Mode Gelap"}
+              aria-label={isDark ? "Ganti ke Mode Terang" : "Ganti ke Mode Gelap"}
+            >
+              {isDark ? <Sun className="size-5" /> : <Moon className="size-5" />}
+            </button>
+          </div>
+        </header>
+
+        {/* Main Tab Screen Canvas */}
+        <main
+          id="main-content"
+          className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 pt-6 pb-24 md:pb-12"
+        >
+          {activeTab === "calendars" && <TabCalendars />}
+          {activeTab === "partners" && <TabPartners />}
+          {activeTab === "manuscripts" && <TabManuscripts />}
+          {activeTab === "claim-batches" && <TabClaimBatches />}
+          {activeTab === "financials" && <TabFinancials overview={overview} />}
+          {activeTab === "notes" && (
+            <TabNotes userRole={currentUser.role ?? undefined} />
+          )}
+        </main>
+
+        <div className="pb-20 md:pb-0">
+          <SiteFooter />
         </div>
+      </div>
 
-        {/* Quick Pending Summary Counters */}
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <button
-            type="button"
-            onClick={() => setActiveTab("calendars")}
-            className="flex min-h-[44px] items-center justify-between rounded-lg border border-border bg-card p-3 text-left transition hover:border-primary/50 focus-visible:outline-2 focus-visible:outline-primary"
-          >
-            <div className="flex items-center gap-2.5">
-              <Calendar className="size-4 text-muted-foreground" aria-hidden="true" />
-              <span className="text-xs font-medium text-foreground">Komunitas</span>
-            </div>
-            <span
-              className={`rounded px-2 py-0.5 text-xs font-bold ${
-                pendingCalendars > 0
-                  ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
-              {pendingCalendars}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("partners")}
-            className="flex min-h-[44px] items-center justify-between rounded-lg border border-border bg-card p-3 text-left transition hover:border-primary/50 focus-visible:outline-2 focus-visible:outline-primary"
-          >
-            <div className="flex items-center gap-2.5">
-              <UserCheck className="size-4 text-muted-foreground" aria-hidden="true" />
-              <span className="text-xs font-medium text-foreground">Penulis &amp; Penerbit</span>
-            </div>
-            <span
-              className={`rounded px-2 py-0.5 text-xs font-bold ${
-                pendingAuthors + pendingPublishers > 0
-                  ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
-              {pendingAuthors + pendingPublishers}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("manuscripts")}
-            className="flex min-h-[44px] items-center justify-between rounded-lg border border-border bg-card p-3 text-left transition hover:border-primary/50 focus-visible:outline-2 focus-visible:outline-primary"
-          >
-            <div className="flex items-center gap-2.5">
-              <BookOpen className="size-4 text-muted-foreground" aria-hidden="true" />
-              <span className="text-xs font-medium text-foreground">Naskah Masuk</span>
-            </div>
-            <span
-              className={`rounded px-2 py-0.5 text-xs font-bold ${
-                pendingManuscripts > 0
-                  ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
-              {pendingManuscripts}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("financials")}
-            className="flex min-h-[44px] items-center justify-between rounded-lg border border-border bg-card p-3 text-left transition hover:border-primary/50 focus-visible:outline-2 focus-visible:outline-primary"
-          >
-            <div className="flex items-center gap-2.5">
-              <Coins className="size-4 text-muted-foreground" aria-hidden="true" />
-              <span className="text-xs font-medium text-foreground">Royalti Nakama</span>
-            </div>
-            <span className="text-xs font-bold text-foreground">
-              {overviewLoading
-                ? "..."
-                : formatIdr(overview?.estimatedNakamaRoyaltyPoolIdr ?? 0)}
-            </span>
-          </button>
-        </div>
-      </header>
-
-      {/* Main Tab Navigation */}
+      {/* 3. Mobile Bottom Navigation Bar (WCAG AA 44px+ touch targets) */}
       <nav
-        aria-label="Tab navigasi CMS"
-        className="flex flex-wrap gap-2 border-b border-border pb-2"
+        aria-label="Navigasi Admin Mobile"
+        className="md:hidden fixed bottom-0 inset-x-0 bg-background/95 backdrop-blur-md border-t border-border z-40 flex items-center justify-around py-1.5 px-1 shadow-lg"
       >
         <button
           type="button"
           onClick={() => setActiveTab("calendars")}
-          className={`flex min-h-[44px] items-center gap-2 rounded-md px-4 py-2.5 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-primary ${
+          className={`flex flex-col items-center justify-center min-h-[48px] min-w-[50px] px-1 py-1 text-[10px] font-mono cursor-pointer rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
             activeTab === "calendars"
-              ? "bg-primary text-primary-foreground shadow-xs"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              ? "text-[var(--color-accent)] font-bold bg-muted/40"
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          <Calendar className="size-4" aria-hidden="true" />
-          <span>Verifikasi Komunitas &amp; Acara</span>
-          {pendingCalendars > 0 && (
-            <span className="ml-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-bold text-amber-900 dark:text-amber-200">
-              {pendingCalendars}
-            </span>
-          )}
+          <Calendar className="size-4" />
+          <span>Komunitas</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab("partners")}
-          className={`flex min-h-[44px] items-center gap-2 rounded-md px-4 py-2.5 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-primary ${
+          className={`flex flex-col items-center justify-center min-h-[48px] min-w-[50px] px-1 py-1 text-[10px] font-mono cursor-pointer rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
             activeTab === "partners"
-              ? "bg-primary text-primary-foreground shadow-xs"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              ? "text-[var(--color-accent)] font-bold bg-muted/40"
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          <UserCheck className="size-4" aria-hidden="true" />
-          <span>Verifikasi Penulis &amp; Penerbit</span>
-          {pendingAuthors + pendingPublishers > 0 && (
-            <span className="ml-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-bold text-amber-900 dark:text-amber-200">
-              {pendingAuthors + pendingPublishers}
-            </span>
-          )}
+          <UserCheck className="size-4" />
+          <span>Mitra</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab("manuscripts")}
-          className={`flex min-h-[44px] items-center gap-2 rounded-md px-4 py-2.5 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-primary ${
+          className={`flex flex-col items-center justify-center min-h-[48px] min-w-[50px] px-1 py-1 text-[10px] font-mono cursor-pointer rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
             activeTab === "manuscripts"
-              ? "bg-primary text-primary-foreground shadow-xs"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              ? "text-[var(--color-accent)] font-bold bg-muted/40"
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          <BookOpen className="size-4" aria-hidden="true" />
-          <span>Editor &amp; Kurasi Naskah</span>
-          {pendingManuscripts > 0 && (
-            <span className="ml-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-bold text-amber-900 dark:text-amber-200">
-              {pendingManuscripts}
-            </span>
-          )}
+          <BookOpen className="size-4" />
+          <span>Naskah</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab("claim-batches")}
-          className={`flex min-h-[44px] items-center gap-2 rounded-md px-4 py-2.5 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-primary ${
+          className={`flex flex-col items-center justify-center min-h-[48px] min-w-[50px] px-1 py-1 text-[10px] font-mono cursor-pointer rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
             activeTab === "claim-batches"
-              ? "bg-primary text-primary-foreground shadow-xs"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              ? "text-[var(--color-accent)] font-bold bg-muted/40"
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          <FileCode className="size-4" aria-hidden="true" />
-          <span>Generator Kode Klaim Fisik</span>
+          <FileCode className="size-4" />
+          <span>Klaim</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab("financials")}
-          className={`flex min-h-[44px] items-center gap-2 rounded-md px-4 py-2.5 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-primary ${
+          className={`flex flex-col items-center justify-center min-h-[48px] min-w-[50px] px-1 py-1 text-[10px] font-mono cursor-pointer rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
             activeTab === "financials"
-              ? "bg-primary text-primary-foreground shadow-xs"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              ? "text-[var(--color-accent)] font-bold bg-muted/40"
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          <Coins className="size-4" aria-hidden="true" />
-          <span>Monitor Royalti &amp; Kas Komunitas</span>
+          <Coins className="size-4" />
+          <span>Royalti</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab("notes")}
-          className={`flex min-h-[44px] items-center gap-2 rounded-md px-4 py-2.5 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-primary ${
+          className={`flex flex-col items-center justify-center min-h-[48px] min-w-[50px] px-1 py-1 text-[10px] font-mono cursor-pointer rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
             activeTab === "notes"
-              ? "bg-primary text-primary-foreground shadow-xs"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              ? "text-[var(--color-accent)] font-bold bg-muted/40"
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          <FileText className="size-4" aria-hidden="true" />
-          <span>Utilitas &amp; Catatan Sistem</span>
+          <FileText className="size-4" />
+          <span>Catatan</span>
         </button>
       </nav>
+    </div>
+  );
+}
 
-      {/* Tab Panels */}
-      <main className="min-h-[480px]">
-        {activeTab === "calendars" && <TabCalendars />}
-        {activeTab === "partners" && <TabPartners />}
-        {activeTab === "manuscripts" && <TabManuscripts />}
-        {activeTab === "claim-batches" && <TabClaimBatches />}
-        {activeTab === "financials" && <TabFinancials overview={overview} />}
-        {activeTab === "notes" && <TabNotes userRole={currentUser.role ?? undefined} />}
-      </main>
+// =========================================================================
+// Reusable Visual Profile & Dossier Modal for Admin Review
+// =========================================================================
+
+function AdminReviewDossierModal({
+  type,
+  data,
+  isOpen,
+  onClose,
+  onApprove,
+  onReject,
+  isPending,
+}: {
+  type: "calendar" | "publisher" | "author";
+  data: AdminCalendarDto | PublisherDto | AdminAuthorApplicationDto | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onApprove: (id: string) => Promise<void>;
+  onReject: (id: string, reason: string) => Promise<void>;
+  isPending: boolean;
+}) {
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [showRejectInput, setShowRejectInput] = useState(false);
+
+  useEffect(() => {
+    setRejectionReason("");
+    setShowRejectInput(false);
+  }, [data, isOpen]);
+
+  if (!isOpen || !data) return null;
+
+  const cal = type === "calendar" ? (data as AdminCalendarDto) : null;
+  const pub = type === "publisher" ? (data as PublisherDto) : null;
+  const auth = type === "author" ? (data as AdminAuthorApplicationDto) : null;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs text-foreground overflow-y-auto"
+    >
+      <div className="max-w-2xl w-full bg-card border border-border rounded-2xl p-6 sm:p-8 shadow-2xl relative space-y-6 my-8 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between border-b border-border pb-4">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="size-5 text-[var(--color-accent)]" />
+            <h3 className="font-serif text-lg font-bold">
+              Tinjauan Dossier Profil{" "}
+              {type === "calendar"
+                ? "Komunitas"
+                : type === "publisher"
+                ? "Penerbit Mitra"
+                : "Penulis Resmi"}
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground cursor-pointer p-1 rounded-md"
+          >
+            <XCircle className="size-5" />
+          </button>
+        </div>
+
+        {/* Visual Profile Preview Section */}
+        {cal && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-border/80 bg-muted/20 p-5 space-y-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="size-16 rounded-2xl bg-muted border border-border flex items-center justify-center font-serif font-bold text-2xl text-foreground shrink-0">
+                    {cal.name.slice(0, 1)}
+                  </div>
+                  <div>
+                    <h4 className="font-serif text-xl font-bold text-foreground">
+                      {cal.name}
+                    </h4>
+                    <p className="text-xs text-muted-foreground font-mono">
+                      /c/{cal.slug}
+                    </p>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                      <span>Kota: <strong className="text-foreground">{cal.city || "Nasional"}</strong></span>
+                      <span>•</span>
+                      <span>Tipe: <strong className="text-foreground capitalize">{cal.type}</strong></span>
+                    </div>
+                  </div>
+                </div>
+
+                <span
+                  className={`px-3 py-1 rounded-md text-xs font-mono font-semibold uppercase tracking-wider border ${
+                    cal.verificationStatus === "verified"
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                      : cal.verificationStatus === "rejected"
+                      ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
+                      : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                  }`}
+                >
+                  {cal.verificationStatus}
+                </span>
+              </div>
+
+              <div className="space-y-1.5 pt-2 border-t border-border/60 text-xs">
+                <p className="font-semibold text-foreground">Visi / Deskripsi Komunitas:</p>
+                <p className="text-muted-foreground leading-relaxed whitespace-pre-line bg-card p-3 rounded-lg border border-border/60">
+                  {cal.description || "Tidak ada deskripsi yang disertakan."}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs pt-2">
+                <div>
+                  <span className="text-muted-foreground">Pengaju / Inisiator:</span>{" "}
+                  <strong className="text-foreground">{cal.creatorName || "Anonim"}</strong>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Email:</span>{" "}
+                  <strong className="text-foreground">{cal.creatorEmail}</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Verification Documents Dossier */}
+            <div className="space-y-2">
+              <h5 className="font-serif font-bold text-sm text-foreground flex items-center gap-2">
+                <FileCheck className="size-4 text-[var(--color-accent)]" />
+                <span>Dokumen Berkas &amp; Legalitas Komunitas</span>
+              </h5>
+
+              {cal.verificationDocuments && cal.verificationDocuments.length > 0 ? (
+                <div className="space-y-2">
+                  {cal.verificationDocuments.map((doc, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3 rounded-xl border border-border bg-card flex items-center justify-between text-xs"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <FileText className="size-4 text-[var(--color-accent)] shrink-0" />
+                        <div>
+                          <p className="font-semibold text-foreground">{doc.title}</p>
+                          <p className="text-[11px] font-mono text-muted-foreground">
+                            {doc.fileType || "Dokumen Pendukung"}
+                          </p>
+                        </div>
+                      </div>
+                      <a
+                        href={doc.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-[var(--color-accent)] hover:underline font-semibold text-xs"
+                      >
+                        <span>Lihat Dokumen</span>
+                        <ExternalLink className="size-3" />
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl border border-dashed border-border text-center text-xs text-muted-foreground">
+                  Pengaju tidak melampirkan berkas digital tambahan (opsional). Verifikasi dapat ditinjau berdasarkan profil &amp; narahubung.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {pub && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-border/80 bg-muted/20 p-5 space-y-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="size-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center font-serif font-bold text-2xl text-amber-600 shrink-0">
+                    {pub.name.slice(0, 1)}
+                  </div>
+                  <div>
+                    <h4 className="font-serif text-xl font-bold text-foreground">
+                      {pub.name}
+                    </h4>
+                    <p className="text-xs text-muted-foreground font-mono">
+                      /p/{pub.slug}
+                    </p>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                      <span>No. IKAPI: <strong className="text-foreground">{pub.ikapiNumber || "Belum ada"}</strong></span>
+                      <span>•</span>
+                      <span>Kota: <strong className="text-foreground">{pub.city || "Indonesia"}</strong></span>
+                    </div>
+                  </div>
+                </div>
+
+                <span
+                  className={`px-3 py-1 rounded-md text-xs font-mono font-semibold uppercase tracking-wider border ${
+                    pub.verificationStatus === "verified"
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                      : pub.verificationStatus === "rejected"
+                      ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
+                      : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                  }`}
+                >
+                  {pub.verificationStatus}
+                </span>
+              </div>
+
+              <div className="space-y-1.5 pt-2 border-t border-border/60 text-xs">
+                <p className="font-semibold text-foreground">Profil &amp; Visi Editorial Penerbit:</p>
+                <p className="text-muted-foreground leading-relaxed whitespace-pre-line bg-card p-3 rounded-lg border border-border/60">
+                  {pub.description || "Tidak ada deskripsi."}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs pt-2">
+                <div>
+                  <span className="text-muted-foreground">Email Narahubung:</span>{" "}
+                  <strong className="text-foreground">{pub.contactEmail || "-"}</strong>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Alamat Redaksi:</span>{" "}
+                  <strong className="text-foreground">{pub.address || "-"}</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Verification Documents Dossier */}
+            <div className="space-y-2">
+              <h5 className="font-serif font-bold text-sm text-foreground flex items-center gap-2">
+                <FileCheck className="size-4 text-[var(--color-accent)]" />
+                <span>Dokumen Bukti Keanggotaan IKAPI / Legalitas</span>
+              </h5>
+
+              {pub.verificationDocuments && pub.verificationDocuments.length > 0 ? (
+                <div className="space-y-2">
+                  {pub.verificationDocuments.map((doc, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3 rounded-xl border border-border bg-card flex items-center justify-between text-xs"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <FileText className="size-4 text-[var(--color-accent)] shrink-0" />
+                        <div>
+                          <p className="font-semibold text-foreground">{doc.title}</p>
+                          <p className="text-[11px] font-mono text-muted-foreground">
+                            {doc.fileType || "Dokumen Pendukung"}
+                          </p>
+                        </div>
+                      </div>
+                      <a
+                        href={doc.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-[var(--color-accent)] hover:underline font-semibold text-xs"
+                      >
+                        <span>Lihat Dokumen</span>
+                        <ExternalLink className="size-3" />
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl border border-dashed border-border text-center text-xs text-muted-foreground">
+                  Nomor IKAPI: {pub.ikapiNumber || "Tidak dicantumkan"}. Tidak ada berkas lampiran digital tambahan.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {auth && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-border/80 bg-muted/20 p-5 space-y-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-serif text-xl font-bold text-foreground">
+                      {auth.penName}
+                    </h4>
+                    <span
+                      className={`px-2.5 py-0.5 rounded-md text-[10px] font-mono font-semibold uppercase tracking-wider border ${
+                        auth.status === "verified"
+                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                          : auth.status === "rejected"
+                          ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
+                          : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                      }`}
+                    >
+                      {auth.status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Akun: <strong className="text-foreground">{auth.userName}</strong> ({auth.userEmail})
+                  </p>
+                </div>
+
+                {auth.portfolioUrl && (
+                  <a
+                    href={auth.portfolioUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-card text-xs font-semibold text-[var(--color-accent)] hover:underline"
+                  >
+                    <span>Portofolio / Karya</span>
+                    <ExternalLink className="size-3" />
+                  </a>
+                )}
+              </div>
+
+              <div className="space-y-1.5 pt-2 border-t border-border/60 text-xs">
+                <p className="font-semibold text-foreground">Bio &amp; Rekam Jejak Kepenulisan:</p>
+                <p className="text-muted-foreground leading-relaxed whitespace-pre-line bg-card p-3 rounded-lg border border-border/60">
+                  {auth.bio}
+                </p>
+              </div>
+
+              {auth.claimedBookTitle && (
+                <div className="text-xs p-3 rounded-lg border border-border bg-card">
+                  <span className="text-muted-foreground">Klaim Hak Buku:</span>{" "}
+                  <strong className="text-foreground">{auth.claimedBookTitle}</strong>
+                </div>
+              )}
+            </div>
+
+            {/* Verification Documents Dossier */}
+            <div className="space-y-2">
+              <h5 className="font-serif font-bold text-sm text-foreground flex items-center gap-2">
+                <FileCheck className="size-4 text-[var(--color-accent)]" />
+                <span>Dokumen Portofolio &amp; Berkas Penulis</span>
+              </h5>
+
+              {auth.verificationDocuments && auth.verificationDocuments.length > 0 ? (
+                <div className="space-y-2">
+                  {auth.verificationDocuments.map((doc, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3 rounded-xl border border-border bg-card flex items-center justify-between text-xs"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <FileText className="size-4 text-[var(--color-accent)] shrink-0" />
+                        <div>
+                          <p className="font-semibold text-foreground">{doc.title}</p>
+                          <p className="text-[11px] font-mono text-muted-foreground">
+                            {doc.fileType || "Dokumen Pendukung"}
+                          </p>
+                        </div>
+                      </div>
+                      <a
+                        href={doc.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-[var(--color-accent)] hover:underline font-semibold text-xs"
+                      >
+                        <span>Lihat Dokumen</span>
+                        <ExternalLink className="size-3" />
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl border border-dashed border-border text-center text-xs text-muted-foreground">
+                  Portofolio: {auth.portfolioUrl ? auth.portfolioUrl : "Tidak ada tautan berkas tambahan."}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Rejection Reason Input (if rejecting) */}
+        {showRejectInput && (
+          <div className="p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 space-y-2">
+            <Label htmlFor="rejection-reason" className="text-xs font-semibold text-rose-700 dark:text-rose-300">
+              Alasan Penolakan Pengajuan (Wajib diisi agar pengaju dapat memperbaiki):
+            </Label>
+            <Textarea
+              id="rejection-reason"
+              rows={3}
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              placeholder="Contoh: Nomor keanggotaan IKAPI tidak terdaftar atau dokumen legalitas buram..."
+              className="text-xs bg-background"
+            />
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex items-center justify-between pt-4 border-t border-border gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className="text-xs cursor-pointer"
+          >
+            Tutup
+          </Button>
+
+          <div className="flex items-center gap-2">
+            {showRejectInput ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowRejectInput(false)}
+                  className="text-xs cursor-pointer"
+                >
+                  Batal
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={isPending || !rejectionReason.trim()}
+                  onClick={() => onReject(data.id, rejectionReason.trim())}
+                  className="text-xs font-semibold cursor-pointer"
+                >
+                  {isPending ? "Memproses..." : "Konfirmasi Tolak Pengajuan"}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => setShowRejectInput(true)}
+                  className="text-xs font-semibold cursor-pointer"
+                >
+                  <XCircle className="size-4" />
+                  <span>Tolak...</span>
+                </Button>
+
+                <Button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => onApprove(data.id)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <CheckCircle2 className="size-4" />
+                  <span>{isPending ? "Menyetujui..." : "Setujui & ACC Verifikasi"}</span>
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -388,12 +834,14 @@ function TabCalendars() {
   });
   const verifyMutation = useVerifyCalendar();
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [selectedCalendar, setSelectedCalendar] = useState<AdminCalendarDto | null>(null);
 
-  async function handleVerify(id: string, status: "verified" | "trusted" | "rejected") {
+  async function handleVerify(id: string, status: "verified" | "trusted" | "rejected", rejectionReason?: string) {
     try {
       setFeedback(null);
-      await verifyMutation.mutateAsync({ id, input: { status } });
+      await verifyMutation.mutateAsync({ id, input: { status, rejectionReason } });
       setFeedback(`Status kalender komunitas berhasil diperbarui menjadi "${status}".`);
+      setSelectedCalendar(null);
     } catch (err) {
       setFeedback(`Gagal memperbarui status: ${getErrorMessage(err)}`);
     }
@@ -469,14 +917,14 @@ function TabCalendars() {
                     /{cal.slug}
                   </span>
                   <span
-                    className={`rounded px-2 py-0.5 text-xs font-semibold uppercase ${
-                      cal.verificationStatus === "verified"
-                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                        : cal.verificationStatus === "trusted"
-                        ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
+                    className={`rounded-md border px-2 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wider ${
+                      cal.verificationStatus === "trusted"
+                        ? "border-border bg-foreground text-background"
+                        : cal.verificationStatus === "verified"
+                        ? "border-border/80 bg-muted text-foreground"
                         : cal.verificationStatus === "rejected"
-                        ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
-                        : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                        ? "border-destructive/30 bg-destructive/10 text-destructive"
+                        : "border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 text-foreground"
                     }`}
                   >
                     {cal.verificationStatus}
@@ -544,8 +992,18 @@ function TabCalendars() {
               {/* Actions */}
               <div className="flex flex-row sm:flex-col gap-2 shrink-0">
                 <Button
+                  variant="outline"
                   size="sm"
-                  className="min-h-[44px] bg-emerald-700 text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                  className="min-h-[44px] font-semibold text-xs border-[var(--color-accent)]/40 hover:bg-[var(--color-accent)]/10"
+                  onClick={() => setSelectedCalendar(cal)}
+                >
+                  <Eye className="size-4 text-[var(--color-accent)]" aria-hidden="true" />
+                  <span>Tinjau Profil &amp; Berkas</span>
+                </Button>
+
+                <Button
+                  size="sm"
+                  className="min-h-[44px] font-semibold"
                   disabled={verifyMutation.isPending || cal.verificationStatus === "verified"}
                   onClick={() => handleVerify(cal.id, "verified")}
                 >
@@ -569,15 +1027,28 @@ function TabCalendars() {
                   size="sm"
                   className="min-h-[44px]"
                   disabled={verifyMutation.isPending || cal.verificationStatus === "rejected"}
-                  onClick={() => handleVerify(cal.id, "rejected")}
+                  onClick={() => setSelectedCalendar(cal)}
                 >
                   <XCircle className="size-4" aria-hidden="true" />
-                  Tolak
+                  Tolak...
                 </Button>
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {/* Visual Dossier Modal */}
+      {selectedCalendar && (
+        <AdminReviewDossierModal
+          type="calendar"
+          data={selectedCalendar}
+          isOpen={Boolean(selectedCalendar)}
+          onClose={() => setSelectedCalendar(null)}
+          onApprove={(id) => handleVerify(id, "verified")}
+          onReject={(id, reason) => handleVerify(id, "rejected", reason)}
+          isPending={verifyMutation.isPending}
+        />
       )}
     </div>
   );
@@ -642,17 +1113,20 @@ function AuthorsSection() {
   const reviewMutation = useReviewAuthorApplication();
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [selectedAuthor, setSelectedAuthor] = useState<AdminAuthorApplicationDto | null>(null);
 
-  async function handleReview(id: string, status: "verified" | "rejected") {
+  async function handleReview(id: string, status: "verified" | "rejected", rejectionReason?: string) {
     try {
       setFeedback(null);
       await reviewMutation.mutateAsync({
         id,
         input: {
           status,
+          rejectionReason,
           reviewNotes: reviewNotes[id]?.trim() || undefined,
         },
       });
+      setSelectedAuthor(null);
       setFeedback(
         status === "verified"
           ? "Penulis berhasil disetujui! Status akun dan buku yang diklaim telah diperbarui secara otomatis."
@@ -717,12 +1191,12 @@ function AuthorsSection() {
                   <div className="flex items-center gap-2">
                     <h3 className="text-lg font-bold text-foreground">{app.penName}</h3>
                     <span
-                      className={`rounded px-2 py-0.5 text-xs font-semibold uppercase ${
+                      className={`rounded-md border px-2 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wider ${
                         app.status === "verified"
-                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                          ? "border-border/80 bg-muted text-foreground"
                           : app.status === "rejected"
-                          ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
-                          : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                          ? "border-destructive/30 bg-destructive/10 text-destructive"
+                          : "border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 text-foreground"
                       }`}
                     >
                       {app.status}
@@ -787,8 +1261,18 @@ function AuthorsSection() {
 
                 <div className="flex gap-2 shrink-0">
                   <Button
+                    variant="outline"
                     size="sm"
-                    className="min-h-[44px] bg-emerald-700 text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                    className="min-h-[44px] text-xs font-semibold border-[var(--color-accent)]/40 hover:bg-[var(--color-accent)]/10"
+                    onClick={() => setSelectedAuthor(app)}
+                  >
+                    <Eye className="size-4 text-[var(--color-accent)]" aria-hidden="true" />
+                    <span>Tinjau Profil &amp; Berkas</span>
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    className="min-h-[44px] font-semibold"
                     disabled={reviewMutation.isPending || app.status === "verified"}
                     onClick={() => handleReview(app.id, "verified")}
                   >
@@ -800,16 +1284,29 @@ function AuthorsSection() {
                     size="sm"
                     className="min-h-[44px]"
                     disabled={reviewMutation.isPending || app.status === "rejected"}
-                    onClick={() => handleReview(app.id, "rejected")}
+                    onClick={() => setSelectedAuthor(app)}
                   >
                     <XCircle className="size-4" aria-hidden="true" />
-                    Tolak
+                    Tolak...
                   </Button>
                 </div>
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {/* Visual Dossier Modal */}
+      {selectedAuthor && (
+        <AdminReviewDossierModal
+          type="author"
+          data={selectedAuthor}
+          isOpen={Boolean(selectedAuthor)}
+          onClose={() => setSelectedAuthor(null)}
+          onApprove={(id) => handleReview(id, "verified")}
+          onReject={(id, reason) => handleReview(id, "rejected", reason)}
+          isPending={reviewMutation.isPending}
+        />
       )}
     </div>
   );
@@ -822,11 +1319,13 @@ function PublishersSection() {
   });
   const verifyMutation = useVerifyPublisher();
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [selectedPublisher, setSelectedPublisher] = useState<PublisherDto | null>(null);
 
-  async function handleVerify(id: string, status: "verified" | "rejected") {
+  async function handleVerify(id: string, status: "verified" | "rejected", rejectionReason?: string) {
     try {
       setFeedback(null);
-      await verifyMutation.mutateAsync({ id, input: { status } });
+      await verifyMutation.mutateAsync({ id, input: { status, rejectionReason } });
+      setSelectedPublisher(null);
       setFeedback(`Penerbit mitra berhasil diperbarui menjadi status "${status}".`);
     } catch (err) {
       setFeedback(`Gagal memperbarui status penerbit: ${getErrorMessage(err)}`);
@@ -889,12 +1388,12 @@ function PublishersSection() {
                     /{pub.slug}
                   </span>
                   <span
-                    className={`rounded px-2 py-0.5 text-xs font-semibold uppercase ${
+                    className={`rounded-md border px-2 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wider ${
                       pub.verificationStatus === "verified"
-                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                        ? "border-border/80 bg-muted text-foreground"
                         : pub.verificationStatus === "rejected"
-                        ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
-                        : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                        ? "border-destructive/30 bg-destructive/10 text-destructive"
+                        : "border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 text-foreground"
                     }`}
                   >
                     {pub.verificationStatus}
@@ -931,8 +1430,18 @@ function PublishersSection() {
 
               <div className="flex sm:flex-col gap-2 shrink-0">
                 <Button
+                  variant="outline"
                   size="sm"
-                  className="min-h-[44px] bg-emerald-700 text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                  className="min-h-[44px] font-semibold text-xs border-[var(--color-accent)]/40 hover:bg-[var(--color-accent)]/10"
+                  onClick={() => setSelectedPublisher(pub)}
+                >
+                  <Eye className="size-4 text-[var(--color-accent)]" aria-hidden="true" />
+                  <span>Tinjau Profil &amp; Berkas</span>
+                </Button>
+
+                <Button
+                  size="sm"
+                  className="min-h-[44px] font-semibold"
                   disabled={verifyMutation.isPending || pub.verificationStatus === "verified"}
                   onClick={() => handleVerify(pub.id, "verified")}
                 >
@@ -944,15 +1453,28 @@ function PublishersSection() {
                   size="sm"
                   className="min-h-[44px]"
                   disabled={verifyMutation.isPending || pub.verificationStatus === "rejected"}
-                  onClick={() => handleVerify(pub.id, "rejected")}
+                  onClick={() => setSelectedPublisher(pub)}
                 >
                   <XCircle className="size-4" aria-hidden="true" />
-                  Tolak
+                  Tolak...
                 </Button>
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {/* Visual Dossier Modal */}
+      {selectedPublisher && (
+        <AdminReviewDossierModal
+          type="publisher"
+          data={selectedPublisher}
+          isOpen={Boolean(selectedPublisher)}
+          onClose={() => setSelectedPublisher(null)}
+          onApprove={(id) => handleVerify(id, "verified")}
+          onReject={(id, reason) => handleVerify(id, "rejected", reason)}
+          isPending={verifyMutation.isPending}
+        />
       )}
     </div>
   );
@@ -1035,14 +1557,14 @@ function TabManuscripts() {
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="text-lg font-bold text-foreground break-words">{m.title}</h3>
                   <span
-                    className={`rounded px-2 py-0.5 text-xs font-semibold uppercase ${
+                    className={`rounded-md border px-2 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wider ${
                       m.status === "published"
-                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                        ? "border-border bg-foreground text-background"
                         : m.status === "in_editing"
-                        ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
+                        ? "border-border/80 bg-muted text-foreground"
                         : m.status === "rejected"
-                        ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
-                        : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                        ? "border-destructive/30 bg-destructive/10 text-destructive"
+                        : "border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 text-foreground"
                     }`}
                   >
                     {m.status.replace("_", " ")}
@@ -1105,7 +1627,7 @@ function ManuscriptEditorWorkspace({
     "free_open" | "sample_only" | "alacarte_only" | "print_claim_only" | "hybrid_nakama_alacarte"
   >("sample_only");
   const [alacartePriceIdr, setAlacartePriceIdr] = useState<number>(0);
-  const [status, setStatus] = useState<"pending_review" | "in_editing" | "published" | "rejected">(
+  const [status, setStatus] = useState<ManuscriptSubmissionStatus>(
     "pending_review",
   );
   const [rejectionReason, setRejectionReason] = useState("");
@@ -1328,9 +1850,9 @@ function ManuscriptEditorWorkspace({
           <Button
             onClick={() => setIsPublishing(true)}
             disabled={chapters.length === 0 || manuscript?.status === "published"}
-            className="min-h-[44px] bg-emerald-700 text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 font-bold"
+            className="min-h-[44px] font-semibold"
           >
-            🚀 Terbitkan ke Katalog AnzaBook
+            Terbitkan ke Katalog AnzaBook
           </Button>
         </div>
       </div>
@@ -1342,9 +1864,9 @@ function ManuscriptEditorWorkspace({
       )}
 
       {publishResult && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-6 space-y-3">
-          <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold text-lg">
-            <CheckCircle2 className="size-5" aria-hidden="true" />
+        <div className="rounded-xl border border-border/80 bg-muted/40 p-6 space-y-3">
+          <div className="flex items-center gap-2 text-foreground font-bold text-lg">
+            <CheckCircle2 className="size-5 text-foreground" aria-hidden="true" />
             Naskah Berhasil Diterbitkan ke Katalog AnzaBook!
           </div>
           <p className="text-sm text-foreground/90">
@@ -1683,7 +2205,7 @@ function ManuscriptEditorWorkspace({
               <Button
                 onClick={handlePublishCatalog}
                 disabled={publishMutation.isPending}
-                className="min-h-[44px] bg-emerald-700 text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 font-bold"
+                className="min-h-[44px] font-semibold"
               >
                 {publishMutation.isPending ? (
                   <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
@@ -1868,10 +2390,10 @@ function TabClaimBatches() {
 
       {/* Result of Newly Generated Batch */}
       {lastGeneratedBatch && (
-        <div className="rounded-xl border border-emerald-500/30 bg-card p-6 space-y-4">
+        <div className="rounded-xl border border-border/80 bg-card p-6 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <span className="text-xs font-semibold uppercase text-emerald-600 dark:text-emerald-400">
+              <span className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Batch Berhasil Dibuat
               </span>
               <h3 className="text-xl font-bold text-foreground">
@@ -1893,7 +2415,7 @@ function TabClaimBatches() {
                   lastGeneratedBatch.codes,
                 )
               }
-              className="min-h-[44px] bg-emerald-700 text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 font-bold shrink-0"
+              className="min-h-[44px] font-semibold shrink-0"
             >
               <Download className="size-4" aria-hidden="true" />
               Unduh CSV Siap Cetak ({lastGeneratedBatch.codes.length} Kode)
@@ -2013,7 +2535,7 @@ function TabFinancials({ overview }: { overview: AdminOverviewDto | undefined })
 
         {/* Card 2: Ala Carte Sales */}
         <div className="rounded-xl border border-border bg-card p-6 space-y-3 shadow-xs">
-          <div className="flex items-center justify-between text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+          <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             <span>Buku Satuan (75% : 25%)</span>
             <BookOpen className="size-4" aria-hidden="true" />
           </div>
@@ -2034,7 +2556,7 @@ function TabFinancials({ overview }: { overview: AdminOverviewDto | undefined })
 
         {/* Card 3: Community Affiliate */}
         <div className="rounded-xl border border-border bg-card p-6 space-y-3 shadow-xs">
-          <div className="flex items-center justify-between text-xs font-semibold text-amber-600 dark:text-amber-400">
+          <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             <span>Kas Komunitas Literasi (10%)</span>
             <Users className="size-4" aria-hidden="true" />
           </div>

@@ -71,6 +71,20 @@
       "when": 1794279114956,
       "tag": "0009_oval_scarlet_witch",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794337661552,
+      "tag": "0010_brown_the_anarchist",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794419700058,
+      "tag": "0011_adorable_sinister_six",
+      "breakpoints": true
     }
   ]
 }

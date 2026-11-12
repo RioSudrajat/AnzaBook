@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Link } from "@tanstack/react-router";
 import {
   X,
   Camera,
@@ -28,7 +29,6 @@ import {
   LocationPickerPopover,
   type SelectedLocationState,
 } from "./location-picker-popover";
-import { ApplyCalendarDialog } from "./apply-calendar-dialog";
 import { EventDescriptionDialog } from "./event-description-dialog";
 
 interface CreateEventDialogProps {
@@ -64,7 +64,13 @@ export function CreateEventDialog({
 
   const userRole = session?.user?.role || "user";
   const managedCalendars = React.useMemo(() => {
-    return calendars.filter((c) => c.isManager || userRole === "admin");
+    return calendars.filter(
+      (c) =>
+        (c.isManager &&
+          (c.verificationStatus === "verified" ||
+            c.verificationStatus === "trusted")) ||
+        userRole === "admin",
+    );
   }, [calendars, userRole]);
 
   const [selectedCalendarId, setSelectedCalendarId] = React.useState<string>("");
@@ -449,17 +455,17 @@ export function CreateEventDialog({
                       ))
                     )}
                     <div className="mt-1 border-t border-white/10 pt-1">
-                      <button
-                        type="button"
+                      <Link
+                        to="/partner-program"
                         onClick={() => {
                           setIsCalendarMenuOpen(false);
-                          setIsApplyCalendarOpen(true);
+                          onClose();
                         }}
                         className="flex w-full items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-amber-400 hover:bg-white/10 transition-colors"
                       >
                         <Plus className="size-3.5" />
-                        <span>+ Ajukan Kalender Baru</span>
-                      </button>
+                        <span>Daftarkan Komunitas (Partner Program)</span>
+                      </Link>
                     </div>
                   </div>
                 )}
@@ -856,15 +862,6 @@ export function CreateEventDialog({
         onClose={() => setIsDescDialogOpen(false)}
         value={description}
         onSave={setDescription}
-      />
-
-      {/* Apply Calendar Modal if needed */}
-      <ApplyCalendarDialog
-        open={isApplyCalendarOpen}
-        onClose={() => setIsApplyCalendarOpen(false)}
-        onSuccess={(calSlug) => {
-          setIsApplyCalendarOpen(false);
-        }}
       />
     </div>
   );

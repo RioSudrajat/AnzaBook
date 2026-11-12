@@ -27,7 +27,8 @@ type DashboardHomeProps = {
   authors: AuthorSummaryDto[];
   bulletinBook: BookSummaryDto | null;
   collections: CollectionSummaryDto[];
-  currentlyReading?: ShelfItemDto;
+  currentlyReading?: ShelfItemDto | ShelfItemDto[];
+  currentlyReadingList?: ShelfItemDto[];
 };
 
 export function DashboardHome({
@@ -36,9 +37,16 @@ export function DashboardHome({
   bulletinBook,
   collections,
   currentlyReading,
+  currentlyReadingList,
 }: DashboardHomeProps) {
   const { data: eventsData } = useEvents({ limit: 4 });
   const upcomingEvents = eventsData?.data || [];
+
+  const readingList: ShelfItemDto[] = Array.isArray(currentlyReading)
+    ? currentlyReading
+    : currentlyReading
+      ? [currentlyReading]
+      : currentlyReadingList || [];
 
   const popularBooks = books
     .filter((book) => book.ratingCount > 0)
@@ -121,6 +129,11 @@ export function DashboardHome({
           >
             <BookOpen className="size-4 text-accent" aria-hidden="true" />
             Lanjutkan Membaca
+            {readingList.length > 0 && (
+              <span className="text-xs font-mono font-normal text-muted-foreground">
+                ({readingList.length})
+              </span>
+            )}
           </h2>
           <Link
             to="/app"
@@ -130,79 +143,100 @@ export function DashboardHome({
             Rak Saya <ChevronRight className="size-4" aria-hidden="true" />
           </Link>
         </div>
-        {currentlyReading ? (
-          <div className="flex max-w-xl flex-wrap items-center justify-between gap-4 rounded-lg border bg-card p-4">
-            <div className="flex min-w-0 items-center gap-4">
-              <BookCover
-                book={currentlyReading.book}
-                className="w-16 shrink-0"
-                decorative
-              />
-              <div className="min-w-0 space-y-1">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {currentlyReading.book.accessTier === "premium" ? (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 font-mono text-[10px] font-semibold text-foreground border border-border/40">
-                      <Crown
-                        className="size-3 text-foreground/85"
-                        aria-hidden="true"
-                      />
-                      Premium
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 font-mono text-[10px] font-semibold text-foreground border border-border/40">
-                      <Unlock
-                        className="size-3 text-foreground/85"
-                        aria-hidden="true"
-                      />
-                      Free
-                    </span>
-                  )}
-                  {currentlyReading.book.hasPhysical && (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 font-mono text-[10px] font-semibold text-foreground border border-border/40">
-                      <Book
-                        className="size-3 text-foreground/85"
-                        aria-hidden="true"
-                      />
-                      Fisik
-                    </span>
-                  )}
-                </div>
-                <h3 className="font-serif text-sm font-bold">
-                  {currentlyReading.book.title}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {currentlyReading.book.author}
-                </p>
-                <div className="flex items-center gap-2 pt-1">
-                  <progress
-                    aria-label={
-                      currentlyReading.previewProgressPercent == null
-                        ? "Progres buku"
-                        : "Progres cuplikan"
-                    }
-                    value={
-                      currentlyReading.previewProgressPercent ??
-                      currentlyReading.progressPercent
-                    }
-                    max={100}
-                    className="h-2 w-24 accent-primary"
+
+        {readingList.length > 0 ? (
+          <div className="flex gap-4 overflow-x-auto pb-3 pt-1 scrollbar-none snap-x snap-mandatory">
+            {readingList.map((item) => (
+              <div
+                key={item.id}
+                className="flex w-[290px] sm:w-[330px] shrink-0 snap-start items-center justify-between gap-3.5 rounded-xl border border-border/80 bg-card p-4 hover:border-foreground/30 transition-all shadow-xs"
+              >
+                <Link
+                  to="/read/$slug"
+                  params={{ slug: item.book.slug }}
+                  className="shrink-0 focus-visible:outline-2 focus-visible:outline-ring rounded-md group"
+                  title={item.book.title}
+                >
+                  <BookCover
+                    book={item.book}
+                    className="w-14 sm:w-16 shrink-0 shadow-sm rounded-md group-hover:scale-105 transition-transform"
+                    decorative
                   />
-                  <span className="text-sm tabular-nums text-muted-foreground">
-                    {currentlyReading.previewProgressPercent == null
-                      ? `${currentlyReading.progressPercent}%`
-                      : `Cuplikan ${currentlyReading.previewProgressPercent}%`}
-                  </span>
+                </Link>
+
+                <div className="min-w-0 flex-1 space-y-1.5 flex flex-col justify-between self-stretch">
+                  <div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {item.book.accessTier === "premium" ? (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 font-mono text-[10px] font-semibold text-foreground border border-border/40">
+                          <Crown
+                            className="size-3 text-foreground/85"
+                            aria-hidden="true"
+                          />
+                          Premium
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 font-mono text-[10px] font-semibold text-foreground border border-border/40">
+                          <Unlock
+                            className="size-3 text-foreground/85"
+                            aria-hidden="true"
+                          />
+                          Free
+                        </span>
+                      )}
+                      {item.book.hasPhysical && (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 font-mono text-[10px] font-semibold text-foreground border border-border/40">
+                          <Book
+                            className="size-3 text-foreground/85"
+                            aria-hidden="true"
+                          />
+                          Fisik
+                        </span>
+                      )}
+                    </div>
+
+                    <Link
+                      to="/read/$slug"
+                      params={{ slug: item.book.slug }}
+                      className="hover:underline focus-visible:outline-2 focus-visible:outline-ring rounded-xs"
+                    >
+                      <h3 className="font-serif text-sm font-bold text-foreground line-clamp-1 mt-1 leading-snug">
+                        {item.book.title}
+                      </h3>
+                    </Link>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {item.book.author}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1 pt-1">
+                    <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="bg-[var(--color-accent)] h-1.5 rounded-full"
+                        style={{
+                          width: `${Math.min(100, Math.max(0, item.previewProgressPercent ?? item.progressPercent))}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] font-mono text-muted-foreground">
+                      <span>
+                        {item.previewProgressPercent == null
+                          ? `${item.progressPercent}%`
+                          : `Cuplikan ${item.previewProgressPercent}%`}
+                      </span>
+                      <Link
+                        to="/read/$slug"
+                        params={{ slug: item.book.slug }}
+                        className="text-xs font-semibold text-[var(--color-accent)] hover:underline inline-flex items-center gap-0.5"
+                      >
+                        <span>Lanjut</span>
+                        <ChevronRight className="size-3" />
+                      </Link>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-            <Button asChild className="min-h-11 shrink-0">
-              <Link
-                to="/read/$slug"
-                params={{ slug: currentlyReading.book.slug }}
-              >
-                Lanjut Baca
-              </Link>
-            </Button>
+            ))}
           </div>
         ) : (
           <div className="flex max-w-xl flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed p-4">
@@ -376,9 +410,12 @@ export function DashboardHome({
               <ChevronRight className="size-4" aria-hidden="true" />
             </Link>
           </div>
-          <ul className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-6">
-            {books.slice(0, 6).map((book) => (
-              <li key={book.id}>
+          <ul className="flex gap-4 sm:gap-5 overflow-x-auto pb-4 pt-1 scrollbar-none snap-x snap-mandatory">
+            {books.map((book) => (
+              <li
+                key={book.id}
+                className="w-[145px] sm:w-[165px] shrink-0 snap-start"
+              >
                 <Link
                   to="/books/$slug"
                   params={{ slug: book.slug }}
@@ -386,7 +423,7 @@ export function DashboardHome({
                 >
                   <BookCover
                     book={book}
-                    className="w-full group-hover:scale-[1.02] transition-transform"
+                    className="w-full shadow-sm rounded-md group-hover:scale-[1.03] transition-transform"
                     decorative
                   />
                   <div className="flex items-center gap-1 flex-wrap pt-0.5">
@@ -420,7 +457,9 @@ export function DashboardHome({
                   <h3 className="font-serif text-sm font-semibold leading-snug line-clamp-2 group-hover:text-[var(--color-accent)] transition-colors">
                     {book.title}
                   </h3>
-                  <p className="text-xs text-muted-foreground line-clamp-1">{book.author}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-1">
+                    {book.author}
+                  </p>
                 </Link>
               </li>
             ))}
@@ -433,26 +472,28 @@ export function DashboardHome({
           <h2 id="authors-heading" className="font-serif text-xl font-bold">
             Para Penulis
           </h2>
-          <ul className="flex flex-wrap items-start gap-5">
+          <ul className="flex items-start gap-5 sm:gap-6 overflow-x-auto pb-4 pt-1 scrollbar-none snap-x">
             {authors.map((author) => (
               <li
                 key={author.name}
-                className="flex w-24 flex-col items-center gap-2 text-center"
+                className="flex w-24 shrink-0 snap-start flex-col items-center gap-2 text-center group cursor-pointer"
               >
-                <div className="flex size-16 items-center justify-center overflow-hidden rounded-full border bg-muted font-serif text-lg font-bold">
+                <div className="flex size-16 sm:size-18 items-center justify-center overflow-hidden rounded-full border border-border/80 bg-muted font-serif text-lg font-bold text-foreground shadow-2xs group-hover:scale-105 group-hover:border-[var(--color-accent)] transition-all">
                   {author.avatarUrl ? (
                     <img
                       src={author.avatarUrl}
-                      alt=""
+                      alt={author.name}
                       className="size-full object-cover"
                     />
                   ) : (
                     <span aria-hidden="true">{author.name.slice(0, 1)}</span>
                   )}
                 </div>
-                <div>
-                  <p className="font-serif text-xs font-bold">{author.name}</p>
-                  <p className="text-xs text-muted-foreground">
+                <div className="w-full">
+                  <p className="font-serif text-xs font-bold text-foreground group-hover:text-[var(--color-accent)] transition-colors line-clamp-1">
+                    {author.name}
+                  </p>
+                  <p className="text-[11px] font-mono text-muted-foreground mt-0.5">
                     {author.bookCount} buku
                   </p>
                 </div>

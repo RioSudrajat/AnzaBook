@@ -1,7 +1,7 @@
 import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Camera, Link as LinkIcon, Loader2, LogOut, QrCode, Trash2 } from "lucide-react";
+import { BookOpen, Camera, ExternalLink, Link as LinkIcon, Loader2, LogOut, QrCode, Sparkles, Trash2 } from "lucide-react";
 import { membershipUsernameSchema } from "@starter/shared/validators/membership";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -583,6 +583,26 @@ export function DashboardSettings({
                   <QrCode className="size-3.5" />
                   <span>Tampilkan QR</span>
                 </Button>
+              </div>
+            </div>
+
+            {/* Partner Program */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-4 items-start pt-2 border-t border-border/40">
+              <span className="sm:col-span-3 text-muted-foreground pt-1">
+                Partner Program
+              </span>
+              <div className="sm:col-span-9 space-y-1.5">
+                <Link
+                  to="/partner-program"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/40 hover:bg-muted border border-border/80 text-xs font-mono font-medium text-foreground transition-colors cursor-pointer group"
+                >
+                  <BookOpen className="size-3.5 text-foreground shrink-0" />
+                  <span className="group-hover:underline">AnzaBook Partner Program</span>
+                  <ExternalLink className="size-3 text-muted-foreground ml-1" />
+                </Link>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Jembatan kemitraan dan bagi hasil royalti untuk Penulis Resmi, Penerbit Mitra, dan Komunitas Literasi.
+                </p>
               </div>
             </div>
           </div>

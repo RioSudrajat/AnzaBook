@@ -161,7 +161,7 @@ export function LiveStockTracker({
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto no-scrollbar scrollbar-none">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-border/70 text-muted-foreground font-mono uppercase text-[10px] tracking-wider">

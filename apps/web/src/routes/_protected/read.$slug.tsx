@@ -8,7 +8,7 @@ import {
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { CheckCircle2, Flame, Share2, Star, Trophy, X } from "lucide-react";
+import { CheckCircle2, Flame, Share2, Sparkles, Star, Trophy, X } from "lucide-react";
 import { z } from "zod";
 import {
   splitChapterIntoPages,
@@ -16,7 +16,12 @@ import {
   getChapterAndPageFromGlobal,
 } from "@starter/shared/chapter-pagination";
 import { bookProgressPercent } from "@starter/shared/reading-progress";
-import type { BookHighlightDto, HighlightColor } from "@starter/shared/types";
+import type {
+  BookHighlightDto,
+  HighlightColor,
+  BookReaderPayloadDto,
+  ManuscriptChapterDto,
+} from "@starter/shared/types";
 import type { SaveReadingProgressInput } from "@starter/shared/validators/reading";
 import { Button } from "@/components/ui/button";
 import {
@@ -56,12 +61,61 @@ import {
   type ReadingLayout,
   ReaderToolbar,
 } from "@/features/reader/components/reader-toolbar";
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import ImageExtension from "@tiptap/extension-image";
+import Placeholder from "@tiptap/extension-placeholder";
+import { TextStyle } from "@tiptap/extension-text-style";
+import { Color } from "@tiptap/extension-color";
+import Highlight from "@tiptap/extension-highlight";
+import TextAlign from "@tiptap/extension-text-align";
+import {
+  PageBreak,
+  ChapterBreak,
+  NakamaPaywall,
+  SubstackButton,
+  AudioEmbed,
+  VideoEmbed,
+  CalloutBox,
+  FinancialChart,
+  LatexBlock,
+  Collapsible,
+  PoetryBlock,
+  PollBlock,
+  PredictionMarket,
+  RecipeBlock,
+  AudienceGated,
+  FootnoteBlock,
+  ThinDivider,
+  MediumDivider,
+} from "@/features/reader/editor/extensions";
+import { SubstackEditorToolbar } from "@/features/reader/editor/components/substack-editor-toolbar";
+import { ReaderBookHeader } from "@/features/reader/components/reader-book-header";
+import {
+  ManuscriptConfigDialog,
+  type ManuscriptConfigData,
+} from "@/features/reader/components/manuscript-config-dialog";
+import {
+  buildUnifiedDocFromChapters,
+  extractChaptersFromJson,
+  type ExtractedChapter,
+} from "@/features/reader/editor/manuscript-json";
+import {
+  useManuscript,
+  useUpdateManuscript,
+  useSubmitManuscriptDraft,
+  useReviewManuscript,
+  useTogglePostHighlight,
+  useTogglePostSession,
+} from "@/features/social/hooks";
+import "@/features/reader/editor/components/editor-styles.css";
 
 const readSearchSchema = z.object({
   mode: z.enum(["full", "blueprint", "audio"]).optional(),
   chapter: z.coerce.number().int().min(1).optional().catch(undefined),
   page: z.coerce.number().int().min(1).optional(),
   drm: z.coerce.boolean().optional(),
+  editorial: z.enum(["preview", "edit"]).optional(),
 });
 
 export const Route = createFileRoute("/_protected/read/$slug")({
@@ -71,7 +125,35 @@ export const Route = createFileRoute("/_protected/read/$slug")({
 
 function splitParagraphs(text?: string | null): string[] {
   if (!text) return [];
+  if (!text.includes("<")) {
+    return text
+      .split(/\n\n+/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+  }
+  // Content is HTML from Tiptap or rich editor
+  if (typeof document !== "undefined") {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(text, "text/html");
+    doc
+      .querySelectorAll(
+        '[data-type="chapter-break"], [data-type="page-break"], .tiptap-chapter-break, .tiptap-page-break',
+      )
+      .forEach((el) => el.remove());
+
+    const paras: string[] = [];
+    doc.body
+      .querySelectorAll("p, h1, h2, h3, h4, blockquote, li")
+      .forEach((el) => {
+        const t = el.textContent?.trim();
+        if (t) paras.push(t);
+      });
+    if (paras.length > 0) return paras;
+    const fallback = doc.body.textContent?.trim();
+    return fallback ? [fallback] : [];
+  }
   return text
+    .replace(/<[^>]*>/g, "\n\n")
     .split(/\n\n+/)
     .map((p) => p.trim())
     .filter(Boolean);
@@ -204,17 +286,142 @@ function ReaderBook() {
   const queryClient = useQueryClient();
   const requestedChapter = search.chapter ?? 1;
 
+  const isManuscript = slug.startsWith("manuscript-") || slug.startsWith("manu-");
+  const manuscriptId = isManuscript
+    ? slug.replace(/^manuscript-/, "").replace(/^manu-/, "")
+    : "";
+
   const {
-    data: payload,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useBookReader(slug, {
+    data: manuscript,
+    isLoading: isManuscriptLoading,
+    refetch: refetchManuscript,
+  } = useManuscript(manuscriptId);
+
+  const updateManuscriptMutation = useUpdateManuscript();
+  const submitDraftMutation = useSubmitManuscriptDraft();
+  const reviewMutation = useReviewManuscript();
+
+  const {
+    data: bookPayload,
+    isLoading: isBookLoading,
+    isError: isBookError,
+    error: bookError,
+    refetch: refetchBook,
+  } = useBookReader(isManuscript ? "" : slug, {
     mode: "full",
     chapter: requestedChapter,
     continuous: true,
   });
+
+  const manuscriptPayload: (BookReaderPayloadDto & { watermark: string }) | null = useMemo(() => {
+    if (!manuscript) return null;
+    const chaps: ManuscriptChapterDto[] =
+      manuscript.chapters && manuscript.chapters.length > 0
+        ? manuscript.chapters
+        : [
+            {
+              id: "ch-1",
+              manuscriptId: manuscript.id,
+              chapterNumber: 1,
+              titleId: "Bab 1: Permulaan",
+              contentId: "Tuliskan naskah Anda di sini...",
+              contentEn: null,
+              blueprintContent: "",
+              estimatedMinutes: 5,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+          ];
+
+    return {
+      book: {
+        id: manuscript.id,
+        slug: `manuscript-${manuscript.id}`,
+        title: manuscript.title || "Naskah Tanpa Judul",
+        author: user.name || "Penulis",
+        coverUrl:
+          manuscript.coverUrl || "template",
+        synopsis: manuscript.synopsis || "",
+        readingMinutes: 15,
+        pageCount: (manuscript as any).pageCount || 10,
+        totalChapters: chaps.length,
+        accessTier: "free" as const,
+        digitalPolicy: (manuscript.proposedDigitalPolicy as any) || "hybrid_nakama_alacarte",
+        authorUserId: manuscript.authorUserId,
+        publisherId: manuscript.publisherId,
+      } as any,
+      mode: "full" as const,
+      currentChapter: {
+        id: chaps[0].id || "1",
+        chapterNumber: chaps[0].chapterNumber || 1,
+        title: chaps[0].titleId || "Bab 1",
+        contentId: chaps[0].contentId || "",
+        contentEn: chaps[0].contentEn || null,
+        blueprintContent: chaps[0].blueprintContent || "",
+        audioUrl: null,
+        audioDurationSeconds: null,
+      },
+      chapters: chaps.map((c) => ({
+        id: c.id || String(c.chapterNumber),
+        chapterNumber: c.chapterNumber,
+        title: c.titleId,
+        contentId: c.contentId,
+        contentEn: c.contentEn || null,
+        blueprintContent: c.blueprintContent || "",
+        audioUrl: null,
+        audioDurationSeconds: null,
+      })),
+      allChapters: chaps.map((c) => ({
+        id: c.id || String(c.chapterNumber),
+        chapterNumber: c.chapterNumber,
+        title: c.titleId,
+        isSample: true,
+      })),
+      hasFullAccess: true,
+      accessExpiresAt: null,
+      watermark: "DRAF EDITORIAL ANZA",
+    };
+  }, [manuscript, user.name]);
+
+  const payload = isManuscript ? manuscriptPayload : bookPayload;
+  const isLoading = isManuscript ? isManuscriptLoading : isBookLoading;
+  const isError = isManuscript ? false : isBookError;
+  const error = isManuscript ? null : bookError;
+  const refetch = isManuscript ? refetchManuscript : refetchBook;
+
+  const isAuthorOrPublisher = Boolean(
+    isManuscript ||
+    ((payload?.book as any)?.authorUserId && (payload?.book as any).authorUserId === user.id) ||
+    user.role === "admin"
+  );
+
+  const [editMode, setEditMode] = useState<"preview" | "edit">(
+    search.editorial ?? (isManuscript && manuscript?.status === "draft" ? "edit" : "preview")
+  );
+  const [editorialTitle, setEditorialTitle] = useState("");
+  const [editorialCoverUrl, setEditorialCoverUrl] = useState<string | null>(null);
+  const [editorialCoverColor, setEditorialCoverColor] = useState<string>("#181614");
+  const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
+  const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
+  const [editorialNotes, setEditorialNotes] = useState("");
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+
+  const coverInitializedRef = useRef(false);
+
+  useEffect(() => {
+    if (payload?.book?.title && !editorialTitle) {
+      setEditorialTitle(payload.book.title);
+    }
+    if (!coverInitializedRef.current && payload?.book) {
+      if (payload.book.coverUrl) {
+        setEditorialCoverUrl(payload.book.coverUrl);
+      }
+      if (payload.book.coverColor) {
+        setEditorialCoverColor(payload.book.coverColor);
+      }
+      coverInitializedRef.current = true;
+    }
+  }, [payload?.book, editorialTitle]);
 
   const bookId = payload?.book?.id || "";
   const scope = payload?.hasFullAccess ? "full" : "preview";
@@ -229,6 +436,11 @@ function ReaderBook() {
   const { data: bookHighlights = [] } = useBookHighlights(bookId);
   const createHighlightMutation = useCreateHighlight(bookId);
   const deleteHighlightMutation = useDeleteHighlight(bookId);
+  const togglePostHighlightMutation = useTogglePostHighlight();
+  const togglePostSessionMutation = useTogglePostSession();
+
+  const [createdSessionId, setCreatedSessionId] = useState<string | null>(null);
+  const [isSessionPosted, setIsSessionPosted] = useState(false);
 
   // Local optimistic highlights to ensure immediate instant stabilo rendering
   const [optimisticHighlights, setOptimisticHighlights] = useState<
@@ -245,6 +457,146 @@ function ReaderBook() {
     ),
     ...bookHighlights,
   ];
+
+  const initialEditorContent = useMemo(() => {
+    return buildUnifiedDocFromChapters(
+      payload?.chapters || [],
+      editorialTitle || payload?.book?.title || "Bab 1: Permulaan",
+    );
+  }, [payload?.chapters, payload?.book?.title, editorialTitle]);
+
+  // Live Chapter State derived from Tiptap JSON AST (Industry Standard)
+  const [liveChapters, setLiveChapters] = useState<ExtractedChapter[]>(() => {
+    return extractChaptersFromJson(initialEditorContent);
+  });
+
+  const syncLiveChaptersFromEditor = useCallback((ed: any) => {
+    if (!ed) return;
+    const json = ed.getJSON();
+    const chaps = extractChaptersFromJson(json);
+    setLiveChapters(chaps);
+  }, []);
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: {
+          levels: [1, 2, 3],
+        },
+      }),
+      ImageExtension.configure({
+        inline: false,
+        allowBase64: true,
+      }),
+      Placeholder.configure({
+        placeholder:
+          "Mulai menulis naskah Anda di sini (mendukung paragraf, heading, kutipan, pemisah)...",
+      }),
+      TextStyle,
+      Color,
+      Highlight.configure({ multicolor: true }),
+      TextAlign.configure({
+        types: ["heading", "paragraph"],
+      }),
+      PageBreak,
+      ChapterBreak,
+      NakamaPaywall,
+      SubstackButton,
+      AudioEmbed,
+      VideoEmbed,
+      CalloutBox,
+      FinancialChart,
+      LatexBlock,
+      Collapsible,
+      PoetryBlock,
+      PollBlock,
+      PredictionMarket,
+      RecipeBlock,
+      AudienceGated,
+      FootnoteBlock,
+      ThinDivider,
+      MediumDivider,
+    ],
+    content: initialEditorContent,
+    editable: editMode === "edit",
+    onUpdate({ editor: currentEditor }) {
+      if (isAuthorOrPublisher) {
+        syncLiveChaptersFromEditor(currentEditor);
+      }
+    },
+  });
+
+  useEffect(() => {
+    if (editor && isAuthorOrPublisher) {
+      syncLiveChaptersFromEditor(editor);
+    }
+  }, [editor, isAuthorOrPublisher, syncLiveChaptersFromEditor]);
+
+  // Derived effective chapters: prioritizes live editor chapters for authors/publishers
+  const displayChapters = useMemo(() => {
+    if (isAuthorOrPublisher && liveChapters.length > 0) {
+      return liveChapters.map((c) => ({
+        id: `live-toc-${c.chapterNumber}`,
+        chapterNumber: c.chapterNumber,
+        title: c.title,
+        isSample: true,
+      }));
+    }
+    return payload?.allChapters || [];
+  }, [isAuthorOrPublisher, liveChapters, payload?.allChapters]);
+
+  useEffect(() => {
+    if (editor) {
+      editor.setEditable(editMode === "edit");
+    }
+  }, [editor, editMode]);
+
+  const isPublisherReview = Boolean(
+    isManuscript &&
+      manuscript &&
+      (manuscript.status === "pending_review" ||
+        manuscript.status === "in_editing" ||
+        manuscript.status === "revision_requested"),
+  );
+
+  const handleSaveDraft = async () => {
+    if (!isManuscript || !manuscriptId || !editor) return;
+    setIsSavingDraft(true);
+    try {
+      const fullDocJson = editor.getJSON();
+      const extracted = extractChaptersFromJson(fullDocJson);
+
+      await updateManuscriptMutation.mutateAsync({
+        idOrSlug: manuscriptId,
+        input: {
+          title: editorialTitle.trim() || undefined,
+          coverUrl:
+            editorialCoverUrl === "template"
+              ? null
+              : editorialCoverUrl !== undefined
+                ? editorialCoverUrl
+                : undefined,
+          chapters: extracted.map((chap) => ({
+            chapterNumber: chap.chapterNumber,
+            titleId: chap.title,
+            contentId: JSON.stringify(chap.doc),
+            blueprintContent: JSON.stringify(chap.doc),
+            estimatedMinutes: Math.max(
+              1,
+              Math.ceil(
+                chap.plainTextParagraphs.join(" ").split(/\s+/).length / 200,
+              ),
+            ),
+          })),
+        },
+      });
+      await refetchManuscript();
+    } catch (err) {
+      console.error("Failed to save manuscript draft", err);
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
 
   // Reader Settings State
   const [theme, setTheme] = useState<ReaderTheme>("manila");
@@ -319,21 +671,33 @@ function ReaderBook() {
     return () => clearTimeout(pendingCheckpoint.current);
   }, []);
 
+  const accessibleChapters = useMemo(() => {
+    if (isAuthorOrPublisher && liveChapters.length > 0) {
+      return liveChapters.map((c) => ({
+        id: `live-chap-${c.chapterNumber}`,
+        chapterNumber: c.chapterNumber,
+        title: c.title,
+        contentId: JSON.stringify(c.doc),
+        contentEn: null,
+        blueprintContent: JSON.stringify(c.doc),
+        audioUrl: null,
+        audioDurationSeconds: null,
+      }));
+    }
+    return payload?.chapters?.length
+      ? payload.chapters
+      : payload?.currentChapter
+        ? [payload.currentChapter]
+        : [];
+  }, [isAuthorOrPublisher, liveChapters, payload?.chapters, payload?.currentChapter]);
+
   const selectedChapter =
     readingLayout === "scroll" ? scrollPosition.chapter : slidePosition.chapter;
   const chapter =
-    payload?.chapters?.find((item) => item.chapterNumber === selectedChapter) ??
+    accessibleChapters.find((item: any) => item.chapterNumber === selectedChapter) ??
+    accessibleChapters[0] ??
     payload?.currentChapter;
   const activeChapterNum = chapter?.chapterNumber ?? requestedChapter;
-  const accessibleChapters = useMemo(
-    () =>
-      payload?.chapters?.length
-        ? payload.chapters
-        : payload?.currentChapter
-          ? [payload.currentChapter]
-          : [],
-    [payload?.chapters, payload?.currentChapter],
-  );
   const fontClass =
     fontFamily === "serif"
       ? "font-serif"
@@ -365,7 +729,7 @@ function ReaderBook() {
     if (waitingForCheckpoint) return;
     const checkpoint = search.chapter === undefined ? progress : null;
     const savedChapter = payload.chapters?.find(
-      (item) => item.chapterNumber === checkpoint?.lastChapterNumber,
+      (item: any) => item.chapterNumber === checkpoint?.lastChapterNumber,
     );
     const frame = requestAnimationFrame(() => {
       hasRestoredRef.current = true;
@@ -546,7 +910,7 @@ function ReaderBook() {
     }
     if (atBookEnd) body = finalSection;
     const visibleChapter = payload?.chapters?.find(
-      (item) => item.chapterNumber === Number(body.dataset.chapterNumber),
+      (item: any) => item.chapterNumber === Number(body.dataset.chapterNumber),
     );
     if (visibleChapter) {
       positionChapter = visibleChapter;
@@ -621,6 +985,27 @@ function ReaderBook() {
   useEffect(() => {
     if (!chapter || readingLayout !== "scroll") return;
     const handleScroll = () => {
+      // Live Chapter Detection for Editorial Mode (Updates left TOC active indicator on scroll)
+      if (isAuthorOrPublisher) {
+        const chapterBreaks = Array.from(
+          document.querySelectorAll<HTMLElement>('[data-type="chapter-break"]')
+        );
+        let detected = 1;
+        const viewportMarker = window.innerHeight * 0.36;
+        for (const cb of chapterBreaks) {
+          const num = Number(cb.getAttribute("data-chapter-number")) || 1;
+          if (cb.getBoundingClientRect().top <= viewportMarker) {
+            detected = num;
+          }
+        }
+        if (detected !== activeChapterNum) {
+          setScrollPosition((previous) => ({
+            ...previous,
+            chapter: detected,
+          }));
+        }
+      }
+
       const position = capturePosition();
       if (
         !position ||
@@ -642,9 +1027,11 @@ function ReaderBook() {
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, [
+    activeChapterNum,
     capturePosition,
     chapter,
     expiredAccess,
+    isAuthorOrPublisher,
     payload?.accessExpiresAt,
     queueCheckpoint,
     readingLayout,
@@ -686,6 +1073,38 @@ function ReaderBook() {
   }
 
   async function handleSelectChapter(ch: number) {
+    if (readingLayout === "slide") {
+      setSlidePosition({ chapter: ch, paragraph: -1, offset: 0 });
+      return;
+    }
+
+    if (isAuthorOrPublisher) {
+      setScrollPosition((prev) => ({ ...prev, chapter: ch }));
+      if (ch === 1) {
+        const chap1Break = document.querySelector(
+          '[data-type="chapter-break"][data-chapter-number="1"]'
+        );
+        if (chap1Break) {
+          chap1Break.scrollIntoView({ behavior: "smooth", block: "start" });
+          return;
+        }
+        const canvas =
+          document.querySelector(".tiptap-editorial-canvas") ||
+          document.querySelector("header");
+        if (canvas) {
+          canvas.scrollIntoView({ behavior: "smooth", block: "start" });
+          return;
+        }
+      }
+      const targetEl = document.querySelector(
+        `[data-type="chapter-break"][data-chapter-number="${ch}"]`
+      );
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+    }
+
     if (ch === activeChapterNum) return;
     if (!payload?.hasFullAccess) {
       paywallRef.current?.focus();
@@ -791,6 +1210,21 @@ function ReaderBook() {
     }
   };
 
+  // Handle toggling highlight public post status
+  const handleTogglePostHighlight = async (id: string, isPosted: boolean) => {
+    setOptimisticHighlights((prev) =>
+      prev.map((h) => (h.id === id ? { ...h, isPosted } : h)),
+    );
+    try {
+      await togglePostHighlightMutation.mutateAsync({
+        highlightId: id,
+        isPosted,
+      });
+    } catch (err) {
+      console.error("Gagal mengubah status publikasi stabilo:", err);
+    }
+  };
+
   async function saveSession(
     destination: "home" | "membership" | "summary",
     finishedBook = false,
@@ -824,7 +1258,7 @@ function ReaderBook() {
             Math.max(1, Math.round((Date.now() - startTimeRef.current) / 1000)),
           );
           const positionChapter = payload?.chapters?.find(
-            (item) => item.chapterNumber === position.lastChapterNumber,
+            (item: any) => item.chapterNumber === position.lastChapterNumber,
           );
           const words = splitParagraphs(
             positionChapter?.contentId ?? chapter?.contentId,
@@ -839,7 +1273,7 @@ function ReaderBook() {
             Math.min(1200, Math.round((words * 60) / durationSeconds)),
           );
           sessionIdRef.current ??= crypto.randomUUID();
-          await createSessionMutation.mutateAsync({
+          const createdSession = await createSessionMutation.mutateAsync({
             sessionId: sessionIdRef.current,
             bookId,
             pagesRead,
@@ -847,6 +1281,10 @@ function ReaderBook() {
             avgWpm: wpm,
             mode: "full",
           });
+          if (createdSession?.id) {
+            setCreatedSessionId(createdSession.id);
+            setIsSessionPosted(false);
+          }
           sessionIdRef.current = null;
           startTimeRef.current = 0;
           setSessionSummary({
@@ -973,7 +1411,7 @@ function ReaderBook() {
   const isPremiumPreview =
     !payload.hasFullAccess && book.accessTier === "premium";
   const chapterIndex = allChapters.findIndex(
-    (item) => item.chapterNumber === activeChapterNum,
+    (item: any) => item.chapterNumber === activeChapterNum,
   );
   const nextChapter = payload.hasFullAccess
     ? allChapters[chapterIndex + 1]?.chapterNumber
@@ -999,7 +1437,7 @@ function ReaderBook() {
         {/* Sticky Header: Reader Toolbar + Audio Player (stacked in single sticky container so they NEVER overlap) */}
         <div className="sticky top-0 z-40 w-full bg-background/95 backdrop-blur-md border-b border-border/40 transition-colors">
           <ReaderToolbar
-            bookTitle={book.title}
+            bookTitle={editorialTitle || book.title}
             readingLayout={readingLayout}
             onReadingLayoutChange={changeReadingLayout}
             languageView={languageView}
@@ -1011,7 +1449,7 @@ function ReaderBook() {
             fontSize={fontSize}
             onFontSizeChange={setFontSize}
             currentChapter={activeChapterNum}
-            allChapters={allChapters}
+            allChapters={displayChapters}
             onSelectChapter={handleSelectChapter}
             onFinishSession={() => void saveSession("summary")}
             onExit={() => void saveSession("home")}
@@ -1033,7 +1471,25 @@ function ReaderBook() {
                 trigger: event.currentTarget,
               })
             }
+            isAuthorOrPublisher={isAuthorOrPublisher}
+            editMode={editMode}
+            onEditModeChange={setEditMode}
+            onSaveDraft={handleSaveDraft}
+            onSubmitDraft={
+              isPublisherReview
+                ? () => setIsPublishDialogOpen(true)
+                : () => setIsConfigDialogOpen(true)
+            }
+            submitDraftLabel={
+              isPublisherReview ? "Review & Terbitkan" : "Ajukan Naskah"
+            }
+            isSavingDraft={isSavingDraft}
           />
+
+          {/* Substack-Style Rich Formatting Toolbar (Active when in Edit Mode) */}
+          {isAuthorOrPublisher && editMode === "edit" && (
+            <SubstackEditorToolbar editor={editor} />
+          )}
 
           {/* Floating Audio Player when Opened */}
           {isAudioOpen && currentChapter.audioUrl && (
@@ -1061,7 +1517,7 @@ function ReaderBook() {
         {/* Left Dynamic TOC Sidebar (Only rendered in Scroll Mode; hidden in Slide Mode so it never obstructs the book spread) */}
         {readingLayout === "scroll" && (
           <ReaderSidebarToc
-            chapters={allChapters}
+            chapters={displayChapters}
             currentChapterNumber={activeChapterNum}
             onSelectChapter={handleSelectChapter}
           />
@@ -1088,7 +1544,33 @@ function ReaderBook() {
           {readingLayout === "scroll" ? (
             /* Continuous Scroll Mode Across All Accessible Chapters */
             <div className="space-y-16">
-              {chaptersList.map((chap, chapIdx) => {
+              {/* Header Buku (Author, Judul Besar Serif, Bab, Cover) - Sesuai SS 2 */}
+              <ReaderBookHeader
+                authorOrPublisher={book.author || user.name || "Penulis"}
+                title={editorialTitle || book.title}
+                totalChapters={displayChapters.length}
+                coverUrl={editorialCoverUrl !== undefined ? editorialCoverUrl : book.coverUrl}
+                coverColor={editorialCoverColor || book.coverColor}
+                publishedYear={book.publishedYear}
+                genres={book.genres}
+                pageCount={book.pageCount}
+                isEditMode={isAuthorOrPublisher && editMode === "edit"}
+                onTitleChange={setEditorialTitle}
+                onCoverUrlChange={setEditorialCoverUrl}
+                onCoverColorChange={setEditorialCoverColor}
+              />
+
+              {/* JIKA AUTHOR / PUBLISHER: RENDER TIPTAP WYSIWYG KANVAS (EDIT ATAU PREVIEW) */}
+              {isAuthorOrPublisher ? (
+                <div
+                  className={`tiptap-editorial-canvas relative font-serif text-[18px] leading-[1.85] text-justify min-h-[500px] ${
+                    editMode === "preview" ? "is-preview-reading-mode select-text" : ""
+                  }`}
+                >
+                  <EditorContent editor={editor} />
+                </div>
+              ) : (
+                chaptersList.map((chap: any, chapIdx: number) => {
                 const idPars = splitParagraphs(chap.contentId);
                 const enPars = splitParagraphs(chap.contentEn);
                 const paragraphs = languageView === "en" ? enPars : idPars;
@@ -1235,18 +1717,25 @@ function ReaderBook() {
                                   data-reader-paragraph={pIdx}
                                   className="scroll-mt-28"
                                 >
-                                  <p
-                                    data-preview-fade={
-                                      pIdx === fadeParagraph || undefined
-                                    }
-                                    className="leading-relaxed text-justify mb-6 select-text"
-                                  >
-                                    {renderHighlightedText(
-                                      text,
-                                      highlights,
-                                      handleFlexHighlight,
-                                    )}
-                                  </p>
+                                  {text.trim().startsWith("<") ? (
+                                    <div
+                                      className="leading-relaxed mb-6 select-text"
+                                      dangerouslySetInnerHTML={{ __html: text }}
+                                    />
+                                  ) : (
+                                    <p
+                                      data-preview-fade={
+                                        pIdx === fadeParagraph || undefined
+                                      }
+                                      className="leading-relaxed text-justify mb-6 select-text"
+                                    >
+                                      {renderHighlightedText(
+                                        text,
+                                        highlights,
+                                        handleFlexHighlight,
+                                      )}
+                                    </p>
+                                  )}
                                 </div>
                               );
                             })}
@@ -1256,7 +1745,8 @@ function ReaderBook() {
                     )}
                   </section>
                 );
-              })}
+              })
+              )}
 
               {/* End of Reading Completion Section */}
               {payload.hasFullAccess && (
@@ -1357,7 +1847,7 @@ function ReaderBook() {
         {readingLayout === "scroll" && (
           <GlossyProgressBar
             currentChapter={activeChapterNum}
-            totalChapters={allChapters.length}
+            totalChapters={displayChapters.length}
             currentPercent={currentPercent}
             onOpenRating={() => setIsRatingOpen(true)}
           />
@@ -1387,6 +1877,7 @@ function ReaderBook() {
           onSelectHighlight={handleSelectHighlight}
           onFlexHighlight={handleFlexHighlight}
           onDeleteHighlight={handleDeleteHighlight}
+          onTogglePostHighlight={handleTogglePostHighlight}
         />
 
         {share && (
@@ -1485,6 +1976,37 @@ function ReaderBook() {
 
                 {/* Actions */}
                 <div className="mt-6 flex flex-col gap-2.5">
+                  {createdSessionId && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={async () => {
+                        const nextPosted = !isSessionPosted;
+                        setIsSessionPosted(nextPosted);
+                        try {
+                          await togglePostSessionMutation.mutateAsync({
+                            sessionId: createdSessionId,
+                            isPosted: nextPosted,
+                          });
+                        } catch (err) {
+                          console.error("Gagal mengubah publikasi sesi:", err);
+                        }
+                      }}
+                      className={`gap-2 font-mono text-xs cursor-pointer transition-colors ${
+                        isSessionPosted
+                          ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/40"
+                          : "border-border hover:bg-muted"
+                      }`}
+                    >
+                      <Sparkles className="size-3.5" />
+                      <span>
+                        {isSessionPosted
+                          ? "Sesi Dipost ke Linimasa Publik ✓"
+                          : "Post Sesi ke Linimasa Komunitas / Publik"}
+                      </span>
+                    </Button>
+                  )}
+
                   <Button
                     asChild
                     className="gap-2 font-mono text-xs bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent)]/90"
@@ -1518,6 +2040,134 @@ function ReaderBook() {
                     </Button>
                   )}
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Author Manuscript Submission & Configuration Dialog */}
+        {isAuthorOrPublisher && (
+          <ManuscriptConfigDialog
+            isOpen={isConfigDialogOpen}
+            onClose={() => setIsConfigDialogOpen(false)}
+            initialData={{
+              title: editorialTitle || book.title,
+              synopsis: book.synopsis || "",
+              publisherId: manuscript?.publisherId || "",
+              digitalPolicy: book.digitalPolicy,
+            }}
+            onSubmit={async (config) => {
+              await handleSaveDraft();
+              if (isManuscript && manuscriptId) {
+                await updateManuscriptMutation.mutateAsync({
+                  idOrSlug: manuscriptId,
+                  input: {
+                    title: config.title,
+                    synopsis: config.synopsis,
+                    category: config.category,
+                    proposedDigitalPolicy: config.digitalPolicy,
+                  },
+                });
+                await submitDraftMutation.mutateAsync({
+                  idOrSlug: manuscriptId,
+                  publisherId: config.publisherId || null,
+                });
+                setIsConfigDialogOpen(false);
+                refetchManuscript();
+                navigate({ to: "/app", search: { tab: "profile" } });
+              }
+            }}
+            isSubmitting={submitDraftMutation.isPending}
+          />
+        )}
+
+        {/* Publisher Review & Revision Inline Bar (Zero Modal Dialog - Read & Review seamlessly) */}
+        {isPublisherReview && isManuscript && (
+          <div className="fixed bottom-0 inset-x-0 z-50 bg-card/95 backdrop-blur-md border-t border-border shadow-2xl p-3 sm:px-6 animate-in slide-in-from-bottom duration-200">
+            <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
+              <div className="flex-1 w-full space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground font-semibold">
+                    Studio Penerbit: Meninjau Naskah &quot;{editorialTitle || book.title}&quot;
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  value={editorialNotes}
+                  onChange={(e) => setEditorialNotes(e.target.value)}
+                  placeholder="Ketik catatan kurasi atau instruksi revisi untuk penulis di sini..."
+                  className="w-full text-xs bg-background/80 border border-border/80 rounded-lg px-3 py-1.5 outline-none focus:border-[var(--color-accent)] placeholder:text-muted-foreground/60"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0 w-full md:w-auto justify-end">
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={reviewMutation.isPending}
+                  onClick={async () => {
+                    await reviewMutation.mutateAsync({
+                      idOrSlug: manuscriptId,
+                      input: {
+                        action: "request_revision",
+                        notes:
+                          editorialNotes ||
+                          "Perlu revisi pada bagian tertentu sesuai catatan editorial.",
+                      },
+                    });
+                    refetchManuscript();
+                    navigate({ to: "/app", search: { tab: "profile" } });
+                  }}
+                  className="h-8 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-lg cursor-pointer"
+                >
+                  Minta Revisi
+                </Button>
+
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={reviewMutation.isPending}
+                  onClick={async () => {
+                    await reviewMutation.mutateAsync({
+                      idOrSlug: manuscriptId,
+                      input: {
+                        action: "approve",
+                        notes:
+                          editorialNotes || "Naskah disetujui untuk terbit.",
+                      },
+                    });
+                    refetchManuscript();
+                    navigate({ to: "/app", search: { tab: "profile" } });
+                  }}
+                  className="h-8 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg cursor-pointer"
+                >
+                  {reviewMutation.isPending
+                    ? "Menerbitkan..."
+                    : "Setujui & Terbitkan"}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={reviewMutation.isPending}
+                  onClick={async () => {
+                    await reviewMutation.mutateAsync({
+                      idOrSlug: manuscriptId,
+                      input: {
+                        action: "reject",
+                        notes:
+                          editorialNotes ||
+                          "Naskah belum sesuai dengan kriteria kurasi penerbit.",
+                      },
+                    });
+                    refetchManuscript();
+                    navigate({ to: "/app", search: { tab: "profile" } });
+                  }}
+                  className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/10 rounded-lg"
+                >
+                  Tolak
+                </Button>
               </div>
             </div>
           </div>

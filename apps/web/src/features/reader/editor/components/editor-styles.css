@@ -1,0 +1,97 @@
+/* Tiptap Reader Editor Styles */
+.tiptap {
+  outline: none;
+}
+
+.tiptap p.is-editor-empty:first-child::before {
+  color: var(--color-muted-foreground);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  opacity: 0.45;
+}
+
+.tiptap blockquote {
+  border-left: 3px solid var(--color-border);
+  padding-left: 1rem;
+  font-style: italic;
+  margin: 1.5rem 0;
+  color: var(--color-foreground);
+  opacity: 0.9;
+}
+
+.tiptap ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin: 1rem 0;
+}
+
+.tiptap ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin: 1rem 0;
+}
+
+.tiptap img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.75rem;
+  margin: 1.5rem auto;
+  display: block;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.tiptap pre {
+  background: var(--color-muted);
+  color: var(--color-foreground);
+  font-family: monospace;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+
+/* Preview Reading Mode Adjustments */
+.is-preview-reading-mode .tiptap {
+  cursor: default;
+  user-select: text;
+}
+
+.is-preview-reading-mode .tiptap p.is-editor-empty::before {
+  display: none !important;
+}
+
+/* Page Break in Preview vs Edit */
+.is-preview-reading-mode .tiptap-page-break {
+  border-top: 1px solid var(--color-border);
+  border-bottom: none;
+  background: transparent;
+  padding: 2rem 0;
+  margin: 2.5rem 0;
+}
+
+.is-preview-reading-mode .tiptap-page-break span {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: var(--color-muted-foreground);
+  letter-spacing: 0.5em;
+  font-size: 0.75rem;
+}
+
+/* Chapter Break in Preview vs Edit */
+.is-preview-reading-mode .tiptap-chapter-break {
+  border: none;
+  background: transparent;
+  padding: 3rem 0 1.5rem 0;
+}
+
+/* Custom Blocks Polish */
+div[data-type="substack-button"] a {
+  text-decoration: none;
+}
+
+details[data-type="collapsible"] summary::-webkit-details-marker {
+  display: none;
+}

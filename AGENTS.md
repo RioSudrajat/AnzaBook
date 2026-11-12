@@ -136,7 +136,7 @@ Our frontend must look **human-crafted, intentional, and distinctive**—never l
 
 # Build on this starter
 
-This is the **Express + TanStack Start + PostgreSQL monorepo** of the ngodingpakeai starter family. An Express 5 API (Better Auth, Drizzle, RBAC) and a TanStack Start web app live side by side and share one TypeScript contract package. Help beginners turn a plain-language idea into a working app. Keep explanations short, explain decisions in familiar words, and implement the smallest useful feature end to end. Ask only about product decisions that materially change the work.
+This is the **Express + TanStack Start + PostgreSQL monorepo** powering **AnzaBook**. An Express 5 API (Better Auth, Drizzle, RBAC) and a TanStack Start web app live side by side and share one TypeScript contract package. Help beginners turn a plain-language idea into a working app. Keep explanations short, explain decisions in familiar words, and implement the smallest useful feature end to end. Ask only about product decisions that materially change the work.
 
 ## First prompt: set up, then build
 

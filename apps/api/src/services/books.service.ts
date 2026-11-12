@@ -488,11 +488,17 @@ export async function listBooks(query: ListBooksQuery) {
     conditions.push(eq(books.collectionName, query.collection));
   }
   if (query.publisher) {
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        query.publisher,
+      );
     const [pub] = await db
       .select({ id: publishers.id })
       .from(publishers)
       .where(
-        or(eq(publishers.id, query.publisher), eq(publishers.slug, query.publisher)),
+        isUuid
+          ? or(eq(publishers.id, query.publisher), eq(publishers.slug, query.publisher))
+          : eq(publishers.slug, query.publisher),
       )
       .limit(1);
     if (pub) {

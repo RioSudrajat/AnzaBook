@@ -31,10 +31,21 @@ export const publishers = pgTable(
     city: varchar("city", { length: 80 }),
     address: text("address"),
     contactEmail: varchar("contact_email", { length: 255 }),
+    headerImageUrl: text("header_image_url"),
+    socialLinks: jsonb("social_links").$type<{
+      instagram?: string;
+      twitter?: string;
+      website?: string;
+      whatsapp?: string;
+    }>(),
     verificationStatus: varchar("verification_status", { length: 20 })
       .$type<PublisherVerificationStatus>()
       .notNull()
       .default("pending"),
+    rejectionReason: text("rejection_reason"),
+    verificationDocuments: jsonb("verification_documents").$type<
+      Array<{ title: string; url: string; fileType?: string }>
+    >(),
     verifiedAt: timestamp("verified_at", { withTimezone: true }),
     freeClaimCodeQuotaPerBook: integer("free_claim_code_quota_per_book")
       .notNull()
@@ -90,14 +101,18 @@ export const manuscriptSubmissions = pgTable(
     publisherId: uuid("publisher_id").references(() => publishers.id, {
       onDelete: "set null",
     }),
+    slug: varchar("slug", { length: 255 }),
     title: varchar("title", { length: 255 }).notNull(),
+    coverUrl: text("cover_url"),
+    category: varchar("category", { length: 80 }),
     synopsis: text("synopsis").notNull(),
+    editorialNotes: text("editorial_notes"),
     proposedDigitalPolicy: varchar("proposed_digital_policy", { length: 32 })
       .$type<DigitalPolicy>()
       .notNull(),
     proposedAlacartePriceIdr: integer("proposed_alacarte_price_idr"),
     printSimJson: jsonb("print_sim_json").$type<Record<string, unknown> | null>(),
-    status: varchar("status", { length: 20 })
+    status: varchar("status", { length: 32 })
       .$type<ManuscriptSubmissionStatus>()
       .notNull()
       .default("pending_review"),

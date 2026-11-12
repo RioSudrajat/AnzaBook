@@ -13,7 +13,12 @@ import {
   exploreReaders,
   followUser,
   getSocialProfile,
+  getUserFollowers,
+  getUserFollowing,
+  togglePostHighlight,
+  togglePostSession,
   unfollowUser,
+  unifiedExplore,
   updateMySocialProfile,
 } from "../services/social.service";
 
@@ -52,6 +57,16 @@ socialRouter.patch(
   },
 );
 
+// Unified Explore Search Engine (Substack / Instagram style)
+socialRouter.get("/explore", optionalAuth, async (req, res) => {
+  const currentUserId = req.auth?.user.id;
+  const q = typeof req.query.q === "string" ? req.query.q : undefined;
+  const category = typeof req.query.category === "string" ? req.query.category : undefined;
+  const sort = req.query.sort === "latest" ? "latest" : "top";
+  const result = await unifiedExplore(currentUserId, { q, category, sort });
+  res.json({ data: result });
+});
+
 // 4D Explore Directories: Authors & Readers
 socialRouter.get("/explore/authors", optionalAuth, async (req, res) => {
   const currentUserId = req.auth?.user.id;
@@ -89,6 +104,22 @@ socialRouter.get("/users/:username", optionalAuth, async (req, res) => {
   res.json({ data: profile });
 });
 
+// User followers list
+socialRouter.get("/users/:username/followers", optionalAuth, async (req, res) => {
+  const currentUserId = req.auth?.user.id;
+  const username = String(req.params.username);
+  const followers = await getUserFollowers(username, currentUserId);
+  res.json({ data: followers });
+});
+
+// User following list
+socialRouter.get("/users/:username/following", optionalAuth, async (req, res) => {
+  const currentUserId = req.auth?.user.id;
+  const username = String(req.params.username);
+  const following = await getUserFollowing(username, currentUserId);
+  res.json({ data: following });
+});
+
 // Follow user
 socialRouter.post(
   "/users/:userId/follow",
@@ -120,6 +151,42 @@ socialRouter.delete(
     const currentUserId = getAuth(req).user.id;
     const targetUserId = String(req.params.userId);
     const result = await unfollowUser(currentUserId, targetUserId);
+    res.json({ data: result });
+  },
+);
+
+// Toggle post highlight/quote to public feed
+socialRouter.post(
+  "/highlights/:id/toggle-post",
+  requireAuth,
+  requireTrustedOrigin,
+  jsonBody,
+  async (req, res) => {
+    const userId = getAuth(req).user.id;
+    const highlightId = String(req.params.id);
+    const isPosted =
+      typeof req.body?.isPosted === "boolean" ? req.body.isPosted : undefined;
+    const result = await togglePostHighlight(userId, highlightId, isPosted);
+    res.json({ data: result });
+  },
+);
+
+// Toggle post reading session to public feed
+socialRouter.post(
+  "/sessions/:id/toggle-post",
+  requireAuth,
+  requireTrustedOrigin,
+  jsonBody,
+  async (req, res) => {
+    const userId = getAuth(req).user.id;
+    const sessionId = String(req.params.id);
+    const isPosted =
+      typeof req.body?.isPosted === "boolean" ? req.body.isPosted : undefined;
+    const note = typeof req.body?.note === "string" ? req.body.note : undefined;
+    const result = await togglePostSession(userId, sessionId, {
+      note,
+      isPosted,
+    });
     res.json({ data: result });
   },
 );

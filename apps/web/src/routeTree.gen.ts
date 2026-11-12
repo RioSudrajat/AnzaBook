@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as ProtectedRouteImport } from './routes/_protected'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as MembershipRouteImport } from './routes/membership'
+import { Route as PartnerProgramRouteImport } from './routes/partner-program'
 import { Route as AuthSignInRouteImport } from './routes/_auth/sign-in'
 import { Route as AuthSignUpRouteImport } from './routes/_auth/sign-up'
 import { Route as ProtectedAdminRouteImport } from './routes/_protected/admin'
@@ -25,6 +26,10 @@ import { Route as CSlugRouteImport } from './routes/c.$slug'
 import { Route as EventsSlugRouteImport } from './routes/events.$slug'
 import { Route as PSlugRouteImport } from './routes/p.$slug'
 import { Route as UUsernameRouteImport } from './routes/u.$username'
+import { Route as ProtectedAuthorsNewRouteImport } from './routes/_protected/authors.new'
+import { Route as ProtectedCommunitiesNewRouteImport } from './routes/_protected/communities.new'
+import { Route as ProtectedProfileEditRouteImport } from './routes/_protected/profile.edit'
+import { Route as ProtectedPublishersNewRouteImport } from './routes/_protected/publishers.new'
 import { Route as ProtectedReadSlugRouteImport } from './routes/_protected/read.$slug'
 import { Route as ProtectedMembershipCheckoutOrderIdRouteImport } from './routes/_protected/membership.checkout.$orderId'
 
@@ -49,6 +54,11 @@ const AboutRoute = AboutRouteImport.update({
 const MembershipRoute = MembershipRouteImport.update({
   id: '/membership',
   path: '/membership',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PartnerProgramRoute = PartnerProgramRouteImport.update({
+  id: '/partner-program',
+  path: '/partner-program',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthSignInRoute = AuthSignInRouteImport.update({
@@ -106,6 +116,26 @@ const UUsernameRoute = UUsernameRouteImport.update({
   path: '/u/$username',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProtectedAuthorsNewRoute = ProtectedAuthorsNewRouteImport.update({
+  id: '/authors/new',
+  path: '/authors/new',
+  getParentRoute: () => ProtectedRoute,
+} as any)
+const ProtectedCommunitiesNewRoute = ProtectedCommunitiesNewRouteImport.update({
+  id: '/communities/new',
+  path: '/communities/new',
+  getParentRoute: () => ProtectedRoute,
+} as any)
+const ProtectedProfileEditRoute = ProtectedProfileEditRouteImport.update({
+  id: '/profile/edit',
+  path: '/profile/edit',
+  getParentRoute: () => ProtectedRoute,
+} as any)
+const ProtectedPublishersNewRoute = ProtectedPublishersNewRouteImport.update({
+  id: '/publishers/new',
+  path: '/publishers/new',
+  getParentRoute: () => ProtectedRoute,
+} as any)
 const ProtectedReadSlugRoute = ProtectedReadSlugRouteImport.update({
   id: '/read/$slug',
   path: '/read/$slug',
@@ -122,6 +152,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/membership': typeof MembershipRoute
+  '/partner-program': typeof PartnerProgramRoute
   '/sign-in': typeof AuthSignInRoute
   '/sign-up': typeof AuthSignUpRoute
   '/admin': typeof ProtectedAdminRoute
@@ -133,6 +164,10 @@ export interface FileRoutesByFullPath {
   '/events/$slug': typeof EventsSlugRoute
   '/p/$slug': typeof PSlugRoute
   '/u/$username': typeof UUsernameRoute
+  '/authors/new': typeof ProtectedAuthorsNewRoute
+  '/communities/new': typeof ProtectedCommunitiesNewRoute
+  '/profile/edit': typeof ProtectedProfileEditRoute
+  '/publishers/new': typeof ProtectedPublishersNewRoute
   '/read/$slug': typeof ProtectedReadSlugRoute
   '/membership/checkout/$orderId': typeof ProtectedMembershipCheckoutOrderIdRoute
 }
@@ -140,6 +175,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/membership': typeof MembershipRoute
+  '/partner-program': typeof PartnerProgramRoute
   '/sign-in': typeof AuthSignInRoute
   '/sign-up': typeof AuthSignUpRoute
   '/admin': typeof ProtectedAdminRoute
@@ -151,6 +187,10 @@ export interface FileRoutesByTo {
   '/events/$slug': typeof EventsSlugRoute
   '/p/$slug': typeof PSlugRoute
   '/u/$username': typeof UUsernameRoute
+  '/authors/new': typeof ProtectedAuthorsNewRoute
+  '/communities/new': typeof ProtectedCommunitiesNewRoute
+  '/profile/edit': typeof ProtectedProfileEditRoute
+  '/publishers/new': typeof ProtectedPublishersNewRoute
   '/read/$slug': typeof ProtectedReadSlugRoute
   '/membership/checkout/$orderId': typeof ProtectedMembershipCheckoutOrderIdRoute
 }
@@ -161,6 +201,7 @@ export interface FileRoutesById {
   '/_protected': typeof ProtectedRouteWithChildren
   '/about': typeof AboutRoute
   '/membership': typeof MembershipRoute
+  '/partner-program': typeof PartnerProgramRoute
   '/_auth/sign-in': typeof AuthSignInRoute
   '/_auth/sign-up': typeof AuthSignUpRoute
   '/_protected/admin': typeof ProtectedAdminRoute
@@ -172,6 +213,10 @@ export interface FileRoutesById {
   '/events/$slug': typeof EventsSlugRoute
   '/p/$slug': typeof PSlugRoute
   '/u/$username': typeof UUsernameRoute
+  '/_protected/authors/new': typeof ProtectedAuthorsNewRoute
+  '/_protected/communities/new': typeof ProtectedCommunitiesNewRoute
+  '/_protected/profile/edit': typeof ProtectedProfileEditRoute
+  '/_protected/publishers/new': typeof ProtectedPublishersNewRoute
   '/_protected/read/$slug': typeof ProtectedReadSlugRoute
   '/_protected/membership/checkout/$orderId': typeof ProtectedMembershipCheckoutOrderIdRoute
 }
@@ -181,6 +226,7 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/membership'
+    | '/partner-program'
     | '/sign-in'
     | '/sign-up'
     | '/admin'
@@ -192,6 +238,10 @@ export interface FileRouteTypes {
     | '/events/$slug'
     | '/p/$slug'
     | '/u/$username'
+    | '/authors/new'
+    | '/communities/new'
+    | '/profile/edit'
+    | '/publishers/new'
     | '/read/$slug'
     | '/membership/checkout/$orderId'
   fileRoutesByTo: FileRoutesByTo
@@ -199,6 +249,7 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/membership'
+    | '/partner-program'
     | '/sign-in'
     | '/sign-up'
     | '/admin'
@@ -210,6 +261,10 @@ export interface FileRouteTypes {
     | '/events/$slug'
     | '/p/$slug'
     | '/u/$username'
+    | '/authors/new'
+    | '/communities/new'
+    | '/profile/edit'
+    | '/publishers/new'
     | '/read/$slug'
     | '/membership/checkout/$orderId'
   id:
@@ -219,6 +274,7 @@ export interface FileRouteTypes {
     | '/_protected'
     | '/about'
     | '/membership'
+    | '/partner-program'
     | '/_auth/sign-in'
     | '/_auth/sign-up'
     | '/_protected/admin'
@@ -230,6 +286,10 @@ export interface FileRouteTypes {
     | '/events/$slug'
     | '/p/$slug'
     | '/u/$username'
+    | '/_protected/authors/new'
+    | '/_protected/communities/new'
+    | '/_protected/profile/edit'
+    | '/_protected/publishers/new'
     | '/_protected/read/$slug'
     | '/_protected/membership/checkout/$orderId'
   fileRoutesById: FileRoutesById
@@ -240,6 +300,7 @@ export interface RootRouteChildren {
   ProtectedRoute: typeof ProtectedRouteWithChildren
   AboutRoute: typeof AboutRoute
   MembershipRoute: typeof MembershipRoute
+  PartnerProgramRoute: typeof PartnerProgramRoute
   BookPreviewSlugRoute: typeof BookPreviewSlugRoute
   BooksSlugRoute: typeof BooksSlugRoute
   CSlugRoute: typeof CSlugRoute
@@ -283,6 +344,13 @@ declare module '@tanstack/react-router' {
       path: '/membership'
       fullPath: '/membership'
       preLoaderRoute: typeof MembershipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/partner-program': {
+      id: '/partner-program'
+      path: '/partner-program'
+      fullPath: '/partner-program'
+      preLoaderRoute: typeof PartnerProgramRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_auth/sign-in': {
@@ -362,6 +430,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UUsernameRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_protected/authors/new': {
+      id: '/_protected/authors/new'
+      path: '/authors/new'
+      fullPath: '/authors/new'
+      preLoaderRoute: typeof ProtectedAuthorsNewRouteImport
+      parentRoute: typeof ProtectedRoute
+    }
+    '/_protected/communities/new': {
+      id: '/_protected/communities/new'
+      path: '/communities/new'
+      fullPath: '/communities/new'
+      preLoaderRoute: typeof ProtectedCommunitiesNewRouteImport
+      parentRoute: typeof ProtectedRoute
+    }
+    '/_protected/profile/edit': {
+      id: '/_protected/profile/edit'
+      path: '/profile/edit'
+      fullPath: '/profile/edit'
+      preLoaderRoute: typeof ProtectedProfileEditRouteImport
+      parentRoute: typeof ProtectedRoute
+    }
+    '/_protected/publishers/new': {
+      id: '/_protected/publishers/new'
+      path: '/publishers/new'
+      fullPath: '/publishers/new'
+      preLoaderRoute: typeof ProtectedPublishersNewRouteImport
+      parentRoute: typeof ProtectedRoute
+    }
     '/_protected/read/$slug': {
       id: '/_protected/read/$slug'
       path: '/read/$slug'
@@ -395,6 +491,10 @@ interface ProtectedRouteChildren {
   ProtectedAdminRoute: typeof ProtectedAdminRoute
   ProtectedAppRoute: typeof ProtectedAppRoute
   ProtectedNotesRoute: typeof ProtectedNotesRoute
+  ProtectedAuthorsNewRoute: typeof ProtectedAuthorsNewRoute
+  ProtectedCommunitiesNewRoute: typeof ProtectedCommunitiesNewRoute
+  ProtectedProfileEditRoute: typeof ProtectedProfileEditRoute
+  ProtectedPublishersNewRoute: typeof ProtectedPublishersNewRoute
   ProtectedReadSlugRoute: typeof ProtectedReadSlugRoute
   ProtectedMembershipCheckoutOrderIdRoute: typeof ProtectedMembershipCheckoutOrderIdRoute
 }
@@ -403,6 +503,10 @@ const ProtectedRouteChildren: ProtectedRouteChildren = {
   ProtectedAdminRoute: ProtectedAdminRoute,
   ProtectedAppRoute: ProtectedAppRoute,
   ProtectedNotesRoute: ProtectedNotesRoute,
+  ProtectedAuthorsNewRoute: ProtectedAuthorsNewRoute,
+  ProtectedCommunitiesNewRoute: ProtectedCommunitiesNewRoute,
+  ProtectedProfileEditRoute: ProtectedProfileEditRoute,
+  ProtectedPublishersNewRoute: ProtectedPublishersNewRoute,
   ProtectedReadSlugRoute: ProtectedReadSlugRoute,
   ProtectedMembershipCheckoutOrderIdRoute:
     ProtectedMembershipCheckoutOrderIdRoute,
@@ -418,6 +522,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProtectedRoute: ProtectedRouteWithChildren,
   AboutRoute: AboutRoute,
   MembershipRoute: MembershipRoute,
+  PartnerProgramRoute: PartnerProgramRoute,
   BookPreviewSlugRoute: BookPreviewSlugRoute,
   BooksSlugRoute: BooksSlugRoute,
   CSlugRoute: CSlugRoute,

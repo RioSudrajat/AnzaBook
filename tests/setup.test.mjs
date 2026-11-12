@@ -45,8 +45,8 @@ test("first-run setup creates independent local secrets and is repeatable", () =
     const first = readFileSync(resolve(cwd, ".env.local"), "utf8");
     assert.match(first, /BETTER_AUTH_SECRET="[a-f0-9]{64}"/);
     assert.match(first, /POSTGRES_PASSWORD="[a-f0-9]{48}"/);
-    assert.match(first, /DATABASE_URL="postgresql:\/\/starter:/);
-    assert.match(first, /COMPOSE_PROJECT_NAME="ngodingpakeai-pg-/);
+    assert.match(first, /DATABASE_URL="postgresql:\/\/(?:anzabook|starter):/);
+    assert.match(first, /COMPOSE_PROJECT_NAME="(?:anzabook|ngodingpakeai)-pg-/);
     // Both apps share this file; the browser's API origin matches the API.
     assert.match(first, /BETTER_AUTH_URL="http:\/\/localhost:4000"/);
     assert.match(first, /WEB_URL="http:\/\/localhost:3000"/);

@@ -2,15 +2,55 @@ import { z } from "zod";
 
 export const socialLinksSchema = z
   .object({
-    instagram: z.string().url("URL Instagram tidak valid").or(z.literal("")).optional(),
-    twitter: z.string().url("URL Twitter / X tidak valid").or(z.literal("")).optional(),
-    website: z.string().url("URL situs web tidak valid").or(z.literal("")).optional(),
-    goodreads: z.string().url("URL Goodreads tidak valid").or(z.literal("")).optional(),
+    instagram: z.string().optional(),
+    twitter: z.string().optional(),
+    website: z.string().optional(),
+    goodreads: z.string().optional(),
+    linkedin: z.string().optional(),
+    headerImage: z.string().optional(),
   })
   .strict();
 
 export const updateProfileBioSchema = z
   .object({
+    name: z
+      .string()
+      .min(2, "Nama minimal 2 karakter")
+      .max(100, "Nama maksimal 100 karakter")
+      .optional(),
+    username: z
+      .string()
+      .min(3, "Username minimal 3 karakter")
+      .max(30, "Username maksimal 30 karakter")
+      .regex(
+        /^[a-z0-9_]+$/,
+        "Username hanya boleh berupa huruf kecil, angka, dan underscore",
+      )
+      .optional(),
+    image: z
+      .string()
+      .refine(
+        (val) =>
+          val === "" ||
+          val.startsWith("http://") ||
+          val.startsWith("https://") ||
+          val.startsWith("data:image/"),
+        { message: "Format foto profil harus berupa URL atau Data Image yang valid" },
+      )
+      .optional()
+      .nullable(),
+    headerImage: z
+      .string()
+      .refine(
+        (val) =>
+          val === "" ||
+          val.startsWith("http://") ||
+          val.startsWith("https://") ||
+          val.startsWith("data:image/"),
+        { message: "Format gambar header harus berupa URL atau Data Image yang valid" },
+      )
+      .optional()
+      .nullable(),
     bio: z.string().max(1000, "Bio maksimal 1000 karakter").optional(),
     locationCity: z.string().max(80, "Kota maksimal 80 karakter").optional().nullable(),
     authorPenName: z.string().max(160, "Nama pena maksimal 160 karakter").optional().nullable(),
@@ -39,6 +79,15 @@ export const applyAuthorSchema = z
       .uuid("ID buku tidak valid")
       .optional()
       .nullable(),
+    verificationDocuments: z
+      .array(
+        z.object({
+          title: z.string().min(1, "Judul berkas wajib diisi"),
+          url: z.string().min(1, "URL berkas wajib diisi"),
+          fileType: z.string().optional(),
+        }),
+      )
+      .optional(),
   })
   .strict();
 

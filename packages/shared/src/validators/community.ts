@@ -143,7 +143,19 @@ export const createCalendarSchema = z
         instagram: z.string().optional(),
         twitter: z.string().optional(),
         website: z.string().optional(),
+        discord: z.string().optional(),
+        telegram: z.string().optional(),
+        whatsapp: z.string().optional(),
       })
+      .optional(),
+    verificationDocuments: z
+      .array(
+        z.object({
+          title: z.string().min(1, "Judul berkas wajib diisi"),
+          url: z.string().min(1, "URL berkas wajib diisi"),
+          fileType: z.string().optional(),
+        }),
+      )
       .optional(),
   })
   .strict();

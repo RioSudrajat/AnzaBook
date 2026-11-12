@@ -1,19 +1,27 @@
 import type {
   AuthorDirectoryItemDto,
+  CommunityCalendarDto,
   DataResponse,
   ManuscriptSubmissionDto,
   PublisherDto,
   ReaderDirectoryItemDto,
   SocialProfileDto,
+  SocialRelationItemDto,
+  UnifiedExploreResultDto,
 } from "@starter/shared/types";
 import type {
   ApplyPublisherInput,
+  CreateManuscriptDraftInput,
+  ReviewManuscriptInput,
   SubmitManuscriptInput,
+  UpdateManuscriptInput,
+  UpdatePublisherInput,
 } from "@starter/shared/validators/publisher";
 import type {
   ApplyAuthorInput,
   UpdateProfileBioInput,
 } from "@starter/shared/validators/social";
+import type { UpdateCalendarInput } from "@starter/shared/validators/community";
 import { apiFetch } from "@/lib/api/client";
 
 export async function getMySocialProfile(
@@ -78,6 +86,29 @@ export async function exploreReaders(
   return data;
 }
 
+export async function fetchUnifiedExplore(
+  params?: {
+    q?: string;
+    category?: string;
+    sort?: "top" | "latest";
+  },
+  signal?: AbortSignal,
+): Promise<UnifiedExploreResultDto> {
+  const queryObj: Record<string, string> = {};
+  if (params?.q) queryObj.q = params.q;
+  if (params?.category) queryObj.category = params.category;
+  if (params?.sort) queryObj.sort = params.sort;
+
+  const { data } = await apiFetch<DataResponse<UnifiedExploreResultDto>>(
+    "/api/social/explore",
+    {
+      query: Object.keys(queryObj).length > 0 ? queryObj : undefined,
+      signal,
+    },
+  );
+  return data;
+}
+
 export async function applyAuthor(
   input: ApplyAuthorInput,
 ): Promise<{ id: string; status: string }> {
@@ -111,6 +142,28 @@ export async function unfollowUser(
     {
       method: "DELETE",
     },
+  );
+  return data;
+}
+
+export async function getUserFollowers(
+  username: string,
+  signal?: AbortSignal,
+): Promise<SocialRelationItemDto[]> {
+  const { data } = await apiFetch<DataResponse<SocialRelationItemDto[]>>(
+    `/api/social/users/${encodeURIComponent(username)}/followers`,
+    { signal },
+  );
+  return data;
+}
+
+export async function getUserFollowing(
+  username: string,
+  signal?: AbortSignal,
+): Promise<SocialRelationItemDto[]> {
+  const { data } = await apiFetch<DataResponse<SocialRelationItemDto[]>>(
+    `/api/social/users/${encodeURIComponent(username)}/following`,
+    { signal },
   );
   return data;
 }
@@ -171,5 +224,146 @@ export async function getMyManuscripts(
     "/api/publisher/manuscripts/mine",
     { signal },
   );
+  return data;
+}
+
+export async function createManuscriptDraft(
+  input: CreateManuscriptDraftInput,
+): Promise<ManuscriptSubmissionDto> {
+  const { data } = await apiFetch<DataResponse<ManuscriptSubmissionDto>>(
+    "/api/publisher/manuscripts/drafts",
+    {
+      method: "POST",
+      body: input,
+    },
+  );
+  return data;
+}
+
+export async function getManuscript(
+  idOrSlug: string,
+  signal?: AbortSignal,
+): Promise<ManuscriptSubmissionDto> {
+  const { data } = await apiFetch<DataResponse<ManuscriptSubmissionDto>>(
+    `/api/publisher/manuscripts/${encodeURIComponent(idOrSlug)}`,
+    { signal },
+  );
+  return data;
+}
+
+export async function updateManuscript(
+  idOrSlug: string,
+  input: UpdateManuscriptInput,
+): Promise<ManuscriptSubmissionDto> {
+  const { data } = await apiFetch<DataResponse<ManuscriptSubmissionDto>>(
+    `/api/publisher/manuscripts/${encodeURIComponent(idOrSlug)}`,
+    {
+      method: "PATCH",
+      body: input,
+    },
+  );
+  return data;
+}
+
+export async function submitManuscriptDraft(
+  idOrSlug: string,
+  publisherId?: string | null,
+): Promise<ManuscriptSubmissionDto> {
+  const { data } = await apiFetch<DataResponse<ManuscriptSubmissionDto>>(
+    `/api/publisher/manuscripts/${encodeURIComponent(idOrSlug)}/submit`,
+    {
+      method: "POST",
+      body: { publisherId },
+    },
+  );
+  return data;
+}
+
+export async function getPublisherManuscripts(
+  slug: string,
+  signal?: AbortSignal,
+): Promise<ManuscriptSubmissionDto[]> {
+  const { data } = await apiFetch<DataResponse<ManuscriptSubmissionDto[]>>(
+    `/api/publisher/${encodeURIComponent(slug)}/manuscripts`,
+    { signal },
+  );
+  return data;
+}
+
+export async function reviewManuscript(
+  idOrSlug: string,
+  input: ReviewManuscriptInput,
+): Promise<ManuscriptSubmissionDto> {
+  const { data } = await apiFetch<DataResponse<ManuscriptSubmissionDto>>(
+    `/api/publisher/manuscripts/${encodeURIComponent(idOrSlug)}/review`,
+    {
+      method: "POST",
+      body: input,
+    },
+  );
+  return data;
+}
+
+export async function updatePublisherProfile(
+  slug: string,
+  input: UpdatePublisherInput,
+): Promise<PublisherDto> {
+  const { data } = await apiFetch<DataResponse<PublisherDto>>(
+    `/api/publisher/${encodeURIComponent(slug)}`,
+    {
+      method: "PATCH",
+      body: input,
+    },
+  );
+  return data;
+}
+
+export async function updateCalendarProfile(
+  slug: string,
+  input: UpdateCalendarInput,
+): Promise<CommunityCalendarDto> {
+  const { data } = await apiFetch<DataResponse<CommunityCalendarDto>>(
+    `/api/events/calendars/${encodeURIComponent(slug)}`,
+    {
+      method: "PATCH",
+      body: input,
+    },
+  );
+  return data;
+}
+
+export async function togglePostHighlight(
+  highlightId: string,
+  isPosted?: boolean,
+): Promise<{ id: string; isPosted: boolean; postedAt: string | null }> {
+  const { data } = await apiFetch<
+    DataResponse<{ id: string; isPosted: boolean; postedAt: string | null }>
+  >(`/api/social/highlights/${encodeURIComponent(highlightId)}/toggle-post`, {
+    method: "POST",
+    body: { isPosted },
+  });
+  return data;
+}
+
+export async function togglePostSession(
+  sessionId: string,
+  input: { note?: string; isPosted?: boolean },
+): Promise<{
+  id: string;
+  isPosted: boolean;
+  note: string | null;
+  postedAt: string | null;
+}> {
+  const { data } = await apiFetch<
+    DataResponse<{
+      id: string;
+      isPosted: boolean;
+      note: string | null;
+      postedAt: string | null;
+    }>
+  >(`/api/social/sessions/${encodeURIComponent(sessionId)}/toggle-post`, {
+    method: "POST",
+    body: input,
+  });
   return data;
 }

@@ -87,15 +87,15 @@ export async function prepareEnvironment(cwd = root) {
       process.env.BETTER_AUTH_URL || additions.BETTER_AUTH_URL;
   if (!process.env.DATABASE_URL) {
     const local = {
-      POSTGRES_USER: process.env.POSTGRES_USER || "starter",
+      POSTGRES_USER: process.env.POSTGRES_USER || "anzabook",
       POSTGRES_PASSWORD:
         process.env.POSTGRES_PASSWORD || randomBytes(24).toString("hex"),
-      POSTGRES_DB: process.env.POSTGRES_DB || "starter",
+      POSTGRES_DB: process.env.POSTGRES_DB || "anzabook",
       POSTGRES_PORT:
         process.env.POSTGRES_PORT || String(await availablePostgresPort()),
       COMPOSE_PROJECT_NAME:
         process.env.COMPOSE_PROJECT_NAME ||
-        `ngodingpakeai-pg-${randomBytes(6).toString("hex")}`,
+        `anzabook-pg-${randomBytes(6).toString("hex")}`,
     };
     if (
       !/^\d+$/.test(local.POSTGRES_PORT) ||

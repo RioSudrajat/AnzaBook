@@ -133,6 +133,8 @@ export async function listAdminCalendars(query: AdminListQueryInput) {
       contactEmail: communityCalendars.contactEmail,
       socialLinks: communityCalendars.socialLinks,
       verificationStatus: communityCalendars.verificationStatus,
+      rejectionReason: communityCalendars.rejectionReason,
+      verificationDocuments: communityCalendars.verificationDocuments,
       createdByUserId: communityCalendars.createdByUserId,
       creatorName: user.name,
       creatorEmail: user.email,
@@ -162,6 +164,7 @@ export async function verifyAdminCalendar(
     .update(communityCalendars)
     .set({
       verificationStatus: status,
+      rejectionReason: input.rejectionReason ?? null,
       updatedAt: new Date(),
     })
     .where(eq(communityCalendars.id, id))
@@ -197,6 +200,8 @@ export async function listAdminAuthorApplications(query: AdminListQueryInput) {
       claimedBookTitle: books.title,
       claimedBookCover: books.coverUrl,
       status: authorApplications.status,
+      rejectionReason: authorApplications.rejectionReason,
+      verificationDocuments: authorApplications.verificationDocuments,
       reviewedByUserId: authorApplications.reviewedByUserId,
       reviewNotes: authorApplications.reviewNotes,
       userName: user.name,
@@ -238,6 +243,7 @@ export async function reviewAdminAuthorApplication(
       .update(authorApplications)
       .set({
         status: input.status,
+        rejectionReason: input.rejectionReason ?? null,
         reviewedByUserId: reviewerUserId,
         reviewNotes: input.reviewNotes ?? null,
         updatedAt: new Date(),
@@ -264,6 +270,14 @@ export async function reviewAdminAuthorApplication(
           })
           .where(eq(books.id, app.claimedBookId));
       }
+    } else if (input.status === "rejected") {
+      await tx
+        .update(user)
+        .set({
+          authorStatus: "rejected",
+          updatedAt: new Date(),
+        })
+        .where(eq(user.id, app.userId));
     }
 
     return {
@@ -311,6 +325,7 @@ export async function verifyAdminPublisher(
     .update(publishers)
     .set({
       verificationStatus: status,
+      rejectionReason: input.rejectionReason ?? null,
       verifiedAt,
       updatedAt: new Date(),
     })

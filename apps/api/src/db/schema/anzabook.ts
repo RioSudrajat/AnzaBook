@@ -252,6 +252,9 @@ export const readingSessions = pgTable(
     avgWpm: integer("avg_wpm").notNull(),
     mode: varchar("mode", { length: 32 }).notNull().default("full"),
     isValidForRoyalty: boolean("is_valid_for_royalty").notNull().default(false),
+    isPosted: boolean("is_posted").notNull().default(false),
+    note: text("note"),
+    postedAt: timestamp("posted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -367,6 +370,8 @@ export const bookHighlights = pgTable(
       .notNull()
       .default("yellow"),
     note: text("note"),
+    isPosted: boolean("is_posted").notNull().default(false),
+    postedAt: timestamp("posted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),

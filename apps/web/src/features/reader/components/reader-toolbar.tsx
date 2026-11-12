@@ -1,10 +1,14 @@
 import { useState, type MouseEventHandler } from "react";
 import {
   Check,
+  Eye,
   Headphones,
   Languages,
   Moon,
   MoveRight,
+  PenTool,
+  Save,
+  Send,
   ShieldCheck,
   ShieldOff,
   Smartphone,
@@ -57,6 +61,13 @@ type ReaderToolbarProps = {
   onToggleHighlights?: () => void;
   highlightCount?: number;
   onShare?: MouseEventHandler<HTMLButtonElement>;
+  isAuthorOrPublisher?: boolean;
+  editMode?: "preview" | "edit";
+  onEditModeChange?: (mode: "preview" | "edit") => void;
+  onSaveDraft?: () => void;
+  onSubmitDraft?: () => void;
+  submitDraftLabel?: string;
+  isSavingDraft?: boolean;
 };
 
 export function ReaderToolbar({
@@ -84,6 +95,13 @@ export function ReaderToolbar({
   onToggleHighlights,
   highlightCount = 0,
   onShare,
+  isAuthorOrPublisher = false,
+  editMode = "preview",
+  onEditModeChange,
+  onSaveDraft,
+  onSubmitDraft,
+  submitDraftLabel = "Ajukan Naskah",
+  isSavingDraft = false,
 }: ReaderToolbarProps) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isTocOpen, setIsTocOpen] = useState(false);
@@ -97,226 +115,139 @@ export function ReaderToolbar({
 
   return (
     <header className="w-full px-2 sm:px-4 py-2 transition-colors">
-      <div className="relative mx-auto flex max-w-7xl flex-col sm:flex-row sm:items-center justify-between gap-y-2 sm:gap-y-0 sm:flex-nowrap">
-        {/* Top / Main Row: Back & Title on Left, Essential Controls on Right */}
-        <div className="flex items-center justify-between gap-2 w-full sm:w-auto">
-          {/* Left: Back & Title */}
-          <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={onExit}
-              disabled={isSaving}
-              className="min-h-10 min-w-10 sm:min-h-11 sm:min-w-11 shrink-0 p-1 sm:px-2.5 rounded-full hover:bg-muted/60"
-              aria-label="Keluar ke Home"
-            >
-              <IosArrowLeft className="size-4" aria-hidden="true" />
-              <span className="hidden sm:inline font-sans text-xs">
-                {isSaving ? "Menyimpan…" : "Keluar"}
-              </span>
-            </Button>
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 lg:flex-nowrap">
+        {/* Top / Main Row: Back & Title on Left */}
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 max-w-[220px] xs:max-w-xs md:max-w-sm shrink">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onExit}
+            disabled={isSaving}
+            className="min-h-10 min-w-10 sm:min-h-11 sm:min-w-11 shrink-0 p-1 sm:px-2.5 rounded-full hover:bg-muted/60"
+            aria-label="Keluar ke Home"
+          >
+            <IosArrowLeft className="size-4" aria-hidden="true" />
+            <span className="hidden sm:inline font-sans text-xs">
+              {isSaving ? "Menyimpan…" : "Keluar"}
+            </span>
+          </Button>
 
-            <img
-              src="/icon.svg"
-              alt="AnzaBook"
-              className="size-6 rounded-[6px] object-contain hidden md:block shrink-0 border border-border/40 shadow-xs"
-            />
+          <img
+            src="/icon.svg"
+            alt="AnzaBook"
+            className="size-6 rounded-[6px] object-contain hidden md:block shrink-0 border border-border/40 shadow-xs"
+          />
 
-            <div className="min-w-0 max-w-[150px] xs:max-w-[190px] sm:max-w-xs md:max-w-sm">
-              <h1 className="font-serif text-xs font-bold text-foreground truncate">
-                {bookTitle}
-              </h1>
-              <div className="flex items-center gap-1.5 whitespace-nowrap text-[10px] sm:text-[11px] font-mono text-muted-foreground">
-                <span>Bab {currentChapter}</span>
-                <span>&bull;</span>
-                <span>{allChapters.length} Bab</span>
-              </div>
+          <div className="min-w-0">
+            <h1 className="font-serif text-xs sm:text-sm font-bold text-foreground truncate">
+              {bookTitle}
+            </h1>
+            <div className="flex items-center gap-1.5 whitespace-nowrap text-[10px] sm:text-[11px] font-mono text-muted-foreground">
+              <span>Bab {currentChapter}</span>
+              <span>&bull;</span>
+              <span>{allChapters.length} Bab</span>
             </div>
-          </div>
-
-          {/* Mobile Right: Reading Controls Pill (Aa, TOC, Stabilo, Share) */}
-          <div className="flex sm:hidden items-center rounded-full border border-border/50 bg-muted/60 p-0.5 shrink-0">
-            {/* TOC */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  const next = !isTocOpen;
-                  closeAllMenus();
-                  setIsTocOpen(next);
-                }}
-                className={`size-9 rounded-full flex items-center justify-center transition-all ${
-                  isTocOpen
-                    ? "bg-background text-foreground shadow-xs font-bold"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-                title="Daftar Bab"
-                aria-label="Daftar Bab"
-              >
-                <IosList className="size-4" />
-              </button>
-            </div>
-
-            {/* Highlights */}
-            {onToggleHighlights && (
-              <button
-                type="button"
-                onClick={onToggleHighlights}
-                className={`size-9 rounded-full flex items-center justify-center transition-all ${
-                  isHighlightsOpen
-                    ? "bg-amber-500/20 text-amber-500 font-bold"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-                title="Buka Catatan & Stabilo"
-                aria-label="Catatan & Stabilo"
-              >
-                <IosHighlighter className="size-3.5 text-foreground" />
-              </button>
-            )}
-
-            {/* Typography */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  const next = !isSettingsOpen;
-                  closeAllMenus();
-                  setIsSettingsOpen(next);
-                }}
-                className={`size-9 rounded-full flex items-center justify-center transition-all ${
-                  isSettingsOpen
-                    ? "bg-background text-foreground shadow-xs font-bold"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-                title="Pengaturan Tipografi"
-                aria-label="Pengaturan Tipografi"
-              >
-                <span className="font-serif font-bold text-xs">Aa</span>
-              </button>
-            </div>
-
-            {/* Language Switcher */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  const next = !isLanguageOpen;
-                  closeAllMenus();
-                  setIsLanguageOpen(next);
-                }}
-                className={`size-9 rounded-full flex items-center justify-center transition-all overflow-hidden ${
-                  isLanguageOpen
-                    ? "ring-2 ring-[var(--color-accent)] bg-background"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-                title="Pilih Bahasa Naskah"
-                aria-label="Pilih Bahasa Naskah"
-              >
-                {languageView === "id" ? (
-                  <FlagIcon
-                    lang="id"
-                    size="sm"
-                    className="rounded-full overflow-hidden w-4 h-4 object-cover"
-                  />
-                ) : languageView === "en" ? (
-                  <FlagIcon
-                    lang="en"
-                    size="sm"
-                    className="rounded-full overflow-hidden w-4 h-4 object-cover"
-                  />
-                ) : (
-                  <Languages className="size-3.5 text-foreground" />
-                )}
-              </button>
-            </div>
-
-            {/* Share */}
-            {onShare && (
-              <button
-                type="button"
-                onClick={onShare}
-                className="size-9 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-all"
-                title="Bagikan Halaman Ini"
-                aria-label="Bagikan"
-              >
-                <IosShare className="size-3.5" />
-              </button>
-            )}
           </div>
         </div>
 
-        {/* Center: Scroll vs Slide Layout Toggle */}
-        <div className="sm:absolute sm:left-1/2 sm:-translate-x-1/2 sm:top-1/2 sm:-translate-y-1/2 z-20 flex items-center justify-center gap-1.5 sm:gap-1 bg-muted/60 p-1 rounded-full border border-border/60 text-xs font-mono shadow-xs self-center">
-          <button
-            type="button"
-            onClick={() => onReadingLayoutChange("scroll")}
-            aria-pressed={readingLayout === "scroll"}
-            className={`min-h-9 sm:min-h-10 px-2.5 sm:px-3 rounded-full font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
-              readingLayout === "scroll"
-                ? "bg-background text-foreground shadow-xs font-bold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-            title="Mode Baca Gulir Bebas (Continuous Scroll)"
-          >
-            <Smartphone className="hidden size-3.5 lg:block" />
-            <span>Scroll</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onReadingLayoutChange("slide")}
-            aria-pressed={readingLayout === "slide"}
-            className={`min-h-9 sm:min-h-10 px-2.5 sm:px-3 rounded-full font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
-              readingLayout === "slide"
-                ? "bg-background text-foreground shadow-xs font-bold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-            title="Mode Baca Halaman Geser (Slide Paginated)"
-          >
-            <MoveRight className="hidden size-3.5 lg:block" />
-            <span>Slide</span>
-          </button>
-
-          {/* Quick DRM & Audio status badges on mobile inside center pill */}
-          {onToggleDrm && (
+        {/* Center: Scroll vs Slide Toggle AND (if author/publisher) Editorial Preview vs Edit Toggle */}
+        <div className="flex items-center justify-center gap-2 shrink-0 order-3 md:order-2 w-full md:w-auto">
+          {/* Scroll vs Slide Toggle */}
+          <div className="flex items-center justify-center gap-1 bg-muted/60 p-1 rounded-full border border-border/60 text-xs font-mono shadow-xs">
             <button
               type="button"
-              onClick={onToggleDrm}
-              className={`sm:hidden size-8 justify-center rounded-full border transition-all inline-flex items-center ${
-                isDrmEnabled
-                  ? "text-emerald-600 dark:text-emerald-400 border-emerald-500/40 bg-emerald-500/10"
-                  : "text-amber-600 dark:text-amber-400 border-amber-500/40 bg-amber-500/10"
+              onClick={() => onReadingLayoutChange("scroll")}
+              aria-pressed={readingLayout === "scroll"}
+              className={`min-h-8 sm:min-h-9 px-2.5 sm:px-3 rounded-full font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+                readingLayout === "scroll"
+                  ? "bg-background text-foreground shadow-xs font-bold"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
-              title={isDrmEnabled ? "DRM Aktif" : "DRM Nonaktif"}
-              aria-label="Toggle DRM"
+              title="Mode Baca Gulir Bebas (Continuous Scroll)"
             >
-              {isDrmEnabled ? (
-                <ShieldCheck className="size-3 text-emerald-500" />
-              ) : (
-                <ShieldOff className="size-3 text-amber-500" />
-              )}
+              <Smartphone className="hidden lg:block size-3.5" />
+              <span>Scroll</span>
             </button>
-          )}
-
-          {onToggleAudio && (
             <button
               type="button"
-              onClick={onToggleAudio}
-              className={`sm:hidden size-8 justify-center rounded-full border transition-all inline-flex items-center ${
-                isAudioOpen
-                  ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)] border-[var(--color-accent)]/40"
-                  : "border-border/60 text-muted-foreground"
+              onClick={() => onReadingLayoutChange("slide")}
+              aria-pressed={readingLayout === "slide"}
+              className={`min-h-8 sm:min-h-9 px-2.5 sm:px-3 rounded-full font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+                readingLayout === "slide"
+                  ? "bg-background text-foreground shadow-xs font-bold"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
-              title="Toggle Audio Book"
-              aria-label="Toggle Audio Book"
+              title="Mode Baca Halaman Geser (Slide Paginated)"
             >
-              <Headphones className="size-3" />
+              <MoveRight className="hidden lg:block size-3.5" />
+              <span>Slide</span>
             </button>
+          </div>
+
+          {/* Editorial Mode Segmented Toggle: [Preview] vs [Edit] */}
+          {isAuthorOrPublisher && onEditModeChange && (
+            <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-full border border-border/80 text-xs font-mono shadow-xs">
+              <button
+                type="button"
+                onClick={() => onEditModeChange("preview")}
+                aria-pressed={editMode === "preview"}
+                className={`min-h-8 sm:min-h-9 px-2.5 sm:px-3 rounded-full font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+                  editMode === "preview"
+                    ? "bg-background text-foreground shadow-xs font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                title="Mode Pratinjau Tampilan Pembaca"
+              >
+                <Eye className="size-3.5" />
+                <span>Preview</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onEditModeChange("edit")}
+                aria-pressed={editMode === "edit"}
+                className={`min-h-8 sm:min-h-9 px-2.5 sm:px-3 rounded-full font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+                  editMode === "edit"
+                    ? "bg-amber-500 text-black shadow-xs font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                title="Mode Editorial Naskah"
+              >
+                <PenTool className="size-3.5" />
+                <span>Edit</span>
+              </button>
+            </div>
           )}
         </div>
 
-        {/* Desktop Right Controls (Hidden on Mobile) */}
-        <div className="hidden sm:flex items-center justify-end sm:gap-1">
+        {/* Desktop & Tablet Right Controls */}
+        <div className="flex items-center justify-end gap-1.5 sm:gap-2 shrink-0 order-2 md:order-3">
+          {/* Quick Editorial Actions: Save & Submit */}
+          {isAuthorOrPublisher && editMode === "edit" && onSaveDraft && (
+            <button
+              type="button"
+              onClick={onSaveDraft}
+              disabled={isSavingDraft}
+              className="min-h-9 px-3 text-xs font-mono rounded-full border border-border/80 bg-background hover:bg-muted text-foreground transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              title="Simpan Draf Naskah"
+            >
+              <Save className="size-3.5" />
+              <span>{isSavingDraft ? "Menyimpan…" : "Simpan"}</span>
+            </button>
+          )}
+
+          {isAuthorOrPublisher && onSubmitDraft && (
+            <button
+              type="button"
+              onClick={onSubmitDraft}
+              className="min-h-9 px-3.5 text-xs font-semibold rounded-full bg-[var(--color-accent)] hover:opacity-90 text-white shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+              title={submitDraftLabel}
+            >
+              <Send className="size-3.5" />
+              <span>{submitDraftLabel}</span>
+            </button>
+          )}
+
           {/* DRM On/Off Toggle */}
           {onToggleDrm && (
             <button

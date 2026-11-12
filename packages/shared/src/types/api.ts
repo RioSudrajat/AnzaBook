@@ -156,6 +156,9 @@ export type ReadingSessionDto = {
   avgWpm: number;
   mode: ReadingMode;
   isValidForRoyalty?: boolean;
+  isPosted?: boolean;
+  note?: string | null;
+  postedAt?: string | null;
   createdAt: string;
 };
 
@@ -208,6 +211,8 @@ export type BookHighlightDto = {
   selectedText: string;
   color: HighlightColor;
   note: string | null;
+  isPosted?: boolean;
+  postedAt?: string | null;
   createdAt: string;
 };
 
@@ -253,6 +258,12 @@ export type LocationSuggestionDto = {
   isStoreBranch?: boolean;
 };
 
+export type VerificationDocumentDto = {
+  title: string;
+  url: string;
+  fileType?: string;
+};
+
 export type CommunityCalendarMemberDto = {
   id: string;
   userId: string;
@@ -276,8 +287,13 @@ export type CommunityCalendarDto = {
     instagram?: string;
     twitter?: string;
     website?: string;
+    discord?: string;
+    telegram?: string;
+    whatsapp?: string;
   } | null;
   verificationStatus: "pending" | "verified" | "trusted" | "rejected";
+  rejectionReason?: string | null;
+  verificationDocuments?: VerificationDocumentDto[] | null;
   followerCount: number;
   isFollowing?: boolean;
   isManager?: boolean;
@@ -382,19 +398,56 @@ export type HostEventAnalyticsDto = {
 
 // ---------------- Social Profile & Directory DTOs ---------------- //
 
+export type SocialLinks = {
+  instagram?: string;
+  twitter?: string;
+  website?: string;
+  goodreads?: string;
+  linkedin?: string;
+  headerImage?: string;
+};
+
+export type ManagedCommunitySummaryDto = {
+  id: string;
+  name: string;
+  slug: string;
+  avatarUrl: string | null;
+  coverUrl: string | null;
+  city: string | null;
+  verificationStatus: "pending" | "verified" | "trusted" | "rejected";
+  rejectionReason?: string | null;
+  role: "owner" | "admin" | "checkin_staff" | "member";
+};
+
+export type ManagedPublisherSummaryDto = {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl: string | null;
+  headerImageUrl: string | null;
+  city: string | null;
+  verificationStatus: PublisherVerificationStatus;
+  rejectionReason?: string | null;
+  role: PublisherMemberRole;
+};
+
+export type PublicProfileReviewDto = {
+  id: string;
+  rating: number;
+  content: string;
+  createdAt: string;
+  book: BookSummaryDto;
+};
+
 export type SocialProfileDto = {
   id: string;
   name: string;
   username: string | null;
   image: string | null;
+  headerImage: string | null;
   bio: string;
   locationCity: string | null;
-  socialLinks: {
-    instagram?: string;
-    twitter?: string;
-    website?: string;
-    goodreads?: string;
-  } | null;
+  socialLinks: SocialLinks | null;
   authorStatus: AuthorStatus;
   authorPenName: string | null;
   followersCount: number;
@@ -403,7 +456,33 @@ export type SocialProfileDto = {
   isSubscribedUpdates?: boolean;
   booksPublishedCount?: number;
   totalReadingMinutes?: number;
+  isPublisher?: boolean;
+  publisherSlug?: string | null;
+  publisherName?: string | null;
+  isCommunityOwner?: boolean;
+  ownedCommunitySlug?: string | null;
+  ownedCommunityName?: string | null;
+  managedCommunities?: ManagedCommunitySummaryDto[];
+  managedPublishers?: ManagedPublisherSummaryDto[];
+  publishedBooks?: BookSummaryDto[];
+  /** Books this person is reading or has finished. Always the profile owner's, never the viewer's. */
+  publicShelves?: ShelfItemDto[];
+  publicReviews?: PublicProfileReviewDto[];
+  publicActivities?: ExplorePostItemDto[];
+  booksCompletedCount?: number;
   createdAt: string;
+};
+
+export type SocialRelationItemDto = {
+  id: string;
+  name: string;
+  username: string | null;
+  image: string | null;
+  bio: string | null;
+  role?: string;
+  type: "user" | "author" | "publisher" | "community";
+  href: string;
+  isFollowing: boolean;
 };
 
 export type AuthorDirectoryItemDto = {
@@ -433,6 +512,55 @@ export type ReaderDirectoryItemDto = {
   isFollowing?: boolean;
 };
 
+export type ExploreUserItemDto = {
+  id: string;
+  name: string;
+  username: string | null;
+  image: string | null;
+  bio: string | null;
+  locationCity: string | null;
+  authorStatus: AuthorStatus;
+  authorPenName?: string | null;
+  followerCount?: number;
+  bookCount?: number;
+  booksReadCount?: number;
+  streakDays?: number;
+  isFollowing?: boolean;
+};
+
+export type ExplorePostItemDto = {
+  id: string;
+  type: "quote" | "review" | "session";
+  content: string;
+  note?: string | null;
+  createdAt: string;
+  author: {
+    id: string;
+    name: string;
+    username: string | null;
+    image: string | null;
+  };
+  book: {
+    id: string;
+    slug: string;
+    title: string;
+    author: string;
+    coverColor?: string | null;
+  };
+  rating?: number;
+  color?: HighlightColor;
+  pagesRead?: number;
+  durationSeconds?: number;
+};
+
+export type UnifiedExploreResultDto = {
+  users: ExploreUserItemDto[];
+  books: BookSummaryDto[];
+  posts: ExplorePostItemDto[];
+  communities: ManagedCommunitySummaryDto[];
+  publishers: ManagedPublisherSummaryDto[];
+};
+
 // ---------------- Publisher & B2B2C DTOs ---------------- //
 
 export type PublisherVerificationStatus = "pending" | "verified" | "rejected";
@@ -445,10 +573,19 @@ export type PublisherDto = {
   ikapiNumber: string | null;
   description: string | null;
   logoUrl: string | null;
+  headerImageUrl?: string | null;
   city: string | null;
   address: string | null;
   contactEmail: string | null;
   verificationStatus: PublisherVerificationStatus;
+  rejectionReason?: string | null;
+  verificationDocuments?: VerificationDocumentDto[] | null;
+  socialLinks?: {
+    instagram?: string;
+    twitter?: string;
+    website?: string;
+    whatsapp?: string;
+  } | null;
   verifiedAt: string | null;
   freeClaimCodeQuotaPerBook: number;
   claimCodeFeeIdr: number;
@@ -459,8 +596,10 @@ export type PublisherDto = {
 };
 
 export type ManuscriptSubmissionStatus =
+  | "draft"
   | "pending_review"
   | "in_editing"
+  | "revision_requested"
   | "published"
   | "rejected";
 
@@ -485,7 +624,11 @@ export type ManuscriptSubmissionDto = {
   publisherId: string | null;
   publisherName?: string | null;
   title: string;
+  slug?: string | null;
+  coverUrl?: string | null;
+  category?: string | null;
   synopsis: string;
+  editorialNotes?: string | null;
   proposedDigitalPolicy: DigitalPolicy;
   proposedAlacartePriceIdr: number | null;
   printSimJson: Record<string, unknown> | null;
@@ -578,6 +721,8 @@ export type AdminCalendarDto = {
   contactEmail: string | null;
   socialLinks: Record<string, string> | null;
   verificationStatus: "pending" | "verified" | "trusted" | "rejected";
+  rejectionReason?: string | null;
+  verificationDocuments?: VerificationDocumentDto[] | null;
   createdByUserId: string;
   creatorName: string | null;
   creatorEmail: string | null;
@@ -595,6 +740,8 @@ export type AdminAuthorApplicationDto = {
   claimedBookTitle: string | null;
   claimedBookCover: string | null;
   status: "pending" | "verified" | "rejected";
+  rejectionReason?: string | null;
+  verificationDocuments?: VerificationDocumentDto[] | null;
   reviewedByUserId: string | null;
   reviewNotes: string | null;
   userName: string | null;

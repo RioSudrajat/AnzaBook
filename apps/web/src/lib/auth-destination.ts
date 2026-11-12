@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const returnPath =
-  /^\/(?:app|notes|admin|membership(?:\/checkout\/[a-f0-9-]{36})?|(?:books|read)\/[a-z0-9-]{1,120})$/;
+  /^\/(?:app|notes|admin|membership(?:\/checkout\/[a-f0-9-]{36})?|(?:books|read)\/[a-z0-9-]{1,120}|(?:publishers|authors|communities)\/new|profile\/edit)$/;
 const internalOrigin = "https://anzabook.invalid";
 
 export function authDestination(value: unknown): string | undefined {

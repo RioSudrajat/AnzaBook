@@ -11,6 +11,7 @@ import {
   Filter,
   X,
 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import type { CommunityEventSummaryDto } from "@starter/shared/types";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
@@ -18,7 +19,6 @@ import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { useCalendars, useEvents } from "../hooks";
 import { CreateEventDialog } from "./create-event-dialog";
 import { EventDetailDrawer } from "./event-detail-drawer";
-import { ApplyCalendarDialog } from "./apply-calendar-dialog";
 
 export function DashboardEvents() {
   const [filterTab, setFilterTab] = React.useState<"upcoming" | "past" | "my_rsvps" | "hosting">("upcoming");
@@ -36,8 +36,12 @@ export function DashboardEvents() {
   const canHostEvents = React.useMemo(() => {
     if (!session?.user) return false;
     const role = session.user.role;
-    if (role === "admin" || role === "author" || role === "publisher") return true;
-    return calendars.some((c) => c.isManager);
+    if (role === "admin") return true;
+    return calendars.some(
+      (c) =>
+        c.isManager &&
+        (c.verificationStatus === "verified" || c.verificationStatus === "trusted"),
+    );
   }, [session, calendars]);
 
   const handleCreateClick = () => {
@@ -533,22 +537,19 @@ export function DashboardEvents() {
               Akses Penyelenggara Acara
             </h3>
             <p className="text-xs text-white/60 leading-relaxed mb-6">
-              Di AnzaBook, acara diselenggarakan oleh <strong>Komunitas Baca, TBM, Penulis,</strong> atau <strong>Penerbit</strong> terverifikasi untuk menjaga linimasa tetap berkualitas dan bebas spam.
+              Di AnzaBook, acara diselenggarakan oleh <strong>Komunitas Baca, Penulis,</strong> atau <strong>Penerbit</strong> terverifikasi untuk menjaga linimasa tetap berkualitas dan bebas spam.
               <br /><br />
-              Apakah Anda mengelola komunitas literasi atau seorang penulis? Ajukan kalender komunitas Anda sekarang untuk mulai menyelenggarakan acara.
+              Seluruh pendaftaran komunitas, penerbit, maupun penulis resmi kini diproses satu pintu melalui <strong>Partner Program</strong>. Daftarkan entitas Anda untuk diverifikasi oleh kurator admin.
             </p>
 
             <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsHostGateOpen(false);
-                  setIsApplyCalendarOpen(true);
-                }}
-                className="w-full rounded-xl bg-amber-500 hover:bg-amber-400 py-2.5 text-xs font-semibold text-black transition-colors cursor-pointer text-center"
+              <Link
+                to="/partner-program"
+                onClick={() => setIsHostGateOpen(false)}
+                className="w-full rounded-xl bg-amber-500 hover:bg-amber-400 py-2.5 text-xs font-semibold text-black transition-colors cursor-pointer text-center block"
               >
-                Ajukan Kalender Komunitas
-              </button>
+                Buka Partner Program
+              </Link>
               <button
                 type="button"
                 onClick={() => setIsHostGateOpen(false)}
@@ -560,16 +561,6 @@ export function DashboardEvents() {
           </div>
         </div>
       )}
-
-      {/* Apply Calendar Dialog */}
-      <ApplyCalendarDialog
-        open={isApplyCalendarOpen}
-        onClose={() => setIsApplyCalendarOpen(false)}
-        onSuccess={() => {
-          setIsApplyCalendarOpen(false);
-          setIsCreateOpen(true);
-        }}
-      />
     </div>
   );
 }

@@ -160,6 +160,9 @@ export async function listReadingSessions(
       durationSeconds: readingSessions.durationSeconds,
       avgWpm: readingSessions.avgWpm,
       mode: readingSessions.mode,
+      isPosted: readingSessions.isPosted,
+      note: readingSessions.note,
+      postedAt: readingSessions.postedAt,
       createdAt: readingSessions.createdAt,
     })
     .from(readingSessions)
@@ -177,6 +180,9 @@ export async function listReadingSessions(
     durationSeconds: r.durationSeconds,
     avgWpm: r.avgWpm,
     mode: r.mode as ReadingMode,
+    isPosted: r.isPosted,
+    note: r.note,
+    postedAt: r.postedAt ? r.postedAt.toISOString() : null,
     createdAt: r.createdAt.toISOString(),
   }));
 
@@ -451,6 +457,8 @@ export async function listHighlights(
     selectedText: r.selectedText,
     color: r.color as HighlightColor,
     note: r.note,
+    isPosted: r.isPosted,
+    postedAt: r.postedAt ? r.postedAt.toISOString() : null,
     createdAt: r.createdAt.toISOString(),
   }));
 }
@@ -474,6 +482,8 @@ export async function listAllUserHighlights(
     selectedText: r.selectedText,
     color: r.color as HighlightColor,
     note: r.note,
+    isPosted: r.isPosted,
+    postedAt: r.postedAt ? r.postedAt.toISOString() : null,
     createdAt: r.createdAt.toISOString(),
   }));
 }
@@ -506,6 +516,8 @@ export async function createHighlight(
     selectedText: created.selectedText,
     color: created.color as HighlightColor,
     note: created.note,
+    isPosted: created.isPosted,
+    postedAt: created.postedAt ? created.postedAt.toISOString() : null,
     createdAt: created.createdAt.toISOString(),
   };
 }

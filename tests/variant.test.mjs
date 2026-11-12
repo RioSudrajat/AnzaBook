@@ -72,7 +72,7 @@ test("a derivative preserves base files and provenance while excluding local sta
     );
     assert.equal(
       JSON.parse(readFileSync(resolve(target, "package.json"))).name,
-      "ngodingpakeai-dashboard",
+      "anzabook-dashboard",
     );
     assert.ok(existsSync(resolve(target, "pnpm-lock.yaml")));
     assert.ok(existsSync(resolve(target, "pnpm-workspace.yaml")));

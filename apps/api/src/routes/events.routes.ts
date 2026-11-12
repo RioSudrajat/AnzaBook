@@ -7,6 +7,7 @@ import {
   listEventsQuerySchema,
   reportEventSchema,
   rsvpEventSchema,
+  updateCalendarSchema,
   updateEventSchema,
 } from "@starter/shared/validators/community";
 import { HttpError } from "../lib/http-error";
@@ -39,6 +40,7 @@ import {
   reportEvent,
   rsvpEvent,
   toggleFollowCalendar,
+  updateCalendar,
   updateEvent,
   verifyCalendar,
 } from "../services/events.service";
@@ -75,6 +77,25 @@ eventsRouter.post(
     const input = createCalendarSchema.parse(req.body);
     const calendar = await createCalendar(getAuth(req).user.id, input);
     res.status(201).json({ data: calendar });
+  },
+);
+
+// Update calendar profile (manager or admin)
+eventsRouter.patch(
+  "/calendars/:slug",
+  requireAuth,
+  requireTrustedOrigin,
+  jsonBody,
+  async (req, res) => {
+    const slug = String(req.params.slug);
+    const input = updateCalendarSchema.parse(req.body);
+    const calendar = await updateCalendar(
+      getAuth(req).user.id,
+      slug,
+      input,
+      getAuth(req).user.role || undefined,
+    );
+    res.json({ data: calendar });
   },
 );
 

@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import {
-  ArrowLeft,
   BookMarked,
   BookOpen,
   Calendar,
@@ -18,6 +17,8 @@ import {
 } from "lucide-react";
 import type { BookDetailDto, BookSummaryDto, EditionTier } from "@starter/shared/types";
 import { SiteFooter } from "@/components/site-footer";
+import { SmartBackButton } from "@/components/smart-back-button";
+import { AppShell } from "@/features/dashboard/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api/client";
@@ -374,6 +375,7 @@ export default function BookDetailPage() {
   const { slug } = Route.useParams();
   const navigate = useNavigate();
   const isLoggedIn = !!Route.useRouteContext().session;
+  const sessionUser = Route.useRouteContext().session?.user;
 
   const { data: book } = useBookDetail(slug);
   const { data: reviews = [] } = useBookReviews(slug);
@@ -524,18 +526,20 @@ export default function BookDetailPage() {
 
   const isPremium = book.accessTier === "premium";
 
-  return (
-    <div className="min-h-screen bg-background text-foreground pb-24">
+  const body = (
+    <>
       {/* Top Header Bar */}
-      <div className="border-b border-border/70 bg-background/95 backdrop-blur-md sticky top-0 z-30">
+      <div
+        className={`border-b border-border/70 bg-background/95 backdrop-blur-md ${
+          sessionUser ? "" : "sticky top-0 z-30"
+        }`}
+      >
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 text-xs font-mono text-muted-foreground hover:text-foreground transition-colors py-2"
-          >
-            <ArrowLeft className="size-4" />
-            <span>Katalog AnzaBook</span>
-          </Link>
+          <SmartBackButton
+            fallbackTo={sessionUser ? "/app" : "/"}
+            label="Kembali"
+            className="-ml-2"
+          />
 
           {book.hasPhysical && (
             isLoggedIn ? (
@@ -553,7 +557,7 @@ export default function BookDetailPage() {
         </div>
       </div>
 
-      <main id="main-content" className="max-w-6xl mx-auto px-4 sm:px-6 pt-10 pb-16 space-y-12">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-10 pb-16 space-y-12">
         {/* 2-Column Hero: Left Book Details & TOC, Right 3D Cover & Action Buttons */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
           {/* Left Column: Details, Metadata, TOC, Store Map, Reviews */}
@@ -1111,10 +1115,22 @@ export default function BookDetailPage() {
             </div>
           </div>
         )}
-      </main>
+      </div>
+    </>
+  );
 
+  if (sessionUser) {
+    return (
+      <AppShell user={sessionUser} activeTab="explore" title="Detail Buku" wide>
+        <div className="-mx-4 sm:-mx-8 -mt-6">{body}</div>
+      </AppShell>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background text-foreground pb-24">
+      <main id="main-content">{body}</main>
       <SiteFooter />
-
     </div>
   );
 }

@@ -29,6 +29,7 @@ import type {
   CommunityEventSummaryDto,
 } from "@starter/shared/types";
 import { Button } from "@/components/ui/button";
+import { BookCover } from "@/features/books/components/book-cover";
 import {
   useCancelRsvp,
   useDeleteEvent,
@@ -515,10 +516,10 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
           {event.bookSummary ? (
             <div className="flex items-center justify-between gap-3 pt-1">
               <div className="flex items-center gap-3">
-                <img
-                  src={event.bookSummary.coverUrl}
-                  alt={event.bookSummary.title}
-                  className="h-14 w-10 rounded object-cover shadow border border-white/10"
+                <BookCover
+                  book={event.bookSummary}
+                  className="w-10 shrink-0"
+                  decorative
                 />
                 <div>
                   <div className="font-semibold text-white">{event.bookSummary.title}</div>

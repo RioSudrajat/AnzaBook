@@ -3,6 +3,7 @@ import {
   Maximize2,
   Minimize2,
   Share2,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -22,6 +23,7 @@ type HighlightsSidebarProps = {
   onSelectHighlight: (h: BookHighlightDto) => void;
   onFlexHighlight: (h: BookHighlightDto) => void;
   onDeleteHighlight?: (id: string) => void;
+  onTogglePostHighlight?: (id: string, isPosted: boolean) => void;
 };
 
 export function HighlightsSidebar({
@@ -32,6 +34,7 @@ export function HighlightsSidebar({
   onSelectHighlight,
   onFlexHighlight,
   onDeleteHighlight,
+  onTogglePostHighlight,
 }: HighlightsSidebarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -174,10 +177,26 @@ export function HighlightsSidebar({
                         <button
                           type="button"
                           onClick={() => onDeleteHighlight(h.id)}
-                          className="p-1 hover:text-red-400 opacity-60 hover:opacity-100 transition-colors"
+                          className="p-1 hover:text-red-400 opacity-60 hover:opacity-100 transition-colors cursor-pointer"
                           title="Hapus Stabilo"
                         >
                           <Trash2 className="size-3.5" />
+                        </button>
+                      )}
+
+                      {onTogglePostHighlight && (
+                        <button
+                          type="button"
+                          onClick={() => onTogglePostHighlight(h.id, !h.isPosted)}
+                          className={`h-6 px-2 text-[11px] font-mono gap-1 inline-flex items-center rounded-[6px] border transition-colors cursor-pointer ${
+                            h.isPosted
+                              ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-300 font-semibold"
+                              : "bg-white/5 border-white/10 text-white/60 hover:text-white hover:bg-white/10"
+                          }`}
+                          title={h.isPosted ? "Batalkan publikasi" : "Post kutipan ke linimasa / jelajah publik"}
+                        >
+                          <Sparkles className="size-3" />
+                          <span>{h.isPosted ? "Dipost" : "Post"}</span>
                         </button>
                       )}
 

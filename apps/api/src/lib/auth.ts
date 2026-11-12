@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin } from "better-auth/plugins";
+import { eq } from "drizzle-orm";
 import {
   ac,
   ADMIN_ROLES,
@@ -41,6 +42,40 @@ export const auth = betterAuth({
   // mutations from any origin not listed here.
   trustedOrigins: env.trustedOrigins,
   database: drizzleAdapter(db, { provider: "pg", schema }),
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (userData) => {
+          let base = (userData.name || "nakama")
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9_]/g, "")
+            .slice(0, 24);
+          if (!base || base.length < 3) base = "nakama";
+
+          let candidate = base;
+          let suffix = 1;
+          while (true) {
+            const [existing] = await db
+              .select({ id: schema.user.id })
+              .from(schema.user)
+              .where(eq(schema.user.username, candidate))
+              .limit(1);
+            if (!existing) break;
+            candidate = `${base}${suffix}`;
+            suffix++;
+          }
+          return {
+            data: {
+              ...userData,
+              username: candidate,
+            },
+          };
+        },
+      },
+    },
+  },
   ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
     ? {
         socialProviders: {

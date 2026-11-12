@@ -1,16 +1,31 @@
-import { createFileRoute, notFound } from "@tanstack/react-router";
+import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
+import { z } from "zod";
 import { roleHasPermission } from "@starter/shared/permissions";
 import { siteConfig } from "@/config/site";
-import { AdminCmsDashboard } from "@/features/admin/components/admin-cms-dashboard";
+import {
+  AdminCmsDashboard,
+  type TabId,
+} from "@/features/admin/components/admin-cms-dashboard";
 import { adminNotesQuery, adminOverviewQuery } from "@/features/admin/queries";
 
+const adminSearchSchema = z.object({
+  tab: z
+    .enum([
+      "calendars",
+      "partners",
+      "manuscripts",
+      "claim-batches",
+      "financials",
+      "notes",
+    ])
+    .optional(),
+});
+
 export const Route = createFileRoute("/_protected/admin")({
+  validateSearch: adminSearchSchema,
   head: () => ({
     meta: [{ title: `Redaksi & Kemitraan CMS | ${siteConfig.name}` }],
   }),
-  // Without admin role or notes:read-any this renders not-found, so the route
-  // stays invisible to unauthorized accounts. The role comes from the session;
-  // the API re-checks permissions on every request.
   beforeLoad: ({ context }) => {
     const userRole = context.session?.user.role || "";
     const roles = userRole.split(",").map((r) => r.trim());
@@ -32,6 +47,21 @@ export const Route = createFileRoute("/_protected/admin")({
 
 function AdminPage() {
   const { user } = Route.useRouteContext().session;
+  const search = Route.useSearch();
+  const navigate = useNavigate();
 
-  return <AdminCmsDashboard currentUser={user} />;
+  const handleTabChange = (tab: TabId) => {
+    void navigate({
+      to: "/admin",
+      search: { tab },
+    });
+  };
+
+  return (
+    <AdminCmsDashboard
+      currentUser={user}
+      activeTabProp={search.tab}
+      onTabChangeProp={handleTabChange}
+    />
+  );
 }

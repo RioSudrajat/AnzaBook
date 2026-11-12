@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   ChevronDown,
   FileText,
-  HelpCircle,
   Loader2,
   Plus,
   Trash2,
@@ -220,7 +219,7 @@ export function ManuscriptStudioDialog({
         {/* Success View */}
         {isSubmittedSuccess ? (
           <div className="p-8 text-center space-y-4 my-auto">
-            <div className="size-14 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center">
+            <div className="size-14 rounded-full bg-[var(--color-accent)]/10 text-[var(--color-accent)] mx-auto flex items-center justify-center">
               <CheckCircle2 className="size-8" />
             </div>
             <h3 className="font-serif text-2xl font-bold">
@@ -515,13 +514,13 @@ export function ManuscriptStudioDialog({
                   </div>
 
                   {extractedFileName && (
-                    <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md">
+                    <span className="text-[11px] font-mono text-foreground bg-muted border border-border px-2.5 py-1 rounded-md">
                       ✓ Berkas berhasil diproses: {extractedFileName}
                     </span>
                   )}
 
                   {extractionError && (
-                    <span className="text-[11px] font-mono text-red-600 dark:text-red-400 bg-red-500/10 px-2.5 py-1 rounded-md">
+                    <span className="text-[11px] font-mono text-destructive bg-destructive/10 border border-destructive/20 px-2.5 py-1 rounded-md">
                       ✕ {extractionError}
                     </span>
                   )}
@@ -614,7 +613,7 @@ export function ManuscriptStudioDialog({
                 className="flex items-center justify-between w-full text-xs font-mono text-muted-foreground hover:text-foreground py-1 cursor-pointer"
               >
                 <span className="flex items-center gap-1.5">
-                  <ShieldCheck className="size-3.5 text-emerald-500" />
+                  <ShieldCheck className="size-3.5 text-foreground" />
                   <span>Simulasi HPP Cetak Rakyat Transparan (Opsional)</span>
                 </span>
                 <ChevronDown
@@ -668,7 +667,7 @@ export function ManuscriptStudioDialog({
                       <span className="text-muted-foreground">
                         Saran Jual Rakyat:
                       </span>{" "}
-                      <strong className="text-emerald-600 dark:text-emerald-400">
+                      <strong className="text-foreground">
                         Rp{" "}
                         {rakyatTier?.recommendedPriceIdr.toLocaleString("id-ID")}
                       </strong>
