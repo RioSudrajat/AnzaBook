@@ -119,6 +119,19 @@ Our frontend must look **human-crafted, intentional, and distinctive**—never l
 
 ---
 
+## 6. Team Collaboration & Git Workflow
+
+Read `CONTRIBUTING.md` for team roles, area ownership, and release rules. Every AI assistant working in this repository MUST enforce:
+
+- **Branching**: Always work on a scoped branch (`feat|fix|ops|chore/<issue>-<slug>`); never commit or push directly to `main` or `production`.
+- **Issue-Scoped PRs**: Tie every PR to a single GitHub Issue (`Closes #<id>`) and keep diffs focused (`<= ~400` logic lines where practical).
+- **Contract-First**: Define or update shared Zod schemas and DTOs in `packages/shared/` first before parallelizing `apps/api` and `apps/web` work.
+- **Drizzle Migrations**: Coordinate with `@SalmanMuhammadRidwan` before running `pnpm db:generate` in `apps/api/drizzle/`, and rebase onto latest `origin/main` first so `apps/api/drizzle/meta/_journal.json` stays linear.
+- **Generated Route Tree**: Never hand-resolve merge conflicts in `apps/web/src/routeTree.gen.ts`; rebase onto `main` and regenerate via TanStack Router (`pnpm dev` or `pnpm build`).
+- **Pre-PR Verification**: Run `pnpm check && pnpm format:check && pnpm build` locally before opening a PR (plus `pnpm test:e2e` for auth, routing, session, CORS, or critical UI changes).
+
+---
+
 ## Quick Reference: Skill Invocation Guide
 
 | Scenario / Task                                | Recommended Skill / Plugin                                                | Action                                      |
