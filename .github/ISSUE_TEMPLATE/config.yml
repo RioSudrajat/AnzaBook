@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Team Contributing & Workflow Guide
+    url: https://github.com/RioSudrajat/AnzaBook/blob/main/CONTRIBUTING.md
+    about: Read onboarding steps, branching rules, and AI collaboration guidelines.
+  - name: AnzaBook Product Requirements Document (PRD)
+    url: https://github.com/RioSudrajat/AnzaBook/blob/main/PRD_AnzaBook.md
+    about: Check product vision, P0/P1 priorities, and acceptance criteria.

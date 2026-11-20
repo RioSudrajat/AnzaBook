@@ -1,0 +1,48 @@
+name: DevOps / Security Task
+description: Infrastructure, deployment, CI/CD, domain/SSL, DRM, RBAC, or security hardening work.
+title: "[Ops/Sec] "
+labels: ["area:devops", "area:security"]
+body:
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      options:
+        - staging
+        - production
+        - ci
+        - both
+    validations:
+      required: true
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective & Scope
+      description: What infrastructure or security capability is being built, hardened, or audited?
+    validations:
+      required: true
+  - type: textarea
+    id: checklist
+    attributes:
+      label: Security & Deployment Checklist
+      description: Reference docs/deployment.md (COOKIE_DOMAIN, TRUST_PROXY, HTTPS, rate limits, backups, RBAC/DRM).
+      value: |
+        - [ ] Requirement 1
+        - [ ] Verified against docs/deployment.md security checklist
+    validations:
+      required: true
+  - type: textarea
+    id: secrets
+    attributes:
+      label: Secret Names Needed (Names Only — NEVER Paste Secret Values)
+      description: List required GitHub Environment or host secret variable names. Hand off actual values out-of-band to @RioSudrajat (GitHub Custodian) — never post credentials in Issues, PRs, or git.
+      placeholder: "Example: DATABASE_URL, BETTER_AUTH_SECRET, DEPLOY_WEBHOOK_URL (values sent out-of-band)"
+    validations:
+      required: false
+  - type: textarea
+    id: verification_rollback
+    attributes:
+      label: Verification & Rollback Plan
+      description: How will we verify health (/api/health, /api/health/ready, HTTPS cookies) and roll back if needed?
+    validations:
+      required: true

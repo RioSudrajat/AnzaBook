@@ -1,0 +1,34 @@
+# Default fallback (Founder + DevOps backup)
+* @RioSudrajat @luminariadev
+
+# Product specs & frontend design (Founder authority + Fullstack co-reviewer)
+/PRD_AnzaBook.md @RioSudrajat @rakaalpiansyah
+/DESIGN.md @RioSudrajat @rakaalpiansyah
+
+# AI & team governance guides (Founder + DevOps co-reviewer)
+/AGENTS.md @RioSudrajat @luminariadev
+/CONTRIBUTING.md @RioSudrajat @luminariadev
+
+# Shared contract layer & root workspace manifests
+/packages/shared/ @RioSudrajat @SalmanMuhammadRidwan @rakaalpiansyah
+/package.json @RioSudrajat @SalmanMuhammadRidwan @rakaalpiansyah @luminariadev
+/pnpm-lock.yaml @RioSudrajat @SalmanMuhammadRidwan @rakaalpiansyah @luminariadev
+
+# Backend API, database schema & Drizzle migrations (Salman primary + Founder)
+/apps/api/ @SalmanMuhammadRidwan @RioSudrajat
+/apps/api/src/db/ @SalmanMuhammadRidwan @RioSudrajat
+/apps/api/drizzle/ @SalmanMuhammadRidwan @RioSudrajat
+/tests/ @SalmanMuhammadRidwan @RioSudrajat
+
+# Web frontend & Playwright E2E (Raka primary + Founder)
+/apps/web/ @rakaalpiansyah @RioSudrajat
+/e2e/ @rakaalpiansyah @RioSudrajat
+
+# CI/CD, Docker, scripts, deployment & security config (Rizkia primary + Founder)
+/.github/ @luminariadev @RioSudrajat
+/scripts/ @luminariadev @RioSudrajat
+/apps/api/Dockerfile @luminariadev @RioSudrajat
+/apps/web/Dockerfile @luminariadev @RioSudrajat
+/compose.dev.yaml @luminariadev @RioSudrajat
+/compose.test.yaml @luminariadev @RioSudrajat
+/docs/deployment.md @luminariadev @RioSudrajat

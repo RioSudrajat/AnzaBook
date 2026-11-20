@@ -1,0 +1,76 @@
+name: Feature / Task Brief (AI-Ready)
+description: Delegate a scoped product feature or engineering task with clear acceptance criteria.
+title: "[Feat] "
+labels: ["type:feature", "ai-ready"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Write this brief so both the assigned engineer and their AI coding assistant share exact product context without guesswork.
+  - type: textarea
+    id: goal
+    attributes:
+      label: Product Goal & Why
+      description: What user or business outcome does this solve? Link PRD_AnzaBook.md sections if relevant.
+      placeholder: "Example: Allow readers to share a finished-book Flex card directly from the reader footer so friends can open the same book sample."
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Target Area
+      description: Primary package/workspace touched by this task.
+      options:
+        - apps/web
+        - apps/api
+        - packages/shared
+        - Fullstack
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - priority:p0-hackathon
+        - priority:p1-startup
+        - priority:p2-later
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Concrete, testable checklist that defines "done".
+      value: |
+        - [ ] Criterion 1
+        - [ ] Criterion 2
+        - [ ] Covered by automated test(s) and passes `pnpm check && pnpm format:check && pnpm build`
+    validations:
+      required: true
+  - type: textarea
+    id: target_files
+    attributes:
+      label: Target Files & Shared Contracts
+      description: Expected routes, services, components, or packages/shared validators/DTOs to touch or reuse.
+      placeholder: "Example: packages/shared/src/validators/..., apps/api/src/routes/..., apps/web/src/features/..."
+    validations:
+      required: false
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of Scope
+      description: Explicitly list what NOT to build or refactor (prevents AI scope creep).
+      placeholder: "Example: Do not redesign the catalog header or modify unrelated reader settings."
+    validations:
+      required: true
+  - type: dropdown
+    id: db_migration
+    attributes:
+      label: Requires Drizzle DB Migration?
+      description: All changes under apps/api/drizzle/ must be coordinated with @SalmanMuhammadRidwan.
+      options:
+        - "No"
+        - "Yes — coordinate with @SalmanMuhammadRidwan before pnpm db:generate"
+    validations:
+      required: true
