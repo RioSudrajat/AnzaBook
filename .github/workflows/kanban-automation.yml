@@ -13,8 +13,10 @@ jobs:
   sync-kanban:
     name: sync-project-1
     if: >-
-      github.event_name == 'issues' ||
-      github.event.pull_request.head.repo.full_name == github.repository
+      (github.event_name == 'issues' &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)) ||
+      (github.event_name == 'pull_request_target' &&
+        github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     steps:
       - name: Check project token availability

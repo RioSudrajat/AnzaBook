@@ -4,7 +4,7 @@
 
 - **Product:** AnzaBook (Platform E-Reader, Buku Cetak Terjangkau Multi-Kertas, Komunitas Literasi & Strava-Style Reading Share).
 - **Theme Foundation:** Hallmark `Furrow` (Manila Paper, Warm Ink, Ruled Index Hairlines, Moulded Keys, Tangerine Bookmark Ribbon).
-- **Brand Icon:** `/icon.svg` (Ikon *Open-Page Arch* terinspirasi siluet Arch dengan lipatan halaman terbuka Tangerine `#F06A24` dan tinta `#13110F` di atas ubin kertas Manila `#F6F2E9`).
+- **Brand Icon:** `/icon.svg` (Ikon _Open-Page Arch_ terinspirasi siluet Arch dengan lipatan halaman terbuka Tangerine `#F06A24` dan tinta `#13110F` di atas ubin kertas Manila `#F6F2E9`).
 - **Dials (Exploration & Marketing Pages):** `Dial: ENERGY 2 / RHYTHM 3 / MOTION 3`
 - **Dials (Protected Reading Canvas):** `Dial: ENERGY 1 / RHYTHM 1 / MOTION 1`
 

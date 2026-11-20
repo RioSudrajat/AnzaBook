@@ -1,10 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   PROJECT_CONSTANTS,
+  assertNoGraphqlErrors,
   extractLinkedIssueNumbers,
   parseKanbanArgs,
   resolveTransitionForEvent,
+  syncLinkedIssues,
 } from "../scripts/kanban.mjs";
 
 test("parseKanbanArgs maps add command fields to Project #1 IDs", () => {
@@ -88,4 +92,49 @@ test("extractLinkedIssueNumbers finds issue numbers from PR body and branch", ()
     extractLinkedIssueNumbers("No closing keyword", "feat/16-arch-logo"),
     [16],
   );
+  assert.deepEqual(
+    extractLinkedIssueNumbers(
+      "Closes: #16 and Fixes RioSudrajat/AnzaBook#17",
+      "",
+    ),
+    [16, 17],
+  );
+});
+
+test("assertNoGraphqlErrors throws when GraphQL returns errors", () => {
+  assert.throws(
+    () =>
+      assertNoGraphqlErrors({
+        data: null,
+        errors: [{ message: "Bad project ID" }],
+      }),
+    /Bad project ID/,
+  );
+});
+
+test("syncLinkedIssues continues syncing valid issues when one reference fails lookup", () => {
+  const updated = [];
+  const warnings = [];
+  const result = syncLinkedIssues([999, 16], "In Review", {
+    moveIssue: (issueNumber, statusName) => {
+      if (issueNumber === 999) throw new Error("Issue #999 not found");
+      updated.push({ issueNumber, statusName });
+    },
+    warn: (message) => warnings.push(message),
+  });
+
+  assert.deepEqual(updated, [{ issueNumber: 16, statusName: "In Review" }]);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /#999/);
+  assert.deepEqual(result, [16]);
+});
+
+test("kanban-automation workflow gates public issue triggers to trusted collaborators", () => {
+  const workflow = readFileSync(
+    resolve(import.meta.dirname, "../.github/workflows/kanban-automation.yml"),
+    "utf8",
+  );
+  assert.match(workflow, /author_association/);
+  assert.match(workflow, /OWNER/);
+  assert.match(workflow, /COLLABORATOR/);
 });

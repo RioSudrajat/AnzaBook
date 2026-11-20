@@ -35,7 +35,11 @@ test("public SVG brand assets use Open-Page Arch paths and remove legacy ANZABOO
 
   for (const file of svgFiles) {
     const content = readRepoFile(file);
-    assert.match(content, /<svg[^>]*>[\s\S]*<\/svg>/, `${file} must be valid SVG`);
+    assert.match(
+      content,
+      /<svg[^>]*>[\s\S]*<\/svg>/,
+      `${file} must be valid SVG`,
+    );
     assert.ok(
       content.includes(ANZA_ARCH_LOGO_PATHS.leftSweep),
       `${file} missing leftSweep path`,

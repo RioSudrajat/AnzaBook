@@ -72,7 +72,9 @@ export function parseKanbanArgs(argv) {
     const issueNumber = parseIssueNumber(rawIssue);
     const statusName = rest[0];
     if (!statusName) {
-      throw new Error("Usage: node scripts/kanban.mjs move <issueNumber> <status>");
+      throw new Error(
+        "Usage: node scripts/kanban.mjs move <issueNumber> <status>",
+      );
     }
     return {
       command,
@@ -139,7 +141,7 @@ export function resolveTransitionForEvent(eventName, payload) {
 export function extractLinkedIssueNumbers(text = "", branchName = "") {
   const found = new Set();
   const keywordMatches = String(text).matchAll(
-    /(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)/gi,
+    /(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s+(?:[a-z0-9_.-]+\/[a-z0-9_.-]+)?#(\d+)/gi,
   );
   for (const match of keywordMatches) {
     found.add(Number.parseInt(match[1], 10));
@@ -155,6 +157,34 @@ export function extractLinkedIssueNumbers(text = "", branchName = "") {
   return [...found];
 }
 
+export function assertNoGraphqlErrors(payload) {
+  if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
+    const messages = payload.errors
+      .map((err) => err?.message || "Unknown GraphQL error")
+      .join("; ");
+    throw new Error(`GitHub GraphQL error: ${messages}`);
+  }
+  return payload;
+}
+
+export function syncLinkedIssues(
+  issueNumbers,
+  statusName,
+  { moveIssue, warn = console.warn },
+) {
+  const synced = [];
+  for (const issueNumber of issueNumbers) {
+    try {
+      moveIssue(issueNumber, statusName);
+      synced.push(issueNumber);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      warn(`Skipping Kanban sync for #${issueNumber}: ${reason}`);
+    }
+  }
+  return synced;
+}
+
 function ghGraphql(query, variables = {}) {
   const args = ["api", "graphql", "-f", `query=${query}`];
   for (const [key, value] of Object.entries(variables)) {
@@ -165,7 +195,7 @@ function ghGraphql(query, variables = {}) {
     }
   }
   const stdout = execFileSync("gh", args, { encoding: "utf8" });
-  return JSON.parse(stdout);
+  return assertNoGraphqlErrors(JSON.parse(stdout));
 }
 
 function ensureProjectItemId(issueNumber) {
@@ -191,7 +221,9 @@ function ensureProjectItemId(issueNumber) {
   );
   const issue = lookup?.data?.repository?.issue;
   if (!issue?.id) {
-    throw new Error(`Issue #${issueNumber} not found in ${PROJECT_CONSTANTS.owner}/${PROJECT_CONSTANTS.repo}`);
+    throw new Error(
+      `Issue #${issueNumber} not found in ${PROJECT_CONSTANTS.owner}/${PROJECT_CONSTANTS.repo}`,
+    );
   }
   const existing = issue.projectItems?.nodes?.find(
     (node) => node.project?.id === PROJECT_CONSTANTS.projectId,
@@ -249,7 +281,9 @@ function applyCommand(parsed) {
     const payload = JSON.parse(readFileSync(eventPath, "utf8"));
     const nextStatus = resolveTransitionForEvent(eventName, payload);
     if (!nextStatus) {
-      console.log(`No Kanban status transition for ${eventName}/${payload?.action}`);
+      console.log(
+        `No Kanban status transition for ${eventName}/${payload?.action}`,
+      );
       return;
     }
     const issueNumbers =
@@ -264,11 +298,26 @@ function applyCommand(parsed) {
       return;
     }
     const statusOptionId = requireOptionId("status", nextStatus, "status");
-    for (const issueNumber of issueNumbers) {
-      const itemId = ensureProjectItemId(issueNumber);
-      setSingleSelectField(itemId, PROJECT_CONSTANTS.fields.status.id, statusOptionId);
-      console.log(`Kanban #${issueNumber} -> ${nextStatus}`);
+    const isTrustedIssueAuthor = ["OWNER", "MEMBER", "COLLABORATOR"].includes(
+      payload?.issue?.author_association ?? "",
+    );
+    if (eventName === "issues" && !isTrustedIssueAuthor) {
+      console.log(
+        `Skipping untrusted issue event for author_association="${payload?.issue?.author_association ?? "NONE"}".`,
+      );
+      return;
     }
+    syncLinkedIssues(issueNumbers, nextStatus, {
+      moveIssue: (issueNumber) => {
+        const itemId = ensureProjectItemId(issueNumber);
+        setSingleSelectField(
+          itemId,
+          PROJECT_CONSTANTS.fields.status.id,
+          statusOptionId,
+        );
+        console.log(`Kanban #${issueNumber} -> ${nextStatus}`);
+      },
+    });
     return;
   }
 
