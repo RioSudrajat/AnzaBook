@@ -1,10 +1,7 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { PageFrame } from "@/features/dashboard/components/page-frame";
 import { ApiError } from "@/lib/api/client";
-import {
-  calendarDetailQuery,
-  eventsQuery,
-} from "@/features/events/queries";
+import { calendarDetailQuery, eventsQuery } from "@/features/events/queries";
 import { CommunityHubView } from "@/features/events/components/community-hub-view";
 
 export const Route = createFileRoute("/c/$slug")({

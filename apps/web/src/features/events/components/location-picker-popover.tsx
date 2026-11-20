@@ -1,15 +1,5 @@
 import * as React from "react";
-import {
-  MapPin,
-  Video,
-  Search,
-  ExternalLink,
-  Store,
-  Sliders,
-  Check,
-  X,
-  Lock,
-} from "lucide-react";
+import { MapPin, Video, Search, Store, Sliders, X } from "lucide-react";
 import { useLocationSuggestions } from "../hooks";
 import { AdjustPinMapDialog } from "./adjust-pin-map-dialog";
 
@@ -49,19 +39,17 @@ export function LocationPickerPopover({
       district?: string;
     }>
   >([]);
-  const [isSearchingOsm, setIsSearchingOsm] = React.useState(false);
 
   const { data: suggestions = [] } = useLocationSuggestions();
 
   // Debounced search to OpenStreetMap Nominatim API
   React.useEffect(() => {
     if (!searchQuery.trim() || searchQuery.length < 3) {
-      setOsmResults([]);
+      queueMicrotask(() => setOsmResults([]));
       return;
     }
 
     const timer = setTimeout(async () => {
-      setIsSearchingOsm(true);
       try {
         const res = await fetch(
           `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
@@ -74,8 +62,22 @@ export function LocationPickerPopover({
           },
         );
         if (res.ok) {
-          const items = await res.json();
-          const parsed = items.map((item: any) => ({
+          interface NominatimItem {
+            namedetails?: { name?: string };
+            name?: string;
+            display_name: string;
+            lat: string;
+            lon: string;
+            address?: {
+              city?: string;
+              town?: string;
+              county?: string;
+              suburb?: string;
+              city_district?: string;
+            };
+          }
+          const items = (await res.json()) as NominatimItem[];
+          const parsed = items.map((item) => ({
             name:
               item.namedetails?.name ||
               item.name ||
@@ -94,8 +96,6 @@ export function LocationPickerPopover({
         }
       } catch {
         // Fallback gracefully on network timeout
-      } finally {
-        setIsSearchingOsm(false);
       }
     }, 400);
 
@@ -233,7 +233,9 @@ export function LocationPickerPopover({
                     >
                       <MapPin className="mt-0.5 size-4 shrink-0 text-amber-400" />
                       <div className="truncate">
-                        <div className="font-medium text-white">{item.name}</div>
+                        <div className="font-medium text-white">
+                          {item.name}
+                        </div>
                         <div className="truncate text-[11px] text-white/50">
                           {item.address}
                         </div>
@@ -274,7 +276,9 @@ export function LocationPickerPopover({
                           <MapPin className="mt-0.5 size-4 shrink-0 text-blue-400" />
                         )}
                         <div className="truncate">
-                          <div className="font-medium text-white">{sug.name}</div>
+                          <div className="font-medium text-white">
+                            {sug.name}
+                          </div>
                           <div className="truncate text-[11px] text-white/50">
                             {sug.address}
                           </div>
@@ -359,7 +363,9 @@ export function LocationPickerPopover({
                 }
                 className="size-3.5 rounded border-white/20 bg-black/40 text-amber-500 focus:ring-0"
               />
-              <span className="text-[11px]">Sembunyikan alamat sebelum disetujui</span>
+              <span className="text-[11px]">
+                Sembunyikan alamat sebelum disetujui
+              </span>
             </label>
           </div>
         </div>

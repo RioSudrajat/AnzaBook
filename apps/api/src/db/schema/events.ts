@@ -21,10 +21,7 @@ import type {
   EventVisibility,
   RsvpStatus,
 } from "@starter/shared/validators/community";
-import type {
-  EventCoHostDto,
-  FeaturedWorkDto,
-} from "@starter/shared/types";
+import type { EventCoHostDto, FeaturedWorkDto } from "@starter/shared/types";
 
 export const communityCalendars = pgTable(
   "community_calendars",
@@ -182,7 +179,9 @@ export const communityEvents = pgTable(
     requiresApproval: boolean("requires_approval").notNull().default(false),
     allowWaitlist: boolean("allow_waitlist").notNull().default(true),
     status: varchar("status", { length: 32 })
-      .$type<"draft" | "pending_review" | "published" | "canceled" | "completed">()
+      .$type<
+        "draft" | "pending_review" | "published" | "canceled" | "completed"
+      >()
       .notNull()
       .default("published"),
     parentEventId: uuid("parent_event_id"),
@@ -235,10 +234,7 @@ export const eventRsvps = pgTable(
       table.eventId,
       table.userId,
     ),
-    index("event_rsvps_event_checkin_idx").on(
-      table.eventId,
-      table.checkinCode,
-    ),
+    index("event_rsvps_event_checkin_idx").on(table.eventId, table.checkinCode),
     index("event_rsvps_user_created_idx").on(
       table.userId,
       table.createdAt.desc(),

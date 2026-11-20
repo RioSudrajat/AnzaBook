@@ -7,12 +7,17 @@ import {
 describe("Events & Calendars Validators", () => {
   it("calculates accurate Haversine distance in meters", () => {
     // Monas (-6.1754, 106.8272) to Menara Rajawali (-6.2284, 106.8352) ~5.9 km
-    const distance = haversineDistanceMeters(-6.1754, 106.8272, -6.2284, 106.8352);
+    const distance = haversineDistanceMeters(
+      -6.1754,
+      106.8272,
+      -6.2284,
+      106.8352,
+    );
     expect(distance).toBeGreaterThan(5800);
     expect(distance).toBeLessThan(6100);
 
     // Nearby point within 250m
-    const near = haversineDistanceMeters(-6.2284, 106.8352, -6.2295, 106.8360);
+    const near = haversineDistanceMeters(-6.2284, 106.8352, -6.2295, 106.836);
     expect(near).toBeLessThan(300);
   });
 
@@ -20,8 +25,10 @@ describe("Events & Calendars Validators", () => {
     const input = {
       calendarId: "123e4567-e89b-12d3-a456-426614174000",
       title: "Bedah Film & Naskah: Laut Bercerita",
-      description: "Diskusi adaptasi novel ke film pendek bersama sutradara dan pemeran.",
-      coverUrl: "https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=800&q=80",
+      description:
+        "Diskusi adaptasi novel ke film pendek bersama sutradara dan pemeran.",
+      coverUrl:
+        "https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=800&q=80",
       themePreset: "midnight_ink",
       visibility: "public",
       eventType: "film_discussion",
@@ -71,10 +78,10 @@ describe("Events & Calendars Validators", () => {
       city: "Jakarta",
       venueName: "Taman Suropati",
       venueAddress: "Jl. Taman Suropati No.5, Menteng",
-      latitude: -6.1990, // moved > 1.2km away
-      longitude: 106.8400,
-      placeSourceLat: -6.1990,
-      placeSourceLng: 106.8270, // ~1430m difference in longitude
+      latitude: -6.199, // moved > 1.2km away
+      longitude: 106.84,
+      placeSourceLat: -6.199,
+      placeSourceLng: 106.827, // ~1430m difference in longitude
       startsAt: "2026-11-14T09:00:00.000Z",
       endsAt: "2026-11-14T11:00:00.000Z",
     };
@@ -82,8 +89,8 @@ describe("Events & Calendars Validators", () => {
     const parsed = createEventSchema.safeParse(input);
     expect(parsed.success).toBe(false);
     if (!parsed.success) {
-      const issue = parsed.error.issues.find((i) =>
-        i.message.includes("1 km") || i.message.includes("1000"),
+      const issue = parsed.error.issues.find(
+        (i) => i.message.includes("1 km") || i.message.includes("1000"),
       );
       expect(issue).toBeDefined();
     }

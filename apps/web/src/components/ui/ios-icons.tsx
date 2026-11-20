@@ -9,7 +9,11 @@ type IconProps = SVGProps<SVGSVGElement> & {
  * iOS SF-Symbols style Star icon
  * Rounded vertices and soft concave joints for an organic, non-rigid appearance.
  */
-export function IosStar({ className = "size-4", filled = false, ...props }: IconProps) {
+export function IosStar({
+  className = "size-4",
+  filled = false,
+  ...props
+}: IconProps) {
   return (
     <svg
       viewBox="0 0 24 24"

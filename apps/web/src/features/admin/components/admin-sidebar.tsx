@@ -283,9 +283,7 @@ export function AdminSidebar({
         </Link>
 
         {/* Hairline Divider before profile in collapsed mode */}
-        {isCollapsed && (
-          <div className="w-9 h-px bg-border/80 my-1 mx-auto" />
-        )}
+        {isCollapsed && <div className="w-9 h-px bg-border/80 my-1 mx-auto" />}
 
         {/* User Profile Card */}
         <div

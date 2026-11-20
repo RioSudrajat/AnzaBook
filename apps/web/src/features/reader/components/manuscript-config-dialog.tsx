@@ -1,18 +1,5 @@
 import * as React from "react";
-import {
-  BookOpen,
-  Check,
-  CheckCircle2,
-  ChevronDown,
-  Coins,
-  Globe,
-  Layers,
-  Printer,
-  Send,
-  ShieldCheck,
-  Sparkles,
-  X,
-} from "lucide-react";
+import { Check, Globe, Layers, Printer, Send, Sparkles, X } from "lucide-react";
 import type { DigitalPolicy } from "@starter/shared/types";
 import { calculatePrintEconomics } from "@starter/shared/print-economics";
 import { Button } from "@/components/ui/button";
@@ -73,10 +60,8 @@ export function ManuscriptConfigDialog({
   const [targetAudience, setTargetAudience] = React.useState(
     initialData?.targetAudience || "Semua Umur (General)",
   );
-  const [estimatedPages, setEstimatedPages] = React.useState(
-    initialData?.estimatedPages || 180,
-  );
-  const [isbn, setIsbn] = React.useState(initialData?.isbn || "");
+  const estimatedPages = initialData?.estimatedPages || 180;
+  const isbn = initialData?.isbn || "";
   const [publisherId, setPublisherId] = React.useState(
     initialData?.publisherId || "",
   );
@@ -84,21 +69,18 @@ export function ManuscriptConfigDialog({
     initialData?.authorNotes || "",
   );
 
-  React.useEffect(() => {
+  const [prevInitialData, setPrevInitialData] = React.useState(initialData);
+  if (initialData !== prevInitialData) {
+    setPrevInitialData(initialData);
     if (initialData) {
       if (initialData.title) setTitle(initialData.title);
       if (initialData.synopsis) setSynopsis(initialData.synopsis);
       if (initialData.category) setCategory(initialData.category);
       if (initialData.publisherId) setPublisherId(initialData.publisherId);
     }
-  }, [initialData]);
+  }
 
-  // Set default publisher if available
-  React.useEffect(() => {
-    if (!publisherId && verifiedPublishers.length > 0) {
-      setPublisherId(verifiedPublishers[0].id);
-    }
-  }, [verifiedPublishers, publisherId]);
+  const effectivePublisherId = publisherId || verifiedPublishers[0]?.id || "";
 
   if (!isOpen) {
     return null;
@@ -129,7 +111,7 @@ export function ManuscriptConfigDialog({
       targetAudience,
       estimatedPages: Number(estimatedPages) || 180,
       isbn: isbn.trim() || undefined,
-      publisherId,
+      publisherId: effectivePublisherId,
       authorNotes: authorNotes.trim() || undefined,
     });
   };
@@ -147,7 +129,8 @@ export function ManuscriptConfigDialog({
               </h3>
             </div>
             <p className="text-xs text-muted-foreground">
-              Atur hak akses bahasa, lisensi distribusi, dan metadata naskah sebelum diajukan ke mitra penerbit resmi.
+              Atur hak akses bahasa, lisensi distribusi, dan metadata naskah
+              sebelum diajukan ke mitra penerbit resmi.
             </p>
           </div>
 
@@ -171,14 +154,15 @@ export function ManuscriptConfigDialog({
               </span>
             </Label>
             <select
-              value={publisherId}
+              value={effectivePublisherId}
               onChange={(e) => setPublisherId(e.target.value)}
               required
               className="w-full h-10 px-3 rounded-xl border border-border bg-background text-xs font-serif text-foreground outline-none focus:border-[var(--color-accent)]"
             >
               {verifiedPublishers.map((pub) => (
                 <option key={pub.id} value={pub.id}>
-                  {pub.name} — {pub.city || "Nasional"} (IKAPI: {pub.ikapiNumber || "Resmi"})
+                  {pub.name} — {pub.city || "Nasional"} (IKAPI:{" "}
+                  {pub.ikapiNumber || "Resmi"})
                 </option>
               ))}
               {verifiedPublishers.length === 0 && (
@@ -210,9 +194,15 @@ export function ManuscriptConfigDialog({
                 className="w-full h-10 px-3 rounded-xl border border-border bg-background text-xs text-foreground outline-none"
               >
                 <option value="Fiksi Sastra">Fiksi Sastra &amp; Roman</option>
-                <option value="Non-Fiksi Populer">Non-Fiksi &amp; Humaniora</option>
-                <option value="Sejarah & Sosial">Sejarah &amp; Ilmu Sosial</option>
-                <option value="Pengembangan Diri">Pengembangan Diri (Self-Help)</option>
+                <option value="Non-Fiksi Populer">
+                  Non-Fiksi &amp; Humaniora
+                </option>
+                <option value="Sejarah & Sosial">
+                  Sejarah &amp; Ilmu Sosial
+                </option>
+                <option value="Pengembangan Diri">
+                  Pengembangan Diri (Self-Help)
+                </option>
                 <option value="Sains Populer">Sains &amp; Filsafat</option>
                 <option value="Puisi & Antologi">Puisi &amp; Antologi</option>
               </select>
@@ -244,7 +234,9 @@ export function ManuscriptConfigDialog({
                     onChange={(e) => setHasEnglish(e.target.checked)}
                     className="rounded text-amber-600 size-3.5 cursor-pointer"
                   />
-                  <span>Tersedia Terjemahan Bahasa Inggris (English Edition)</span>
+                  <span>
+                    Tersedia Terjemahan Bahasa Inggris (English Edition)
+                  </span>
                 </label>
               </div>
             </div>
@@ -257,12 +249,19 @@ export function ManuscriptConfigDialog({
                 onChange={(e) => setTargetAudience(e.target.value)}
                 className="w-full h-9 px-2.5 rounded-lg border border-border bg-background text-xs text-foreground outline-none"
               >
-                <option value="Semua Umur (General)">Semua Umur (General Audience)</option>
-                <option value="Remaja 13+ (Young Adult)">Remaja 13+ (Young Adult)</option>
-                <option value="Dewasa 18+ (Mature/Academic)">Dewasa 18+ (Mature/Akademik)</option>
+                <option value="Semua Umur (General)">
+                  Semua Umur (General Audience)
+                </option>
+                <option value="Remaja 13+ (Young Adult)">
+                  Remaja 13+ (Young Adult)
+                </option>
+                <option value="Dewasa 18+ (Mature/Academic)">
+                  Dewasa 18+ (Mature/Akademik)
+                </option>
               </select>
               <p className="text-[10px] text-muted-foreground">
-                Membantu redaksi penerbit menentukan target segmen pasar pembaca.
+                Membantu redaksi penerbit menentukan target segmen pasar
+                pembaca.
               </p>
             </div>
           </div>
@@ -289,7 +288,9 @@ export function ManuscriptConfigDialog({
               >
                 <div className="font-bold text-xs flex items-center justify-between">
                   <span>Akses Terbuka</span>
-                  {accessTier === "free" && <Check className="size-3.5 text-[var(--color-accent)]" />}
+                  {accessTier === "free" && (
+                    <Check className="size-3.5 text-[var(--color-accent)]" />
+                  )}
                 </div>
                 <p className="text-[10px] text-muted-foreground mt-1">
                   Gratis untuk seluruh pembaca umum di AnzaBook.
@@ -310,7 +311,9 @@ export function ManuscriptConfigDialog({
               >
                 <div className="font-bold text-xs flex items-center justify-between">
                   <span>Premium Nakama</span>
-                  {accessTier === "premium" && <Check className="size-3.5 text-amber-500" />}
+                  {accessTier === "premium" && (
+                    <Check className="size-3.5 text-amber-500" />
+                  )}
                 </div>
                 <p className="text-[10px] text-muted-foreground mt-1">
                   Hanya anggota Nakama Member + royalti membaca.
@@ -332,7 +335,9 @@ export function ManuscriptConfigDialog({
               >
                 <div className="font-bold text-xs flex items-center justify-between">
                   <span>Digital + Cetak Fisik</span>
-                  {accessTier === "premium_physical" && <Check className="size-3.5 text-emerald-500" />}
+                  {accessTier === "premium_physical" && (
+                    <Check className="size-3.5 text-emerald-500" />
+                  )}
                 </div>
                 <p className="text-[10px] text-muted-foreground mt-1">
                   Didistribusikan digital dan dicetak fisik IKAPI.
@@ -355,16 +360,28 @@ export function ManuscriptConfigDialog({
               </div>
               <div className="grid grid-cols-3 gap-2 text-[11px] font-mono text-foreground/90">
                 <div>
-                  <span className="text-muted-foreground block text-[10px]">Perkiraan Hal:</span>
+                  <span className="text-muted-foreground block text-[10px]">
+                    Perkiraan Hal:
+                  </span>
                   <strong>{estimatedPages} Halaman</strong>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px]">HPP Cetak/Eks:</span>
-                  <strong>Rp {standardTier?.hppPerUnitIdr.toLocaleString("id-ID") || "18.500"}</strong>
+                  <span className="text-muted-foreground block text-[10px]">
+                    HPP Cetak/Eks:
+                  </span>
+                  <strong>
+                    Rp{" "}
+                    {standardTier?.hppPerUnitIdr.toLocaleString("id-ID") ||
+                      "18.500"}
+                  </strong>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px]">Royalti Penulis:</span>
-                  <strong className="text-emerald-600 dark:text-emerald-400">12% / Buku Terjual</strong>
+                  <span className="text-muted-foreground block text-[10px]">
+                    Royalti Penulis:
+                  </span>
+                  <strong className="text-emerald-600 dark:text-emerald-400">
+                    12% / Buku Terjual
+                  </strong>
                 </div>
               </div>
             </div>
@@ -384,7 +401,9 @@ export function ManuscriptConfigDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Catatan Pengantar untuk Redaksi Penerbit (Opsional)</Label>
+            <Label className="text-xs font-semibold">
+              Catatan Pengantar untuk Redaksi Penerbit (Opsional)
+            </Label>
             <Textarea
               value={authorNotes}
               onChange={(e) => setAuthorNotes(e.target.value)}
@@ -408,11 +427,15 @@ export function ManuscriptConfigDialog({
 
             <Button
               type="submit"
-              disabled={isSubmitting || !title || !synopsis || !publisherId}
+              disabled={
+                isSubmitting || !title || !synopsis || !effectivePublisherId
+              }
               className="h-10 px-6 text-xs font-bold bg-[var(--color-accent)] hover:opacity-90 text-white shadow-xs cursor-pointer inline-flex items-center gap-1.5"
             >
               <Send className="size-3.5" />
-              <span>{isSubmitting ? "Mengajukan..." : "Kirim Naskah ke Penerbit"}</span>
+              <span>
+                {isSubmitting ? "Mengajukan..." : "Kirim Naskah ke Penerbit"}
+              </span>
             </Button>
           </div>
         </form>

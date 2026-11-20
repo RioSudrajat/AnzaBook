@@ -11,6 +11,7 @@
 ---
 
 ## Global Constraints
+
 - Must use existing E-Reader route (`read.$slug.tsx`) in scroll mode—no separate isolated canvas.
 - Must preserve Literata serif typography, theme colors (Manila, Sepia, Night), and responsive padding.
 - Anti-slop strict aesthetic: no purple neon gradients, no clunky borders, authentic human-crafted publisher tools.

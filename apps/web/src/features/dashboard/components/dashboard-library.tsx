@@ -13,7 +13,11 @@ import {
   RotateCcw,
   Unlock,
 } from "lucide-react";
-import type { BookSummaryDto, ReadingSessionDto, ShelfItemDto } from "@starter/shared/types";
+import type {
+  BookSummaryDto,
+  ReadingSessionDto,
+  ShelfItemDto,
+} from "@starter/shared/types";
 import { Button } from "@/components/ui/button";
 import { BookCover } from "@/features/books/components/book-cover";
 import { useBookSessions } from "@/features/books/hooks";
@@ -343,8 +347,12 @@ function ShelfBookLinks({ shelves }: { shelves: ShelfItemDto[] }) {
                 </span>
               )}
             </div>
-            <h3 className="font-serif text-sm font-bold line-clamp-2">{book.title}</h3>
-            <p className="text-xs text-muted-foreground line-clamp-1">{book.author}</p>
+            <h3 className="font-serif text-sm font-bold line-clamp-2">
+              {book.title}
+            </h3>
+            <p className="text-xs text-muted-foreground line-clamp-1">
+              {book.author}
+            </p>
           </Link>
         </li>
       ))}

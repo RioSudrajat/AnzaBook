@@ -1,14 +1,11 @@
 import * as React from "react";
 import {
   Calendar as CalendarIcon,
-  Clock,
   MapPin,
   Plus,
   Users,
   Video,
   Sparkles,
-  Search,
-  Filter,
   X,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
@@ -21,12 +18,17 @@ import { CreateEventDialog } from "./create-event-dialog";
 import { EventDetailDrawer } from "./event-detail-drawer";
 
 export function DashboardEvents() {
-  const [filterTab, setFilterTab] = React.useState<"upcoming" | "past" | "my_rsvps" | "hosting">("upcoming");
-  const [selectedFormat, setSelectedFormat] = React.useState<"all" | "offline" | "online">("all");
+  const [filterTab, setFilterTab] = React.useState<
+    "upcoming" | "past" | "my_rsvps" | "hosting"
+  >("upcoming");
+  const [selectedFormat, setSelectedFormat] = React.useState<
+    "all" | "offline" | "online"
+  >("all");
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
-  const [selectedEventSlug, setSelectedEventSlug] = React.useState<string | null>(null);
+  const [selectedEventSlug, setSelectedEventSlug] = React.useState<
+    string | null
+  >(null);
   const [isHostGateOpen, setIsHostGateOpen] = React.useState(false);
-  const [isApplyCalendarOpen, setIsApplyCalendarOpen] = React.useState(false);
 
   useBodyScrollLock(isHostGateOpen);
 
@@ -40,7 +42,8 @@ export function DashboardEvents() {
     return calendars.some(
       (c) =>
         c.isManager &&
-        (c.verificationStatus === "verified" || c.verificationStatus === "trusted"),
+        (c.verificationStatus === "verified" ||
+          c.verificationStatus === "trusted"),
     );
   }, [session, calendars]);
 
@@ -62,11 +65,20 @@ export function DashboardEvents() {
     limit: 50,
   });
 
-  const events = eventsData?.data || [];
+  const events = React.useMemo(
+    () => eventsData?.data || [],
+    [eventsData?.data],
+  );
 
   // Group events by date string (e.g. "Besok Selasa", "12 Nov Kamis")
   const groupedEvents = React.useMemo(() => {
-    const groups: { [key: string]: { label: string; date: Date; items: CommunityEventSummaryDto[] } } = {};
+    const groups: {
+      [key: string]: {
+        label: string;
+        date: Date;
+        items: CommunityEventSummaryDto[];
+      };
+    } = {};
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -126,8 +138,11 @@ export function DashboardEvents() {
     return Object.values(groups);
   }, [events]);
 
-  const selectedEventIndex = events.findIndex((e) => e.slug === selectedEventSlug);
-  const selectedEvent = selectedEventIndex >= 0 ? events[selectedEventIndex] : null;
+  const selectedEventIndex = events.findIndex(
+    (e) => e.slug === selectedEventSlug,
+  );
+  const selectedEvent =
+    selectedEventIndex >= 0 ? events[selectedEventIndex] : null;
 
   const handleNextEvent = () => {
     if (selectedEventIndex >= 0 && selectedEventIndex < events.length - 1) {
@@ -143,11 +158,13 @@ export function DashboardEvents() {
 
   const formatCardTime = (iso: string) => {
     const d = new Date(iso);
-    return d.toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).replace(".", ".");
+    return d
+      .toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      })
+      .replace(".", ".");
   };
 
   return (
@@ -163,10 +180,10 @@ export function DashboardEvents() {
             {filterTab === "hosting"
               ? "Kelola acara yang Anda selenggarakan, tinjau permohonan peserta, dan perbarui detail."
               : filterTab === "my_rsvps"
-              ? "Daftar acara yang telah Anda daftarkan dan tiket masuk Anda."
-              : filterTab === "past"
-              ? "Arsip dan riwayat agenda komunitas yang telah selesai diselenggarakan."
-              : "Temukan bedah buku, sesi diskusi film, temu literasi, dan ruang baca bersama."}
+                ? "Daftar acara yang telah Anda daftarkan dan tiket masuk Anda."
+                : filterTab === "past"
+                  ? "Arsip dan riwayat agenda komunitas yang telah selesai diselenggarakan."
+                  : "Temukan bedah buku, sesi diskusi film, temu literasi, dan ruang baca bersama."}
           </p>
         </div>
 
@@ -236,7 +253,9 @@ export function DashboardEvents() {
           <span className="text-muted-foreground text-[11px]">Format:</span>
           <select
             value={selectedFormat}
-            onChange={(e) => setSelectedFormat(e.target.value as any)}
+            onChange={(e) =>
+              setSelectedFormat(e.target.value as "all" | "offline" | "online")
+            }
             className="rounded-lg border border-border/80 bg-background px-2.5 py-1 text-xs text-foreground outline-none cursor-pointer"
           >
             <option value="all">Semua Format</option>
@@ -258,9 +277,12 @@ export function DashboardEvents() {
             <>
               <Users className="size-10 text-muted-foreground/40 mx-auto" />
               <div className="space-y-1">
-                <h3 className="font-semibold text-foreground text-sm">Masuk untuk Melihat Acara Kelolaan</h3>
+                <h3 className="font-semibold text-foreground text-sm">
+                  Masuk untuk Melihat Acara Kelolaan
+                </h3>
                 <p className="text-xs max-w-sm mx-auto">
-                  Masuk ke akun AnzaBook untuk melihat dan mengelola acara yang Anda selenggarakan.
+                  Masuk ke akun AnzaBook untuk melihat dan mengelola acara yang
+                  Anda selenggarakan.
                 </p>
               </div>
               <Button
@@ -275,9 +297,12 @@ export function DashboardEvents() {
             <>
               <Sparkles className="size-10 text-muted-foreground/40 mx-auto" />
               <div className="space-y-1">
-                <h3 className="font-semibold text-foreground text-sm">Belum Ada Acara yang Anda Buat</h3>
+                <h3 className="font-semibold text-foreground text-sm">
+                  Belum Ada Acara yang Anda Buat
+                </h3>
                 <p className="text-xs max-w-sm mx-auto">
-                  Anda belum menyelenggarakan acara apa pun. Mulai buat agenda bedah buku atau temu literasi pertama Anda!
+                  Anda belum menyelenggarakan acara apa pun. Mulai buat agenda
+                  bedah buku atau temu literasi pertama Anda!
                 </p>
               </div>
               <Button
@@ -293,9 +318,12 @@ export function DashboardEvents() {
             <>
               <Users className="size-10 text-muted-foreground/40 mx-auto" />
               <div className="space-y-1">
-                <h3 className="font-semibold text-foreground text-sm">Masuk untuk Melihat Pendaftaran</h3>
+                <h3 className="font-semibold text-foreground text-sm">
+                  Masuk untuk Melihat Pendaftaran
+                </h3>
                 <p className="text-xs max-w-sm mx-auto">
-                  Masuk ke akun AnzaBook Anda untuk melihat daftar acara yang Anda ikuti dan status tiket Anda.
+                  Masuk ke akun AnzaBook Anda untuk melihat daftar acara yang
+                  Anda ikuti dan status tiket Anda.
                 </p>
               </div>
               <Button
@@ -310,9 +338,12 @@ export function DashboardEvents() {
             <>
               <CalendarIcon className="size-10 text-muted-foreground/40 mx-auto" />
               <div className="space-y-1">
-                <h3 className="font-semibold text-foreground text-sm">Belum Ada Pendaftaran Acara</h3>
+                <h3 className="font-semibold text-foreground text-sm">
+                  Belum Ada Pendaftaran Acara
+                </h3>
                 <p className="text-xs max-w-sm mx-auto">
-                  Anda belum mendaftar di acara mana pun. Temukan acara menarik di &quot;Acara Terdekat&quot; dan daftarkan diri Anda!
+                  Anda belum mendaftar di acara mana pun. Temukan acara menarik
+                  di &quot;Acara Terdekat&quot; dan daftarkan diri Anda!
                 </p>
               </div>
               <Button
@@ -328,7 +359,9 @@ export function DashboardEvents() {
             <>
               <CalendarIcon className="size-10 text-muted-foreground/40 mx-auto" />
               <div className="space-y-1">
-                <h3 className="font-semibold text-foreground text-sm">Belum Ada Riwayat Acara</h3>
+                <h3 className="font-semibold text-foreground text-sm">
+                  Belum Ada Riwayat Acara
+                </h3>
                 <p className="text-xs max-w-sm mx-auto">
                   Belum ada agenda komunitas yang telah berakhir.
                 </p>
@@ -338,9 +371,12 @@ export function DashboardEvents() {
             <>
               <CalendarIcon className="size-10 text-muted-foreground/40 mx-auto" />
               <div className="space-y-1">
-                <h3 className="font-semibold text-foreground text-sm">Belum Ada Acara Terdekat</h3>
+                <h3 className="font-semibold text-foreground text-sm">
+                  Belum Ada Acara Terdekat
+                </h3>
                 <p className="text-xs max-w-sm mx-auto">
-                  Jadilah yang pertama membuat agenda bedah buku atau temu literasi di komunitas!
+                  Jadilah yang pertama membuat agenda bedah buku atau temu
+                  literasi di komunitas!
                 </p>
               </div>
               <Button
@@ -368,7 +404,10 @@ export function DashboardEvents() {
               <div className="space-y-2.5">
                 {group.items.map((ev) => {
                   const isSelected = ev.slug === selectedEventSlug;
-                  const isFull = ev.capacity !== null && ev.capacity !== undefined && ev.attendeeCount >= ev.capacity;
+                  const isFull =
+                    ev.capacity !== null &&
+                    ev.capacity !== undefined &&
+                    ev.attendeeCount >= ev.capacity;
 
                   return (
                     <article
@@ -415,7 +454,10 @@ export function DashboardEvents() {
                           <span className="truncate">
                             {ev.isAddressHidden
                               ? `${ev.district ? `${ev.district}, ` : ""}${ev.city || "Jakarta"}`
-                              : ev.venueName || (ev.format === "online" ? "Daring via Tautan Virtual" : "Lokasi Acara")}
+                              : ev.venueName ||
+                                (ev.format === "online"
+                                  ? "Daring via Tautan Virtual"
+                                  : "Lokasi Acara")}
                           </span>
                         </div>
 
@@ -430,11 +472,12 @@ export function DashboardEvents() {
                           )}
 
                           {/* Pending Requests Badge */}
-                          {ev.pendingRsvpCount !== undefined && ev.pendingRsvpCount > 0 && (
-                            <span className="rounded-md bg-rose-500/20 border border-rose-500/30 px-2 py-0.5 text-[10px] font-semibold text-rose-300">
-                              {ev.pendingRsvpCount} Permintaan
-                            </span>
-                          )}
+                          {ev.pendingRsvpCount !== undefined &&
+                            ev.pendingRsvpCount > 0 && (
+                              <span className="rounded-md bg-rose-500/20 border border-rose-500/30 px-2 py-0.5 text-[10px] font-semibold text-rose-300">
+                                {ev.pendingRsvpCount} Permintaan
+                              </span>
+                            )}
 
                           {/* Waitlist Badge (Luma Screenshot 4) */}
                           {isFull && (
@@ -456,8 +499,8 @@ export function DashboardEvents() {
                               {ev.userRsvpStatus === "going"
                                 ? "Terdaftar ✓"
                                 : ev.userRsvpStatus === "pending_approval"
-                                ? "Menunggu Persetujuan"
-                                : "Daftar Tunggu"}
+                                  ? "Menunggu Persetujuan"
+                                  : "Daftar Tunggu"}
                             </span>
                           )}
 
@@ -495,7 +538,9 @@ export function DashboardEvents() {
         event={selectedEvent}
         onNextEvent={handleNextEvent}
         onPrevEvent={handlePrevEvent}
-        hasNextEvent={selectedEventIndex >= 0 && selectedEventIndex < events.length - 1}
+        hasNextEvent={
+          selectedEventIndex >= 0 && selectedEventIndex < events.length - 1
+        }
         hasPrevEvent={selectedEventIndex > 0}
       />
 
@@ -537,9 +582,15 @@ export function DashboardEvents() {
               Akses Penyelenggara Acara
             </h3>
             <p className="text-xs text-white/60 leading-relaxed mb-6">
-              Di AnzaBook, acara diselenggarakan oleh <strong>Komunitas Baca, Penulis,</strong> atau <strong>Penerbit</strong> terverifikasi untuk menjaga linimasa tetap berkualitas dan bebas spam.
-              <br /><br />
-              Seluruh pendaftaran komunitas, penerbit, maupun penulis resmi kini diproses satu pintu melalui <strong>Partner Program</strong>. Daftarkan entitas Anda untuk diverifikasi oleh kurator admin.
+              Di AnzaBook, acara diselenggarakan oleh{" "}
+              <strong>Komunitas Baca, Penulis,</strong> atau{" "}
+              <strong>Penerbit</strong> terverifikasi untuk menjaga linimasa
+              tetap berkualitas dan bebas spam.
+              <br />
+              <br />
+              Seluruh pendaftaran komunitas, penerbit, maupun penulis resmi kini
+              diproses satu pintu melalui <strong>Partner Program</strong>.
+              Daftarkan entitas Anda untuk diverifikasi oleh kurator admin.
             </p>
 
             <div className="flex flex-col gap-2">

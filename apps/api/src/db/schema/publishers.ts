@@ -111,7 +111,10 @@ export const manuscriptSubmissions = pgTable(
       .$type<DigitalPolicy>()
       .notNull(),
     proposedAlacartePriceIdr: integer("proposed_alacarte_price_idr"),
-    printSimJson: jsonb("print_sim_json").$type<Record<string, unknown> | null>(),
+    printSimJson: jsonb("print_sim_json").$type<Record<
+      string,
+      unknown
+    > | null>(),
     status: varchar("status", { length: 32 })
       .$type<ManuscriptSubmissionStatus>()
       .notNull()

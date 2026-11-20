@@ -82,7 +82,11 @@ function PartnerProgramPage() {
               </h1>
 
               <p className="text-sm sm:text-base lg:text-lg text-zinc-400 max-w-xl leading-relaxed">
-                AnzaBook Partner Program hadir bagi para penulis independen, penerbit mitra, dan komunitas literasi yang berkomitmen merawat kedalaman gagasan, memperluas jangkauan pembaca berkualitas, dan membangun ekosistem perbukuan yang adil serta berdaya di Indonesia.
+                AnzaBook Partner Program hadir bagi para penulis independen,
+                penerbit mitra, dan komunitas literasi yang berkomitmen merawat
+                kedalaman gagasan, memperluas jangkauan pembaca berkualitas, dan
+                membangun ekosistem perbukuan yang adil serta berdaya di
+                Indonesia.
               </p>
 
               <div className="pt-2 flex flex-wrap items-center gap-4">
@@ -130,9 +134,29 @@ function PartnerProgramPage() {
                   xmlns="http://www.w3.org/2000/svg"
                 >
                   {/* Subtle Etching Lines */}
-                  <circle cx="160" cy="160" r="140" stroke="#27272a" strokeWidth="1" strokeDasharray="4 6" />
-                  <circle cx="160" cy="160" r="110" stroke="#3f3f46" strokeWidth="1" />
-                  <circle cx="160" cy="160" r="80" stroke="#27272a" strokeWidth="1" strokeDasharray="2 4" />
+                  <circle
+                    cx="160"
+                    cy="160"
+                    r="140"
+                    stroke="#27272a"
+                    strokeWidth="1"
+                    strokeDasharray="4 6"
+                  />
+                  <circle
+                    cx="160"
+                    cy="160"
+                    r="110"
+                    stroke="#3f3f46"
+                    strokeWidth="1"
+                  />
+                  <circle
+                    cx="160"
+                    cy="160"
+                    r="80"
+                    stroke="#27272a"
+                    strokeWidth="1"
+                    strokeDasharray="2 4"
+                  />
 
                   {/* Open Book Base */}
                   <path
@@ -143,10 +167,26 @@ function PartnerProgramPage() {
                     strokeLinejoin="round"
                   />
                   <path d="M160 218V258" stroke="#71717a" strokeWidth="2" />
-                  <path d="M75 220C100 212 130 216 155 226" stroke="#3f3f46" strokeWidth="1.5" />
-                  <path d="M75 228C100 220 130 224 155 234" stroke="#3f3f46" strokeWidth="1.5" />
-                  <path d="M245 220C220 212 190 216 165 226" stroke="#3f3f46" strokeWidth="1.5" />
-                  <path d="M245 228C220 220 190 224 165 234" stroke="#3f3f46" strokeWidth="1.5" />
+                  <path
+                    d="M75 220C100 212 130 216 155 226"
+                    stroke="#3f3f46"
+                    strokeWidth="1.5"
+                  />
+                  <path
+                    d="M75 228C100 220 130 224 155 234"
+                    stroke="#3f3f46"
+                    strokeWidth="1.5"
+                  />
+                  <path
+                    d="M245 220C220 212 190 216 165 226"
+                    stroke="#3f3f46"
+                    strokeWidth="1.5"
+                  />
+                  <path
+                    d="M245 228C220 220 190 224 165 234"
+                    stroke="#3f3f46"
+                    strokeWidth="1.5"
+                  />
 
                   {/* Sprouting Plant (Botanical leaves directly matching the reference) */}
                   {/* Stem */}
@@ -163,7 +203,11 @@ function PartnerProgramPage() {
                     stroke="#059669"
                     strokeWidth="2"
                   />
-                  <path d="M132 105C142 125 152 145 160 165" stroke="#047857" strokeWidth="1.5" />
+                  <path
+                    d="M132 105C142 125 152 145 160 165"
+                    stroke="#047857"
+                    strokeWidth="1.5"
+                  />
 
                   {/* Right Big Leaf */}
                   <path
@@ -172,7 +216,11 @@ function PartnerProgramPage() {
                     stroke="#059669"
                     strokeWidth="2"
                   />
-                  <path d="M190 160C180 162 170 155 160 145" stroke="#047857" strokeWidth="1.5" />
+                  <path
+                    d="M190 160C180 162 170 155 160 145"
+                    stroke="#047857"
+                    strokeWidth="1.5"
+                  />
 
                   {/* Top Bud / Small Leaf */}
                   <path
@@ -199,13 +247,19 @@ function PartnerProgramPage() {
               </h2>
               <div className="space-y-4 text-xs sm:text-sm text-muted-foreground leading-relaxed pt-2">
                 <p>
-                  Di tengah industri konten serba cepat yang didikte oleh umpan klik (clickbait) dan kejaran impresi iklan tanpa arti, AnzaBook Partner Program mengambil sikap teguh untuk menghargai karya bermutu.
+                  Di tengah industri konten serba cepat yang didikte oleh umpan
+                  klik (clickbait) dan kejaran impresi iklan tanpa arti,
+                  AnzaBook Partner Program mengambil sikap teguh untuk
+                  menghargai karya bermutu.
                 </p>
                 <p>
-                  Sebagai mitra, saat karya terbaik Anda dibaca dan direnungkan oleh para anggota Nakama, sebagian dari iuran keanggotaan dibagikan secara adil dan transparan kepada Anda.
+                  Sebagai mitra, saat karya terbaik Anda dibaca dan direnungkan
+                  oleh para anggota Nakama, sebagian dari iuran keanggotaan
+                  dibagikan secara adil dan transparan kepada Anda.
                 </p>
                 <p>
-                  Berikut beberapa faktor utama yang kami pertimbangkan dalam menentukan kualitas dan nilai apresiasi:
+                  Berikut beberapa faktor utama yang kami pertimbangkan dalam
+                  menentukan kualitas dan nilai apresiasi:
                 </p>
               </div>
             </div>
@@ -218,7 +272,10 @@ function PartnerProgramPage() {
                   Member read time (Waktu Baca Nyata)
                 </h3>
                 <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                  Cerita dan buku yang Anda rilis memperoleh royalti saat anggota membaca selama 30 detik atau lebih, dan royalti terus bertambah seiring kedalaman waktu baca mereka. Bacaan panjang, bernalar kritis, dan penuh perenungan sangat kami apresiasi.
+                  Cerita dan buku yang Anda rilis memperoleh royalti saat
+                  anggota membaca selama 30 detik atau lebih, dan royalti terus
+                  bertambah seiring kedalaman waktu baca mereka. Bacaan panjang,
+                  bernalar kritis, dan penuh perenungan sangat kami apresiasi.
                 </p>
               </div>
 
@@ -228,7 +285,10 @@ function PartnerProgramPage() {
                   Positive interactions (Interaksi Bermakna)
                 </h3>
                 <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                  Apresiasi meningkat ketika pembaca memberikan respon aktif, menyoroti kutipan naskah, meninggalkan catatan marjinalia reflektif di pinggir halaman, atau menuliskan ulasan di rak buku mereka.
+                  Apresiasi meningkat ketika pembaca memberikan respon aktif,
+                  menyoroti kutipan naskah, meninggalkan catatan marjinalia
+                  reflektif di pinggir halaman, atau menuliskan ulasan di rak
+                  buku mereka.
                 </p>
               </div>
 
@@ -238,7 +298,10 @@ function PartnerProgramPage() {
                   Follower bonus (Bonus Pembaca Setia)
                 </h3>
                 <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                  Saat pembaca mengikuti profil penulis, penerbit, atau komunitas Anda dan terus membaca rilisan terbaru Anda, Anda memperoleh bonus pembaca setia. Kami mendorong Anda merawat audiens dengan hubungan yang bermakna.
+                  Saat pembaca mengikuti profil penulis, penerbit, atau
+                  komunitas Anda dan terus membaca rilisan terbaru Anda, Anda
+                  memperoleh bonus pembaca setia. Kami mendorong Anda merawat
+                  audiens dengan hubungan yang bermakna.
                 </p>
               </div>
 
@@ -248,7 +311,10 @@ function PartnerProgramPage() {
                   Boost bonus (Kurasi Unggulan Redaksi)
                 </h3>
                 <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                  Naskah dengan bobot pemikiran tinggi yang mendapatkan kurasi khusus (Boost) dari tim kurator redaksi AnzaBook akan dipromosikan ke Buletin Mingguan dan rak utama pembaca, menghasilkan jangkauan bacaan yang jauh lebih luas.
+                  Naskah dengan bobot pemikiran tinggi yang mendapatkan kurasi
+                  khusus (Boost) dari tim kurator redaksi AnzaBook akan
+                  dipromosikan ke Buletin Mingguan dan rak utama pembaca,
+                  menghasilkan jangkauan bacaan yang jauh lebih luas.
                 </p>
               </div>
             </div>
@@ -258,7 +324,10 @@ function PartnerProgramPage() {
         {/* ================================================================= */}
         {/* 3. PARTNER TRACKS (Jembatan Formulir Penulis, Penerbit & Komunitas)*/}
         {/* ================================================================= */}
-        <section id="tracks" className="py-16 sm:py-24 bg-muted/20 border-b border-border/70 scroll-mt-12">
+        <section
+          id="tracks"
+          className="py-16 sm:py-24 bg-muted/20 border-b border-border/70 scroll-mt-12"
+        >
           <div className="max-w-6xl mx-auto px-4 sm:px-8 space-y-12">
             <div className="text-center max-w-2xl mx-auto space-y-2">
               <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider">
@@ -268,7 +337,8 @@ function PartnerProgramPage() {
                 Pilih Jalur Kolaborasi Anda
               </h2>
               <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                Jembatan pendaftaran resmi untuk seluruh ekosistem literasi AnzaBook. Pilih peran Anda untuk memulai.
+                Jembatan pendaftaran resmi untuk seluruh ekosistem literasi
+                AnzaBook. Pilih peran Anda untuk memulai.
               </p>
             </div>
 
@@ -290,7 +360,9 @@ function PartnerProgramPage() {
                       Penerbit Mitra
                     </h3>
                     <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                      Daftarkan badan usaha penerbitan Anda. Unggah katalog ber-ISBN, kelola tim editor &amp; penulis rekanan, serta manfaatkan jalur distribusi Phygital AnzaBook.
+                      Daftarkan badan usaha penerbitan Anda. Unggah katalog
+                      ber-ISBN, kelola tim editor &amp; penulis rekanan, serta
+                      manfaatkan jalur distribusi Phygital AnzaBook.
                     </p>
                   </div>
 
@@ -305,7 +377,9 @@ function PartnerProgramPage() {
                     </li>
                     <li className="flex items-start gap-2">
                       <Check className="size-3.5 text-foreground shrink-0 mt-0.5" />
-                      <span>Simulasi HPP cetak rakyat terbuka tanpa potongan 55%</span>
+                      <span>
+                        Simulasi HPP cetak rakyat terbuka tanpa potongan 55%
+                      </span>
                     </li>
                   </ul>
                 </div>
@@ -338,14 +412,18 @@ function PartnerProgramPage() {
                       Penulis Resmi
                     </h3>
                     <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                      Terbitkan esai reflektif, cerpen, fiksi, puisi, atau buku lengkap. Dapatkan royalti per menit baca dari iuran Nakama dan berinteraksi langsung lewat catatan marjinalia.
+                      Terbitkan esai reflektif, cerpen, fiksi, puisi, atau buku
+                      lengkap. Dapatkan royalti per menit baca dari iuran Nakama
+                      dan berinteraksi langsung lewat catatan marjinalia.
                     </p>
                   </div>
 
                   <ul className="space-y-2 text-xs text-muted-foreground pt-2">
                     <li className="flex items-start gap-2">
                       <Check className="size-3.5 text-foreground shrink-0 mt-0.5" />
-                      <span>Lencana Penulis Terverifikasi di profil &amp; karya</span>
+                      <span>
+                        Lencana Penulis Terverifikasi di profil &amp; karya
+                      </span>
                     </li>
                     <li className="flex items-start gap-2">
                       <Check className="size-3.5 text-foreground shrink-0 mt-0.5" />
@@ -386,22 +464,30 @@ function PartnerProgramPage() {
                       Komunitas Literasi
                     </h3>
                     <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                      Kelola ruang baca, TBM, atau klub buku kotamu. Publikasikan agenda bedah buku, kelola tiket acara, dan peroleh kas afiliasi 10% untuk keberlanjutan komunitas.
+                      Kelola ruang baca, TBM, atau klub buku kotamu.
+                      Publikasikan agenda bedah buku, kelola tiket acara, dan
+                      peroleh kas afiliasi 10% untuk keberlanjutan komunitas.
                     </p>
                   </div>
 
                   <ul className="space-y-2 text-xs text-muted-foreground pt-2">
                     <li className="flex items-start gap-2">
                       <Check className="size-3.5 text-foreground shrink-0 mt-0.5" />
-                      <span>Halaman publik kalender komunitas di anzabook.id/c/...</span>
+                      <span>
+                        Halaman publik kalender komunitas di anzabook.id/c/...
+                      </span>
                     </li>
                     <li className="flex items-start gap-2">
                       <Check className="size-3.5 text-foreground shrink-0 mt-0.5" />
-                      <span>Komisi kas 10% dari setiap pembelian &amp; langganan</span>
+                      <span>
+                        Komisi kas 10% dari setiap pembelian &amp; langganan
+                      </span>
                     </li>
                     <li className="flex items-start gap-2">
                       <Check className="size-3.5 text-foreground shrink-0 mt-0.5" />
-                      <span>Sistem RSVP diskusi daring &amp; luring terintegrasi</span>
+                      <span>
+                        Sistem RSVP diskusi daring &amp; luring terintegrasi
+                      </span>
                     </li>
                   </ul>
                 </div>

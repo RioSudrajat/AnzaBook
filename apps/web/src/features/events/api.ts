@@ -14,7 +14,6 @@ import type {
   CreateCalendarInput,
   CreateEventInput,
   ListEventsInput,
-  ListEventsQuery,
   ReportEventInput,
   RsvpEventInput,
   UpdateEventInput,
@@ -70,12 +69,11 @@ export async function rsvpEvent(slug: string, input: RsvpEventInput) {
 }
 
 export async function cancelRsvp(slug: string) {
-  const { data } = await apiFetch<DataResponse<{ success: boolean; message: string }>>(
-    `/api/events/${encodeURIComponent(slug)}/rsvp`,
-    {
-      method: "DELETE",
-    },
-  );
+  const { data } = await apiFetch<
+    DataResponse<{ success: boolean; message: string }>
+  >(`/api/events/${encodeURIComponent(slug)}/rsvp`, {
+    method: "DELETE",
+  });
   return data;
 }
 
@@ -91,12 +89,11 @@ export async function updateEvent(slug: string, input: UpdateEventInput) {
 }
 
 export async function deleteEvent(slug: string) {
-  const { data } = await apiFetch<DataResponse<{ success: boolean; message: string }>>(
-    `/api/events/${encodeURIComponent(slug)}`,
-    {
-      method: "DELETE",
-    },
-  );
+  const { data } = await apiFetch<
+    DataResponse<{ success: boolean; message: string }>
+  >(`/api/events/${encodeURIComponent(slug)}`, {
+    method: "DELETE",
+  });
   return data;
 }
 
@@ -192,22 +189,20 @@ export async function toggleFollowCalendar(slug: string) {
 }
 
 export async function joinCalendar(slug: string) {
-  const { data } = await apiFetch<DataResponse<{ success: boolean; role: string }>>(
-    `/api/events/calendars/${encodeURIComponent(slug)}/join`,
-    {
-      method: "POST",
-    },
-  );
+  const { data } = await apiFetch<
+    DataResponse<{ success: boolean; role: string }>
+  >(`/api/events/calendars/${encodeURIComponent(slug)}/join`, {
+    method: "POST",
+  });
   return data;
 }
 
 export async function leaveCalendar(slug: string) {
-  const { data } = await apiFetch<DataResponse<{ success: boolean; message: string }>>(
-    `/api/events/calendars/${encodeURIComponent(slug)}/leave`,
-    {
-      method: "DELETE",
-    },
-  );
+  const { data } = await apiFetch<
+    DataResponse<{ success: boolean; message: string }>
+  >(`/api/events/calendars/${encodeURIComponent(slug)}/leave`, {
+    method: "DELETE",
+  });
   return data;
 }
 

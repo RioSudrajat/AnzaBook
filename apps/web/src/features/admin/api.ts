@@ -186,13 +186,12 @@ export async function publishAdminManuscript(
   id: string,
   overrides?: AdminPublishManuscriptInput,
 ): Promise<AdminPublishManuscriptResultDto> {
-  const { data } = await apiFetch<DataResponse<AdminPublishManuscriptResultDto>>(
-    `/api/admin/manuscripts/${encodeURIComponent(id)}/publish`,
-    {
-      method: "POST",
-      body: overrides ?? {},
-    },
-  );
+  const { data } = await apiFetch<
+    DataResponse<AdminPublishManuscriptResultDto>
+  >(`/api/admin/manuscripts/${encodeURIComponent(id)}/publish`, {
+    method: "POST",
+    body: overrides ?? {},
+  });
   return data;
 }
 

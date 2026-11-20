@@ -1,7 +1,5 @@
 import * as React from "react";
-import { Link } from "@tanstack/react-router";
 import {
-  ArrowLeft,
   Calendar as CalendarIcon,
   Check,
   CheckCircle,
@@ -67,8 +65,12 @@ export function CommunityHubView({
   const leaveMutation = useLeaveCalendar(slug);
   const updateProfileMutation = useUpdateCalendarProfile();
 
-  const [activeTab, setActiveTab] = React.useState<"agenda" | "anggota" | "kas">("agenda");
-  const [selectedEventSlug, setSelectedEventSlug] = React.useState<string | null>(null);
+  const [activeTab, setActiveTab] = React.useState<
+    "agenda" | "anggota" | "kas"
+  >("agenda");
+  const [selectedEventSlug, setSelectedEventSlug] = React.useState<
+    string | null
+  >(null);
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
   const [copiedLink, setCopiedLink] = React.useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = React.useState(false);
@@ -86,13 +88,15 @@ export function CommunityHubView({
 
   React.useEffect(() => {
     if (calendar) {
-      setEditName(calendar.name);
-      setEditDescription(calendar.description || "");
-      setEditCity(calendar.city || "");
-      setEditContactEmail(calendar.contactEmail || "");
-      setEditInstagram(calendar.socialLinks?.instagram || "");
-      setEditTwitter(calendar.socialLinks?.twitter || "");
-      setEditWebsite(calendar.socialLinks?.website || "");
+      queueMicrotask(() => {
+        setEditName(calendar.name);
+        setEditDescription(calendar.description || "");
+        setEditCity(calendar.city || "");
+        setEditContactEmail(calendar.contactEmail || "");
+        setEditInstagram(calendar.socialLinks?.instagram || "");
+        setEditTwitter(calendar.socialLinks?.twitter || "");
+        setEditWebsite(calendar.socialLinks?.website || "");
+      });
     }
   }, [calendar]);
 
@@ -126,8 +130,8 @@ export function CommunityHubView({
 
   const isManager = Boolean(
     calendar?.isManager ||
-      calendar?.memberRole === "owner" ||
-      calendar?.memberRole === "admin",
+    calendar?.memberRole === "owner" ||
+    calendar?.memberRole === "admin",
   );
 
   const { data: members = [] } = useCalendarMembers(slug);
@@ -174,8 +178,11 @@ export function CommunityHubView({
   }
 
   const events = eventsData?.data || [];
-  const selectedEvent = events.find((e) => e.slug === selectedEventSlug) || null;
-  const leaders = members.filter((m) => m.role === "owner" || m.role === "admin");
+  const selectedEvent =
+    events.find((e) => e.slug === selectedEventSlug) || null;
+  const leaders = members.filter(
+    (m) => m.role === "owner" || m.role === "admin",
+  );
   const regularMembers = members.filter(
     (m) => m.role === "member" || m.role === "checkin_staff",
   );
@@ -203,7 +210,9 @@ export function CommunityHubView({
             {copiedLink ? (
               <>
                 <Check className="size-3.5 text-emerald-500" />
-                <span className="text-emerald-600 dark:text-emerald-400 font-medium">Tautan Disalin!</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                  Tautan Disalin!
+                </span>
               </>
             ) : (
               <>
@@ -623,7 +632,8 @@ export function CommunityHubView({
             </h3>
             {regularMembers.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border p-8 text-center text-xs text-muted-foreground">
-                Belum ada anggota umum yang bergabung. Jadilah anggota pertama dengan menekan tombol &ldquo;Gabung Komunitas&rdquo;!
+                Belum ada anggota umum yang bergabung. Jadilah anggota pertama
+                dengan menekan tombol &ldquo;Gabung Komunitas&rdquo;!
               </div>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
@@ -648,7 +658,8 @@ export function CommunityHubView({
                         {member.name}
                       </div>
                       <span className="text-[11px] text-muted-foreground">
-                        Bergabung {new Date(member.createdAt).toLocaleDateString("id-ID")}
+                        Bergabung{" "}
+                        {new Date(member.createdAt).toLocaleDateString("id-ID")}
                       </span>
                     </div>
                   </div>
@@ -673,7 +684,9 @@ export function CommunityHubView({
                   </h4>
                 </div>
                 <p className="text-xs text-muted-foreground max-w-xl leading-relaxed">
-                  Bagikan tautan ini ke anggota atau media sosial. Setiap transaksi buku digital atau aktivasi langganan dari tautan ini otomatis menyumbang komisi 10% ke kas komunitas.
+                  Bagikan tautan ini ke anggota atau media sosial. Setiap
+                  transaksi buku digital atau aktivasi langganan dari tautan ini
+                  otomatis menyumbang komisi 10% ke kas komunitas.
                 </p>
               </div>
 
@@ -687,7 +700,9 @@ export function CommunityHubView({
                 {copiedLink ? (
                   <>
                     <Check className="size-3.5 text-emerald-500" />
-                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">Tautan Disalin!</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                      Tautan Disalin!
+                    </span>
                   </>
                 ) : (
                   <>
@@ -753,7 +768,8 @@ export function CommunityHubView({
                 {formatIdr(wallet?.totalPaidEventTicketsIdr || 0)}
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Penarikan dana: {formatIdr(wallet?.totalPayoutsWithdrawnIdr || 0)}
+                Penarikan dana:{" "}
+                {formatIdr(wallet?.totalPayoutsWithdrawnIdr || 0)}
               </p>
             </div>
           </div>
@@ -790,13 +806,18 @@ export function CommunityHubView({
                                   : "Pencairan Kas"}
                           </span>
                           <span className="text-muted-foreground text-[11px]">
-                            {new Date(ledger.createdAt).toLocaleString("id-ID", {
-                              dateStyle: "medium",
-                              timeStyle: "short",
-                            })}
+                            {new Date(ledger.createdAt).toLocaleString(
+                              "id-ID",
+                              {
+                                dateStyle: "medium",
+                                timeStyle: "short",
+                              },
+                            )}
                           </span>
                         </div>
-                        <p className="text-foreground/90 font-medium">{ledger.description}</p>
+                        <p className="text-foreground/90 font-medium">
+                          {ledger.description}
+                        </p>
                       </div>
 
                       <div
@@ -910,7 +931,9 @@ export function CommunityHubView({
               </div>
 
               <div className="space-y-2 pt-2 border-t border-border/60">
-                <Label className="text-xs font-semibold">Tautan Media Sosial</Label>
+                <Label className="text-xs font-semibold">
+                  Tautan Media Sosial
+                </Label>
                 <div className="space-y-2">
                   <Input
                     value={editInstagram}
@@ -944,7 +967,9 @@ export function CommunityHubView({
                   disabled={updateProfileMutation.isPending}
                   className="bg-foreground text-background text-xs min-h-10 px-4 cursor-pointer font-semibold rounded-xl"
                 >
-                  {updateProfileMutation.isPending ? "Menyimpan..." : "Simpan Perubahan"}
+                  {updateProfileMutation.isPending
+                    ? "Menyimpan..."
+                    : "Simpan Perubahan"}
                 </Button>
               </div>
             </form>

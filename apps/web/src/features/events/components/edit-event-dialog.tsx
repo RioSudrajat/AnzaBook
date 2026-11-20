@@ -6,9 +6,11 @@ import {
   MapPin,
   Video,
   Pencil,
-  Sparkles,
 } from "lucide-react";
-import type { CommunityEventDetailDto, CommunityEventSummaryDto } from "@starter/shared/types";
+import type {
+  CommunityEventDetailDto,
+  CommunityEventSummaryDto,
+} from "@starter/shared/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
@@ -32,29 +34,39 @@ export function EditEventDialog({
   const [title, setTitle] = React.useState(event.title);
   const [description, setDescription] = React.useState(event.description);
   const [coverUrl, setCoverUrl] = React.useState(event.coverUrl);
-  const [format, setFormat] = React.useState<"offline" | "online" | "hybrid">(event.format);
+  const [format, setFormat] = React.useState<"offline" | "online" | "hybrid">(
+    event.format,
+  );
   const [venueName, setVenueName] = React.useState(event.venueName || "");
-  const [venueAddress, setVenueAddress] = React.useState(event.venueAddress || "");
+  const [venueAddress, setVenueAddress] = React.useState(
+    event.venueAddress || "",
+  );
   const [onlineMeetingUrl, setOnlineMeetingUrl] = React.useState(
-    ("onlineMeetingUrl" in event && event.onlineMeetingUrl) ? event.onlineMeetingUrl : "",
+    "onlineMeetingUrl" in event && event.onlineMeetingUrl
+      ? event.onlineMeetingUrl
+      : "",
   );
   const [capacity, setCapacity] = React.useState<string>(
     event.capacity ? String(event.capacity) : "",
   );
-  const [requiresApproval, setRequiresApproval] = React.useState(event.requiresApproval);
+  const [requiresApproval, setRequiresApproval] = React.useState(
+    event.requiresApproval,
+  );
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
   // Parse start / end dates
   const startD = new Date(event.startsAt);
   const endD = new Date(event.endsAt);
-  const [startDate, setStartDate] = React.useState(startD.toISOString().split("T")[0]);
+  const [startDate, setStartDate] = React.useState(
+    startD.toISOString().split("T")[0],
+  );
   const [startTime, setStartTime] = React.useState(
     startD.toTimeString().slice(0, 5),
   );
-  const [endDate, setEndDate] = React.useState(endD.toISOString().split("T")[0]);
-  const [endTime, setEndTime] = React.useState(
-    endD.toTimeString().slice(0, 5),
+  const [endDate, setEndDate] = React.useState(
+    endD.toISOString().split("T")[0],
   );
+  const [endTime, setEndTime] = React.useState(endD.toTimeString().slice(0, 5));
 
   if (!open) return null;
 
@@ -80,9 +92,14 @@ export function EditEventDialog({
         description: description.trim(),
         coverUrl: coverUrl.trim(),
         format,
-        venueName: format !== "online" ? venueName.trim() || undefined : undefined,
-        venueAddress: format !== "online" ? venueAddress.trim() || undefined : undefined,
-        onlineMeetingUrl: format === "online" ? onlineMeetingUrl.trim() || undefined : undefined,
+        venueName:
+          format !== "online" ? venueName.trim() || undefined : undefined,
+        venueAddress:
+          format !== "online" ? venueAddress.trim() || undefined : undefined,
+        onlineMeetingUrl:
+          format === "online"
+            ? onlineMeetingUrl.trim() || undefined
+            : undefined,
         startsAt,
         endsAt,
         capacity: capacity ? Number(capacity) : undefined,
@@ -90,8 +107,9 @@ export function EditEventDialog({
       });
 
       onClose();
-    } catch (err: any) {
-      setErrorMsg(err.message || "Gagal memperbarui acara.");
+    } catch (err: unknown) {
+      const apiErr = err as { message?: string };
+      setErrorMsg(apiErr?.message || "Gagal memperbarui acara.");
     }
   };
 
@@ -109,7 +127,9 @@ export function EditEventDialog({
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-4 bg-[#141518]">
           <div className="flex items-center gap-2">
             <Pencil className="size-4 text-amber-500" />
-            <h2 className="text-base font-bold text-white">Edit Detail Acara</h2>
+            <h2 className="text-base font-bold text-white">
+              Edit Detail Acara
+            </h2>
           </div>
           <button
             type="button"
@@ -144,7 +164,9 @@ export function EditEventDialog({
 
           {/* Description */}
           <div className="space-y-1.5">
-            <label className="font-semibold text-white/80">Deskripsi Acara</label>
+            <label className="font-semibold text-white/80">
+              Deskripsi Acara
+            </label>
             <textarea
               rows={4}
               value={description}
@@ -155,7 +177,9 @@ export function EditEventDialog({
 
           {/* Banner URL */}
           <div className="space-y-1.5">
-            <label className="font-semibold text-white/80">URL Banner Poster</label>
+            <label className="font-semibold text-white/80">
+              URL Banner Poster
+            </label>
             <Input
               value={coverUrl}
               onChange={(e) => setCoverUrl(e.target.value)}
@@ -165,7 +189,9 @@ export function EditEventDialog({
 
           {/* Format */}
           <div className="space-y-1.5">
-            <label className="font-semibold text-white/80">Format Pertemuan</label>
+            <label className="font-semibold text-white/80">
+              Format Pertemuan
+            </label>
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -220,7 +246,9 @@ export function EditEventDialog({
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="font-semibold text-white/80">Alamat Lengkap</label>
+                <label className="font-semibold text-white/80">
+                  Alamat Lengkap
+                </label>
                 <Input
                   value={venueAddress}
                   onChange={(e) => setVenueAddress(e.target.value)}
@@ -274,7 +302,9 @@ export function EditEventDialog({
           {/* Capacity & Approval */}
           <div className="grid grid-cols-2 gap-3 pt-1">
             <div className="space-y-1.5">
-              <label className="font-semibold text-white/80">Kapasitas Kursi</label>
+              <label className="font-semibold text-white/80">
+                Kapasitas Kursi
+              </label>
               <Input
                 type="number"
                 min="1"
@@ -287,8 +317,12 @@ export function EditEventDialog({
 
             <div className="flex items-center justify-between rounded-xl border border-white/10 bg-black/30 p-3 self-end h-14">
               <div>
-                <span className="text-xs font-semibold text-white block">Perlu Persetujuan</span>
-                <span className="text-[10px] text-white/40 block">Host menyetujui RSVP</span>
+                <span className="text-xs font-semibold text-white block">
+                  Perlu Persetujuan
+                </span>
+                <span className="text-[10px] text-white/40 block">
+                  Host menyetujui RSVP
+                </span>
               </div>
               <input
                 type="checkbox"

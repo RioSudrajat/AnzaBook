@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { hashPassword } from "better-auth/crypto";
 import { and, eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "./schema";
@@ -314,290 +316,36 @@ export async function seedCatalog(
     }
   }
 
-  // 4. Seeding Komunitas, Kalender Host, dan Agenda Acara
-  let [systemHost] = await db
+  // 4. Pastikan akun Admin default tersedia
+  const defaultAdminEmail = "admin@anzabook.id";
+  const [existingAdmin] = await db
     .select()
     .from(schema.user)
-    .where(eq(schema.user.email, "host@anzabook.id"))
+    .where(eq(schema.user.email, defaultAdminEmail))
     .limit(1);
 
-  if (!systemHost) {
-    const [created] = await db
-      .insert(schema.user)
-      .values({
-        id: "anzabook-system-host",
-        name: "Penggerak Literasi",
-        email: "host@anzabook.id",
-        emailVerified: true,
-        image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80",
-      })
-      .onConflictDoNothing()
-      .returning();
-    systemHost = created;
-  }
-
-  if (systemHost) {
-    const calendarSeeds = [
-      {
-        slug: "kolektif-layar-aksara",
-        name: "Kolektif Layar & Aksara",
-        type: "community" as const,
-        description: "Ruang temu pegiat literasi, sinema alternatif, dan diskusi naskah independen.",
-        city: "Jakarta Selatan",
-        contactEmail: "layar.aksara@anzabook.id",
-        avatarUrl: "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=256&q=80",
-        coverUrl: "https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=1200&q=80",
-        verificationStatus: "verified" as const,
-      },
-      {
-        slug: "klub-buku-taman-suropati",
-        name: "Klub Buku Taman Suropati",
-        type: "community" as const,
-        description: "Komunitas membaca hening (silent reading) dan bedah buku setiap pekan di ruang terbuka.",
-        city: "Jakarta Pusat",
-        contactEmail: "tamansuropati@anzabook.id",
-        avatarUrl: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=256&q=80",
-        coverUrl: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=1200&q=80",
-        verificationStatus: "verified" as const,
-      },
-      {
-        slug: "pramoedya-institute",
-        name: "Pramoedya Institute",
-        type: "author" as const,
-        description: "Kanal resmi arsip pemikiran, peluncuran karya digital, dan diskusi kebangsaan.",
-        city: "Jakarta",
-        contactEmail: "pram@anzabook.id",
-        avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=256&q=80",
-        coverUrl: "https://images.unsplash.com/photo-1457369804613-52c61a468e7d?auto=format&fit=crop&w=1200&q=80",
-        verificationStatus: "trusted" as const,
-      },
-    ];
-
-    const calendarMap = new Map<string, string>();
-    for (const c of calendarSeeds) {
-      const [existingCal] = await db
-        .select()
-        .from(schema.communityCalendars)
-        .where(eq(schema.communityCalendars.slug, c.slug))
-        .limit(1);
-
-      if (existingCal) {
-        calendarMap.set(c.slug, existingCal.id);
-      } else {
-        const [inserted] = await db
-          .insert(schema.communityCalendars)
-          .values({
-            ...c,
-            createdByUserId: systemHost.id,
-          })
-          .returning();
-        if (inserted) {
-          calendarMap.set(c.slug, inserted.id);
-          await db
-            .insert(schema.communityCalendarMembers)
-            .values({
-              calendarId: inserted.id,
-              userId: systemHost.id,
-              role: "owner",
-            })
-            .onConflictDoNothing();
-        }
-      }
-    }
-
-    // Ambil buku Revolusi Cetak untuk dikaitkan
-    const [revolusiBook] = await db
-      .select({ id: schema.books.id })
-      .from(schema.books)
-      .where(eq(schema.books.slug, "revolusi-cetak-kedaulatan-membaca"))
-      .limit(1);
-
-    const now = new Date();
-    const addDays = (d: number, hour = 14, min = 0) => {
-      const res = new Date(now.getTime() + d * 86400000);
-      res.setHours(hour, min, 0, 0);
-      return res;
-    };
-
-    const kolektifCalId = calendarMap.get("kolektif-layar-aksara");
-    const suropatiCalId = calendarMap.get("klub-buku-taman-suropati");
-    const pramCalId = calendarMap.get("pramoedya-institute");
-
-    if (kolektifCalId && suropatiCalId && pramCalId) {
-      const eventSeeds = [
-        {
-          slug: "kopichat-x-prodia-scaling-up-without-burning-out",
-          calendarId: kolektifCalId,
-          bookId: null,
-          featuredWork: {
-            mediaType: "film" as const,
-            title: "Scaling Up: Dokumenter Ruang Kreatif",
-            creator: "Kolektif Sinema",
-          },
-          title: "KopiChat x Prodia: Scaling Up Without Burning Out",
-          description:
-            "Diskusi intim mengenai kesehatan mental, produktivitas berkarya tanpa burnout, dan manajemen energi dalam komunitas kreatif.\n\nTopik Utama:\n- Mengelola ekspektasi dan target karya\n- Tanda awal kelelahan mental (burnout)\n- Sesi tanya jawab dan temu jejaring",
-          logisticsNotes: "Lokasi: Ground Floor Menara Rajawali. Parkir tersedia di basement. Harap datang 15 menit sebelum acara.",
-          coverUrl: "https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=800&q=80",
-          themePreset: "minimal" as const,
-          visibility: "public" as const,
-          eventType: "community_meetup" as const,
-          categoryTag: "Pengembangan Diri",
-          coHosts: [{ name: "Naura Humairaa", roleLabel: "Moderator & Penyelenggara" }],
-          format: "offline" as const,
-          district: "Kecamatan Setiabudi",
-          city: "Daerah Khusus Ibukota Jakarta",
-          venueName: "GoWork Menara Rajawali - Coworking and Office Space",
-          venueAddress: "Ground Floor, Menara Rajawali, Jl. DR. Ide Anak Agung Gde Agung, Kuningan Timur",
-          hideAddressUntilApproved: true,
-          latitude: -6.22838,
-          longitude: 106.83532,
-          placeSourceLat: -6.22838,
-          placeSourceLng: 106.83532,
-          startsAt: addDays(3, 13, 0),
-          endsAt: addDays(3, 15, 30),
-          timezone: "Asia/Jakarta",
-          capacity: 45,
-          requiresApproval: true,
-          allowWaitlist: true,
-          status: "published" as const,
-        },
-        {
-          slug: "indonesia-temporal-user-group",
-          calendarId: kolektifCalId,
-          bookId: null,
-          featuredWork: null,
-          title: "Indonesia Temporal User Group",
-          description:
-            "Temu komunitas kedua di Jakarta! Kesempatan bagus untuk bertemu dengan sesama engineer dan pegiat open-source.\n\nTopik:\n- Durable Execution in Action\n- Workflow Architecture\n- Tanya jawab santai ditemani kopi dan kudapan.",
-          logisticsNotes: "GoWork Menara Rajawali. Bawa laptop bila ingin mencoba hands-on.",
-          coverUrl: "https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&w=800&q=80",
-          themePreset: "midnight_ink" as const,
-          visibility: "public" as const,
-          eventType: "community_meetup" as const,
-          categoryTag: "Teknologi",
-          coHosts: [
-            { name: "Michael Mah", roleLabel: "Host" },
-            { name: "Shaik Jifridin", roleLabel: "Speaker" },
-          ],
-          format: "offline" as const,
-          district: "Kecamatan Setiabudi",
-          city: "Daerah Khusus Ibukota Jakarta",
-          venueName: "GoWork Menara Rajawali - Coworking and Office Space",
-          venueAddress: "Ground Floor, Menara Rajawali, Kuningan Timur",
-          hideAddressUntilApproved: false,
-          latitude: -6.22838,
-          longitude: 106.83532,
-          placeSourceLat: -6.22838,
-          placeSourceLng: 106.83532,
-          startsAt: addDays(1, 18, 0),
-          endsAt: addDays(1, 21, 0),
-          timezone: "Asia/Jakarta",
-          capacity: 1, // Kapasitas 1 agar memicu tampilan Acara Penuh / Daftar Tunggu
-          requiresApproval: false,
-          allowWaitlist: true,
-          status: "published" as const,
-        },
-        {
-          slug: "baca-bareng-akhir-pekan-revolusi-cetak",
-          calendarId: suropatiCalId,
-          bookId: revolusiBook?.id || null,
-          featuredWork: null,
-          title: "Baca Bareng Akhir Pekan: Revolusi Cetak & Kedaulatan Membaca",
-          description:
-            "Sesi membaca hening (silent reading) selama 45 menit, dilanjutkan dengan diskusi santai mengenai kedaulatan buku cetak dan digital di era modern.\n\nBuku Bahasan:\nRevolusi Cetak: Kedaulatan Membaca Rakyat.",
-          logisticsNotes: "Taman Suropati dekat air mancur tengah. Harap membawa alas duduk sendiri.",
-          coverUrl: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=800&q=80",
-          themePreset: "classic_paper" as const,
-          visibility: "public" as const,
-          eventType: "book_club" as const,
-          categoryTag: "Literasi",
-          coHosts: [{ name: "Klub Buku Suropati", roleLabel: "Penyelenggara" }],
-          format: "offline" as const,
-          district: "Menteng",
-          city: "Jakarta Pusat",
-          venueName: "Taman Suropati",
-          venueAddress: "Jl. Taman Suropati No.5, RT.5/RW.5, Menteng, Jakarta Pusat",
-          hideAddressUntilApproved: false,
-          latitude: -6.1990,
-          longitude: 106.8320,
-          placeSourceLat: -6.1990,
-          placeSourceLng: 106.8320,
-          startsAt: addDays(5, 16, 0),
-          endsAt: addDays(5, 18, 0),
-          timezone: "Asia/Jakarta",
-          capacity: 50,
-          requiresApproval: false,
-          allowWaitlist: true,
-          status: "published" as const,
-        },
-        {
-          slug: "grand-launching-edisi-digital-rakyat",
-          calendarId: pramCalId,
-          bookId: revolusiBook?.id || null,
-          featuredWork: null,
-          title: "Grand Launching & Q&A: Edisi Digital Kerakyatan",
-          description:
-            "Peluncuran resmi buku digital kerakyatan dan perkenalan model akses terbuka AnzaBook bagi seluruh pembaca di pelosok Nusantara.",
-          logisticsNotes: "Tautan ruang Google Meet akan otomatis tersedia untuk peserta yang telah mendaftar.",
-          coverUrl: "https://images.unsplash.com/photo-1457369804613-52c61a468e7d?auto=format&fit=crop&w=800&q=80",
-          themePreset: "terracotta" as const,
-          visibility: "public" as const,
-          eventType: "book_launch" as const,
-          categoryTag: "Peluncuran Buku",
-          coHosts: [{ name: "Pramoedya Institute", roleLabel: "Host Resmi" }],
-          format: "online" as const,
-          district: null,
-          city: null,
-          venueName: null,
-          venueAddress: null,
-          hideAddressUntilApproved: false,
-          latitude: null,
-          longitude: null,
-          placeSourceLat: null,
-          placeSourceLng: null,
-          onlineMeetingUrl: "https://meet.google.com/anz-book-launch",
-          startsAt: addDays(7, 19, 0),
-          endsAt: addDays(7, 21, 0),
-          timezone: "Asia/Jakarta",
-          capacity: 200,
-          requiresApproval: false,
-          allowWaitlist: true,
-          status: "published" as const,
-        },
-      ];
-
-      for (const ev of eventSeeds) {
-        const [existingEv] = await db
-          .select()
-          .from(schema.communityEvents)
-          .where(eq(schema.communityEvents.slug, ev.slug))
-          .limit(1);
-
-        if (!existingEv) {
-          const [createdEv] = await db.insert(schema.communityEvents).values(ev).returning();
-
-          // Untuk event yang sengaja dibuat penuh, buat 1 RSVP going
-          if (createdEv && ev.capacity === 1) {
-            await db
-              .insert(schema.eventRsvps)
-              .values({
-                eventId: createdEv.id,
-                userId: systemHost.id,
-                status: "going",
-                checkinCode: "CHK-TEST-01",
-              })
-              .onConflictDoNothing();
-          }
-        }
-      }
-
-      // Pastikan semua acara yang sebelumnya tersimpan sebagai pending_review diaktifkan ke published
-      await db
-        .update(schema.communityEvents)
-        .set({ status: "published" })
-        .where(eq(schema.communityEvents.status, "pending_review"));
-    }
+  if (!existingAdmin) {
+    const adminId = randomUUID();
+    const passwordHash = await hashPassword("AdminAnza123!");
+    await db.insert(schema.user).values({
+      id: adminId,
+      name: "Admin AnzaBook",
+      email: defaultAdminEmail,
+      emailVerified: true,
+      role: "admin",
+    });
+    await db.insert(schema.account).values({
+      id: randomUUID(),
+      accountId: adminId,
+      providerId: "credential",
+      userId: adminId,
+      password: passwordHash,
+    });
+  } else if (existingAdmin.role !== "admin") {
+    await db
+      .update(schema.user)
+      .set({ role: "admin" })
+      .where(eq(schema.user.id, existingAdmin.id));
   }
 
   console.log("Penyelarasan katalog AnzaBook selesai.");

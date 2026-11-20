@@ -69,7 +69,7 @@ export function LenisGsapProvider({ children }: { children: ReactNode }) {
 
     lenisRef.current = lenis;
     if (typeof window !== "undefined") {
-      (window as any).__lenis = lenis;
+      (window as Window & { __lenis?: Lenis | null }).__lenis = lenis;
     }
 
     lenis.on("scroll", (e: { velocity: number }) => {
@@ -91,7 +91,7 @@ export function LenisGsapProvider({ children }: { children: ReactNode }) {
       lenis.destroy();
       lenisRef.current = null;
       if (typeof window !== "undefined") {
-        (window as any).__lenis = null;
+        (window as Window & { __lenis?: Lenis | null }).__lenis = null;
       }
     };
   }, [isReaderRoute]);

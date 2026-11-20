@@ -22,7 +22,10 @@ export const SubstackButton = Node.create({
         getAttrs: (element) => {
           if (typeof element === "string") return false;
           return {
-            text: element.getAttribute("data-text") || element.textContent || "Berlangganan",
+            text:
+              element.getAttribute("data-text") ||
+              element.textContent ||
+              "Berlangganan",
             variant: element.getAttribute("data-variant") || "free",
             url: element.getAttribute("data-url") || "#",
           };
@@ -115,7 +118,10 @@ export const AudioEmbed = Node.create({
           { class: "min-w-0 flex-1" },
           [
             "div",
-            { class: "font-serif text-sm font-semibold text-foreground truncate" },
+            {
+              class:
+                "font-serif text-sm font-semibold text-foreground truncate",
+            },
             HTMLAttributes.title,
           ],
           [
@@ -178,21 +184,28 @@ export const VideoEmbed = Node.create({
       }),
       [
         "div",
-        { class: "aspect-video w-full flex items-center justify-center bg-muted/20 relative" },
+        {
+          class:
+            "aspect-video w-full flex items-center justify-center bg-muted/20 relative",
+        },
         [
           "iframe",
           {
             src: HTMLAttributes.src,
             title: HTMLAttributes.title,
             class: "w-full h-full border-0",
-            allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture",
+            allow:
+              "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture",
             allowfullscreen: "true",
           },
         ],
       ],
       [
         "div",
-        { class: "p-2.5 bg-background border-t border-border/60 text-xs text-muted-foreground font-serif italic text-center" },
+        {
+          class:
+            "p-2.5 bg-background border-t border-border/60 text-xs text-muted-foreground font-serif italic text-center",
+        },
         HTMLAttributes.title,
       ],
     ];
@@ -224,7 +237,13 @@ export const CalloutBox = Node.create({
         class:
           "my-6 p-4 rounded-xl border-l-4 border-l-[var(--color-accent)] bg-muted/40 border border-border/60 text-sm font-sans leading-relaxed shadow-2xs",
       }),
-      ["div", { class: "font-semibold mb-1 flex items-center gap-1.5 text-foreground" }, "💡 Catatan Penulis:"],
+      [
+        "div",
+        {
+          class: "font-semibold mb-1 flex items-center gap-1.5 text-foreground",
+        },
+        "💡 Catatan Penulis:",
+      ],
       ["div", { class: "text-muted-foreground italic" }, 0],
     ];
   },
@@ -261,7 +280,10 @@ export const FinancialChart = Node.create({
       }),
       [
         "div",
-        { class: "flex items-center justify-between border-b border-border/60 pb-2 mb-3" },
+        {
+          class:
+            "flex items-center justify-between border-b border-border/60 pb-2 mb-3",
+        },
         [
           "span",
           { class: "font-bold text-foreground flex items-center gap-1.5" },
@@ -269,7 +291,10 @@ export const FinancialChart = Node.create({
         ],
         [
           "span",
-          { class: "px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold" },
+          {
+            class:
+              "px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold",
+          },
           "Open Pricing",
         ],
       ],
@@ -279,26 +304,58 @@ export const FinancialChart = Node.create({
         [
           "div",
           { class: "p-2 rounded-lg bg-background border border-border/40" },
-          ["div", { class: "text-muted-foreground text-[10px]" }, "Biaya Cetak"],
-          ["div", { class: "font-bold text-foreground mt-0.5" }, `Rp ${HTMLAttributes.printCost}`],
+          [
+            "div",
+            { class: "text-muted-foreground text-[10px]" },
+            "Biaya Cetak",
+          ],
+          [
+            "div",
+            { class: "font-bold text-foreground mt-0.5" },
+            `Rp ${HTMLAttributes.printCost}`,
+          ],
         ],
         [
           "div",
           { class: "p-2 rounded-lg bg-background border border-border/40" },
-          ["div", { class: "text-muted-foreground text-[10px]" }, "Royalti Penulis"],
-          ["div", { class: "font-bold text-amber-600 dark:text-amber-400 mt-0.5" }, `Rp ${HTMLAttributes.royaltyAuthor}`],
+          [
+            "div",
+            { class: "text-muted-foreground text-[10px]" },
+            "Royalti Penulis",
+          ],
+          [
+            "div",
+            { class: "font-bold text-amber-600 dark:text-amber-400 mt-0.5" },
+            `Rp ${HTMLAttributes.royaltyAuthor}`,
+          ],
         ],
         [
           "div",
           { class: "p-2 rounded-lg bg-background border border-border/40" },
-          ["div", { class: "text-muted-foreground text-[10px]" }, "Penerbit & Editor"],
-          ["div", { class: "font-bold text-foreground mt-0.5" }, `Rp ${HTMLAttributes.publisherShare}`],
+          [
+            "div",
+            { class: "text-muted-foreground text-[10px]" },
+            "Penerbit & Editor",
+          ],
+          [
+            "div",
+            { class: "font-bold text-foreground mt-0.5" },
+            `Rp ${HTMLAttributes.publisherShare}`,
+          ],
         ],
         [
           "div",
           { class: "p-2 rounded-lg bg-background border border-border/40" },
-          ["div", { class: "text-muted-foreground text-[10px]" }, "Harga Resmi"],
-          ["div", { class: "font-bold text-[var(--color-accent)] mt-0.5" }, `Rp ${HTMLAttributes.retailPrice}`],
+          [
+            "div",
+            { class: "text-muted-foreground text-[10px]" },
+            "Harga Resmi",
+          ],
+          [
+            "div",
+            { class: "font-bold text-[var(--color-accent)] mt-0.5" },
+            `Rp ${HTMLAttributes.retailPrice}`,
+          ],
         ],
       ],
     ];
@@ -314,7 +371,10 @@ export const LatexBlock = Node.create({
 
   addAttributes() {
     return {
-      formula: { default: "E = mc^2 \\quad \\Longleftrightarrow \\quad \\int_0^\\infty e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}" },
+      formula: {
+        default:
+          "E = mc^2 \\quad \\Longleftrightarrow \\quad \\int_0^\\infty e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}",
+      },
     };
   },
 
@@ -330,8 +390,22 @@ export const LatexBlock = Node.create({
         class:
           "my-6 p-4 rounded-xl border border-border/70 bg-muted/30 text-center font-mono text-sm shadow-2xs select-none",
       }),
-      ["div", { class: "text-[10px] uppercase font-bold tracking-widest text-muted-foreground/70 mb-1" }, "Formula LaTeX"],
-      ["div", { class: "text-base py-1 font-serif italic text-foreground tracking-wide" }, HTMLAttributes.formula],
+      [
+        "div",
+        {
+          class:
+            "text-[10px] uppercase font-bold tracking-widest text-muted-foreground/70 mb-1",
+        },
+        "Formula LaTeX",
+      ],
+      [
+        "div",
+        {
+          class:
+            "text-base py-1 font-serif italic text-foreground tracking-wide",
+        },
+        HTMLAttributes.formula,
+      ],
     ];
   },
 });
@@ -363,10 +437,17 @@ export const Collapsible = Node.create({
       }),
       [
         "summary",
-        { class: "font-semibold text-foreground cursor-pointer select-none hover:text-[var(--color-accent)]" },
+        {
+          class:
+            "font-semibold text-foreground cursor-pointer select-none hover:text-[var(--color-accent)]",
+        },
         HTMLAttributes.summary,
       ],
-      ["div", { class: "pt-3 border-t border-border/40 mt-2 text-muted-foreground" }, 0],
+      [
+        "div",
+        { class: "pt-3 border-t border-border/40 mt-2 text-muted-foreground" },
+        0,
+      ],
     ];
   },
 });
@@ -404,7 +485,10 @@ export const PollBlock = Node.create({
 
   addAttributes() {
     return {
-      question: { default: "Menurut Anda, bagaimana nasib akhir protagonis di bab selanjutnya?" },
+      question: {
+        default:
+          "Menurut Anda, bagaimana nasib akhir protagonis di bab selanjutnya?",
+      },
       option1: { default: "Menerima tawaran penerbit independen" },
       option2: { default: "Mendirikan percetakan gotong royong" },
     };
@@ -422,8 +506,19 @@ export const PollBlock = Node.create({
         class:
           "my-8 p-5 rounded-2xl border border-border/80 bg-background shadow-xs select-none",
       }),
-      ["div", { class: "font-bold text-foreground text-sm mb-3 flex items-center gap-2" }, "📊 Jajak Pendapat Pembaca"],
-      ["div", { class: "text-xs text-muted-foreground mb-4 font-medium" }, HTMLAttributes.question],
+      [
+        "div",
+        {
+          class:
+            "font-bold text-foreground text-sm mb-3 flex items-center gap-2",
+        },
+        "📊 Jajak Pendapat Pembaca",
+      ],
+      [
+        "div",
+        { class: "text-xs text-muted-foreground mb-4 font-medium" },
+        HTMLAttributes.question,
+      ],
       [
         "div",
         { class: "space-y-2" },
@@ -435,7 +530,11 @@ export const PollBlock = Node.create({
               "w-full text-left p-2.5 rounded-lg border border-border/60 hover:border-[var(--color-accent)] hover:bg-muted/30 text-xs font-medium transition-all flex items-center justify-between",
           },
           ["span", {}, HTMLAttributes.option1],
-          ["span", { class: "font-mono text-muted-foreground text-[10px]" }, "54%"],
+          [
+            "span",
+            { class: "font-mono text-muted-foreground text-[10px]" },
+            "54%",
+          ],
         ],
         [
           "button",
@@ -445,7 +544,11 @@ export const PollBlock = Node.create({
               "w-full text-left p-2.5 rounded-lg border border-border/60 hover:border-[var(--color-accent)] hover:bg-muted/30 text-xs font-medium transition-all flex items-center justify-between",
           },
           ["span", {}, HTMLAttributes.option2],
-          ["span", { class: "font-mono text-muted-foreground text-[10px]" }, "46%"],
+          [
+            "span",
+            { class: "font-mono text-muted-foreground text-[10px]" },
+            "46%",
+          ],
         ],
       ],
     ];
@@ -481,12 +584,26 @@ export const PredictionMarket = Node.create({
       [
         "div",
         { class: "min-w-0" },
-        ["div", { class: "text-[10px] font-mono uppercase tracking-wider text-muted-foreground" }, "💡 Pasar Prediksi Alur"],
-        ["div", { class: "font-semibold text-xs text-foreground mt-0.5" }, HTMLAttributes.question],
+        [
+          "div",
+          {
+            class:
+              "text-[10px] font-mono uppercase tracking-wider text-muted-foreground",
+          },
+          "💡 Pasar Prediksi Alur",
+        ],
+        [
+          "div",
+          { class: "font-semibold text-xs text-foreground mt-0.5" },
+          HTMLAttributes.question,
+        ],
       ],
       [
         "div",
-        { class: "px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-mono font-bold text-xs shrink-0" },
+        {
+          class:
+            "px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-mono font-bold text-xs shrink-0",
+        },
         HTMLAttributes.chance,
       ],
     ];
@@ -518,7 +635,14 @@ export const RecipeBlock = Node.create({
         class:
           "my-6 p-4 rounded-xl border border-border/80 bg-amber-500/5 text-xs shadow-2xs leading-relaxed",
       }),
-      ["div", { class: "font-bold text-amber-700 dark:text-amber-400 mb-2 flex items-center gap-1.5" }, `🍴 ${HTMLAttributes.title}`],
+      [
+        "div",
+        {
+          class:
+            "font-bold text-amber-700 dark:text-amber-400 mb-2 flex items-center gap-1.5",
+        },
+        `🍴 ${HTMLAttributes.title}`,
+      ],
       ["div", { class: "text-foreground" }, 0],
     ];
   },
@@ -547,8 +671,8 @@ export const AudienceGated = Node.create({
     const label = isPhysical
       ? "📦 Khusus Pemilik Buku Fisik"
       : isNakama
-      ? "⭐ Khusus Member Nakama"
-      : "🟢 Terbuka Pembaca Gratis";
+        ? "⭐ Khusus Member Nakama"
+        : "🟢 Terbuka Pembaca Gratis";
 
     return [
       "div",
@@ -580,7 +704,10 @@ export const FootnoteBlock = Node.create({
   addAttributes() {
     return {
       index: { default: "1" },
-      note: { default: "Catatan kaki referensi pustaka atau penjelasan konteks historis." },
+      note: {
+        default:
+          "Catatan kaki referensi pustaka atau penjelasan konteks historis.",
+      },
     };
   },
 
@@ -596,7 +723,11 @@ export const FootnoteBlock = Node.create({
         class:
           "my-4 pt-2 border-t border-border/60 text-[11px] font-serif italic text-muted-foreground flex items-start gap-1.5 select-text",
       }),
-      ["span", { class: "font-mono font-bold text-foreground shrink-0" }, `[${HTMLAttributes.index}]`],
+      [
+        "span",
+        { class: "font-mono font-bold text-foreground shrink-0" },
+        `[${HTMLAttributes.index}]`,
+      ],
       ["span", {}, HTMLAttributes.note],
     ];
   },

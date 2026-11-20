@@ -187,13 +187,19 @@ export function HighlightsSidebar({
                       {onTogglePostHighlight && (
                         <button
                           type="button"
-                          onClick={() => onTogglePostHighlight(h.id, !h.isPosted)}
+                          onClick={() =>
+                            onTogglePostHighlight(h.id, !h.isPosted)
+                          }
                           className={`h-6 px-2 text-[11px] font-mono gap-1 inline-flex items-center rounded-[6px] border transition-colors cursor-pointer ${
                             h.isPosted
                               ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-300 font-semibold"
                               : "bg-white/5 border-white/10 text-white/60 hover:text-white hover:bg-white/10"
                           }`}
-                          title={h.isPosted ? "Batalkan publikasi" : "Post kutipan ke linimasa / jelajah publik"}
+                          title={
+                            h.isPosted
+                              ? "Batalkan publikasi"
+                              : "Post kutipan ke linimasa / jelajah publik"
+                          }
                         >
                           <Sparkles className="size-3" />
                           <span>{h.isPosted ? "Dipost" : "Post"}</span>

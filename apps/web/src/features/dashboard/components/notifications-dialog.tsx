@@ -73,7 +73,10 @@ export function NotificationsDialog({
         <div className="p-4 border-b border-border flex items-center justify-between bg-muted/30">
           <div className="flex items-center gap-2">
             <Bell className="size-4 text-[var(--color-accent)]" />
-            <h3 id="notifications-title" className="font-serif font-bold text-base">
+            <h3
+              id="notifications-title"
+              className="font-serif font-bold text-base"
+            >
               Notifikasi
             </h3>
             {unreadCount > 0 && (
@@ -108,12 +111,18 @@ export function NotificationsDialog({
             <div
               key={item.id}
               className={`p-3.5 space-y-1 transition-colors hover:bg-muted/40 ${
-                item.unread && unreadCount > 0 ? "bg-[var(--color-accent)]/5" : ""
+                item.unread && unreadCount > 0
+                  ? "bg-[var(--color-accent)]/5"
+                  : ""
               }`}
             >
               <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-foreground">{item.title}</span>
-                <span className="text-[10px] font-mono text-muted-foreground">{item.time}</span>
+                <span className="font-semibold text-foreground">
+                  {item.title}
+                </span>
+                <span className="text-[10px] font-mono text-muted-foreground">
+                  {item.time}
+                </span>
               </div>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 {item.desc}

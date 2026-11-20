@@ -4,12 +4,7 @@ import { cn } from "@/lib/utils";
 
 type CoverBook = Pick<
   BookSummaryDto,
-  | "title"
-  | "author"
-  | "coverColor"
-  | "publishedYear"
-  | "genres"
-  | "pageCount"
+  "title" | "author" | "coverColor" | "publishedYear" | "genres" | "pageCount"
 >;
 
 function CoverArtwork({ genre }: { genre?: string }) {
@@ -193,8 +188,18 @@ function CoverArtwork({ genre }: { genre?: string }) {
           stroke="currentColor"
           strokeWidth="1.6"
         />
-        <path d="M80 20 V100" stroke="currentColor" strokeWidth="1" strokeOpacity="0.4" />
-        <path d="M30 60 H130" stroke="currentColor" strokeWidth="1" strokeOpacity="0.4" />
+        <path
+          d="M80 20 V100"
+          stroke="currentColor"
+          strokeWidth="1"
+          strokeOpacity="0.4"
+        />
+        <path
+          d="M30 60 H130"
+          stroke="currentColor"
+          strokeWidth="1"
+          strokeOpacity="0.4"
+        />
         <circle cx="80" cy="60" r="5" fill="var(--color-accent, #F06A24)" />
       </svg>
     );
@@ -258,13 +263,7 @@ function CoverArtwork({ genre }: { genre?: string }) {
       className="w-full h-full opacity-35 drop-shadow-sm"
       aria-hidden="true"
     >
-      <circle
-        cx="80"
-        cy="60"
-        r="44"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
+      <circle cx="80" cy="60" r="44" stroke="currentColor" strokeWidth="1.5" />
       <circle
         cx="80"
         cy="60"

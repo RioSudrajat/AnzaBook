@@ -34,13 +34,40 @@ export const applyPublisherSchema = z
         /^[a-z0-9-]+$/,
         "Slug hanya boleh berisi huruf kecil, angka, dan tanda hubung",
       ),
-    ikapiNumber: z.string().max(80, "Nomor IKAPI maksimal 80 karakter").optional().nullable(),
-    description: z.string().max(2000, "Deskripsi maksimal 2000 karakter").optional().nullable(),
-    logoUrl: z.string().url("URL logo tidak valid").or(z.literal("")).optional().nullable(),
-    headerImageUrl: z.string().url("URL banner tidak valid").or(z.literal("")).optional().nullable(),
+    ikapiNumber: z
+      .string()
+      .max(80, "Nomor IKAPI maksimal 80 karakter")
+      .optional()
+      .nullable(),
+    description: z
+      .string()
+      .max(2000, "Deskripsi maksimal 2000 karakter")
+      .optional()
+      .nullable(),
+    logoUrl: z
+      .string()
+      .url("URL logo tidak valid")
+      .or(z.literal(""))
+      .optional()
+      .nullable(),
+    headerImageUrl: z
+      .string()
+      .url("URL banner tidak valid")
+      .or(z.literal(""))
+      .optional()
+      .nullable(),
     city: z.string().max(80, "Kota maksimal 80 karakter").optional().nullable(),
-    address: z.string().max(500, "Alamat maksimal 500 karakter").optional().nullable(),
-    contactEmail: z.string().email("Email narahubung tidak valid").max(255).optional().nullable(),
+    address: z
+      .string()
+      .max(500, "Alamat maksimal 500 karakter")
+      .optional()
+      .nullable(),
+    contactEmail: z
+      .string()
+      .email("Email narahubung tidak valid")
+      .max(255)
+      .optional()
+      .nullable(),
     socialLinks: z
       .object({
         instagram: z.string().optional(),
@@ -95,7 +122,11 @@ export const submitManuscriptChapterSchema = z
 
 export const createManuscriptDraftSchema = z
   .object({
-    publisherId: z.string().uuid("ID penerbit tidak valid").optional().nullable(),
+    publisherId: z
+      .string()
+      .uuid("ID penerbit tidak valid")
+      .optional()
+      .nullable(),
     title: z.string().min(1, "Judul naskah wajib diisi").max(255),
     slug: z.string().max(255).optional().nullable(),
     coverUrl: z.string().optional().nullable(),
@@ -115,7 +146,11 @@ export const createManuscriptDraftSchema = z
 
 export const submitManuscriptSchema = z
   .object({
-    publisherId: z.string().uuid("ID penerbit tidak valid").optional().nullable(),
+    publisherId: z
+      .string()
+      .uuid("ID penerbit tidak valid")
+      .optional()
+      .nullable(),
     title: z
       .string()
       .min(2, "Judul naskah minimal 2 karakter")
@@ -135,9 +170,7 @@ export const submitManuscriptSchema = z
     printSimJson: z.record(z.string(), z.unknown()).optional().nullable(),
     coverUrl: z.string().optional().nullable(),
     category: z.string().max(80).optional().nullable(),
-    chapters: z
-      .array(submitManuscriptChapterSchema)
-      .optional(),
+    chapters: z.array(submitManuscriptChapterSchema).optional(),
   })
   .strict();
 
@@ -148,12 +181,22 @@ export const updateManuscriptSchema = z
     coverUrl: z.string().optional().nullable(),
     category: z.string().max(80).optional().nullable(),
     proposedDigitalPolicy: digitalPolicyEnum.optional(),
-    proposedAlacartePriceIdr: z.number().int().min(0).max(10_000_000).optional().nullable(),
+    proposedAlacartePriceIdr: z
+      .number()
+      .int()
+      .min(0)
+      .max(10_000_000)
+      .optional()
+      .nullable(),
     printSimJson: z.record(z.string(), z.unknown()).optional().nullable(),
     status: manuscriptStatusEnum.optional(),
     editorialNotes: z.string().max(2000).optional().nullable(),
     rejectionReason: z.string().max(1000).optional().nullable(),
-    publishedBookId: z.string().uuid("ID buku tidak valid").optional().nullable(),
+    publishedBookId: z
+      .string()
+      .uuid("ID buku tidak valid")
+      .optional()
+      .nullable(),
     chapters: z.array(submitManuscriptChapterSchema).optional(),
   })
   .strict();
@@ -200,9 +243,13 @@ export const purchaseBookAlacarteSchema = z
 export type SimulatePrintSchemaInput = z.infer<typeof simulatePrintSchema>;
 export type ApplyPublisherInput = z.infer<typeof applyPublisherSchema>;
 export type UpdatePublisherInput = z.infer<typeof updatePublisherSchema>;
-export type CreateManuscriptDraftInput = z.infer<typeof createManuscriptDraftSchema>;
+export type CreateManuscriptDraftInput = z.infer<
+  typeof createManuscriptDraftSchema
+>;
 export type SubmitManuscriptInput = z.infer<typeof submitManuscriptSchema>;
 export type UpdateManuscriptInput = z.infer<typeof updateManuscriptSchema>;
 export type ReviewManuscriptInput = z.infer<typeof reviewManuscriptSchema>;
 export type CreateClaimBatchInput = z.infer<typeof createClaimBatchSchema>;
-export type PurchaseBookAlacarteInput = z.infer<typeof purchaseBookAlacarteSchema>;
+export type PurchaseBookAlacarteInput = z.infer<
+  typeof purchaseBookAlacarteSchema
+>;

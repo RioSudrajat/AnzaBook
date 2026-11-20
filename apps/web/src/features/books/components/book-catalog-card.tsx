@@ -1,5 +1,13 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, Book, Crown, Share2, Star, Unlock, Users } from "lucide-react";
+import {
+  ArrowRight,
+  Book,
+  Crown,
+  Share2,
+  Star,
+  Unlock,
+  Users,
+} from "lucide-react";
 import type { BookSummaryDto } from "@starter/shared/types";
 import { BookCover } from "./book-cover";
 import { FlagIcon } from "@/components/ui/flag-icon";
@@ -38,19 +46,28 @@ export function BookCatalogCard({ book }: BookCatalogCardProps) {
           <div className="flex items-center gap-1.5 shrink-0">
             {isPremium ? (
               <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 font-mono text-[11px] font-semibold text-foreground border border-border/40">
-                <Crown className="size-3.5 text-foreground/85" aria-hidden="true" />
+                <Crown
+                  className="size-3.5 text-foreground/85"
+                  aria-hidden="true"
+                />
                 Premium
               </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 font-mono text-[11px] font-semibold text-foreground border border-border/40">
-                <Unlock className="size-3.5 text-foreground/85" aria-hidden="true" />
+                <Unlock
+                  className="size-3.5 text-foreground/85"
+                  aria-hidden="true"
+                />
                 Free
               </span>
             )}
 
             {hasPhysical && (
               <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 font-mono text-[11px] font-semibold text-foreground border border-border/40">
-                <Book className="size-3.5 text-foreground/85" aria-hidden="true" />
+                <Book
+                  className="size-3.5 text-foreground/85"
+                  aria-hidden="true"
+                />
                 Fisik
               </span>
             )}
@@ -189,7 +206,9 @@ export function BookCatalogCard({ book }: BookCatalogCardProps) {
             title={`${sharesCount.toLocaleString("id-ID")} dibagikan`}
           >
             <Share2 className="size-3.5 text-muted-foreground/80" />
-            <span className="font-medium text-foreground/90">{sharesCount}</span>
+            <span className="font-medium text-foreground/90">
+              {sharesCount}
+            </span>
             <span className="text-muted-foreground/75 text-[11px]">share</span>
           </span>
         </div>

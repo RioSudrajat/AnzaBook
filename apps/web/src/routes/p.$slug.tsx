@@ -1,17 +1,18 @@
-import { useState, useEffect, type FormEvent } from "react";
-import { createFileRoute, notFound, Link, useNavigate } from "@tanstack/react-router";
+import { useState, type FormEvent } from "react";
+import {
+  createFileRoute,
+  notFound,
+  Link,
+  useNavigate,
+} from "@tanstack/react-router";
 import {
   BookOpen,
-  Building2,
-  CheckCircle,
   Edit3,
-  FileText,
   Inbox,
   Mail,
   MapPin,
   PenTool,
   ShieldCheck,
-  Sparkles,
   X,
 } from "lucide-react";
 import { PageFrame } from "@/features/dashboard/components/page-frame";
@@ -60,11 +61,11 @@ export default function PublisherPublicProfilePage() {
   const { slug } = Route.useParams();
   const sessionUser = Route.useRouteContext().session?.user;
   const { data: publisher } = usePublisher(slug);
-  const { data: booksResponse, refetch: refetchBooks } = useBooks({ publisher: slug });
+  const { data: booksResponse } = useBooks({ publisher: slug });
 
   const isManager = Boolean(
     publisher?.currentUserRole === "owner" ||
-      publisher?.currentUserRole === "editor",
+    publisher?.currentUserRole === "editor",
   );
 
   const { data: manuscripts = [] } = usePublisherManuscripts(slug);
@@ -214,7 +215,12 @@ export default function PublisherPublicProfilePage() {
                 </Button>
               )}
 
-              <Button asChild variant="outline" size="sm" className="h-9 text-xs font-mono rounded-xl">
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="h-9 text-xs font-mono rounded-xl"
+              >
                 <Link to="/app" search={{ tab: "explore" }}>
                   Semua Mitra
                 </Link>
@@ -240,14 +246,18 @@ export default function PublisherPublicProfilePage() {
             {isManager ? (
               <>
                 <div className="rounded-xl border border-border/60 bg-muted/30 p-3.5 space-y-1">
-                  <div className="text-muted-foreground">Bagi Hasil Royalti</div>
+                  <div className="text-muted-foreground">
+                    Bagi Hasil Royalti
+                  </div>
                   <div className="font-serif text-lg font-bold text-emerald-600 dark:text-emerald-400">
                     75% Penerbit / Penulis
                   </div>
                 </div>
 
                 <div className="rounded-xl border border-border/60 bg-muted/30 p-3.5 space-y-1">
-                  <div className="text-muted-foreground">Distribusi Phygital</div>
+                  <div className="text-muted-foreground">
+                    Distribusi Phygital
+                  </div>
                   <div className="font-serif text-lg font-bold text-foreground">
                     Gratis Kuota Klaim Cetak
                   </div>
@@ -308,7 +318,10 @@ export default function PublisherPublicProfilePage() {
 
         {/* Section: Published Books Catalog */}
         {activeTab === "catalog" && (
-          <section aria-labelledby="publisher-books-heading" className="space-y-6">
+          <section
+            aria-labelledby="publisher-books-heading"
+            className="space-y-6"
+          >
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <BookOpen className="size-5 text-[var(--color-accent)]" />
@@ -320,7 +333,8 @@ export default function PublisherPublicProfilePage() {
                 </h2>
               </div>
               <p className="text-xs text-muted-foreground">
-                Jelajahi edisi cetak phygital dan pustaka naskah digital berlisensi resmi.
+                Jelajahi edisi cetak phygital dan pustaka naskah digital
+                berlisensi resmi.
               </p>
             </div>
 
@@ -328,7 +342,8 @@ export default function PublisherPublicProfilePage() {
               <div className="rounded-xl border border-dashed border-border/80 p-12 text-center space-y-3">
                 <BookOpen className="size-8 mx-auto text-muted-foreground/50" />
                 <p className="text-sm text-muted-foreground">
-                  Belum ada naskah yang diterbitkan oleh penerbit ini di katalog digital AnzaBook.
+                  Belum ada naskah yang diterbitkan oleh penerbit ini di katalog
+                  digital AnzaBook.
                 </p>
                 <Button asChild variant="outline" size="sm">
                   <Link to="/app" search={{ tab: "explore" }}>
@@ -350,7 +365,10 @@ export default function PublisherPublicProfilePage() {
 
         {/* Section: Inbox Naskah Masuk (Publisher Manager Only) */}
         {activeTab === "inbox" && isManager && (
-          <section aria-labelledby="publisher-inbox-heading" className="space-y-6">
+          <section
+            aria-labelledby="publisher-inbox-heading"
+            className="space-y-6"
+          >
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <Inbox className="size-5 text-[var(--color-accent)]" />
@@ -362,7 +380,8 @@ export default function PublisherPublicProfilePage() {
                 </h2>
               </div>
               <p className="text-xs text-muted-foreground">
-                Tinjau draf naskah yang diajukan oleh penulis langsung di editor naskah untuk kurasi redaksi, revisi, atau penerbitan.
+                Tinjau draf naskah yang diajukan oleh penulis langsung di editor
+                naskah untuk kurasi redaksi, revisi, atau penerbitan.
               </p>
             </div>
 
@@ -370,7 +389,8 @@ export default function PublisherPublicProfilePage() {
               <div className="rounded-xl border border-dashed border-border/80 p-12 text-center space-y-3">
                 <Inbox className="size-8 mx-auto text-muted-foreground/50" />
                 <p className="text-sm text-muted-foreground">
-                  Belum ada naskah yang dikirimkan oleh penulis kepada penerbit ini.
+                  Belum ada naskah yang dikirimkan oleh penulis kepada penerbit
+                  ini.
                 </p>
               </div>
             ) : (
@@ -378,12 +398,18 @@ export default function PublisherPublicProfilePage() {
                 {manuscripts.map((item) => {
                   const statusColors: Record<string, string> = {
                     draft: "bg-muted text-foreground border-border",
-                    submitted: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30",
-                    under_review: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
-                    revision_requested: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30",
-                    accepted: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
-                    published: "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/40",
-                    rejected: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30",
+                    submitted:
+                      "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30",
+                    under_review:
+                      "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
+                    revision_requested:
+                      "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30",
+                    accepted:
+                      "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
+                    published:
+                      "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/40",
+                    rejected:
+                      "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30",
                   };
 
                   return (
@@ -399,7 +425,8 @@ export default function PublisherPublicProfilePage() {
                             </h4>
                             <span
                               className={`px-2.5 py-0.5 rounded-md text-[10px] font-mono font-semibold uppercase border ${
-                                statusColors[item.status] || "bg-muted text-foreground"
+                                statusColors[item.status] ||
+                                "bg-muted text-foreground"
                               }`}
                             >
                               {formatManuscriptStatus(item.status)}
@@ -409,7 +436,9 @@ export default function PublisherPublicProfilePage() {
                           <p className="text-xs text-muted-foreground font-mono">
                             Penulis:{" "}
                             <strong className="text-foreground">
-                              {item.authorPenName || item.authorName || "Anonim"}
+                              {item.authorPenName ||
+                                item.authorName ||
+                                "Anonim"}
                             </strong>
                           </p>
 
@@ -439,11 +468,15 @@ export default function PublisherPublicProfilePage() {
 
                       <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
                         <div>
-                          {item.chapters?.length || item.totalChapters || 1} Bab • Diajukan{" "}
+                          {item.chapters?.length || item.totalChapters || 1} Bab
+                          • Diajukan{" "}
                           {new Date(item.createdAt).toLocaleDateString("id-ID")}
                         </div>
                         <div>
-                          Skema: <strong className="text-foreground font-medium">{formatDigitalPolicy(item.proposedDigitalPolicy)}</strong>
+                          Skema:{" "}
+                          <strong className="text-foreground font-medium">
+                            {formatDigitalPolicy(item.proposedDigitalPolicy)}
+                          </strong>
                         </div>
                       </div>
                     </div>
@@ -585,7 +618,9 @@ export default function PublisherPublicProfilePage() {
                   disabled={updatePublisherMutation.isPending}
                   className="bg-foreground text-background text-xs min-h-10 px-4 cursor-pointer font-semibold"
                 >
-                  {updatePublisherMutation.isPending ? "Menyimpan..." : "Simpan Perubahan"}
+                  {updatePublisherMutation.isPending
+                    ? "Menyimpan..."
+                    : "Simpan Perubahan"}
                 </Button>
               </div>
             </form>

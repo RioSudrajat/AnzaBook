@@ -171,7 +171,11 @@ export async function verifyAdminCalendar(
     .returning();
 
   if (!updated) {
-    throw new HttpError(404, "NOT_FOUND", "Kalender komunitas tidak ditemukan.");
+    throw new HttpError(
+      404,
+      "NOT_FOUND",
+      "Kalender komunitas tidak ditemukan.",
+    );
   }
 
   return {
@@ -236,7 +240,11 @@ export async function reviewAdminAuthorApplication(
       .where(eq(authorApplications.id, id));
 
     if (!app) {
-      throw new HttpError(404, "NOT_FOUND", "Aplikasi penulis tidak ditemukan.");
+      throw new HttpError(
+        404,
+        "NOT_FOUND",
+        "Aplikasi penulis tidak ditemukan.",
+      );
     }
 
     const [updatedApp] = await tx
@@ -351,10 +359,7 @@ export async function listAdminManuscripts(
     ? eq(
         manuscriptSubmissions.status,
         query.status as
-          | "pending_review"
-          | "in_editing"
-          | "published"
-          | "rejected",
+          "pending_review" | "in_editing" | "published" | "rejected",
       )
     : undefined;
 
@@ -396,8 +401,7 @@ export async function listAdminManuscripts(
 }
 
 type DatabaseExecutor =
-  | typeof db
-  | Parameters<Parameters<typeof db.transaction>[0]>[0];
+  typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export async function getAdminManuscriptById(
   id: string,
@@ -570,12 +574,10 @@ export async function publishAdminManuscript(
     const alacartePriceIdr =
       overrides?.alacartePriceIdr !== undefined
         ? overrides.alacartePriceIdr
-        : manuscript.proposedAlacartePriceIdr ??
-          (digitalPolicy === "alacarte_only" ? 45000 : null);
+        : (manuscript.proposedAlacartePriceIdr ??
+          (digitalPolicy === "alacarte_only" ? 45000 : null));
 
-    const coverUrl =
-      overrides?.coverUrl ||
-      "/covers/default-book.jpg";
+    const coverUrl = overrides?.coverUrl || "/covers/default-book.jpg";
 
     const slug = `${slugify(manuscript.title)}-${randomUUID().slice(0, 8)}`;
     const readingMinutes = chapters.reduce(
@@ -682,7 +684,9 @@ export async function publishAdminManuscript(
   });
 }
 
-export async function createAdminClaimBatch(input: CreateClaimBatchInput): Promise<{
+export async function createAdminClaimBatch(
+  input: CreateClaimBatchInput,
+): Promise<{
   batch: BookClaimBatchDto;
   codes: string[];
 }> {
@@ -715,7 +719,7 @@ export async function createAdminClaimBatch(input: CreateClaimBatchInput): Promi
     const isFirstBatch = existingBatchesCount === 0;
 
     const billingStatus = isFirstBatch ? "free_tier" : "unbilled";
-    const unitFeeIdr = isFirstBatch ? 0 : pub.claimCodeFeeIdr ?? 2000;
+    const unitFeeIdr = isFirstBatch ? 0 : (pub.claimCodeFeeIdr ?? 2000);
 
     const [batch] = await tx
       .insert(bookClaimBatches)

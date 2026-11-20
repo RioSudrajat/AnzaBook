@@ -75,7 +75,9 @@ export function GiftVoucherDialog({
         {/* Voucher Preview Card */}
         <div className="p-4 rounded-xl border border-dashed border-border bg-muted/40 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground font-mono">Kode Voucher Eksklusif</span>
+            <span className="text-xs text-muted-foreground font-mono">
+              Kode Voucher Eksklusif
+            </span>
             <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-[var(--color-accent)]/15 text-[var(--color-accent)] font-bold">
               1 Bulan Nakama
             </span>
@@ -108,7 +110,10 @@ export function GiftVoucherDialog({
 
         {/* Send to Email Form */}
         <form onSubmit={handleSend} className="space-y-3">
-          <label htmlFor="recipient-email" className="block text-xs font-medium text-muted-foreground">
+          <label
+            htmlFor="recipient-email"
+            className="block text-xs font-medium text-muted-foreground"
+          >
             Kirim langsung ke email kawan:
           </label>
           <div className="flex gap-2">
@@ -132,7 +137,8 @@ export function GiftVoucherDialog({
         </form>
 
         <p className="text-[11px] text-muted-foreground text-center">
-          Penerima akan menerima email aktivasi dengan ucapan hangat dari {userName}.
+          Penerima akan menerima email aktivasi dengan ucapan hangat dari{" "}
+          {userName}.
         </p>
       </div>
     </div>

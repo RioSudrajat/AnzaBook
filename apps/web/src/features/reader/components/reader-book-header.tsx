@@ -1,5 +1,5 @@
 import * as React from "react";
-import { BookOpen, Camera, Upload, Palette, Check, Sparkles, X, Image as ImageIcon } from "lucide-react";
+import { BookOpen, Camera, Upload, Palette, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BookCover } from "@/features/books/components/book-cover";
 
@@ -20,7 +20,11 @@ export function isUsableCoverImageUrl(url?: string | null): url is string {
   const trimmed = url.trim();
   if (!trimmed || trimmed === "template") return false;
   if (trimmed.startsWith("/covers/")) return false;
-  if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://") && !trimmed.startsWith("data:image/")) {
+  if (
+    !trimmed.startsWith("http://") &&
+    !trimmed.startsWith("https://") &&
+    !trimmed.startsWith("data:image/")
+  ) {
     return false;
   }
   return true;
@@ -120,7 +124,9 @@ export function ReaderBookHeader({
         <div className="flex items-center gap-2 pt-1 text-xs font-mono text-muted-foreground">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted/60 border border-border/60">
             <BookOpen className="size-3.5 text-muted-foreground" />
-            <span>{totalChapters} {totalChapters === 1 ? "chapter" : "chapters"}</span>
+            <span>
+              {totalChapters} {totalChapters === 1 ? "chapter" : "chapters"}
+            </span>
           </span>
           {isEditMode && (
             <span className="text-[11px] font-sans text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">
@@ -192,7 +198,8 @@ export function ReaderBookHeader({
                     Konfigurasi Sampul Buku
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    Gunakan sampul resmi template AnzaBook atau unggah gambar dari perangkat.
+                    Gunakan sampul resmi template AnzaBook atau unggah gambar
+                    dari perangkat.
                   </p>
                 </div>
               </div>
@@ -220,7 +227,8 @@ export function ReaderBookHeader({
 
               <div className="grid grid-cols-4 gap-2">
                 {COVER_PALETTES.map((palette) => {
-                  const isSelected = !isCustomImage && (coverColor === palette.color);
+                  const isSelected =
+                    !isCustomImage && coverColor === palette.color;
                   return (
                     <button
                       key={palette.color}
@@ -236,9 +244,7 @@ export function ReaderBookHeader({
                       <span className="text-[10px] font-medium leading-tight line-clamp-1">
                         {palette.name}
                       </span>
-                      {isSelected && (
-                        <Check className="size-3.5 mt-0.5" />
-                      )}
+                      {isSelected && <Check className="size-3.5 mt-0.5" />}
                     </button>
                   );
                 })}

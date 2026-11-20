@@ -9,7 +9,7 @@ AnzaBook adalah ekosistem literasi modern yang menyatukan ruang baca digital, pe
 ## Fitur Utama
 
 - **Digital Publishing & E-Reader Studio**: Platform kurasi naskah terintegrasi dengan e-reader modern, tipografi ramah mata, slide page spread, dan sistem manajemen anotasi/kutipan.
-- **Reading Experience**: Pustaka digital terkurasi, rak buku personal, pelacakan sesi baca (*reading progress*), dan pencatatan refleksi baca.
+- **Reading Experience**: Pustaka digital terkurasi, rak buku personal, pelacakan sesi baca (_reading progress_), dan pencatatan refleksi baca.
 - **Community & Events**: Kalender kegiatan literasi, RSVP acara komunitas buku, dan ruang interaksi pembaca serta penulis.
 - **Partner & Publisher Ecosystem**: Akses kolaborasi untuk penerbit mandiri, komunitas independen, dan kurator editorial.
 
@@ -32,6 +32,7 @@ Browser ──cookies + Origin──▶ Express API :4000 ── routes → serv
 ## Memulai Cepat (Quick Start)
 
 ### Prasyarat
+
 1. **Node.js 22.12+**
 2. **Docker Desktop** (untuk database PostgreSQL lokal)
 3. **pnpm** (`corepack enable` jika belum terpasang)
@@ -57,19 +58,19 @@ Browser ──cookies + Origin──▶ Express API :4000 ── routes → serv
 
 ## Perintah Penting (Commands)
 
-| Perintah | Deskripsi |
-| :--- | :--- |
-| `pnpm run setup` | Menyiapkan environment `.env.local`, menyalakan database Docker, dan migrasi skema |
-| `pnpm dev` | Menjalankan API (`:4000`) dan Web (`:3000`) secara bersamaan |
-| `pnpm dev:api` / `pnpm dev:web` | Menjalankan salah satu aplikasi saja |
-| `pnpm db:up` / `pnpm db:down` | Menjalankan atau menghentikan container PostgreSQL lokal (data tetap aman) |
-| `pnpm db:status` / `pnpm db:logs` | Memeriksa status dan log container database |
-| `pnpm db:generate` | Membuat file migrasi SQL baru saat skema diubah |
-| `pnpm db:migrate` | Menerapkan migrasi tertunda ke database |
-| `pnpm db:studio` | Membuka Drizzle Studio di browser untuk inspeksi visual |
-| `pnpm role:set <email> <role>` | Memberikan role akses (misal: `admin`, `author`, `publisher`) |
-| `pnpm run doctor` | Memeriksa kompatibilitas node, pnpm, konfigurasi auth, dan koneksi database |
-| `pnpm check` | Menjalankan linter, typecheck, dan unit test |
+| Perintah                          | Deskripsi                                                                          |
+| :-------------------------------- | :--------------------------------------------------------------------------------- |
+| `pnpm run setup`                  | Menyiapkan environment `.env.local`, menyalakan database Docker, dan migrasi skema |
+| `pnpm dev`                        | Menjalankan API (`:4000`) dan Web (`:3000`) secara bersamaan                       |
+| `pnpm dev:api` / `pnpm dev:web`   | Menjalankan salah satu aplikasi saja                                               |
+| `pnpm db:up` / `pnpm db:down`     | Menjalankan atau menghentikan container PostgreSQL lokal (data tetap aman)         |
+| `pnpm db:status` / `pnpm db:logs` | Memeriksa status dan log container database                                        |
+| `pnpm db:generate`                | Membuat file migrasi SQL baru saat skema diubah                                    |
+| `pnpm db:migrate`                 | Menerapkan migrasi tertunda ke database                                            |
+| `pnpm db:studio`                  | Membuka Drizzle Studio di browser untuk inspeksi visual                            |
+| `pnpm role:set <email> <role>`    | Memberikan role akses (misal: `admin`, `author`, `publisher`)                      |
+| `pnpm run doctor`                 | Memeriksa kompatibilitas node, pnpm, konfigurasi auth, dan koneksi database        |
+| `pnpm check`                      | Menjalankan linter, typecheck, dan unit test                                       |
 
 ---
 

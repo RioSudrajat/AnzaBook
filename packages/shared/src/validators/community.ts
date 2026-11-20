@@ -115,7 +115,11 @@ export const featuredWorkSchema = z.object({
   mediaType: z.enum(["book", "film", "article", "other"]),
   title: z.string().min(1, "Judul karya wajib diisi").max(200),
   creator: z.string().max(160).optional(),
-  externalUrl: z.string().url("Tautan karya harus URL valid").optional().or(z.literal("")),
+  externalUrl: z
+    .string()
+    .url("Tautan karya harus URL valid")
+    .optional()
+    .or(z.literal("")),
 });
 
 export const coHostSchema = z.object({
@@ -131,13 +135,20 @@ export const createCalendarSchema = z
       .string()
       .min(3, "Slug minimal 3 karakter")
       .max(80)
-      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug hanya boleh huruf kecil, angka, dan strip"),
+      .regex(
+        /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+        "Slug hanya boleh huruf kecil, angka, dan strip",
+      ),
     type: z.enum(calendarTypeValues).default("community"),
     description: z.string().max(2000).default(""),
     avatarUrl: z.string().optional(),
     coverUrl: z.string().optional(),
     city: z.string().max(80).optional(),
-    contactEmail: z.string().email("Email kontak tidak valid").optional().or(z.literal("")),
+    contactEmail: z
+      .string()
+      .email("Email kontak tidak valid")
+      .optional()
+      .or(z.literal("")),
     socialLinks: z
       .object({
         instagram: z.string().optional(),
@@ -171,7 +182,10 @@ const bannerUrlSchema = z
       val.startsWith("http://") ||
       val.startsWith("https://") ||
       val.startsWith("data:image/"),
-    { message: "Format banner harus berupa URL valid atau data gambar terkompresi" },
+    {
+      message:
+        "Format banner harus berupa URL valid atau data gambar terkompresi",
+    },
   );
 
 export const eventBaseSchema = z
@@ -180,7 +194,10 @@ export const eventBaseSchema = z
     bookId: z.string().uuid("ID buku harus berupa UUID valid").optional(),
     featuredWork: featuredWorkSchema.optional(),
     title: z.string().min(3, "Judul acara minimal 3 karakter").max(200),
-    description: z.string().min(10, "Deskripsi acara minimal 10 karakter").max(10000),
+    description: z
+      .string()
+      .min(10, "Deskripsi acara minimal 10 karakter")
+      .max(10000),
     logisticsNotes: z.string().max(3000).optional(),
     coverUrl: bannerUrlSchema,
     themePreset: z.enum(eventThemeValues).default("minimal"),
@@ -198,11 +215,24 @@ export const eventBaseSchema = z
     longitude: z.number().min(-180).max(180).optional(),
     placeSourceLat: z.number().min(-90).max(90).optional(),
     placeSourceLng: z.number().min(-180).max(180).optional(),
-    onlineMeetingUrl: z.string().url("Tautan rapat virtual harus berupa URL valid").optional().or(z.literal("")),
-    startsAt: z.string().datetime({ message: "Format waktu mulai harus ISO 8601" }),
-    endsAt: z.string().datetime({ message: "Format waktu selesai harus ISO 8601" }),
+    onlineMeetingUrl: z
+      .string()
+      .url("Tautan rapat virtual harus berupa URL valid")
+      .optional()
+      .or(z.literal("")),
+    startsAt: z
+      .string()
+      .datetime({ message: "Format waktu mulai harus ISO 8601" }),
+    endsAt: z
+      .string()
+      .datetime({ message: "Format waktu selesai harus ISO 8601" }),
     timezone: z.string().default("Asia/Jakarta"),
-    capacity: z.number().int().min(1, "Kapasitas minimal 1 orang").max(10000).optional(),
+    capacity: z
+      .number()
+      .int()
+      .min(1, "Kapasitas minimal 1 orang")
+      .max(10000)
+      .optional(),
     requiresApproval: z.boolean().default(false),
     allowWaitlist: z.boolean().default(true),
   })
@@ -293,7 +323,9 @@ export const listEventsQuerySchema = z
     city: z.string().optional(),
     format: z.enum(eventFormatValues).optional(),
     eventType: z.enum(eventTypeValues).optional(),
-    filter: z.enum(["upcoming", "past", "my_rsvps", "hosting"]).default("upcoming"),
+    filter: z
+      .enum(["upcoming", "past", "my_rsvps", "hosting"])
+      .default("upcoming"),
     limit: z.coerce.number().int().min(1).max(100).default(30),
     offset: z.coerce.number().int().min(0).default(0),
   })

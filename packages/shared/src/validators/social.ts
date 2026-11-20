@@ -35,7 +35,10 @@ export const updateProfileBioSchema = z
           val.startsWith("http://") ||
           val.startsWith("https://") ||
           val.startsWith("data:image/"),
-        { message: "Format foto profil harus berupa URL atau Data Image yang valid" },
+        {
+          message:
+            "Format foto profil harus berupa URL atau Data Image yang valid",
+        },
       )
       .optional()
       .nullable(),
@@ -47,13 +50,24 @@ export const updateProfileBioSchema = z
           val.startsWith("http://") ||
           val.startsWith("https://") ||
           val.startsWith("data:image/"),
-        { message: "Format gambar header harus berupa URL atau Data Image yang valid" },
+        {
+          message:
+            "Format gambar header harus berupa URL atau Data Image yang valid",
+        },
       )
       .optional()
       .nullable(),
     bio: z.string().max(1000, "Bio maksimal 1000 karakter").optional(),
-    locationCity: z.string().max(80, "Kota maksimal 80 karakter").optional().nullable(),
-    authorPenName: z.string().max(160, "Nama pena maksimal 160 karakter").optional().nullable(),
+    locationCity: z
+      .string()
+      .max(80, "Kota maksimal 80 karakter")
+      .optional()
+      .nullable(),
+    authorPenName: z
+      .string()
+      .max(160, "Nama pena maksimal 160 karakter")
+      .optional()
+      .nullable(),
     socialLinks: socialLinksSchema.optional().nullable(),
   })
   .strict();
@@ -74,11 +88,7 @@ export const applyAuthorSchema = z
       .optional()
       .nullable()
       .or(z.literal("")),
-    claimedBookId: z
-      .string()
-      .uuid("ID buku tidak valid")
-      .optional()
-      .nullable(),
+    claimedBookId: z.string().uuid("ID buku tidak valid").optional().nullable(),
     verificationDocuments: z
       .array(
         z.object({

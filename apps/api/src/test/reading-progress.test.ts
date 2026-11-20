@@ -187,13 +187,16 @@ describe("reading checkpoints and history", () => {
     for (let i = 0; i < 12; i++) {
       const sessionId = randomUUID();
       sessionIds.push(sessionId);
-      const res = await reader.post("/api/reading").set(originHeader).send({
-        sessionId,
-        bookId: id,
-        pagesRead: i + 1,
-        durationSeconds: (i + 1) * 30,
-        avgWpm: 150,
-      });
+      const res = await reader
+        .post("/api/reading")
+        .set(originHeader)
+        .send({
+          sessionId,
+          bookId: id,
+          pagesRead: i + 1,
+          durationSeconds: (i + 1) * 30,
+          avgWpm: 150,
+        });
       expect(res.status).toBe(201);
     }
 
@@ -210,10 +213,7 @@ describe("reading checkpoints and history", () => {
       .select({ id: readingSessions.id })
       .from(readingSessions)
       .where(
-        and(
-          eq(readingSessions.bookId, id),
-          eq(readingSessions.userId, userId),
-        ),
+        and(eq(readingSessions.bookId, id), eq(readingSessions.userId, userId)),
       );
     expect(dbRows).toHaveLength(10);
     expect(dbRows.some((r) => r.id === sessionIds[0])).toBe(false);
@@ -227,15 +227,12 @@ describe("reading checkpoints and history", () => {
     const id = await bookId(reader, freeSlug);
 
     // Set progress to finished
-    await reader
-      .put(`/api/reading/progress/${id}`)
-      .set(originHeader)
-      .send({
-        lastChapterNumber: 1,
-        lastPageNumber: 1,
-        lastScrollPercent: 100,
-        layout: "scroll",
-      });
+    await reader.put(`/api/reading/progress/${id}`).set(originHeader).send({
+      lastChapterNumber: 1,
+      lastPageNumber: 1,
+      lastScrollPercent: 100,
+      layout: "scroll",
+    });
 
     // Add a session
     await reader.post("/api/reading").set(originHeader).send({

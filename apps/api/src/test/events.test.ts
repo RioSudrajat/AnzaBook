@@ -1,13 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { agent, originHeader, setRole, signUp } from "./helpers";
-import { db } from "../db";
-import { user } from "../db/schema";
-import { eq } from "drizzle-orm";
 
 describe("Community Calendars & Events API", () => {
   it("allows users to apply for a calendar and admins to verify it", async () => {
     const creator = agent();
-    const creatorEmail = await signUp(creator, "Pegiat Komunitas");
+    await signUp(creator, "Pegiat Komunitas");
 
     const calSlug = `klub-diskusi-senja-${Date.now()}`;
     const calPayload = {
@@ -74,10 +71,10 @@ describe("Community Calendars & Events API", () => {
         format: "offline",
         venueName: "Perpustakaan Cikini",
         venueAddress: "Taman Ismail Marzuki",
-        latitude: -6.2200,
-        longitude: 106.8400,
-        placeSourceLat: -6.1900,
-        placeSourceLng: 106.8300, // >3 km away
+        latitude: -6.22,
+        longitude: 106.84,
+        placeSourceLat: -6.19,
+        placeSourceLng: 106.83, // >3 km away
         startsAt: new Date(Date.now() + 86400000).toISOString(),
         endsAt: new Date(Date.now() + 90000000).toISOString(),
       });
@@ -91,7 +88,8 @@ describe("Community Calendars & Events API", () => {
       .send({
         calendarId,
         title: "Bedah Naskah ke Film: Laut Bercerita",
-        description: "Sesi diskusi adaptasi naskah Leila Chudori ke layar sinema.",
+        description:
+          "Sesi diskusi adaptasi naskah Leila Chudori ke layar sinema.",
         coverUrl: "https://example.com/banner.jpg",
         themePreset: "midnight_ink",
         visibility: "public",
@@ -237,31 +235,44 @@ describe("Community Calendars & Events API", () => {
     // First attendee: gets "going"
     const user1 = agent();
     await signUp(user1, "Peserta Pertama");
-    const rsvp1 = await user1.post(`/api/events/${slug}/rsvp`).set(originHeader).send({});
+    const rsvp1 = await user1
+      .post(`/api/events/${slug}/rsvp`)
+      .set(originHeader)
+      .send({});
     expect(rsvp1.status).toBe(201);
     expect(rsvp1.body.data.status).toBe("going");
 
     // Second attendee: gets "waitlisted"
     const user2 = agent();
     await signUp(user2, "Peserta Kedua");
-    const rsvp2 = await user2.post(`/api/events/${slug}/rsvp`).set(originHeader).send({});
+    const rsvp2 = await user2
+      .post(`/api/events/${slug}/rsvp`)
+      .set(originHeader)
+      .send({});
     expect(rsvp2.status).toBe(201);
     expect(rsvp2.body.data.status).toBe("waitlisted");
 
     // Check onlineMeetingUrl privacy: user1 gets it, user2 does not
     const detail1 = await user1.get(`/api/events/${slug}`);
-    expect(detail1.body.data.onlineMeetingUrl).toBe("https://meet.google.com/one-seat");
+    expect(detail1.body.data.onlineMeetingUrl).toBe(
+      "https://meet.google.com/one-seat",
+    );
 
     const detail2 = await user2.get(`/api/events/${slug}`);
     expect(detail2.body.data.onlineMeetingUrl).toBeNull();
 
     // User1 cancels -> user2 is automatically promoted to "going"
-    const cancelRes = await user1.delete(`/api/events/${slug}/rsvp`).set(originHeader).send();
+    const cancelRes = await user1
+      .delete(`/api/events/${slug}/rsvp`)
+      .set(originHeader)
+      .send();
     expect(cancelRes.status).toBe(200);
 
     const detail2After = await user2.get(`/api/events/${slug}`);
     expect(detail2After.body.data.userRsvpStatus).toBe("going");
-    expect(detail2After.body.data.onlineMeetingUrl).toBe("https://meet.google.com/one-seat");
+    expect(detail2After.body.data.onlineMeetingUrl).toBe(
+      "https://meet.google.com/one-seat",
+    );
 
     // Check-in user2 by checkinCode
     const checkInRes = await host
@@ -363,18 +374,27 @@ describe("Community Calendars & Events API", () => {
     // User A signs up and RSVPs ONLY to Event 1
     const userA = agent();
     await signUp(userA, "Peserta A");
-    const rsvpA = await userA.post(`/api/events/${slug1}/rsvp`).set(originHeader).send({});
+    const rsvpA = await userA
+      .post(`/api/events/${slug1}/rsvp`)
+      .set(originHeader)
+      .send({});
     expect(rsvpA.status).toBe(201);
 
     // User A checks upcoming: sees both
-    const upcomingRes = await userA.get(`/api/events?filter=upcoming&calendarSlug=${calRes.body.data.slug}`);
-    const upcomingSlugs = upcomingRes.body.data.map((e: any) => e.slug);
+    const upcomingRes = await userA.get(
+      `/api/events?filter=upcoming&calendarSlug=${calRes.body.data.slug}`,
+    );
+    const upcomingSlugs = upcomingRes.body.data.map(
+      (e: { slug: string }) => e.slug,
+    );
     expect(upcomingSlugs).toContain(slug1);
     expect(upcomingSlugs).toContain(slug2);
 
     // User A checks my_rsvps: sees ONLY Event 1
     const myRsvpsRes = await userA.get("/api/events?filter=my_rsvps");
-    const myRsvpsSlugs = myRsvpsRes.body.data.map((e: any) => e.slug);
+    const myRsvpsSlugs = myRsvpsRes.body.data.map(
+      (e: { slug: string }) => e.slug,
+    );
     expect(myRsvpsSlugs).toContain(slug1);
     expect(myRsvpsSlugs).not.toContain(slug2);
     expect(myRsvpsRes.body.data[0].userRsvpStatus).toBe("going");
@@ -393,7 +413,9 @@ describe("Community Calendars & Events API", () => {
     // User A cancels RSVP -> my_rsvps no longer contains Event 1
     await userA.delete(`/api/events/${slug1}/rsvp`).set(originHeader).send();
     const myRsvpsAfterCancel = await userA.get("/api/events?filter=my_rsvps");
-    const afterCancelSlugs = myRsvpsAfterCancel.body.data.map((e: any) => e.slug);
+    const afterCancelSlugs = myRsvpsAfterCancel.body.data.map(
+      (e: { slug: string }) => e.slug,
+    );
     expect(afterCancelSlugs).not.toContain(slug1);
   });
 
@@ -442,20 +464,29 @@ describe("Community Calendars & Events API", () => {
     const slug = evRes.body.data.slug;
 
     // Check upcoming feed -> event is visible to everyone
-    const upcomingRes = await host.get(`/api/events?filter=upcoming&calendarSlug=${calSlug}`);
-    const upcomingSlugs = upcomingRes.body.data.map((e: any) => e.slug);
+    const upcomingRes = await host.get(
+      `/api/events?filter=upcoming&calendarSlug=${calSlug}`,
+    );
+    const upcomingSlugs = upcomingRes.body.data.map(
+      (e: { slug: string }) => e.slug,
+    );
     expect(upcomingSlugs).toContain(slug);
 
     // Check hosting feed -> host sees it in hosting tab
     const hostingRes = await host.get("/api/events?filter=hosting");
-    const hostingSlugs = hostingRes.body.data.map((e: any) => e.slug);
+    const hostingSlugs = hostingRes.body.data.map(
+      (e: { slug: string }) => e.slug,
+    );
     expect(hostingSlugs).toContain(slug);
     expect(hostingRes.body.data[0].canManage).toBe(true);
 
     // Another user applies
     const attendee = agent();
     await signUp(attendee, "Calon Peserta");
-    const rsvpRes = await attendee.post(`/api/events/${slug}/rsvp`).set(originHeader).send({});
+    const rsvpRes = await attendee
+      .post(`/api/events/${slug}/rsvp`)
+      .set(originHeader)
+      .send({});
     expect(rsvpRes.status).toBe(201);
     expect(rsvpRes.body.data.status).toBe("pending_approval");
     const rsvpId = rsvpRes.body.data.id;
@@ -480,10 +511,15 @@ describe("Community Calendars & Events API", () => {
       .set(originHeader)
       .send({ title: "Temu Komunitas Mandiri - Edisi Revisi" });
     expect(updateRes.status).toBe(200);
-    expect(updateRes.body.data.title).toBe("Temu Komunitas Mandiri - Edisi Revisi");
+    expect(updateRes.body.data.title).toBe(
+      "Temu Komunitas Mandiri - Edisi Revisi",
+    );
 
     // Host deletes event
-    const delRes = await host.delete(`/api/events/${slug}`).set(originHeader).send();
+    const delRes = await host
+      .delete(`/api/events/${slug}`)
+      .set(originHeader)
+      .send();
     expect(delRes.status).toBe(200);
 
     // After deletion, event is gone
@@ -543,17 +579,23 @@ describe("Community Calendars & Events API", () => {
 
     // Anonymous visitor queries public directory
     const anon = agent();
-    const listRes = await anon.get(`/api/events?calendarSlug=${calRes.body.data.slug}`);
+    const listRes = await anon.get(
+      `/api/events?calendarSlug=${calRes.body.data.slug}`,
+    );
     expect(listRes.status).toBe(200);
-    const slugs = listRes.body.data.map((e: any) => e.slug);
+    const slugs = listRes.body.data.map((e: { slug: string }) => e.slug);
     expect(slugs).toContain(publicSlug);
     expect(slugs).not.toContain(privateSlug);
 
     // Another normal user queries public directory
     const normalUser = agent();
     await signUp(normalUser, "User Biasa");
-    const userListRes = await normalUser.get(`/api/events?calendarSlug=${calRes.body.data.slug}`);
-    const userSlugs = userListRes.body.data.map((e: any) => e.slug);
+    const userListRes = await normalUser.get(
+      `/api/events?calendarSlug=${calRes.body.data.slug}`,
+    );
+    const userSlugs = userListRes.body.data.map(
+      (e: { slug: string }) => e.slug,
+    );
     expect(userSlugs).toContain(publicSlug);
     expect(userSlugs).not.toContain(privateSlug);
 
@@ -681,7 +723,9 @@ describe("Community Calendars & Events API", () => {
     await signUp(attendee, "Peserta Bedah Buku");
 
     // Before RSVP: Chapter 2 is locked (HTTP 403)
-    const lockedRes = await attendee.get(`/api/books/${bookSlug}/read?chapter=2&mode=full`);
+    const lockedRes = await attendee.get(
+      `/api/books/${bookSlug}/read?chapter=2&mode=full`,
+    );
     expect(lockedRes.status).toBe(403);
     expect(lockedRes.body.error.code).toBe("FORBIDDEN_DIGITAL_ACCESS");
 
@@ -694,13 +738,17 @@ describe("Community Calendars & Events API", () => {
     expect(rsvpRes.body.data.status).toBe("going");
 
     // 5. After RSVP "going": Chapter 2 is UNLOCKED (HTTP 200)
-    const unlockedRes = await attendee.get(`/api/books/${bookSlug}/read?chapter=2&mode=full`);
+    const unlockedRes = await attendee.get(
+      `/api/books/${bookSlug}/read?chapter=2&mode=full`,
+    );
     expect(unlockedRes.status).toBe(200);
     expect(unlockedRes.body.data.currentChapter.chapterNumber).toBe(2);
     expect(unlockedRes.body.data.hasEventSampleAccess).toBe(true);
 
     // Chapter 3 is still locked (HTTP 403)
-    const chap3Res = await attendee.get(`/api/books/${bookSlug}/read?chapter=3&mode=full`);
+    const chap3Res = await attendee.get(
+      `/api/books/${bookSlug}/read?chapter=3&mode=full`,
+    );
     expect(chap3Res.status).toBe(403);
   });
 });

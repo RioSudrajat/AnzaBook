@@ -1,13 +1,11 @@
 import * as React from "react";
 import {
-  ChevronRight,
   ChevronUp,
   ChevronDown,
   ChevronsRight,
   Copy,
   Check,
   ExternalLink,
-  X,
 } from "lucide-react";
 import type {
   CommunityEventDetailDto,

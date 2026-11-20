@@ -112,12 +112,13 @@ export async function fetchUnifiedExplore(
 export async function applyAuthor(
   input: ApplyAuthorInput,
 ): Promise<{ id: string; status: string }> {
-  const { data } = await apiFetch<
-    DataResponse<{ id: string; status: string }>
-  >("/api/social/author-applications", {
-    method: "POST",
-    body: input,
-  });
+  const { data } = await apiFetch<DataResponse<{ id: string; status: string }>>(
+    "/api/social/author-applications",
+    {
+      method: "POST",
+      body: input,
+    },
+  );
   return data;
 }
 

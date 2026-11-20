@@ -102,7 +102,9 @@ function downloadClaimCodesCsv(
   codes: Array<{ code: string } | string>,
 ) {
   const origin =
-    typeof window !== "undefined" ? window.location.origin : "https://anzabook.id";
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "https://anzabook.id";
   const rows = [
     ["No", "Kode Klaim", "URL Klaim Langsung"],
     ...codes.map((item, index) => {
@@ -137,7 +139,12 @@ export function AdminCmsDashboard({
   activeTabProp,
   onTabChangeProp,
 }: {
-  currentUser: { id: string; name: string; email: string; role?: string | null };
+  currentUser: {
+    id: string;
+    name: string;
+    email: string;
+    role?: string | null;
+  };
   activeTabProp?: TabId;
   onTabChangeProp?: (tab: TabId) => void;
 }) {
@@ -231,7 +238,8 @@ export function AdminCmsDashboard({
                 {tabTitles[activeTab]}
               </h1>
               <p className="hidden sm:block text-xs text-muted-foreground truncate">
-                Studio Redaksi AnzaBook &bull; Masuk sebagai {currentUser.name} ({currentUser.email})
+                Studio Redaksi AnzaBook &bull; Masuk sebagai {currentUser.name}{" "}
+                ({currentUser.email})
               </p>
             </div>
           </div>
@@ -270,9 +278,15 @@ export function AdminCmsDashboard({
               onClick={handleToggleTheme}
               className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
               title={isDark ? "Ganti ke Mode Terang" : "Ganti ke Mode Gelap"}
-              aria-label={isDark ? "Ganti ke Mode Terang" : "Ganti ke Mode Gelap"}
+              aria-label={
+                isDark ? "Ganti ke Mode Terang" : "Ganti ke Mode Gelap"
+              }
             >
-              {isDark ? <Sun className="size-5" /> : <Moon className="size-5" />}
+              {isDark ? (
+                <Sun className="size-5" />
+              ) : (
+                <Moon className="size-5" />
+              )}
             </button>
           </div>
         </header>
@@ -409,8 +423,10 @@ function AdminReviewDossierModal({
   const [showRejectInput, setShowRejectInput] = useState(false);
 
   useEffect(() => {
-    setRejectionReason("");
-    setShowRejectInput(false);
+    queueMicrotask(() => {
+      setRejectionReason("");
+      setShowRejectInput(false);
+    });
   }, [data, isOpen]);
 
   if (!isOpen || !data) return null;
@@ -434,8 +450,8 @@ function AdminReviewDossierModal({
               {type === "calendar"
                 ? "Komunitas"
                 : type === "publisher"
-                ? "Penerbit Mitra"
-                : "Penulis Resmi"}
+                  ? "Penerbit Mitra"
+                  : "Penulis Resmi"}
             </h3>
           </div>
           <button
@@ -464,9 +480,19 @@ function AdminReviewDossierModal({
                       /c/{cal.slug}
                     </p>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-                      <span>Kota: <strong className="text-foreground">{cal.city || "Nasional"}</strong></span>
+                      <span>
+                        Kota:{" "}
+                        <strong className="text-foreground">
+                          {cal.city || "Nasional"}
+                        </strong>
+                      </span>
                       <span>•</span>
-                      <span>Tipe: <strong className="text-foreground capitalize">{cal.type}</strong></span>
+                      <span>
+                        Tipe:{" "}
+                        <strong className="text-foreground capitalize">
+                          {cal.type}
+                        </strong>
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -476,8 +502,8 @@ function AdminReviewDossierModal({
                     cal.verificationStatus === "verified"
                       ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
                       : cal.verificationStatus === "rejected"
-                      ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
-                      : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                        ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
+                        : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
                   }`}
                 >
                   {cal.verificationStatus}
@@ -485,7 +511,9 @@ function AdminReviewDossierModal({
               </div>
 
               <div className="space-y-1.5 pt-2 border-t border-border/60 text-xs">
-                <p className="font-semibold text-foreground">Visi / Deskripsi Komunitas:</p>
+                <p className="font-semibold text-foreground">
+                  Visi / Deskripsi Komunitas:
+                </p>
                 <p className="text-muted-foreground leading-relaxed whitespace-pre-line bg-card p-3 rounded-lg border border-border/60">
                   {cal.description || "Tidak ada deskripsi yang disertakan."}
                 </p>
@@ -493,12 +521,18 @@ function AdminReviewDossierModal({
 
               <div className="grid grid-cols-2 gap-2 text-xs pt-2">
                 <div>
-                  <span className="text-muted-foreground">Pengaju / Inisiator:</span>{" "}
-                  <strong className="text-foreground">{cal.creatorName || "Anonim"}</strong>
+                  <span className="text-muted-foreground">
+                    Pengaju / Inisiator:
+                  </span>{" "}
+                  <strong className="text-foreground">
+                    {cal.creatorName || "Anonim"}
+                  </strong>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Email:</span>{" "}
-                  <strong className="text-foreground">{cal.creatorEmail}</strong>
+                  <strong className="text-foreground">
+                    {cal.creatorEmail}
+                  </strong>
                 </div>
               </div>
             </div>
@@ -510,7 +544,8 @@ function AdminReviewDossierModal({
                 <span>Dokumen Berkas &amp; Legalitas Komunitas</span>
               </h5>
 
-              {cal.verificationDocuments && cal.verificationDocuments.length > 0 ? (
+              {cal.verificationDocuments &&
+              cal.verificationDocuments.length > 0 ? (
                 <div className="space-y-2">
                   {cal.verificationDocuments.map((doc, idx) => (
                     <div
@@ -520,7 +555,9 @@ function AdminReviewDossierModal({
                       <div className="flex items-center gap-2.5">
                         <FileText className="size-4 text-[var(--color-accent)] shrink-0" />
                         <div>
-                          <p className="font-semibold text-foreground">{doc.title}</p>
+                          <p className="font-semibold text-foreground">
+                            {doc.title}
+                          </p>
                           <p className="text-[11px] font-mono text-muted-foreground">
                             {doc.fileType || "Dokumen Pendukung"}
                           </p>
@@ -540,7 +577,8 @@ function AdminReviewDossierModal({
                 </div>
               ) : (
                 <div className="p-4 rounded-xl border border-dashed border-border text-center text-xs text-muted-foreground">
-                  Pengaju tidak melampirkan berkas digital tambahan (opsional). Verifikasi dapat ditinjau berdasarkan profil &amp; narahubung.
+                  Pengaju tidak melampirkan berkas digital tambahan (opsional).
+                  Verifikasi dapat ditinjau berdasarkan profil &amp; narahubung.
                 </div>
               )}
             </div>
@@ -563,9 +601,19 @@ function AdminReviewDossierModal({
                       /p/{pub.slug}
                     </p>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-                      <span>No. IKAPI: <strong className="text-foreground">{pub.ikapiNumber || "Belum ada"}</strong></span>
+                      <span>
+                        No. IKAPI:{" "}
+                        <strong className="text-foreground">
+                          {pub.ikapiNumber || "Belum ada"}
+                        </strong>
+                      </span>
                       <span>•</span>
-                      <span>Kota: <strong className="text-foreground">{pub.city || "Indonesia"}</strong></span>
+                      <span>
+                        Kota:{" "}
+                        <strong className="text-foreground">
+                          {pub.city || "Indonesia"}
+                        </strong>
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -575,8 +623,8 @@ function AdminReviewDossierModal({
                     pub.verificationStatus === "verified"
                       ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
                       : pub.verificationStatus === "rejected"
-                      ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
-                      : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                        ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
+                        : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
                   }`}
                 >
                   {pub.verificationStatus}
@@ -584,7 +632,9 @@ function AdminReviewDossierModal({
               </div>
 
               <div className="space-y-1.5 pt-2 border-t border-border/60 text-xs">
-                <p className="font-semibold text-foreground">Profil &amp; Visi Editorial Penerbit:</p>
+                <p className="font-semibold text-foreground">
+                  Profil &amp; Visi Editorial Penerbit:
+                </p>
                 <p className="text-muted-foreground leading-relaxed whitespace-pre-line bg-card p-3 rounded-lg border border-border/60">
                   {pub.description || "Tidak ada deskripsi."}
                 </p>
@@ -592,12 +642,18 @@ function AdminReviewDossierModal({
 
               <div className="grid grid-cols-2 gap-2 text-xs pt-2">
                 <div>
-                  <span className="text-muted-foreground">Email Narahubung:</span>{" "}
-                  <strong className="text-foreground">{pub.contactEmail || "-"}</strong>
+                  <span className="text-muted-foreground">
+                    Email Narahubung:
+                  </span>{" "}
+                  <strong className="text-foreground">
+                    {pub.contactEmail || "-"}
+                  </strong>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Alamat Redaksi:</span>{" "}
-                  <strong className="text-foreground">{pub.address || "-"}</strong>
+                  <strong className="text-foreground">
+                    {pub.address || "-"}
+                  </strong>
                 </div>
               </div>
             </div>
@@ -609,7 +665,8 @@ function AdminReviewDossierModal({
                 <span>Dokumen Bukti Keanggotaan IKAPI / Legalitas</span>
               </h5>
 
-              {pub.verificationDocuments && pub.verificationDocuments.length > 0 ? (
+              {pub.verificationDocuments &&
+              pub.verificationDocuments.length > 0 ? (
                 <div className="space-y-2">
                   {pub.verificationDocuments.map((doc, idx) => (
                     <div
@@ -619,7 +676,9 @@ function AdminReviewDossierModal({
                       <div className="flex items-center gap-2.5">
                         <FileText className="size-4 text-[var(--color-accent)] shrink-0" />
                         <div>
-                          <p className="font-semibold text-foreground">{doc.title}</p>
+                          <p className="font-semibold text-foreground">
+                            {doc.title}
+                          </p>
                           <p className="text-[11px] font-mono text-muted-foreground">
                             {doc.fileType || "Dokumen Pendukung"}
                           </p>
@@ -639,7 +698,8 @@ function AdminReviewDossierModal({
                 </div>
               ) : (
                 <div className="p-4 rounded-xl border border-dashed border-border text-center text-xs text-muted-foreground">
-                  Nomor IKAPI: {pub.ikapiNumber || "Tidak dicantumkan"}. Tidak ada berkas lampiran digital tambahan.
+                  Nomor IKAPI: {pub.ikapiNumber || "Tidak dicantumkan"}. Tidak
+                  ada berkas lampiran digital tambahan.
                 </div>
               )}
             </div>
@@ -660,15 +720,17 @@ function AdminReviewDossierModal({
                         auth.status === "verified"
                           ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
                           : auth.status === "rejected"
-                          ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
-                          : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                            ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
+                            : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
                       }`}
                     >
                       {auth.status}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Akun: <strong className="text-foreground">{auth.userName}</strong> ({auth.userEmail})
+                    Akun:{" "}
+                    <strong className="text-foreground">{auth.userName}</strong>{" "}
+                    ({auth.userEmail})
                   </p>
                 </div>
 
@@ -686,7 +748,9 @@ function AdminReviewDossierModal({
               </div>
 
               <div className="space-y-1.5 pt-2 border-t border-border/60 text-xs">
-                <p className="font-semibold text-foreground">Bio &amp; Rekam Jejak Kepenulisan:</p>
+                <p className="font-semibold text-foreground">
+                  Bio &amp; Rekam Jejak Kepenulisan:
+                </p>
                 <p className="text-muted-foreground leading-relaxed whitespace-pre-line bg-card p-3 rounded-lg border border-border/60">
                   {auth.bio}
                 </p>
@@ -695,7 +759,9 @@ function AdminReviewDossierModal({
               {auth.claimedBookTitle && (
                 <div className="text-xs p-3 rounded-lg border border-border bg-card">
                   <span className="text-muted-foreground">Klaim Hak Buku:</span>{" "}
-                  <strong className="text-foreground">{auth.claimedBookTitle}</strong>
+                  <strong className="text-foreground">
+                    {auth.claimedBookTitle}
+                  </strong>
                 </div>
               )}
             </div>
@@ -707,7 +773,8 @@ function AdminReviewDossierModal({
                 <span>Dokumen Portofolio &amp; Berkas Penulis</span>
               </h5>
 
-              {auth.verificationDocuments && auth.verificationDocuments.length > 0 ? (
+              {auth.verificationDocuments &&
+              auth.verificationDocuments.length > 0 ? (
                 <div className="space-y-2">
                   {auth.verificationDocuments.map((doc, idx) => (
                     <div
@@ -717,7 +784,9 @@ function AdminReviewDossierModal({
                       <div className="flex items-center gap-2.5">
                         <FileText className="size-4 text-[var(--color-accent)] shrink-0" />
                         <div>
-                          <p className="font-semibold text-foreground">{doc.title}</p>
+                          <p className="font-semibold text-foreground">
+                            {doc.title}
+                          </p>
                           <p className="text-[11px] font-mono text-muted-foreground">
                             {doc.fileType || "Dokumen Pendukung"}
                           </p>
@@ -737,7 +806,10 @@ function AdminReviewDossierModal({
                 </div>
               ) : (
                 <div className="p-4 rounded-xl border border-dashed border-border text-center text-xs text-muted-foreground">
-                  Portofolio: {auth.portfolioUrl ? auth.portfolioUrl : "Tidak ada tautan berkas tambahan."}
+                  Portofolio:{" "}
+                  {auth.portfolioUrl
+                    ? auth.portfolioUrl
+                    : "Tidak ada tautan berkas tambahan."}
                 </div>
               )}
             </div>
@@ -747,8 +819,12 @@ function AdminReviewDossierModal({
         {/* Rejection Reason Input (if rejecting) */}
         {showRejectInput && (
           <div className="p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 space-y-2">
-            <Label htmlFor="rejection-reason" className="text-xs font-semibold text-rose-700 dark:text-rose-300">
-              Alasan Penolakan Pengajuan (Wajib diisi agar pengaju dapat memperbaiki):
+            <Label
+              htmlFor="rejection-reason"
+              className="text-xs font-semibold text-rose-700 dark:text-rose-300"
+            >
+              Alasan Penolakan Pengajuan (Wajib diisi agar pengaju dapat
+              memperbaiki):
             </Label>
             <Textarea
               id="rejection-reason"
@@ -812,7 +888,9 @@ function AdminReviewDossierModal({
                   className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
                 >
                   <CheckCircle2 className="size-4" />
-                  <span>{isPending ? "Menyetujui..." : "Setujui & ACC Verifikasi"}</span>
+                  <span>
+                    {isPending ? "Menyetujui..." : "Setujui & ACC Verifikasi"}
+                  </span>
                 </Button>
               </>
             )}
@@ -829,18 +907,32 @@ function AdminReviewDossierModal({
 
 function TabCalendars() {
   const [filter, setFilter] = useState<string>("pending");
-  const { data: calendars = [], isLoading, refetch } = useAdminCalendars({
+  const {
+    data: calendars = [],
+    isLoading,
+    refetch,
+  } = useAdminCalendars({
     status: filter === "all" ? undefined : filter,
   });
   const verifyMutation = useVerifyCalendar();
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [selectedCalendar, setSelectedCalendar] = useState<AdminCalendarDto | null>(null);
+  const [selectedCalendar, setSelectedCalendar] =
+    useState<AdminCalendarDto | null>(null);
 
-  async function handleVerify(id: string, status: "verified" | "trusted" | "rejected", rejectionReason?: string) {
+  async function handleVerify(
+    id: string,
+    status: "verified" | "trusted" | "rejected",
+    rejectionReason?: string,
+  ) {
     try {
       setFeedback(null);
-      await verifyMutation.mutateAsync({ id, input: { status, rejectionReason } });
-      setFeedback(`Status kalender komunitas berhasil diperbarui menjadi "${status}".`);
+      await verifyMutation.mutateAsync({
+        id,
+        input: { status, rejectionReason },
+      });
+      setFeedback(
+        `Status kalender komunitas berhasil diperbarui menjadi "${status}".`,
+      );
       setSelectedCalendar(null);
     } catch (err) {
       setFeedback(`Gagal memperbarui status: ${getErrorMessage(err)}`);
@@ -855,26 +947,29 @@ function TabCalendars() {
             Verifikasi Kalender Komunitas &amp; Klub Baca
           </h2>
           <p className="text-sm text-muted-foreground">
-            Validasi kurasi komunitas baca buku, penerbit lokal, dan entitas literasi yang mengajukan kalender acara.
+            Validasi kurasi komunitas baca buku, penerbit lokal, dan entitas
+            literasi yang mengajukan kalender acara.
           </p>
         </div>
 
         {/* Filter Badges */}
         <div className="flex flex-wrap items-center gap-2">
-          {["pending", "verified", "trusted", "rejected", "all"].map((statusKey) => (
-            <button
-              key={statusKey}
-              type="button"
-              onClick={() => setFilter(statusKey)}
-              className={`min-h-[44px] rounded-md px-3.5 py-1.5 text-xs font-semibold capitalize transition focus-visible:outline-2 focus-visible:outline-primary ${
-                filter === statusKey
-                  ? "bg-primary text-primary-foreground"
-                  : "border border-border bg-card text-foreground hover:bg-muted"
-              }`}
-            >
-              {statusKey === "all" ? "Semua Status" : statusKey}
-            </button>
-          ))}
+          {["pending", "verified", "trusted", "rejected", "all"].map(
+            (statusKey) => (
+              <button
+                key={statusKey}
+                type="button"
+                onClick={() => setFilter(statusKey)}
+                className={`min-h-[44px] rounded-md px-3.5 py-1.5 text-xs font-semibold capitalize transition focus-visible:outline-2 focus-visible:outline-primary ${
+                  filter === statusKey
+                    ? "bg-primary text-primary-foreground"
+                    : "border border-border bg-card text-foreground hover:bg-muted"
+                }`}
+              >
+                {statusKey === "all" ? "Semua Status" : statusKey}
+              </button>
+            ),
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -895,13 +990,23 @@ function TabCalendars() {
 
       {isLoading ? (
         <div className="flex min-h-[200px] items-center justify-center">
-          <LoaderCircle className="size-6 animate-spin text-muted-foreground" aria-hidden="true" />
+          <LoaderCircle
+            className="size-6 animate-spin text-muted-foreground"
+            aria-hidden="true"
+          />
         </div>
       ) : calendars.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center text-muted-foreground">
-          <Calendar className="mx-auto size-8 text-muted-foreground/60" aria-hidden="true" />
-          <p className="mt-3 text-base font-medium">Tidak ada kalender komunitas pada status ini.</p>
-          <p className="text-sm">Semua pengajuan kalender komunitas telah selesai diproses.</p>
+          <Calendar
+            className="mx-auto size-8 text-muted-foreground/60"
+            aria-hidden="true"
+          />
+          <p className="mt-3 text-base font-medium">
+            Tidak ada kalender komunitas pada status ini.
+          </p>
+          <p className="text-sm">
+            Semua pengajuan kalender komunitas telah selesai diproses.
+          </p>
         </div>
       ) : (
         <div className="grid gap-4">
@@ -912,7 +1017,9 @@ function TabCalendars() {
             >
               <div className="space-y-2 min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-lg font-bold text-foreground break-words">{cal.name}</h3>
+                  <h3 className="text-lg font-bold text-foreground break-words">
+                    {cal.name}
+                  </h3>
                   <span className="rounded bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                     /{cal.slug}
                   </span>
@@ -921,10 +1028,10 @@ function TabCalendars() {
                       cal.verificationStatus === "trusted"
                         ? "border-border bg-foreground text-background"
                         : cal.verificationStatus === "verified"
-                        ? "border-border/80 bg-muted text-foreground"
-                        : cal.verificationStatus === "rejected"
-                        ? "border-destructive/30 bg-destructive/10 text-destructive"
-                        : "border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 text-foreground"
+                          ? "border-border/80 bg-muted text-foreground"
+                          : cal.verificationStatus === "rejected"
+                            ? "border-destructive/30 bg-destructive/10 text-destructive"
+                            : "border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 text-foreground"
                     }`}
                   >
                     {cal.verificationStatus}
@@ -937,17 +1044,23 @@ function TabCalendars() {
 
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   <span>
-                    Kota: <strong className="text-foreground">{cal.city || "Nasional"}</strong>
+                    Kota:{" "}
+                    <strong className="text-foreground">
+                      {cal.city || "Nasional"}
+                    </strong>
                   </span>
                   <span>
-                    Tipe: <strong className="text-foreground">{cal.type}</strong>
+                    Tipe:{" "}
+                    <strong className="text-foreground">{cal.type}</strong>
                   </span>
                   <span>
-                    Pengaju: <strong className="text-foreground">{cal.creatorName || "Anonim"}</strong> ({cal.creatorEmail})
+                    Pengaju:{" "}
+                    <strong className="text-foreground">
+                      {cal.creatorName || "Anonim"}
+                    </strong>{" "}
+                    ({cal.creatorEmail})
                   </span>
-                  <span>
-                    Dibuat: {formatDate(cal.createdAt)}
-                  </span>
+                  <span>Dibuat: {formatDate(cal.createdAt)}</span>
                 </div>
 
                 {cal.socialLinks && Object.keys(cal.socialLinks).length > 0 && (
@@ -970,8 +1083,8 @@ function TabCalendars() {
                         rel="noreferrer"
                         className="inline-flex items-center gap-1 text-primary hover:underline"
                       >
-                        <ExternalLink className="size-3" aria-hidden="true" />
-                        X / Twitter
+                        <ExternalLink className="size-3" aria-hidden="true" />X
+                        / Twitter
                       </a>
                     )}
                     {cal.socialLinks.website && (
@@ -997,14 +1110,20 @@ function TabCalendars() {
                   className="min-h-[44px] font-semibold text-xs border-[var(--color-accent)]/40 hover:bg-[var(--color-accent)]/10"
                   onClick={() => setSelectedCalendar(cal)}
                 >
-                  <Eye className="size-4 text-[var(--color-accent)]" aria-hidden="true" />
+                  <Eye
+                    className="size-4 text-[var(--color-accent)]"
+                    aria-hidden="true"
+                  />
                   <span>Tinjau Profil &amp; Berkas</span>
                 </Button>
 
                 <Button
                   size="sm"
                   className="min-h-[44px] font-semibold"
-                  disabled={verifyMutation.isPending || cal.verificationStatus === "verified"}
+                  disabled={
+                    verifyMutation.isPending ||
+                    cal.verificationStatus === "verified"
+                  }
                   onClick={() => handleVerify(cal.id, "verified")}
                 >
                   <CheckCircle2 className="size-4" aria-hidden="true" />
@@ -1015,7 +1134,10 @@ function TabCalendars() {
                   variant="outline"
                   size="sm"
                   className="min-h-[44px]"
-                  disabled={verifyMutation.isPending || cal.verificationStatus === "trusted"}
+                  disabled={
+                    verifyMutation.isPending ||
+                    cal.verificationStatus === "trusted"
+                  }
                   onClick={() => handleVerify(cal.id, "trusted")}
                 >
                   <ShieldCheck className="size-4" aria-hidden="true" />
@@ -1026,7 +1148,10 @@ function TabCalendars() {
                   variant="destructive"
                   size="sm"
                   className="min-h-[44px]"
-                  disabled={verifyMutation.isPending || cal.verificationStatus === "rejected"}
+                  disabled={
+                    verifyMutation.isPending ||
+                    cal.verificationStatus === "rejected"
+                  }
                   onClick={() => setSelectedCalendar(cal)}
                 >
                   <XCircle className="size-4" aria-hidden="true" />
@@ -1059,7 +1184,9 @@ function TabCalendars() {
 // =========================================================================
 
 function TabPartners() {
-  const [partnerSubTab, setPartnerSubTab] = useState<"authors" | "publishers">("authors");
+  const [partnerSubTab, setPartnerSubTab] = useState<"authors" | "publishers">(
+    "authors",
+  );
 
   return (
     <div className="space-y-6">
@@ -1069,7 +1196,8 @@ function TabPartners() {
             Verifikasi Penulis Resmi &amp; Penerbit Mitra
           </h2>
           <p className="text-sm text-muted-foreground">
-            Tinjau klaim kepemilikan karya oleh penulis serta verifikasi legalitas nomor IKAPI penerbit mitra.
+            Tinjau klaim kepemilikan karya oleh penulis serta verifikasi
+            legalitas nomor IKAPI penerbit mitra.
           </p>
         </div>
 
@@ -1107,15 +1235,24 @@ function TabPartners() {
 
 function AuthorsSection() {
   const [filter, setFilter] = useState<string>("pending");
-  const { data: applications = [], isLoading, refetch } = useAdminAuthorApplications({
+  const {
+    data: applications = [],
+    isLoading,
+    refetch,
+  } = useAdminAuthorApplications({
     status: filter === "all" ? undefined : filter,
   });
   const reviewMutation = useReviewAuthorApplication();
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [selectedAuthor, setSelectedAuthor] = useState<AdminAuthorApplicationDto | null>(null);
+  const [selectedAuthor, setSelectedAuthor] =
+    useState<AdminAuthorApplicationDto | null>(null);
 
-  async function handleReview(id: string, status: "verified" | "rejected", rejectionReason?: string) {
+  async function handleReview(
+    id: string,
+    status: "verified" | "rejected",
+    rejectionReason?: string,
+  ) {
     try {
       setFeedback(null);
       await reviewMutation.mutateAsync({
@@ -1158,7 +1295,12 @@ function AuthorsSection() {
               {statusKey === "all" ? "Semua" : statusKey}
             </button>
           ))}
-          <Button variant="outline" size="sm" onClick={() => refetch()} className="min-h-[44px]">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            className="min-h-[44px]"
+          >
             <RefreshCw className="size-4" aria-hidden="true" />
           </Button>
         </div>
@@ -1172,12 +1314,20 @@ function AuthorsSection() {
 
       {isLoading ? (
         <div className="flex min-h-[200px] items-center justify-center">
-          <LoaderCircle className="size-6 animate-spin text-muted-foreground" aria-hidden="true" />
+          <LoaderCircle
+            className="size-6 animate-spin text-muted-foreground"
+            aria-hidden="true"
+          />
         </div>
       ) : applications.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center text-muted-foreground">
-          <UserCheck className="mx-auto size-8 text-muted-foreground/60" aria-hidden="true" />
-          <p className="mt-3 text-base font-medium">Tidak ada pengajuan penulis pada status ini.</p>
+          <UserCheck
+            className="mx-auto size-8 text-muted-foreground/60"
+            aria-hidden="true"
+          />
+          <p className="mt-3 text-base font-medium">
+            Tidak ada pengajuan penulis pada status ini.
+          </p>
         </div>
       ) : (
         <div className="grid gap-4">
@@ -1189,21 +1339,27 @@ function AuthorsSection() {
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-bold text-foreground">{app.penName}</h3>
+                    <h3 className="text-lg font-bold text-foreground">
+                      {app.penName}
+                    </h3>
                     <span
                       className={`rounded-md border px-2 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wider ${
                         app.status === "verified"
                           ? "border-border/80 bg-muted text-foreground"
                           : app.status === "rejected"
-                          ? "border-destructive/30 bg-destructive/10 text-destructive"
-                          : "border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 text-foreground"
+                            ? "border-destructive/30 bg-destructive/10 text-destructive"
+                            : "border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 text-foreground"
                       }`}
                     >
                       {app.status}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Akun: <strong className="text-foreground">{app.userName || "Tanpa Nama"}</strong> ({app.userEmail}) · Diajukan {formatDate(app.createdAt)}
+                    Akun:{" "}
+                    <strong className="text-foreground">
+                      {app.userName || "Tanpa Nama"}
+                    </strong>{" "}
+                    ({app.userEmail}) · Diajukan {formatDate(app.createdAt)}
                   </p>
                 </div>
 
@@ -1228,9 +1384,14 @@ function AuthorsSection() {
 
               {app.claimedBookId && (
                 <div className="flex items-center gap-3 rounded-md border border-border bg-muted/20 p-3 text-xs">
-                  <BookOpen className="size-4 text-primary shrink-0" aria-hidden="true" />
+                  <BookOpen
+                    className="size-4 text-primary shrink-0"
+                    aria-hidden="true"
+                  />
                   <div>
-                    <span className="font-semibold text-foreground">Klaim Hak Buku:</span>{" "}
+                    <span className="font-semibold text-foreground">
+                      Klaim Hak Buku:
+                    </span>{" "}
                     {app.claimedBookTitle || app.claimedBookId}
                   </div>
                 </div>
@@ -1245,7 +1406,10 @@ function AuthorsSection() {
               {/* Review Input & Actions */}
               <div className="pt-2 border-t border-border/80 flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
                 <div className="flex-1 space-y-1">
-                  <Label htmlFor={`note-${app.id}`} className="text-xs text-muted-foreground">
+                  <Label
+                    htmlFor={`note-${app.id}`}
+                    className="text-xs text-muted-foreground"
+                  >
                     Catatan Editor / Verifikator (opsional)
                   </Label>
                   <Input
@@ -1253,7 +1417,10 @@ function AuthorsSection() {
                     placeholder="Contoh: Bukti karya valid, telah sesuai nomor ISBN."
                     value={reviewNotes[app.id] ?? ""}
                     onChange={(e) =>
-                      setReviewNotes((prev) => ({ ...prev, [app.id]: e.target.value }))
+                      setReviewNotes((prev) => ({
+                        ...prev,
+                        [app.id]: e.target.value,
+                      }))
                     }
                     className="min-h-[44px]"
                   />
@@ -1266,14 +1433,19 @@ function AuthorsSection() {
                     className="min-h-[44px] text-xs font-semibold border-[var(--color-accent)]/40 hover:bg-[var(--color-accent)]/10"
                     onClick={() => setSelectedAuthor(app)}
                   >
-                    <Eye className="size-4 text-[var(--color-accent)]" aria-hidden="true" />
+                    <Eye
+                      className="size-4 text-[var(--color-accent)]"
+                      aria-hidden="true"
+                    />
                     <span>Tinjau Profil &amp; Berkas</span>
                   </Button>
 
                   <Button
                     size="sm"
                     className="min-h-[44px] font-semibold"
-                    disabled={reviewMutation.isPending || app.status === "verified"}
+                    disabled={
+                      reviewMutation.isPending || app.status === "verified"
+                    }
                     onClick={() => handleReview(app.id, "verified")}
                   >
                     <CheckCircle2 className="size-4" aria-hidden="true" />
@@ -1283,7 +1455,9 @@ function AuthorsSection() {
                     variant="destructive"
                     size="sm"
                     className="min-h-[44px]"
-                    disabled={reviewMutation.isPending || app.status === "rejected"}
+                    disabled={
+                      reviewMutation.isPending || app.status === "rejected"
+                    }
                     onClick={() => setSelectedAuthor(app)}
                   >
                     <XCircle className="size-4" aria-hidden="true" />
@@ -1314,19 +1488,33 @@ function AuthorsSection() {
 
 function PublishersSection() {
   const [filter, setFilter] = useState<string>("pending");
-  const { data: publishers = [], isLoading, refetch } = useAdminPublishers({
+  const {
+    data: publishers = [],
+    isLoading,
+    refetch,
+  } = useAdminPublishers({
     status: filter === "all" ? undefined : filter,
   });
   const verifyMutation = useVerifyPublisher();
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [selectedPublisher, setSelectedPublisher] = useState<PublisherDto | null>(null);
+  const [selectedPublisher, setSelectedPublisher] =
+    useState<PublisherDto | null>(null);
 
-  async function handleVerify(id: string, status: "verified" | "rejected", rejectionReason?: string) {
+  async function handleVerify(
+    id: string,
+    status: "verified" | "rejected",
+    rejectionReason?: string,
+  ) {
     try {
       setFeedback(null);
-      await verifyMutation.mutateAsync({ id, input: { status, rejectionReason } });
+      await verifyMutation.mutateAsync({
+        id,
+        input: { status, rejectionReason },
+      });
       setSelectedPublisher(null);
-      setFeedback(`Penerbit mitra berhasil diperbarui menjadi status "${status}".`);
+      setFeedback(
+        `Penerbit mitra berhasil diperbarui menjadi status "${status}".`,
+      );
     } catch (err) {
       setFeedback(`Gagal memperbarui status penerbit: ${getErrorMessage(err)}`);
     }
@@ -1353,7 +1541,12 @@ function PublishersSection() {
               {statusKey === "all" ? "Semua" : statusKey}
             </button>
           ))}
-          <Button variant="outline" size="sm" onClick={() => refetch()} className="min-h-[44px]">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            className="min-h-[44px]"
+          >
             <RefreshCw className="size-4" aria-hidden="true" />
           </Button>
         </div>
@@ -1367,12 +1560,20 @@ function PublishersSection() {
 
       {isLoading ? (
         <div className="flex min-h-[200px] items-center justify-center">
-          <LoaderCircle className="size-6 animate-spin text-muted-foreground" aria-hidden="true" />
+          <LoaderCircle
+            className="size-6 animate-spin text-muted-foreground"
+            aria-hidden="true"
+          />
         </div>
       ) : publishers.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center text-muted-foreground">
-          <Library className="mx-auto size-8 text-muted-foreground/60" aria-hidden="true" />
-          <p className="mt-3 text-base font-medium">Tidak ada data penerbit pada status ini.</p>
+          <Library
+            className="mx-auto size-8 text-muted-foreground/60"
+            aria-hidden="true"
+          />
+          <p className="mt-3 text-base font-medium">
+            Tidak ada data penerbit pada status ini.
+          </p>
         </div>
       ) : (
         <div className="grid gap-4">
@@ -1383,7 +1584,9 @@ function PublishersSection() {
             >
               <div className="space-y-2 min-w-0">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-bold text-foreground">{pub.name}</h3>
+                  <h3 className="text-lg font-bold text-foreground">
+                    {pub.name}
+                  </h3>
                   <span className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                     /{pub.slug}
                   </span>
@@ -1392,8 +1595,8 @@ function PublishersSection() {
                       pub.verificationStatus === "verified"
                         ? "border-border/80 bg-muted text-foreground"
                         : pub.verificationStatus === "rejected"
-                        ? "border-destructive/30 bg-destructive/10 text-destructive"
-                        : "border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 text-foreground"
+                          ? "border-destructive/30 bg-destructive/10 text-destructive"
+                          : "border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 text-foreground"
                     }`}
                   >
                     {pub.verificationStatus}
@@ -1408,22 +1611,40 @@ function PublishersSection() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground pt-1">
                   <span>
-                    No. IKAPI: <strong className="text-foreground">{pub.ikapiNumber || "Belum disertakan"}</strong>
+                    No. IKAPI:{" "}
+                    <strong className="text-foreground">
+                      {pub.ikapiNumber || "Belum disertakan"}
+                    </strong>
                   </span>
                   <span>
-                    Kota: <strong className="text-foreground">{pub.city || "Indonesia"}</strong>
+                    Kota:{" "}
+                    <strong className="text-foreground">
+                      {pub.city || "Indonesia"}
+                    </strong>
                   </span>
                   <span>
-                    Kontak: <strong className="text-foreground">{pub.contactEmail || "-"}</strong>
+                    Kontak:{" "}
+                    <strong className="text-foreground">
+                      {pub.contactEmail || "-"}
+                    </strong>
                   </span>
                   <span>
-                    Alamat: <strong className="text-foreground">{pub.address || "-"}</strong>
+                    Alamat:{" "}
+                    <strong className="text-foreground">
+                      {pub.address || "-"}
+                    </strong>
                   </span>
                   <span>
-                    Kuota Perdana: <strong className="text-foreground">{pub.freeClaimCodeQuotaPerBook ?? 500} kode gratis/buku</strong>
+                    Kuota Perdana:{" "}
+                    <strong className="text-foreground">
+                      {pub.freeClaimCodeQuotaPerBook ?? 500} kode gratis/buku
+                    </strong>
                   </span>
                   <span>
-                    Biaya Batch Lanjutan: <strong className="text-foreground">{formatIdr(pub.claimCodeFeeIdr ?? 2000)}/kode</strong>
+                    Biaya Batch Lanjutan:{" "}
+                    <strong className="text-foreground">
+                      {formatIdr(pub.claimCodeFeeIdr ?? 2000)}/kode
+                    </strong>
                   </span>
                 </div>
               </div>
@@ -1435,14 +1656,20 @@ function PublishersSection() {
                   className="min-h-[44px] font-semibold text-xs border-[var(--color-accent)]/40 hover:bg-[var(--color-accent)]/10"
                   onClick={() => setSelectedPublisher(pub)}
                 >
-                  <Eye className="size-4 text-[var(--color-accent)]" aria-hidden="true" />
+                  <Eye
+                    className="size-4 text-[var(--color-accent)]"
+                    aria-hidden="true"
+                  />
                   <span>Tinjau Profil &amp; Berkas</span>
                 </Button>
 
                 <Button
                   size="sm"
                   className="min-h-[44px] font-semibold"
-                  disabled={verifyMutation.isPending || pub.verificationStatus === "verified"}
+                  disabled={
+                    verifyMutation.isPending ||
+                    pub.verificationStatus === "verified"
+                  }
                   onClick={() => handleVerify(pub.id, "verified")}
                 >
                   <CheckCircle2 className="size-4" aria-hidden="true" />
@@ -1452,7 +1679,10 @@ function PublishersSection() {
                   variant="destructive"
                   size="sm"
                   className="min-h-[44px]"
-                  disabled={verifyMutation.isPending || pub.verificationStatus === "rejected"}
+                  disabled={
+                    verifyMutation.isPending ||
+                    pub.verificationStatus === "rejected"
+                  }
                   onClick={() => setSelectedPublisher(pub)}
                 >
                   <XCircle className="size-4" aria-hidden="true" />
@@ -1486,9 +1716,15 @@ function PublishersSection() {
 
 function TabManuscripts() {
   const [filter, setFilter] = useState<string>("all");
-  const [selectedManuscriptId, setSelectedManuscriptId] = useState<string | null>(null);
+  const [selectedManuscriptId, setSelectedManuscriptId] = useState<
+    string | null
+  >(null);
 
-  const { data: manuscripts = [], isLoading, refetch } = useAdminManuscripts({
+  const {
+    data: manuscripts = [],
+    isLoading,
+    refetch,
+  } = useAdminManuscripts({
     status: filter === "all" ? undefined : filter,
   });
 
@@ -1512,26 +1748,36 @@ function TabManuscripts() {
             Editor &amp; Kurasi Naskah Masuk
           </h2>
           <p className="text-sm text-muted-foreground">
-            Kelola naskah buku yang dikirimkan oleh penulis independen dan penerbit mitra. Tinjau struktur bab dan terbitkan ke katalog resmi.
+            Kelola naskah buku yang dikirimkan oleh penulis independen dan
+            penerbit mitra. Tinjau struktur bab dan terbitkan ke katalog resmi.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {["pending_review", "in_editing", "published", "rejected", "all"].map((statusKey) => (
-            <button
-              key={statusKey}
-              type="button"
-              onClick={() => setFilter(statusKey)}
-              className={`min-h-[44px] rounded-md px-3.5 py-1.5 text-xs font-semibold transition ${
-                filter === statusKey
-                  ? "bg-primary text-primary-foreground"
-                  : "border border-border bg-card text-foreground hover:bg-muted"
-              }`}
-            >
-              {statusKey === "all" ? "Semua Status" : statusKey.replace("_", " ")}
-            </button>
-          ))}
-          <Button variant="outline" size="sm" onClick={() => refetch()} className="min-h-[44px]">
+          {["pending_review", "in_editing", "published", "rejected", "all"].map(
+            (statusKey) => (
+              <button
+                key={statusKey}
+                type="button"
+                onClick={() => setFilter(statusKey)}
+                className={`min-h-[44px] rounded-md px-3.5 py-1.5 text-xs font-semibold transition ${
+                  filter === statusKey
+                    ? "bg-primary text-primary-foreground"
+                    : "border border-border bg-card text-foreground hover:bg-muted"
+                }`}
+              >
+                {statusKey === "all"
+                  ? "Semua Status"
+                  : statusKey.replace("_", " ")}
+              </button>
+            ),
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            className="min-h-[44px]"
+          >
             <RefreshCw className="size-4" aria-hidden="true" />
           </Button>
         </div>
@@ -1539,12 +1785,20 @@ function TabManuscripts() {
 
       {isLoading ? (
         <div className="flex min-h-[200px] items-center justify-center">
-          <LoaderCircle className="size-6 animate-spin text-muted-foreground" aria-hidden="true" />
+          <LoaderCircle
+            className="size-6 animate-spin text-muted-foreground"
+            aria-hidden="true"
+          />
         </div>
       ) : manuscripts.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center text-muted-foreground">
-          <BookOpen className="mx-auto size-8 text-muted-foreground/60" aria-hidden="true" />
-          <p className="mt-3 text-base font-medium">Tidak ada naskah pada status ini.</p>
+          <BookOpen
+            className="mx-auto size-8 text-muted-foreground/60"
+            aria-hidden="true"
+          />
+          <p className="mt-3 text-base font-medium">
+            Tidak ada naskah pada status ini.
+          </p>
         </div>
       ) : (
         <div className="grid gap-4">
@@ -1555,16 +1809,18 @@ function TabManuscripts() {
             >
               <div className="space-y-2 min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-lg font-bold text-foreground break-words">{m.title}</h3>
+                  <h3 className="text-lg font-bold text-foreground break-words">
+                    {m.title}
+                  </h3>
                   <span
                     className={`rounded-md border px-2 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wider ${
                       m.status === "published"
                         ? "border-border bg-foreground text-background"
                         : m.status === "in_editing"
-                        ? "border-border/80 bg-muted text-foreground"
-                        : m.status === "rejected"
-                        ? "border-destructive/30 bg-destructive/10 text-destructive"
-                        : "border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 text-foreground"
+                          ? "border-border/80 bg-muted text-foreground"
+                          : m.status === "rejected"
+                            ? "border-destructive/30 bg-destructive/10 text-destructive"
+                            : "border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 text-foreground"
                     }`}
                   >
                     {m.status.replace("_", " ")}
@@ -1580,14 +1836,23 @@ function TabManuscripts() {
 
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground pt-1">
                   <span>
-                    Penulis: <strong className="text-foreground">{m.authorPenName || m.authorName || "Anonim"}</strong>
+                    Penulis:{" "}
+                    <strong className="text-foreground">
+                      {m.authorPenName || m.authorName || "Anonim"}
+                    </strong>
                   </span>
                   <span>
-                    Penerbit: <strong className="text-foreground">{m.publisherName || "Penulis Mandiri"}</strong>
+                    Penerbit:{" "}
+                    <strong className="text-foreground">
+                      {m.publisherName || "Penulis Mandiri"}
+                    </strong>
                   </span>
                   {m.proposedAlacartePriceIdr ? (
                     <span>
-                      Harga Satuan: <strong className="text-foreground">{formatIdr(m.proposedAlacartePriceIdr)}</strong>
+                      Harga Satuan:{" "}
+                      <strong className="text-foreground">
+                        {formatIdr(m.proposedAlacartePriceIdr)}
+                      </strong>
                     </span>
                   ) : null}
                   <span>Diajukan: {formatDate(m.createdAt)}</span>
@@ -1616,7 +1881,11 @@ function ManuscriptEditorWorkspace({
   manuscriptId: string;
   onBack: () => void;
 }) {
-  const { data: manuscript, isLoading, refetch } = useAdminManuscriptDetail(manuscriptId);
+  const {
+    data: manuscript,
+    isLoading,
+    refetch,
+  } = useAdminManuscriptDetail(manuscriptId);
   const updateMutation = useUpdateAdminManuscript();
   const publishMutation = usePublishAdminManuscript();
 
@@ -1624,12 +1893,15 @@ function ManuscriptEditorWorkspace({
   const [title, setTitle] = useState("");
   const [synopsis, setSynopsis] = useState("");
   const [digitalPolicy, setDigitalPolicy] = useState<
-    "free_open" | "sample_only" | "alacarte_only" | "print_claim_only" | "hybrid_nakama_alacarte"
+    | "free_open"
+    | "sample_only"
+    | "alacarte_only"
+    | "print_claim_only"
+    | "hybrid_nakama_alacarte"
   >("sample_only");
   const [alacartePriceIdr, setAlacartePriceIdr] = useState<number>(0);
-  const [status, setStatus] = useState<ManuscriptSubmissionStatus>(
-    "pending_review",
-  );
+  const [status, setStatus] =
+    useState<ManuscriptSubmissionStatus>("pending_review");
   const [rejectionReason, setRejectionReason] = useState("");
   const [chapters, setChapters] = useState<
     Array<{
@@ -1687,7 +1959,8 @@ function ManuscriptEditorWorkspace({
           title,
           synopsis,
           proposedDigitalPolicy: digitalPolicy,
-          proposedAlacartePriceIdr: alacartePriceIdr > 0 ? alacartePriceIdr : null,
+          proposedAlacartePriceIdr:
+            alacartePriceIdr > 0 ? alacartePriceIdr : null,
           status,
           rejectionReason: status === "rejected" ? rejectionReason : null,
           chapters: chapters.map((c, idx) => ({
@@ -1770,7 +2043,9 @@ function ManuscriptEditorWorkspace({
       if (!text) return;
 
       // Simple heuristic chapter splitter
-      const rawChapters = text.split(/\n(?=(?:Bab|BAB|Chapter|CHAPTER)\s+\d+)/i);
+      const rawChapters = text.split(
+        /\n(?=(?:Bab|BAB|Chapter|CHAPTER)\s+\d+)/i,
+      );
       if (rawChapters.length > 1) {
         const parsed = rawChapters.map((rawText, i) => {
           const lines = rawText.trim().split("\n");
@@ -1785,7 +2060,9 @@ function ManuscriptEditorWorkspace({
           };
         });
         setChapters(parsed);
-        setFeedback(`Berhasil mengimpor ${parsed.length} bab dari berkas "${file.name}"!`);
+        setFeedback(
+          `Berhasil mengimpor ${parsed.length} bab dari berkas "${file.name}"!`,
+        );
       } else {
         // Single chapter append
         const nextNum = chapters.length + 1;
@@ -1799,7 +2076,9 @@ function ManuscriptEditorWorkspace({
             estimatedMinutes: Math.max(Math.round(text.length / 800), 3),
           },
         ]);
-        setFeedback(`Teks dari berkas "${file.name}" berhasil ditambahkan sebagai Bab ${nextNum}!`);
+        setFeedback(
+          `Teks dari berkas "${file.name}" berhasil ditambahkan sebagai Bab ${nextNum}!`,
+        );
       }
     };
 
@@ -1810,7 +2089,10 @@ function ManuscriptEditorWorkspace({
   if (isLoading) {
     return (
       <div className="flex min-h-[300px] items-center justify-center">
-        <LoaderCircle className="size-6 animate-spin text-muted-foreground" aria-hidden="true" />
+        <LoaderCircle
+          className="size-6 animate-spin text-muted-foreground"
+          aria-hidden="true"
+        />
       </div>
     );
   }
@@ -1820,7 +2102,12 @@ function ManuscriptEditorWorkspace({
       {/* Workspace Header */}
       <div className="flex flex-col gap-4 border-b border-border pb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <Button variant="ghost" size="sm" onClick={onBack} className="min-h-[44px] -ml-2 mb-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onBack}
+            className="min-h-[44px] -ml-2 mb-2"
+          >
             <ArrowLeft className="size-4" aria-hidden="true" />
             Kembali ke Daftar Naskah
           </Button>
@@ -1828,7 +2115,14 @@ function ManuscriptEditorWorkspace({
             Workspace Redaksi: {manuscript?.title}
           </h2>
           <p className="text-sm text-muted-foreground">
-            Penulis: <strong className="text-foreground">{manuscript?.authorPenName || manuscript?.authorName}</strong> · Penerbit: <strong className="text-foreground">{manuscript?.publisherName || "Mandiri"}</strong>
+            Penulis:{" "}
+            <strong className="text-foreground">
+              {manuscript?.authorPenName || manuscript?.authorName}
+            </strong>{" "}
+            · Penerbit:{" "}
+            <strong className="text-foreground">
+              {manuscript?.publisherName || "Mandiri"}
+            </strong>
           </p>
         </div>
 
@@ -1840,7 +2134,10 @@ function ManuscriptEditorWorkspace({
             className="min-h-[44px]"
           >
             {updateMutation.isPending ? (
-              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+              <LoaderCircle
+                className="size-4 animate-spin"
+                aria-hidden="true"
+              />
             ) : (
               <FileCheck className="size-4" aria-hidden="true" />
             )}
@@ -1849,7 +2146,9 @@ function ManuscriptEditorWorkspace({
 
           <Button
             onClick={() => setIsPublishing(true)}
-            disabled={chapters.length === 0 || manuscript?.status === "published"}
+            disabled={
+              chapters.length === 0 || manuscript?.status === "published"
+            }
             className="min-h-[44px] font-semibold"
           >
             Terbitkan ke Katalog AnzaBook
@@ -1866,17 +2165,22 @@ function ManuscriptEditorWorkspace({
       {publishResult && (
         <div className="rounded-xl border border-border/80 bg-muted/40 p-6 space-y-3">
           <div className="flex items-center gap-2 text-foreground font-bold text-lg">
-            <CheckCircle2 className="size-5 text-foreground" aria-hidden="true" />
+            <CheckCircle2
+              className="size-5 text-foreground"
+              aria-hidden="true"
+            />
             Naskah Berhasil Diterbitkan ke Katalog AnzaBook!
           </div>
           <p className="text-sm text-foreground/90">
-            Buku dan seluruh {chapters.length} bab kini aktif di katalog pembaca.
+            Buku dan seluruh {chapters.length} bab kini aktif di katalog
+            pembaca.
           </p>
           <div className="text-xs font-mono bg-background p-3 rounded border border-border">
             ID Buku Katalog: {publishResult.publishedBookId}
             {publishResult.claimBatchId && (
               <div>
-                ID Batch 500 Kode Perdana: {publishResult.claimBatchId} (Skema A Phygital)
+                ID Batch 500 Kode Perdana: {publishResult.claimBatchId} (Skema A
+                Phygital)
               </div>
             )}
           </div>
@@ -1890,7 +2194,9 @@ function ManuscriptEditorWorkspace({
 
       {/* Metadata Form */}
       <section className="rounded-xl border border-border bg-card p-6 space-y-5">
-        <h3 className="text-base font-bold text-foreground">Metadata &amp; Skema B2B2C Naskah</h3>
+        <h3 className="text-base font-bold text-foreground">
+          Metadata &amp; Skema B2B2C Naskah
+        </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1.5">
@@ -1980,10 +2286,7 @@ function ManuscriptEditorWorkspace({
               onChange={(e) =>
                 setStatus(
                   e.target.value as
-                    | "pending_review"
-                    | "in_editing"
-                    | "published"
-                    | "rejected",
+                    "pending_review" | "in_editing" | "published" | "rejected",
                 )
               }
               className="w-full min-h-[44px] rounded-md border border-input bg-card px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-primary"
@@ -1997,7 +2300,10 @@ function ManuscriptEditorWorkspace({
 
           {status === "rejected" && (
             <div className="space-y-1.5 md:col-span-2">
-              <Label htmlFor="rejection" className="text-xs font-semibold text-destructive">
+              <Label
+                htmlFor="rejection"
+                className="text-xs font-semibold text-destructive"
+              >
                 Alasan Penolakan Naskah (disampaikan ke penulis/penerbit)
               </Label>
               <Input
@@ -2033,7 +2339,8 @@ function ManuscriptEditorWorkspace({
               Daftar Struktur Bab Naskah ({chapters.length} Bab)
             </h3>
             <p className="text-xs text-muted-foreground">
-              Susun bab naskah, konten teks penuh, takeaway blueprint, dan estimasi waktu baca pembaca.
+              Susun bab naskah, konten teks penuh, takeaway blueprint, dan
+              estimasi waktu baca pembaca.
             </p>
           </div>
 
@@ -2067,8 +2374,13 @@ function ManuscriptEditorWorkspace({
 
         {chapters.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center text-muted-foreground">
-            <p className="text-sm font-medium">Naskah belum memiliki bab terstruktur.</p>
-            <p className="text-xs mt-1">Gunakan tombol "Tambah Bab Baru" atau impor dari berkas teks naskah Anda.</p>
+            <p className="text-sm font-medium">
+              Naskah belum memiliki bab terstruktur.
+            </p>
+            <p className="text-xs mt-1">
+              Gunakan tombol "Tambah Bab Baru" atau impor dari berkas teks
+              naskah Anda.
+            </p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -2085,7 +2397,9 @@ function ManuscriptEditorWorkspace({
                     <Input
                       placeholder="Judul Bab (contoh: Bab 1 - Awal Mula Perjalanan)"
                       value={ch.titleId}
-                      onChange={(e) => handleChapterChange(idx, "titleId", e.target.value)}
+                      onChange={(e) =>
+                        handleChapterChange(idx, "titleId", e.target.value)
+                      }
                       className="min-h-[44px] font-semibold text-sm max-w-md"
                     />
                   </div>
@@ -2099,7 +2413,11 @@ function ManuscriptEditorWorkspace({
                         max="120"
                         value={ch.estimatedMinutes}
                         onChange={(e) =>
-                          handleChapterChange(idx, "estimatedMinutes", Number(e.target.value))
+                          handleChapterChange(
+                            idx,
+                            "estimatedMinutes",
+                            Number(e.target.value),
+                          )
                         }
                         className="w-16 min-h-[36px] text-xs text-center"
                       />
@@ -2126,21 +2444,28 @@ function ManuscriptEditorWorkspace({
                     rows={6}
                     placeholder="Tuliskan isi bab buku di sini..."
                     value={ch.contentId}
-                    onChange={(e) => handleChapterChange(idx, "contentId", e.target.value)}
+                    onChange={(e) =>
+                      handleChapterChange(idx, "contentId", e.target.value)
+                    }
                     className="text-sm font-sans leading-relaxed"
                   />
                 </div>
 
                 <div className="space-y-1.5">
                   <Label className="text-xs text-muted-foreground font-medium">
-                    Ringkasan Inti Blueprint (Poin Penting untuk Mode Cepat / Takeaway)
+                    Ringkasan Inti Blueprint (Poin Penting untuk Mode Cepat /
+                    Takeaway)
                   </Label>
                   <Textarea
                     rows={2}
                     placeholder="Contoh: Bab ini membahas prinsip pertama kebiasaan atomik..."
                     value={ch.blueprintContent || ""}
                     onChange={(e) =>
-                      handleChapterChange(idx, "blueprintContent", e.target.value)
+                      handleChapterChange(
+                        idx,
+                        "blueprintContent",
+                        e.target.value,
+                      )
                     }
                     className="text-xs"
                   />
@@ -2159,10 +2484,12 @@ function ManuscriptEditorWorkspace({
               Konfirmasi Penerbitan ke Katalog AnzaBook
             </h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Tindakan ini akan menyalin seluruh {chapters.length} bab secara atomik ke tabel produksi buku.
+              Tindakan ini akan menyalin seluruh {chapters.length} bab secara
+              atomik ke tabel produksi buku.
               {digitalPolicy === "print_claim_only" && (
                 <span className="block mt-2 font-semibold text-foreground">
-                  Skema A Phygital: Sistem akan otomatis meng-generate 500 kode klaim fisik perdana secara gratis.
+                  Skema A Phygital: Sistem akan otomatis meng-generate 500 kode
+                  klaim fisik perdana secara gratis.
                 </span>
               )}
             </p>
@@ -2208,7 +2535,10 @@ function ManuscriptEditorWorkspace({
                 className="min-h-[44px] font-semibold"
               >
                 {publishMutation.isPending ? (
-                  <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+                  <LoaderCircle
+                    className="size-4 animate-spin"
+                    aria-hidden="true"
+                  />
                 ) : (
                   <CheckCircle2 className="size-4" aria-hidden="true" />
                 )}
@@ -2245,7 +2575,8 @@ function TabClaimBatches() {
   // Lookup existing batch ID
   const [lookupBatchId, setLookupBatchId] = useState("");
   const [searchBatchId, setSearchBatchId] = useState("");
-  const { data: lookupResult, isLoading: lookupLoading } = useClaimBatchCodes(searchBatchId);
+  const { data: lookupResult, isLoading: lookupLoading } =
+    useClaimBatchCodes(searchBatchId);
 
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -2253,7 +2584,9 @@ function TabClaimBatches() {
 
   async function handleGenerateBatch() {
     if (!selectedBookId || !selectedPublisherId || !batchName.trim()) {
-      setFeedback("Mohon lengkapi pilihan buku, penerbit mitra, dan nama batch.");
+      setFeedback(
+        "Mohon lengkapi pilihan buku, penerbit mitra, dan nama batch.",
+      );
       return;
     }
 
@@ -2266,7 +2599,9 @@ function TabClaimBatches() {
         totalCodes,
       });
       setLastGeneratedBatch(res);
-      setFeedback(`Batch "${res.batch.batchName}" berhasil dibuat dengan ${res.codes.length} kode klaim fisik unik!`);
+      setFeedback(
+        `Batch "${res.batch.batchName}" berhasil dibuat dengan ${res.codes.length} kode klaim fisik unik!`,
+      );
     } catch (err) {
       setFeedback(`Gagal membuat batch kode klaim: ${getErrorMessage(err)}`);
     }
@@ -2279,7 +2614,9 @@ function TabClaimBatches() {
           Generator Batch Kode Klaim Fisik (Skema A Phygital)
         </h2>
         <p className="text-sm text-muted-foreground">
-          Cetak stiker kode QR / kode kupon fisik untuk diselipkan di dalam buku cetak toko Gramedia, Togamas, atau pameran buku. Pembaca yang membeli buku fisik dapat membuka edisi digital gratis di AnzaBook.
+          Cetak stiker kode QR / kode kupon fisik untuk diselipkan di dalam buku
+          cetak toko Gramedia, Togamas, atau pameran buku. Pembaca yang membeli
+          buku fisik dapat membuka edisi digital gratis di AnzaBook.
         </p>
       </div>
 
@@ -2291,7 +2628,9 @@ function TabClaimBatches() {
 
       {/* Generator Form */}
       <div className="rounded-xl border border-border bg-card p-6 space-y-5">
-        <h3 className="text-base font-bold text-foreground">Buat Batch Baru untuk Percetakan</h3>
+        <h3 className="text-base font-bold text-foreground">
+          Buat Batch Baru untuk Percetakan
+        </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1.5">
@@ -2363,13 +2702,17 @@ function TabClaimBatches() {
 
         {/* Pricing notice card */}
         <div className="rounded-lg border border-border bg-muted/30 p-4 text-xs text-muted-foreground space-y-1">
-          <p className="font-semibold text-foreground">Kebijakan Kuota &amp; Biaya Kode Klaim:</p>
+          <p className="font-semibold text-foreground">
+            Kebijakan Kuota &amp; Biaya Kode Klaim:
+          </p>
           <ul className="list-disc list-inside space-y-0.5">
             <li>
-              <strong>Batch Perdana 500 Kode:</strong> Gratis (Rp 0 / <code>free_tier</code>) untuk setiap judul buku baru.
+              <strong>Batch Perdana 500 Kode:</strong> Gratis (Rp 0 /{" "}
+              <code>free_tier</code>) untuk setiap judul buku baru.
             </li>
             <li>
-              <strong>Batch Lanjutan / Cetak Ulang:</strong> Rp 2.000 / kode (<code>unbilled</code>, ditagihkan berkala ke penerbit mitra).
+              <strong>Batch Lanjutan / Cetak Ulang:</strong> Rp 2.000 / kode (
+              <code>unbilled</code>, ditagihkan berkala ke penerbit mitra).
             </li>
           </ul>
         </div>
@@ -2400,7 +2743,11 @@ function TabClaimBatches() {
                 {lastGeneratedBatch.batch.batchName}
               </h3>
               <p className="text-xs text-muted-foreground">
-                ID Batch: <code className="text-foreground">{lastGeneratedBatch.batch.id}</code> · Status Penagihan:{" "}
+                ID Batch:{" "}
+                <code className="text-foreground">
+                  {lastGeneratedBatch.batch.id}
+                </code>{" "}
+                · Status Penagihan:{" "}
                 <span className="font-semibold text-foreground uppercase">
                   {lastGeneratedBatch.batch.billingStatus}
                 </span>{" "}
@@ -2428,7 +2775,10 @@ function TabClaimBatches() {
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs font-mono text-muted-foreground">
               {lastGeneratedBatch.codes.slice(0, 10).map((code) => (
-                <div key={code} className="bg-background border border-border rounded px-2 py-1 text-center">
+                <div
+                  key={code}
+                  className="bg-background border border-border rounded px-2 py-1 text-center"
+                >
                   {code}
                 </div>
               ))}
@@ -2439,7 +2789,9 @@ function TabClaimBatches() {
 
       {/* Lookup Existing Batch */}
       <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-        <h3 className="text-base font-bold text-foreground">Pencarian / Unduh Ulang Batch Kode Klaim</h3>
+        <h3 className="text-base font-bold text-foreground">
+          Pencarian / Unduh Ulang Batch Kode Klaim
+        </h3>
         <div className="flex gap-2">
           <Input
             placeholder="Masukkan UUID Batch ID..."
@@ -2460,7 +2812,10 @@ function TabClaimBatches() {
 
         {lookupLoading && (
           <div className="py-4 text-center text-sm text-muted-foreground">
-            <LoaderCircle className="mx-auto size-5 animate-spin" aria-hidden="true" />
+            <LoaderCircle
+              className="mx-auto size-5 animate-spin"
+              aria-hidden="true"
+            />
           </div>
         )}
 
@@ -2468,9 +2823,12 @@ function TabClaimBatches() {
           <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <h4 className="font-bold text-foreground">{lookupResult.batch.batchName}</h4>
+                <h4 className="font-bold text-foreground">
+                  {lookupResult.batch.batchName}
+                </h4>
                 <p className="text-xs text-muted-foreground">
-                  Buku: {lookupResult.batch.bookTitle} · Penerbit: {lookupResult.batch.publisherName} · Total:{" "}
+                  Buku: {lookupResult.batch.bookTitle} · Penerbit:{" "}
+                  {lookupResult.batch.publisherName} · Total:{" "}
                   {lookupResult.codes.length} kode
                 </p>
               </div>
@@ -2499,7 +2857,11 @@ function TabClaimBatches() {
 // TAB 5: Monitor Royalti B2B2C & Kas Komunitas
 // =========================================================================
 
-function TabFinancials({ overview }: { overview: AdminOverviewDto | undefined }) {
+function TabFinancials({
+  overview,
+}: {
+  overview: AdminOverviewDto | undefined;
+}) {
   const nakamaPool = overview?.estimatedNakamaRoyaltyPoolIdr ?? 0;
   const alacarteSales = overview?.totalAlacarteSalesIdr ?? 0;
   const publisherShare = overview?.totalPublisherShareIdr ?? 0;
@@ -2513,7 +2875,9 @@ function TabFinancials({ overview }: { overview: AdminOverviewDto | undefined })
           Monitor Royalti B2B2C &amp; Kas Komunitas
         </h2>
         <p className="text-sm text-muted-foreground">
-          Transparansi pembagian pendapatan ekosistem AnzaBook: 55% Nakama Pool untuk penulis/penerbit, 75% omzet buku satuan, dan 10% komisi kas komunitas.
+          Transparansi pembagian pendapatan ekosistem AnzaBook: 55% Nakama Pool
+          untuk penulis/penerbit, 75% omzet buku satuan, dan 10% komisi kas
+          komunitas.
         </p>
       </div>
 
@@ -2529,7 +2893,9 @@ function TabFinancials({ overview }: { overview: AdminOverviewDto | undefined })
             {formatIdr(nakamaPool)}
           </div>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Akumulasi 55% dari biaya langganan Nakama berbayar. Didistribusikan secara proporsional kepada penulis &amp; penerbit mitra berdasarkan menit baca pembaca.
+            Akumulasi 55% dari biaya langganan Nakama berbayar. Didistribusikan
+            secara proporsional kepada penulis &amp; penerbit mitra berdasarkan
+            menit baca pembaca.
           </p>
         </div>
 
@@ -2545,11 +2911,15 @@ function TabFinancials({ overview }: { overview: AdminOverviewDto | undefined })
           <div className="space-y-1 text-xs text-muted-foreground">
             <div className="flex justify-between">
               <span>Hak Penerbit (75%):</span>
-              <strong className="text-foreground">{formatIdr(publisherShare)}</strong>
+              <strong className="text-foreground">
+                {formatIdr(publisherShare)}
+              </strong>
             </div>
             <div className="flex justify-between">
               <span>Net AnzaBook (25%):</span>
-              <strong className="text-foreground">{formatIdr(anzabookNet)}</strong>
+              <strong className="text-foreground">
+                {formatIdr(anzabookNet)}
+              </strong>
             </div>
           </div>
         </div>
@@ -2564,7 +2934,8 @@ function TabFinancials({ overview }: { overview: AdminOverviewDto | undefined })
             {formatIdr(affiliateCommissions)}
           </div>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Hak bagi hasil 10% untuk kas komunitas buku dan klub baca yang mendatangkan pembaca baru melalui kalender komunitas mereka.
+            Hak bagi hasil 10% untuk kas komunitas buku dan klub baca yang
+            mendatangkan pembaca baru melalui kalender komunitas mereka.
           </p>
         </div>
       </div>
@@ -2576,16 +2947,26 @@ function TabFinancials({ overview }: { overview: AdminOverviewDto | undefined })
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs text-muted-foreground leading-relaxed">
           <div className="border border-border rounded-lg p-4 space-y-1 bg-muted/10">
-            <strong className="text-foreground block text-sm">Skema A: Phygital (Cetak Fisik)</strong>
-            Penerbit mencetak buku dengan kode klaim digital gratis (500 kode perdana Rp0). Melindungi omzet toko buku luring tanpa kanibalisasi penjualan fisik.
+            <strong className="text-foreground block text-sm">
+              Skema A: Phygital (Cetak Fisik)
+            </strong>
+            Penerbit mencetak buku dengan kode klaim digital gratis (500 kode
+            perdana Rp0). Melindungi omzet toko buku luring tanpa kanibalisasi
+            penjualan fisik.
           </div>
           <div className="border border-border rounded-lg p-4 space-y-1 bg-muted/10">
-            <strong className="text-foreground block text-sm">Skema B: Ala Carte (Beli Lepas)</strong>
-            Pembaca membeli akses digital penuh per judul buku (75% untuk penerbit, 25% biaya platform AnzaBook).
+            <strong className="text-foreground block text-sm">
+              Skema B: Ala Carte (Beli Lepas)
+            </strong>
+            Pembaca membeli akses digital penuh per judul buku (75% untuk
+            penerbit, 25% biaya platform AnzaBook).
           </div>
           <div className="border border-border rounded-lg p-4 space-y-1 bg-muted/10">
-            <strong className="text-foreground block text-sm">Skema C: Nakama Pool (Langganan)</strong>
-            55% dari langganan Nakama dialokasikan ke pool royalti, dibagikan setiap bulan berdasarkan durasi baca aktif pembaca.
+            <strong className="text-foreground block text-sm">
+              Skema C: Nakama Pool (Langganan)
+            </strong>
+            55% dari langganan Nakama dialokasikan ke pool royalti, dibagikan
+            setiap bulan berdasarkan durasi baca aktif pembaca.
           </div>
         </div>
       </div>
@@ -2609,7 +2990,8 @@ function TabNotes({ userRole }: { userRole?: string }) {
           Utilitas &amp; Catatan Sistem
         </h2>
         <p className="text-sm text-muted-foreground">
-          Modul bawaan starter untuk memeriksa dan memelihara catatan lintas akun (notes: read-any / delete-any).
+          Modul bawaan starter untuk memeriksa dan memelihara catatan lintas
+          akun (notes: read-any / delete-any).
         </p>
       </div>
 
@@ -2631,14 +3013,17 @@ function TabNotes({ userRole }: { userRole?: string }) {
               className="flex items-start justify-between gap-4 rounded-xl border border-border bg-card px-5 py-4"
             >
               <div className="min-w-0">
-                <p className="font-medium break-words text-foreground">{note.title}</p>
+                <p className="font-medium break-words text-foreground">
+                  {note.title}
+                </p>
                 {note.content && (
                   <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">
                     {note.content}
                   </p>
                 )}
                 <p className="mt-2 break-all text-xs text-muted-foreground">
-                  {note.ownerName} · {note.ownerEmail} · Dibuat {formatDate(note.createdAt)}
+                  {note.ownerName} · {note.ownerEmail} · Dibuat{" "}
+                  {formatDate(note.createdAt)}
                 </p>
               </div>
               {canDelete && (

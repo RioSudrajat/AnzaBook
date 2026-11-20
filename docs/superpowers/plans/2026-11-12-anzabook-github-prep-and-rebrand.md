@@ -31,24 +31,26 @@
 ### Task 1: Configure Git Remote Origin
 
 **Files:**
+
 - Modify: Git configuration via git CLI
 
 - [ ] **Step 1: Verify current git remotes**
-  Run: `git remote -v`
-  Confirm: No origin currently configured.
+      Run: `git remote -v`
+      Confirm: No origin currently configured.
 
 - [ ] **Step 2: Add remote origin**
-  Run: `git remote add origin https://github.com/RioSudrajat/AnzaBook.git`
+      Run: `git remote add origin https://github.com/RioSudrajat/AnzaBook.git`
 
 - [ ] **Step 3: Verify remote configuration**
-  Run: `git remote -v`
-  Verify output matches `https://github.com/RioSudrajat/AnzaBook.git` for both fetch and push.
+      Run: `git remote -v`
+      Verify output matches `https://github.com/RioSudrajat/AnzaBook.git` for both fetch and push.
 
 ---
 
 ### Task 2: Rebrand Metadata & Docker Container Naming
 
 **Files:**
+
 - Modify: `package.json:2`
 - Modify: `LICENSE:3`
 - Modify: `scripts/lib.mjs:90-99`
@@ -59,43 +61,44 @@
 - Delete: `.ngodingpakeai/` directory
 
 - [ ] **Step 1: Update root `package.json`**
-  Change `"name": "ngodingpakeai-starter-monorepo"` to `"name": "anzabook"`.
+      Change `"name": "ngodingpakeai-starter-monorepo"` to `"name": "anzabook"`.
 
 - [ ] **Step 2: Update `LICENSE`**
-  Change `Copyright (c) 2026 ngodingpakeai contributors` to `Copyright (c) 2026 AnzaBook contributors`.
+      Change `Copyright (c) 2026 ngodingpakeai contributors` to `Copyright (c) 2026 AnzaBook contributors`.
 
 - [ ] **Step 3: Update `scripts/lib.mjs` container and database defaults**
-  In `scripts/lib.mjs`:
-  Change `COMPOSE_PROJECT_NAME` generator fallback from `ngodingpakeai-pg-${randomBytes(6).toString("hex")}` to `anzabook-pg-${randomBytes(6).toString("hex")}`.
-  Change fallback `POSTGRES_USER` and `POSTGRES_DB` to `"anzabook"`.
+      In `scripts/lib.mjs`:
+      Change `COMPOSE_PROJECT_NAME` generator fallback from `ngodingpakeai-pg-${randomBytes(6).toString("hex")}` to `anzabook-pg-${randomBytes(6).toString("hex")}`.
+      Change fallback `POSTGRES_USER` and `POSTGRES_DB` to `"anzabook"`.
 
 - [ ] **Step 4: Update test regex assertions**
-  In `scripts/test-setup.mjs` line 16 and `tests/setup.test.mjs` line 29:
-  Update pattern from `ngodingpakeai-pg-` to `anzabook-pg-`.
+      In `scripts/test-setup.mjs` line 16 and `tests/setup.test.mjs` line 29:
+      Update pattern from `ngodingpakeai-pg-` to `anzabook-pg-`.
 
 - [ ] **Step 5: Update `.env.local` Compose project name**
-  In `.env.local`:
-  Update `COMPOSE_PROJECT_NAME="ngodingpakeai-pg-2bc80f4fa8d9"` to `COMPOSE_PROJECT_NAME="anzabook-pg-2bc80f4fa8d9"`.
+      In `.env.local`:
+      Update `COMPOSE_PROJECT_NAME="ngodingpakeai-pg-2bc80f4fa8d9"` to `COMPOSE_PROJECT_NAME="anzabook-pg-2bc80f4fa8d9"`.
 
 - [ ] **Step 6: Update `AGENTS.md` monorepo description**
-  Change `This is the **Express + TanStack Start + PostgreSQL monorepo** of the ngodingpakeai starter family.` to:
-  `This is the **Express + TanStack Start + PostgreSQL monorepo** powering **AnzaBook**.`
+      Change `This is the **Express + TanStack Start + PostgreSQL monorepo** of the ngodingpakeai starter family.` to:
+      `This is the **Express + TanStack Start + PostgreSQL monorepo** powering **AnzaBook**.`
 
 - [ ] **Step 7: Remove obsolete `.ngodingpakeai` folder**
-  Remove `.ngodingpakeai/template.json` and directory `.ngodingpakeai`.
+      Remove `.ngodingpakeai/template.json` and directory `.ngodingpakeai`.
 
 ---
 
 ### Task 3: Harden `.gitignore`
 
 **Files:**
+
 - Modify: `.gitignore`
 
 - [ ] **Step 1: Review current `.gitignore`**
-  Examine existing rules to ensure essential entries are preserved.
+      Examine existing rules to ensure essential entries are preserved.
 
 - [ ] **Step 2: Add comprehensive ignores**
-  Add explicit rules for:
+      Add explicit rules for:
   - OS generated files: `Thumbs.db`, `ehthumbs.db`, `Desktop.ini`, `._*`
   - IDE & editor files: `.idea/`, `*.sublime-project`, `*.sublime-workspace`, `.vscode/*` with `!.vscode/mcp.json`
   - Debug & process logs: `npm-debug.log*`, `yarn-debug.log*`, `yarn-error.log*`, `pnpm-debug.log*`
@@ -103,21 +106,22 @@
   - Temporary & cache files: `*.tmp`, `*.temp`, `.eslintcache`, `temp/`, `tmp/`
 
 - [ ] **Step 3: Verify git status ignores unwanted files**
-  Run: `git status --ignored` to confirm `.env.local` and temporary items remain untracked.
+      Run: `git status --ignored` to confirm `.env.local` and temporary items remain untracked.
 
 ---
 
 ### Task 4: Preserve Starter Technical Guide & Update `README.md`
 
 **Files:**
+
 - Create: `docs/starter-reference.md`
 - Modify: `README.md`
 
 - [ ] **Step 1: Create `docs/starter-reference.md`**
-  Migrate detailed starter template documentation, philosophy, and reference tables so AI agents or developers needing historical starter architecture can reference it without cluttering root `README.md`.
+      Migrate detailed starter template documentation, philosophy, and reference tables so AI agents or developers needing historical starter architecture can reference it without cluttering root `README.md`.
 
 - [ ] **Step 2: Rewrite `README.md` for AnzaBook**
-  Update `README.md` with:
+      Update `README.md` with:
   - Header: `# AnzaBook`
   - One-liner: `Digital publishing, reading, and community platform.`
   - Short summary of what AnzaBook does (curated digital library, physical Newsprint books, reader studio, community events, and membership).
@@ -131,16 +135,17 @@
 ### Task 5: Verification & Diagnostics
 
 **Files:**
+
 - Verification only
 
 - [ ] **Step 1: Run doctor script**
-  Run: `pnpm run doctor`
-  Verify: Node.js, pnpm, origins, cookie checks, and project files pass.
+      Run: `pnpm run doctor`
+      Verify: Node.js, pnpm, origins, cookie checks, and project files pass.
 
 - [ ] **Step 2: Run type check**
-  Run: `pnpm run typecheck`
-  Verify: Shared, web, and API packages compile with zero errors.
+      Run: `pnpm run typecheck`
+      Verify: Shared, web, and API packages compile with zero errors.
 
 - [ ] **Step 3: Verify Git Status and Remote**
-  Run: `git status` and `git remote -v`
-  Confirm all changes are accounted for, git remote origin is correctly set, and repo is ready for staging and commit.
+      Run: `git status` and `git remote -v`
+      Confirm all changes are accounted for, git remote origin is correctly set, and repo is ready for staging and commit.

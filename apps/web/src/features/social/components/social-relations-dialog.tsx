@@ -137,8 +137,8 @@ export function SocialRelationsDialog({
               {searchQuery.trim()
                 ? "Tidak ada akun yang sesuai dengan pencarian."
                 : activeTab === "followers"
-                ? "Belum ada pengikut."
-                : "Belum mengikuti akun atau komunitas apapun."}
+                  ? "Belum ada pengikut."
+                  : "Belum mengikuti akun atau komunitas apapun."}
             </div>
           ) : (
             filteredList.map((item) => {
@@ -193,34 +193,35 @@ export function SocialRelationsDialog({
                     </div>
                   </Link>
 
-                  {!isSelf && (item.type === "user" || item.type === "author") && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={item.isFollowing ? "outline" : "default"}
-                      disabled={
-                        followMutation.isPending || unfollowMutation.isPending
-                      }
-                      onClick={() => handleToggleFollow(item)}
-                      className={`h-8 px-3 text-xs font-semibold rounded-lg shrink-0 ${
-                        item.isFollowing
-                          ? "border-border text-foreground hover:bg-muted"
-                          : "bg-foreground text-background hover:opacity-90"
-                      }`}
-                    >
-                      {item.isFollowing ? (
-                        <>
-                          <UserCheck className="size-3.5 mr-1" />
-                          <span>Mengikuti</span>
-                        </>
-                      ) : (
-                        <>
-                          <UserPlus className="size-3.5 mr-1" />
-                          <span>Ikuti</span>
-                        </>
-                      )}
-                    </Button>
-                  )}
+                  {!isSelf &&
+                    (item.type === "user" || item.type === "author") && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={item.isFollowing ? "outline" : "default"}
+                        disabled={
+                          followMutation.isPending || unfollowMutation.isPending
+                        }
+                        onClick={() => handleToggleFollow(item)}
+                        className={`h-8 px-3 text-xs font-semibold rounded-lg shrink-0 ${
+                          item.isFollowing
+                            ? "border-border text-foreground hover:bg-muted"
+                            : "bg-foreground text-background hover:opacity-90"
+                        }`}
+                      >
+                        {item.isFollowing ? (
+                          <>
+                            <UserCheck className="size-3.5 mr-1" />
+                            <span>Mengikuti</span>
+                          </>
+                        ) : (
+                          <>
+                            <UserPlus className="size-3.5 mr-1" />
+                            <span>Ikuti</span>
+                          </>
+                        )}
+                      </Button>
+                    )}
                 </div>
               );
             })

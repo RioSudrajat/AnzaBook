@@ -1,7 +1,16 @@
 import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { BookOpen, Camera, ExternalLink, Link as LinkIcon, Loader2, LogOut, QrCode, Sparkles, Trash2 } from "lucide-react";
+import {
+  BookOpen,
+  Camera,
+  ExternalLink,
+  Link as LinkIcon,
+  Loader2,
+  LogOut,
+  QrCode,
+  Trash2,
+} from "lucide-react";
 import { membershipUsernameSchema } from "@starter/shared/validators/membership";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,7 +48,8 @@ async function resizeImageFile(
     reader.onerror = () => reject(new Error("Gagal membaca berkas gambar."));
     reader.onload = () => {
       const img = new Image();
-      img.onerror = () => reject(new Error("Format berkas gambar tidak valid."));
+      img.onerror = () =>
+        reject(new Error("Format berkas gambar tidak valid."));
       img.onload = () => {
         let { width, height } = img;
         if (width > height) {
@@ -387,7 +397,8 @@ export function DashboardSettings({
                 )}
 
                 <p className="text-[11px] text-muted-foreground font-sans">
-                  Pilih berkas dari perangkat (JPG, PNG, WEBP) atau masukkan URL foto. Gambar otomatis dikompres.
+                  Pilih berkas dari perangkat (JPG, PNG, WEBP) atau masukkan URL
+                  foto. Gambar otomatis dikompres.
                 </p>
 
                 {imageError && (
@@ -597,11 +608,14 @@ export function DashboardSettings({
                   className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/40 hover:bg-muted border border-border/80 text-xs font-mono font-medium text-foreground transition-colors cursor-pointer group"
                 >
                   <BookOpen className="size-3.5 text-foreground shrink-0" />
-                  <span className="group-hover:underline">AnzaBook Partner Program</span>
+                  <span className="group-hover:underline">
+                    AnzaBook Partner Program
+                  </span>
                   <ExternalLink className="size-3 text-muted-foreground ml-1" />
                 </Link>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Jembatan kemitraan dan bagi hasil royalti untuk Penulis Resmi, Penerbit Mitra, dan Komunitas Literasi.
+                  Jembatan kemitraan dan bagi hasil royalti untuk Penulis Resmi,
+                  Penerbit Mitra, dan Komunitas Literasi.
                 </p>
               </div>
             </div>

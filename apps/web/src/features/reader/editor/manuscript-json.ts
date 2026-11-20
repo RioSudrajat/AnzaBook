@@ -18,10 +18,7 @@ export function extractTextFromNode(node: JSONContent): string {
     return node.text;
   }
   if (node.content && Array.isArray(node.content)) {
-    return node.content
-      .map(extractTextFromNode)
-      .join("")
-      .trim();
+    return node.content.map(extractTextFromNode).join("").trim();
   }
   return "";
 }
@@ -46,7 +43,9 @@ export function normalizeManuscriptJson(
         },
         {
           type: "paragraph",
-          content: [{ type: "text", text: "Mulai menulis naskah Anda di sini..." }],
+          content: [
+            { type: "text", text: "Mulai menulis naskah Anda di sini..." },
+          ],
         },
       ],
     };
@@ -66,7 +65,9 @@ export function normalizeManuscriptJson(
         },
         {
           type: "paragraph",
-          content: [{ type: "text", text: "Mulai menulis naskah Anda di sini..." }],
+          content: [
+            { type: "text", text: "Mulai menulis naskah Anda di sini..." },
+          ],
         },
       ],
     };
@@ -74,7 +75,10 @@ export function normalizeManuscriptJson(
 
   // Check if first element is chapterBreak for Chapter 1
   const firstNode = content[0];
-  if (firstNode.type !== "chapterBreak" || Number(firstNode.attrs?.chapterNumber) !== 1) {
+  if (
+    firstNode.type !== "chapterBreak" ||
+    Number(firstNode.attrs?.chapterNumber) !== 1
+  ) {
     content.unshift({
       type: "chapterBreak",
       attrs: { chapterNumber: 1, title: defaultTitle },
@@ -102,7 +106,9 @@ export function extractChaptersFromJson(doc: JSONContent): ExtractedChapter[] {
           content: [
             {
               type: "paragraph",
-              content: [{ type: "text", text: "Mulai menulis naskah Anda di sini..." }],
+              content: [
+                { type: "text", text: "Mulai menulis naskah Anda di sini..." },
+              ],
             },
           ],
         },
@@ -133,7 +139,9 @@ export function extractChaptersFromJson(doc: JSONContent): ExtractedChapter[] {
         : [
             {
               type: "paragraph",
-              content: [{ type: "text", text: "Mulai menulis naskah bab ini..." }],
+              content: [
+                { type: "text", text: "Mulai menulis naskah bab ini..." },
+              ],
             },
           ];
 
@@ -145,7 +153,9 @@ export function extractChaptersFromJson(doc: JSONContent): ExtractedChapter[] {
         content: safeNodes,
       },
       plainTextParagraphs:
-        paragraphs.length > 0 ? paragraphs : ["Mulai menulis naskah bab ini..."],
+        paragraphs.length > 0
+          ? paragraphs
+          : ["Mulai menulis naskah bab ini..."],
     });
   };
 
@@ -182,7 +192,9 @@ export function extractChaptersFromJson(doc: JSONContent): ExtractedChapter[] {
           content: [
             {
               type: "paragraph",
-              content: [{ type: "text", text: "Mulai menulis naskah Bab 1 di sini..." }],
+              content: [
+                { type: "text", text: "Mulai menulis naskah Bab 1 di sini..." },
+              ],
             },
           ],
         },
@@ -215,13 +227,18 @@ export function buildUnifiedDocFromChapters(
   defaultBookTitle?: string,
 ): JSONContent {
   if (!chapters || chapters.length === 0) {
-    return normalizeManuscriptJson(null, defaultBookTitle || "Bab 1: Permulaan");
+    return normalizeManuscriptJson(
+      null,
+      defaultBookTitle || "Bab 1: Permulaan",
+    );
   }
 
   const unifiedContent: JSONContent[] = [];
 
   // Sort chapters by chapterNumber
-  const sorted = [...chapters].sort((a, b) => a.chapterNumber - b.chapterNumber);
+  const sorted = [...chapters].sort(
+    (a, b) => a.chapterNumber - b.chapterNumber,
+  );
 
   for (let idx = 0; idx < sorted.length; idx++) {
     const chap = sorted[idx];
@@ -240,7 +257,11 @@ export function buildUnifiedDocFromChapters(
     // Check if blueprintContent is a Tiptap JSON
     let parsedDoc: JSONContent | null = null;
     const rawBlueprint = chap.blueprintContent?.trim();
-    if (rawBlueprint && rawBlueprint.startsWith("{") && rawBlueprint.includes('"type"')) {
+    if (
+      rawBlueprint &&
+      rawBlueprint.startsWith("{") &&
+      rawBlueprint.includes('"type"')
+    ) {
       try {
         const parsed = JSON.parse(rawBlueprint);
         if (parsed.type === "doc" && Array.isArray(parsed.content)) {
@@ -268,7 +289,9 @@ export function buildUnifiedDocFromChapters(
 
     if (parsedDoc && parsedDoc.content) {
       // Filter out any duplicate chapterBreak nodes that might be inside the sub-doc
-      const subNodes = parsedDoc.content.filter((n) => n.type !== "chapterBreak");
+      const subNodes = parsedDoc.content.filter(
+        (n) => n.type !== "chapterBreak",
+      );
       unifiedContent.push(...subNodes);
     } else {
       // Legacy HTML or plain text fallback: convert lines to paragraph nodes
@@ -290,7 +313,9 @@ export function buildUnifiedDocFromChapters(
       } else {
         unifiedContent.push({
           type: "paragraph",
-          content: [{ type: "text", text: "Mulai menulis naskah Anda di sini..." }],
+          content: [
+            { type: "text", text: "Mulai menulis naskah Anda di sini..." },
+          ],
         });
       }
     }

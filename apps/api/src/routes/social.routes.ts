@@ -61,7 +61,8 @@ socialRouter.patch(
 socialRouter.get("/explore", optionalAuth, async (req, res) => {
   const currentUserId = req.auth?.user.id;
   const q = typeof req.query.q === "string" ? req.query.q : undefined;
-  const category = typeof req.query.category === "string" ? req.query.category : undefined;
+  const category =
+    typeof req.query.category === "string" ? req.query.category : undefined;
   const sort = req.query.sort === "latest" ? "latest" : "top";
   const result = await unifiedExplore(currentUserId, { q, category, sort });
   res.json({ data: result });
@@ -70,14 +71,16 @@ socialRouter.get("/explore", optionalAuth, async (req, res) => {
 // 4D Explore Directories: Authors & Readers
 socialRouter.get("/explore/authors", optionalAuth, async (req, res) => {
   const currentUserId = req.auth?.user.id;
-  const query = typeof req.query.query === "string" ? req.query.query : undefined;
+  const query =
+    typeof req.query.query === "string" ? req.query.query : undefined;
   const authors = await exploreAuthors(currentUserId, query);
   res.json({ data: authors });
 });
 
 socialRouter.get("/explore/readers", optionalAuth, async (req, res) => {
   const currentUserId = req.auth?.user.id;
-  const query = typeof req.query.query === "string" ? req.query.query : undefined;
+  const query =
+    typeof req.query.query === "string" ? req.query.query : undefined;
   const readers = await exploreReaders(currentUserId, query);
   res.json({ data: readers });
 });
@@ -105,20 +108,28 @@ socialRouter.get("/users/:username", optionalAuth, async (req, res) => {
 });
 
 // User followers list
-socialRouter.get("/users/:username/followers", optionalAuth, async (req, res) => {
-  const currentUserId = req.auth?.user.id;
-  const username = String(req.params.username);
-  const followers = await getUserFollowers(username, currentUserId);
-  res.json({ data: followers });
-});
+socialRouter.get(
+  "/users/:username/followers",
+  optionalAuth,
+  async (req, res) => {
+    const currentUserId = req.auth?.user.id;
+    const username = String(req.params.username);
+    const followers = await getUserFollowers(username, currentUserId);
+    res.json({ data: followers });
+  },
+);
 
 // User following list
-socialRouter.get("/users/:username/following", optionalAuth, async (req, res) => {
-  const currentUserId = req.auth?.user.id;
-  const username = String(req.params.username);
-  const following = await getUserFollowing(username, currentUserId);
-  res.json({ data: following });
-});
+socialRouter.get(
+  "/users/:username/following",
+  optionalAuth,
+  async (req, res) => {
+    const currentUserId = req.auth?.user.id;
+    const username = String(req.params.username);
+    const following = await getUserFollowing(username, currentUserId);
+    res.json({ data: following });
+  },
+);
 
 // Follow user
 socialRouter.post(

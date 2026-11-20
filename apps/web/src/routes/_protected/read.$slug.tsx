@@ -8,7 +8,15 @@ import {
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { CheckCircle2, Flame, Share2, Sparkles, Star, Trophy, X } from "lucide-react";
+import {
+  CheckCircle2,
+  Flame,
+  Share2,
+  Sparkles,
+  Star,
+  Trophy,
+  X,
+} from "lucide-react";
 import { z } from "zod";
 import {
   splitChapterIntoPages,
@@ -17,9 +25,13 @@ import {
 } from "@starter/shared/chapter-pagination";
 import { bookProgressPercent } from "@starter/shared/reading-progress";
 import type {
+  BookChapterSummaryDto,
   BookHighlightDto,
-  HighlightColor,
+  BookReaderChapterDto,
   BookReaderPayloadDto,
+  BookSummaryDto,
+  DigitalPolicy,
+  HighlightColor,
   ManuscriptChapterDto,
 } from "@starter/shared/types";
 import type { SaveReadingProgressInput } from "@starter/shared/validators/reading";
@@ -61,7 +73,7 @@ import {
   type ReadingLayout,
   ReaderToolbar,
 } from "@/features/reader/components/reader-toolbar";
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import ImageExtension from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -91,10 +103,7 @@ import {
 } from "@/features/reader/editor/extensions";
 import { SubstackEditorToolbar } from "@/features/reader/editor/components/substack-editor-toolbar";
 import { ReaderBookHeader } from "@/features/reader/components/reader-book-header";
-import {
-  ManuscriptConfigDialog,
-  type ManuscriptConfigData,
-} from "@/features/reader/components/manuscript-config-dialog";
+import { ManuscriptConfigDialog } from "@/features/reader/components/manuscript-config-dialog";
 import {
   buildUnifiedDocFromChapters,
   extractChaptersFromJson,
@@ -286,7 +295,8 @@ function ReaderBook() {
   const queryClient = useQueryClient();
   const requestedChapter = search.chapter ?? 1;
 
-  const isManuscript = slug.startsWith("manuscript-") || slug.startsWith("manu-");
+  const isManuscript =
+    slug.startsWith("manuscript-") || slug.startsWith("manu-");
   const manuscriptId = isManuscript
     ? slug.replace(/^manuscript-/, "").replace(/^manu-/, "")
     : "";
@@ -313,7 +323,8 @@ function ReaderBook() {
     continuous: true,
   });
 
-  const manuscriptPayload: (BookReaderPayloadDto & { watermark: string }) | null = useMemo(() => {
+  const manuscriptPayload:
+    (BookReaderPayloadDto & { watermark: string }) | null = useMemo(() => {
     if (!manuscript) return null;
     const chaps: ManuscriptChapterDto[] =
       manuscript.chapters && manuscript.chapters.length > 0
@@ -339,17 +350,18 @@ function ReaderBook() {
         slug: `manuscript-${manuscript.id}`,
         title: manuscript.title || "Naskah Tanpa Judul",
         author: user.name || "Penulis",
-        coverUrl:
-          manuscript.coverUrl || "template",
+        coverUrl: manuscript.coverUrl || "template",
         synopsis: manuscript.synopsis || "",
         readingMinutes: 15,
-        pageCount: (manuscript as any).pageCount || 10,
+        pageCount: (manuscript as { pageCount?: number }).pageCount || 10,
         totalChapters: chaps.length,
         accessTier: "free" as const,
-        digitalPolicy: (manuscript.proposedDigitalPolicy as any) || "hybrid_nakama_alacarte",
+        digitalPolicy:
+          (manuscript.proposedDigitalPolicy as DigitalPolicy) ||
+          "hybrid_nakama_alacarte",
         authorUserId: manuscript.authorUserId,
         publisherId: manuscript.publisherId,
-      } as any,
+      } as unknown as BookSummaryDto,
       mode: "full" as const,
       currentChapter: {
         id: chaps[0].id || "1",
@@ -389,38 +401,49 @@ function ReaderBook() {
   const error = isManuscript ? null : bookError;
   const refetch = isManuscript ? refetchManuscript : refetchBook;
 
+  const bookAuthorUserId = (
+    payload?.book as { authorUserId?: string | null } | undefined
+  )?.authorUserId;
   const isAuthorOrPublisher = Boolean(
     isManuscript ||
-    ((payload?.book as any)?.authorUserId && (payload?.book as any).authorUserId === user.id) ||
-    user.role === "admin"
+    (bookAuthorUserId && bookAuthorUserId === user.id) ||
+    user.role === "admin",
   );
 
   const [editMode, setEditMode] = useState<"preview" | "edit">(
-    search.editorial ?? (isManuscript && manuscript?.status === "draft" ? "edit" : "preview")
+    search.editorial ??
+      (isManuscript && manuscript?.status === "draft" ? "edit" : "preview"),
   );
   const [editorialTitle, setEditorialTitle] = useState("");
-  const [editorialCoverUrl, setEditorialCoverUrl] = useState<string | null>(null);
-  const [editorialCoverColor, setEditorialCoverColor] = useState<string>("#181614");
+  const [editorialCoverUrl, setEditorialCoverUrl] = useState<string | null>(
+    null,
+  );
+  const [editorialCoverColor, setEditorialCoverColor] =
+    useState<string>("#181614");
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
-  const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
+  const [, setIsPublishDialogOpen] = useState(false);
   const [editorialNotes, setEditorialNotes] = useState("");
   const [isSavingDraft, setIsSavingDraft] = useState(false);
 
   const coverInitializedRef = useRef(false);
 
   useEffect(() => {
-    if (payload?.book?.title && !editorialTitle) {
-      setEditorialTitle(payload.book.title);
-    }
-    if (!coverInitializedRef.current && payload?.book) {
-      if (payload.book.coverUrl) {
-        setEditorialCoverUrl(payload.book.coverUrl);
+    if (!payload?.book) return;
+    const book = payload.book;
+    queueMicrotask(() => {
+      if (book.title && !editorialTitle) {
+        setEditorialTitle(book.title);
       }
-      if (payload.book.coverColor) {
-        setEditorialCoverColor(payload.book.coverColor);
+      if (!coverInitializedRef.current) {
+        if (book.coverUrl) {
+          setEditorialCoverUrl(book.coverUrl);
+        }
+        if (book.coverColor) {
+          setEditorialCoverColor(book.coverColor);
+        }
+        coverInitializedRef.current = true;
       }
-      coverInitializedRef.current = true;
-    }
+    });
   }, [payload?.book, editorialTitle]);
 
   const bookId = payload?.book?.id || "";
@@ -470,7 +493,7 @@ function ReaderBook() {
     return extractChaptersFromJson(initialEditorContent);
   });
 
-  const syncLiveChaptersFromEditor = useCallback((ed: any) => {
+  const syncLiveChaptersFromEditor = useCallback((ed: Editor | null) => {
     if (!ed) return;
     const json = ed.getJSON();
     const chaps = extractChaptersFromJson(json);
@@ -528,7 +551,9 @@ function ReaderBook() {
 
   useEffect(() => {
     if (editor && isAuthorOrPublisher) {
-      syncLiveChaptersFromEditor(editor);
+      queueMicrotask(() => {
+        syncLiveChaptersFromEditor(editor);
+      });
     }
   }, [editor, isAuthorOrPublisher, syncLiveChaptersFromEditor]);
 
@@ -553,10 +578,10 @@ function ReaderBook() {
 
   const isPublisherReview = Boolean(
     isManuscript &&
-      manuscript &&
-      (manuscript.status === "pending_review" ||
-        manuscript.status === "in_editing" ||
-        manuscript.status === "revision_requested"),
+    manuscript &&
+    (manuscript.status === "pending_review" ||
+      manuscript.status === "in_editing" ||
+      manuscript.status === "revision_requested"),
   );
 
   const handleSaveDraft = async () => {
@@ -689,12 +714,19 @@ function ReaderBook() {
       : payload?.currentChapter
         ? [payload.currentChapter]
         : [];
-  }, [isAuthorOrPublisher, liveChapters, payload?.chapters, payload?.currentChapter]);
+  }, [
+    isAuthorOrPublisher,
+    liveChapters,
+    payload?.chapters,
+    payload?.currentChapter,
+  ]);
 
   const selectedChapter =
     readingLayout === "scroll" ? scrollPosition.chapter : slidePosition.chapter;
   const chapter =
-    accessibleChapters.find((item: any) => item.chapterNumber === selectedChapter) ??
+    accessibleChapters.find(
+      (item: BookReaderChapterDto) => item.chapterNumber === selectedChapter,
+    ) ??
     accessibleChapters[0] ??
     payload?.currentChapter;
   const activeChapterNum = chapter?.chapterNumber ?? requestedChapter;
@@ -729,7 +761,8 @@ function ReaderBook() {
     if (waitingForCheckpoint) return;
     const checkpoint = search.chapter === undefined ? progress : null;
     const savedChapter = payload.chapters?.find(
-      (item: any) => item.chapterNumber === checkpoint?.lastChapterNumber,
+      (item: BookReaderChapterDto) =>
+        item.chapterNumber === checkpoint?.lastChapterNumber,
     );
     const frame = requestAnimationFrame(() => {
       hasRestoredRef.current = true;
@@ -910,7 +943,8 @@ function ReaderBook() {
     }
     if (atBookEnd) body = finalSection;
     const visibleChapter = payload?.chapters?.find(
-      (item: any) => item.chapterNumber === Number(body.dataset.chapterNumber),
+      (item: BookReaderChapterDto) =>
+        item.chapterNumber === Number(body.dataset.chapterNumber),
     );
     if (visibleChapter) {
       positionChapter = visibleChapter;
@@ -988,7 +1022,7 @@ function ReaderBook() {
       // Live Chapter Detection for Editorial Mode (Updates left TOC active indicator on scroll)
       if (isAuthorOrPublisher) {
         const chapterBreaks = Array.from(
-          document.querySelectorAll<HTMLElement>('[data-type="chapter-break"]')
+          document.querySelectorAll<HTMLElement>('[data-type="chapter-break"]'),
         );
         let detected = 1;
         const viewportMarker = window.innerHeight * 0.36;
@@ -1082,7 +1116,7 @@ function ReaderBook() {
       setScrollPosition((prev) => ({ ...prev, chapter: ch }));
       if (ch === 1) {
         const chap1Break = document.querySelector(
-          '[data-type="chapter-break"][data-chapter-number="1"]'
+          '[data-type="chapter-break"][data-chapter-number="1"]',
         );
         if (chap1Break) {
           chap1Break.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1097,7 +1131,7 @@ function ReaderBook() {
         }
       }
       const targetEl = document.querySelector(
-        `[data-type="chapter-break"][data-chapter-number="${ch}"]`
+        `[data-type="chapter-break"][data-chapter-number="${ch}"]`,
       );
       if (targetEl) {
         targetEl.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1258,7 +1292,8 @@ function ReaderBook() {
             Math.max(1, Math.round((Date.now() - startTimeRef.current) / 1000)),
           );
           const positionChapter = payload?.chapters?.find(
-            (item: any) => item.chapterNumber === position.lastChapterNumber,
+            (item: BookReaderChapterDto) =>
+              item.chapterNumber === position.lastChapterNumber,
           );
           const words = splitParagraphs(
             positionChapter?.contentId ?? chapter?.contentId,
@@ -1411,7 +1446,7 @@ function ReaderBook() {
   const isPremiumPreview =
     !payload.hasFullAccess && book.accessTier === "premium";
   const chapterIndex = allChapters.findIndex(
-    (item: any) => item.chapterNumber === activeChapterNum,
+    (item: BookChapterSummaryDto) => item.chapterNumber === activeChapterNum,
   );
   const nextChapter = payload.hasFullAccess
     ? allChapters[chapterIndex + 1]?.chapterNumber
@@ -1549,7 +1584,11 @@ function ReaderBook() {
                 authorOrPublisher={book.author || user.name || "Penulis"}
                 title={editorialTitle || book.title}
                 totalChapters={displayChapters.length}
-                coverUrl={editorialCoverUrl !== undefined ? editorialCoverUrl : book.coverUrl}
+                coverUrl={
+                  editorialCoverUrl !== undefined
+                    ? editorialCoverUrl
+                    : book.coverUrl
+                }
                 coverColor={editorialCoverColor || book.coverColor}
                 publishedYear={book.publishedYear}
                 genres={book.genres}
@@ -1564,188 +1603,197 @@ function ReaderBook() {
               {isAuthorOrPublisher ? (
                 <div
                   className={`tiptap-editorial-canvas relative font-serif text-[18px] leading-[1.85] text-justify min-h-[500px] ${
-                    editMode === "preview" ? "is-preview-reading-mode select-text" : ""
+                    editMode === "preview"
+                      ? "is-preview-reading-mode select-text"
+                      : ""
                   }`}
                 >
                   <EditorContent editor={editor} />
                 </div>
               ) : (
-                chaptersList.map((chap: any, chapIdx: number) => {
-                const idPars = splitParagraphs(chap.contentId);
-                const enPars = splitParagraphs(chap.contentEn);
-                const paragraphs = languageView === "en" ? enPars : idPars;
-                const highlights = allHighlights.filter(
-                  (item) => item.chapterNumber === chap.chapterNumber,
-                );
-                const fadeParagraph = isPremiumPreview
-                  ? paragraphs.length - 1
-                  : -1;
+                chaptersList.map(
+                  (chap: BookReaderChapterDto, chapIdx: number) => {
+                    const idPars = splitParagraphs(chap.contentId);
+                    const enPars = splitParagraphs(chap.contentEn);
+                    const paragraphs = languageView === "en" ? enPars : idPars;
+                    const highlights = allHighlights.filter(
+                      (item) => item.chapterNumber === chap.chapterNumber,
+                    );
+                    const fadeParagraph = isPremiumPreview
+                      ? paragraphs.length - 1
+                      : -1;
 
-                return (
-                  <section
-                    key={chap.id}
-                    id={`chapter-sec-${chap.chapterNumber}`}
-                    data-chapter-number={chap.chapterNumber}
-                    className="relative scroll-mt-24"
-                  >
-                    {/* Chapter Header or Divider (SS 4) */}
-                    {chapIdx === 0 ? (
-                      <header className="mb-12 text-center pb-8 border-b border-current/15">
-                        <div className="text-xs font-mono uppercase tracking-[0.2em] opacity-60 mb-2">
-                          CHAPTER {chap.chapterNumber}
-                        </div>
-                        <h1 className="font-serif text-xl sm:text-2xl font-semibold tracking-tight">
-                          {chap.title}
-                        </h1>
-                      </header>
-                    ) : (
-                      /* Chapter Divider with 4 beads (SS 4) */
-                      <div
-                        id={`chapter-${chap.chapterNumber}`}
-                        className="pt-20 pb-12 text-center select-none"
+                    return (
+                      <section
+                        key={chap.id}
+                        id={`chapter-sec-${chap.chapterNumber}`}
+                        data-chapter-number={chap.chapterNumber}
+                        className="relative scroll-mt-24"
                       >
-                        <div className="flex items-center justify-center gap-3 mb-8 text-current/30">
-                          <div className="w-16 h-px bg-current/20" />
-                          <div className="flex items-center gap-1.5">
-                            <span className="size-1.5 rounded-full bg-current/40" />
-                            <span className="size-2 rounded-full bg-current/70" />
-                            <span className="size-2 rounded-full bg-current/70" />
-                            <span className="size-1.5 rounded-full bg-current/40" />
-                          </div>
-                          <div className="w-16 h-px bg-current/20" />
-                        </div>
-                        <div className="text-xs font-mono uppercase tracking-[0.2em] opacity-60 mb-3">
-                          CHAPTER {chap.chapterNumber}
-                        </div>
-                        <h2 className="font-serif text-xl sm:text-2xl font-semibold tracking-tight mb-3">
-                          {chap.title}
-                        </h2>
-                      </div>
-                    )}
-
-                    {/* Paragraphs of this chapter (Pure typography, NO cards, NO wrapper boxes) */}
-                    {languageView === "split" ? (
-                      /* Bilingual Split View (ID left, EN right) */
-                      <div className="space-y-6">
-                        {idPars.map((idText, pIdx) => {
-                          const enText = enPars[pIdx] || "";
-                          return (
-                            <div
-                              key={pIdx}
-                              data-reader-paragraph={pIdx}
-                              className="scroll-mt-28"
-                            >
-                              {/* Page Divider every 3 paragraphs (SS 3) */}
-                              {pIdx > 0 && pIdx % 3 === 0 && (
-                                <div
-                                  className="py-8 my-4 text-center select-none text-current/35 font-mono tracking-[0.6em] text-sm"
-                                  aria-hidden="true"
-                                >
-                                  ***
-                                </div>
-                              )}
-
-                              <div
-                                data-preview-fade={
-                                  pIdx === fadeParagraph || undefined
-                                }
-                                className="grid grid-cols-1 md:grid-cols-2 gap-6 py-1 select-text"
-                              >
-                                <p
-                                  className={`leading-relaxed text-justify ${fontClass}`}
-                                  style={{
-                                    fontSize: `${fontSize}px`,
-                                    lineHeight: 1.85,
-                                  }}
-                                >
-                                  {renderHighlightedText(
-                                    idText,
-                                    highlights,
-                                    handleFlexHighlight,
-                                  )}
-                                </p>
-                                <p
-                                  className={`border-t md:border-t-0 md:border-l border-current/15 pt-2 md:pt-0 md:pl-6 opacity-75 italic leading-relaxed text-justify ${fontClass}`}
-                                  style={{
-                                    fontSize: `${fontSize - 1}px`,
-                                    lineHeight: 1.8,
-                                  }}
-                                >
-                                  {enText}
-                                </p>
-                              </div>
+                        {/* Chapter Header or Divider (SS 4) */}
+                        {chapIdx === 0 ? (
+                          <header className="mb-12 text-center pb-8 border-b border-current/15">
+                            <div className="text-xs font-mono uppercase tracking-[0.2em] opacity-60 mb-2">
+                              CHAPTER {chap.chapterNumber}
                             </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      /* Single Column Clean Literary View (Default: ID) */
-                      <div
-                        className={`${fontClass}`}
-                        style={{ fontSize: `${fontSize}px`, lineHeight: 1.85 }}
-                      >
-                        {splitChapterIntoPages(
-                          languageView === "en"
-                            ? chap.contentEn
-                            : chap.contentId,
-                        ).map((pg, pgIdx, allPgs) => (
-                          <div key={pgIdx} className="space-y-4">
-                            {pgIdx > 0 && (
-                              <div
-                                className="py-12 my-8 text-center select-none flex items-center justify-center gap-4 text-current/30"
-                                aria-hidden="true"
-                              >
-                                <div className="w-16 h-px bg-current/20" />
-                                <span className="text-xs tracking-[0.6em] opacity-60 select-none">
-                                  ✦ &nbsp; ✦ &nbsp; ✦
-                                </span>
-                                <div className="w-16 h-px bg-current/20" />
+                            <h1 className="font-serif text-xl sm:text-2xl font-semibold tracking-tight">
+                              {chap.title}
+                            </h1>
+                          </header>
+                        ) : (
+                          /* Chapter Divider with 4 beads (SS 4) */
+                          <div
+                            id={`chapter-${chap.chapterNumber}`}
+                            className="pt-20 pb-12 text-center select-none"
+                          >
+                            <div className="flex items-center justify-center gap-3 mb-8 text-current/30">
+                              <div className="w-16 h-px bg-current/20" />
+                              <div className="flex items-center gap-1.5">
+                                <span className="size-1.5 rounded-full bg-current/40" />
+                                <span className="size-2 rounded-full bg-current/70" />
+                                <span className="size-2 rounded-full bg-current/70" />
+                                <span className="size-1.5 rounded-full bg-current/40" />
                               </div>
-                            )}
+                              <div className="w-16 h-px bg-current/20" />
+                            </div>
+                            <div className="text-xs font-mono uppercase tracking-[0.2em] opacity-60 mb-3">
+                              CHAPTER {chap.chapterNumber}
+                            </div>
+                            <h2 className="font-serif text-xl sm:text-2xl font-semibold tracking-tight mb-3">
+                              {chap.title}
+                            </h2>
+                          </div>
+                        )}
 
-                            {pg.paragraphs.map((text, localIdx) => {
-                              const pIdx =
-                                allPgs
-                                  .slice(0, pgIdx)
-                                  .reduce(
-                                    (acc, p) => acc + p.paragraphs.length,
-                                    0,
-                                  ) + localIdx;
+                        {/* Paragraphs of this chapter (Pure typography, NO cards, NO wrapper boxes) */}
+                        {languageView === "split" ? (
+                          /* Bilingual Split View (ID left, EN right) */
+                          <div className="space-y-6">
+                            {idPars.map((idText, pIdx) => {
+                              const enText = enPars[pIdx] || "";
                               return (
                                 <div
                                   key={pIdx}
                                   data-reader-paragraph={pIdx}
                                   className="scroll-mt-28"
                                 >
-                                  {text.trim().startsWith("<") ? (
+                                  {/* Page Divider every 3 paragraphs (SS 3) */}
+                                  {pIdx > 0 && pIdx % 3 === 0 && (
                                     <div
-                                      className="leading-relaxed mb-6 select-text"
-                                      dangerouslySetInnerHTML={{ __html: text }}
-                                    />
-                                  ) : (
+                                      className="py-8 my-4 text-center select-none text-current/35 font-mono tracking-[0.6em] text-sm"
+                                      aria-hidden="true"
+                                    >
+                                      ***
+                                    </div>
+                                  )}
+
+                                  <div
+                                    data-preview-fade={
+                                      pIdx === fadeParagraph || undefined
+                                    }
+                                    className="grid grid-cols-1 md:grid-cols-2 gap-6 py-1 select-text"
+                                  >
                                     <p
-                                      data-preview-fade={
-                                        pIdx === fadeParagraph || undefined
-                                      }
-                                      className="leading-relaxed text-justify mb-6 select-text"
+                                      className={`leading-relaxed text-justify ${fontClass}`}
+                                      style={{
+                                        fontSize: `${fontSize}px`,
+                                        lineHeight: 1.85,
+                                      }}
                                     >
                                       {renderHighlightedText(
-                                        text,
+                                        idText,
                                         highlights,
                                         handleFlexHighlight,
                                       )}
                                     </p>
-                                  )}
+                                    <p
+                                      className={`border-t md:border-t-0 md:border-l border-current/15 pt-2 md:pt-0 md:pl-6 opacity-75 italic leading-relaxed text-justify ${fontClass}`}
+                                      style={{
+                                        fontSize: `${fontSize - 1}px`,
+                                        lineHeight: 1.8,
+                                      }}
+                                    >
+                                      {enText}
+                                    </p>
+                                  </div>
                                 </div>
                               );
                             })}
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </section>
-                );
-              })
+                        ) : (
+                          /* Single Column Clean Literary View (Default: ID) */
+                          <div
+                            className={`${fontClass}`}
+                            style={{
+                              fontSize: `${fontSize}px`,
+                              lineHeight: 1.85,
+                            }}
+                          >
+                            {splitChapterIntoPages(
+                              languageView === "en"
+                                ? chap.contentEn
+                                : chap.contentId,
+                            ).map((pg, pgIdx, allPgs) => (
+                              <div key={pgIdx} className="space-y-4">
+                                {pgIdx > 0 && (
+                                  <div
+                                    className="py-12 my-8 text-center select-none flex items-center justify-center gap-4 text-current/30"
+                                    aria-hidden="true"
+                                  >
+                                    <div className="w-16 h-px bg-current/20" />
+                                    <span className="text-xs tracking-[0.6em] opacity-60 select-none">
+                                      ✦ &nbsp; ✦ &nbsp; ✦
+                                    </span>
+                                    <div className="w-16 h-px bg-current/20" />
+                                  </div>
+                                )}
+
+                                {pg.paragraphs.map((text, localIdx) => {
+                                  const pIdx =
+                                    allPgs
+                                      .slice(0, pgIdx)
+                                      .reduce(
+                                        (acc, p) => acc + p.paragraphs.length,
+                                        0,
+                                      ) + localIdx;
+                                  return (
+                                    <div
+                                      key={pIdx}
+                                      data-reader-paragraph={pIdx}
+                                      className="scroll-mt-28"
+                                    >
+                                      {text.trim().startsWith("<") ? (
+                                        <div
+                                          className="leading-relaxed mb-6 select-text"
+                                          dangerouslySetInnerHTML={{
+                                            __html: text,
+                                          }}
+                                        />
+                                      ) : (
+                                        <p
+                                          data-preview-fade={
+                                            pIdx === fadeParagraph || undefined
+                                          }
+                                          className="leading-relaxed text-justify mb-6 select-text"
+                                        >
+                                          {renderHighlightedText(
+                                            text,
+                                            highlights,
+                                            handleFlexHighlight,
+                                          )}
+                                        </p>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </section>
+                    );
+                  },
+                )
               )}
 
               {/* End of Reading Completion Section */}
@@ -2088,7 +2136,8 @@ function ReaderBook() {
                 <div className="flex items-center gap-2">
                   <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
                   <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground font-semibold">
-                    Studio Penerbit: Meninjau Naskah &quot;{editorialTitle || book.title}&quot;
+                    Studio Penerbit: Meninjau Naskah &quot;
+                    {editorialTitle || book.title}&quot;
                   </span>
                 </div>
                 <input

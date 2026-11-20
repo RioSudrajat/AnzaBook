@@ -5,12 +5,9 @@ import {
   Camera,
   Shuffle,
   Globe,
-  Lock,
   Calendar as CalendarIcon,
   Clock,
-  Film,
   BookOpen,
-  Sparkles,
   ChevronDown,
   Plus,
   AlignLeft,
@@ -19,6 +16,7 @@ import {
   Check,
   Video,
 } from "lucide-react";
+import type { CreateEventInput } from "@starter/shared/validators/community";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
@@ -39,8 +37,18 @@ interface CreateEventDialogProps {
 
 const THEME_OPTIONS = [
   { id: "minimal", name: "Minimal", bg: "#1f1d18", border: "#38332a" },
-  { id: "classic_paper", name: "Classic Paper", bg: "#2a241b", border: "#4a3c2a" },
-  { id: "midnight_ink", name: "Midnight Ink", bg: "#12141a", border: "#222736" },
+  {
+    id: "classic_paper",
+    name: "Classic Paper",
+    bg: "#2a241b",
+    border: "#4a3c2a",
+  },
+  {
+    id: "midnight_ink",
+    name: "Midnight Ink",
+    bg: "#12141a",
+    border: "#222736",
+  },
   { id: "terracotta", name: "Terracotta", bg: "#281b16", border: "#4a2c22" },
 ] as const;
 
@@ -73,12 +81,13 @@ export function CreateEventDialog({
     );
   }, [calendars, userRole]);
 
-  const [selectedCalendarId, setSelectedCalendarId] = React.useState<string>("");
+  const [selectedCalendarId, setSelectedCalendarId] =
+    React.useState<string>("");
   const [isCalendarMenuOpen, setIsCalendarMenuOpen] = React.useState(false);
-  const [isApplyCalendarOpen, setIsApplyCalendarOpen] = React.useState(false);
   const [isDescDialogOpen, setIsDescDialogOpen] = React.useState(false);
   const [isPaymentPopoverOpen, setIsPaymentPopoverOpen] = React.useState(false);
-  const [isCapacityPopoverOpen, setIsCapacityPopoverOpen] = React.useState(false);
+  const [isCapacityPopoverOpen, setIsCapacityPopoverOpen] =
+    React.useState(false);
 
   // Form states
   const [title, setTitle] = React.useState("");
@@ -89,7 +98,7 @@ export function CreateEventDialog({
   const [visibility, setVisibility] = React.useState<"public" | "private_link">(
     "public",
   );
-  const [eventType, setEventType] = React.useState<
+  const [eventType] = React.useState<
     | "book_club"
     | "film_discussion"
     | "silent_reading"
@@ -97,32 +106,38 @@ export function CreateEventDialog({
     | "writing_session"
     | "community_meetup"
   >("book_club");
-  const [categoryTag, setCategoryTag] = React.useState("Literasi");
+  const [categoryTag] = React.useState("Literasi");
 
   // Dates
-  const tomorrow = new Date(Date.now() + 86400000);
-  const tomorrowStr = tomorrow.toISOString().split("T")[0];
+  const [tomorrowStr] = React.useState(
+    () => new Date(Date.now() + 86400000).toISOString().split("T")[0],
+  );
   const [startDate, setStartDate] = React.useState(tomorrowStr);
   const [startTime, setStartTime] = React.useState("19:00");
   const [endDate, setEndDate] = React.useState(tomorrowStr);
   const [endTime, setEndTime] = React.useState("21:00");
 
   // Location State
-  const [locationState, setLocationState] = React.useState<SelectedLocationState>({
-    format: "offline",
-    hideAddressUntilApproved: false,
-  });
+  const [locationState, setLocationState] =
+    React.useState<SelectedLocationState>({
+      format: "offline",
+      hideAddressUntilApproved: false,
+    });
   const [onlineMeetingUrl, setOnlineMeetingUrl] = React.useState("");
 
   // Sync virtual meeting URL when chosen in location picker
   React.useEffect(() => {
-    if (locationState.onlineMeetingUrl && !onlineMeetingUrl) {
-      setOnlineMeetingUrl(locationState.onlineMeetingUrl);
+    if (locationState.onlineMeetingUrl) {
+      queueMicrotask(() => {
+        setOnlineMeetingUrl(
+          (prev) => prev || locationState.onlineMeetingUrl || "",
+        );
+      });
     }
   }, [locationState.onlineMeetingUrl]);
 
   const [description, setDescription] = React.useState("");
-  const [logisticsNotes, setLogisticsNotes] = React.useState("");
+  const [logisticsNotes] = React.useState("");
 
   // Catalog Books for linking
   const { data: catalogBooksData } = useCatalogBooks({ limit: 50 });
@@ -139,22 +154,26 @@ export function CreateEventDialog({
   const [workUrl, setWorkUrl] = React.useState("");
 
   // Settings
-  const [ticketPriceIdr, setTicketPriceIdr] = React.useState(0);
+  const [ticketPriceIdr] = React.useState(0);
   const [requiresApproval, setRequiresApproval] = React.useState(false);
   const [isUnlimitedCapacity, setIsUnlimitedCapacity] = React.useState(true);
   const [capacity, setCapacity] = React.useState<number>(30);
-  const [allowWaitlist, setAllowWaitlist] = React.useState(true);
+  const [allowWaitlist] = React.useState(true);
 
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
   // Auto-select user's managed calendar
   React.useEffect(() => {
     if (managedCalendars.length > 0 && !selectedCalendarId) {
-      setSelectedCalendarId(managedCalendars[0].id);
+      queueMicrotask(() => {
+        setSelectedCalendarId((prev) => prev || managedCalendars[0].id);
+      });
     }
   }, [managedCalendars, selectedCalendarId]);
 
-  const activeCalendar = managedCalendars.find((c) => c.id === selectedCalendarId);
+  const activeCalendar = managedCalendars.find(
+    (c) => c.id === selectedCalendarId,
+  );
 
   // Client-side Canvas Compression to guarantee base64 image < 80 kB
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -215,11 +234,15 @@ export function CreateEventDialog({
       return;
     }
     if (description.trim().length < 10) {
-      setErrorMsg("Deskripsi acara minimal 10 karakter. Klik 'Tambahkan Deskripsi' untuk mengisi.");
+      setErrorMsg(
+        "Deskripsi acara minimal 10 karakter. Klik 'Tambahkan Deskripsi' untuk mengisi.",
+      );
       return;
     }
 
-    const startIso = new Date(`${startDate}T${startTime}:00+07:00`).toISOString();
+    const startIso = new Date(
+      `${startDate}T${startTime}:00+07:00`,
+    ).toISOString();
     const endIso = new Date(`${endDate}T${endTime}:00+07:00`).toISOString();
 
     if (new Date(endIso) <= new Date(startIso)) {
@@ -228,7 +251,7 @@ export function CreateEventDialog({
     }
 
     try {
-      const payload: any = {
+      const payload: CreateEventInput = {
         calendarId: selectedCalendarId,
         bookId: selectedBookId || undefined,
         title: title.trim(),
@@ -246,7 +269,10 @@ export function CreateEventDialog({
         district: locationState.district,
         latitude: locationState.latitude,
         longitude: locationState.longitude,
-        onlineMeetingUrl: onlineMeetingUrl.trim() || locationState.onlineMeetingUrl || undefined,
+        onlineMeetingUrl:
+          onlineMeetingUrl.trim() ||
+          locationState.onlineMeetingUrl ||
+          undefined,
         hideAddressUntilApproved: locationState.hideAddressUntilApproved,
         startsAt: startIso,
         endsAt: endIso,
@@ -254,6 +280,7 @@ export function CreateEventDialog({
         capacity: isUnlimitedCapacity ? undefined : Number(capacity),
         requiresApproval,
         allowWaitlist,
+        coHosts: [],
       };
 
       if (isLinkingWork && workTitle.trim()) {
@@ -268,14 +295,16 @@ export function CreateEventDialog({
       const res = await createEventMutation.mutateAsync(payload);
       if (onSuccess) onSuccess(res.slug);
       onClose();
-    } catch (err: any) {
-      setErrorMsg(err.message || "Gagal membuat acara.");
+    } catch (err: unknown) {
+      const apiErr = err as { message?: string };
+      setErrorMsg(apiErr?.message || "Gagal membuat acara.");
     }
   };
 
   if (!open) return null;
 
-  const currentTheme = THEME_OPTIONS.find((t) => t.id === themePreset) || THEME_OPTIONS[0];
+  const currentTheme =
+    THEME_OPTIONS.find((t) => t.id === themePreset) || THEME_OPTIONS[0];
 
   return (
     <div
@@ -328,7 +357,9 @@ export function CreateEventDialog({
               <label className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white">
                 <Camera className="size-8 mb-2" />
                 <span className="text-xs font-medium">Unggah Poster (1:1)</span>
-                <span className="text-[10px] text-white/60 mt-0.5">JPG / PNG (Otomatis Kompres)</span>
+                <span className="text-[10px] text-white/60 mt-0.5">
+                  JPG / PNG (Otomatis Kompres)
+                </span>
                 <input
                   type="file"
                   accept="image/png, image/jpeg, image/webp"
@@ -367,16 +398,24 @@ export function CreateEventDialog({
                   />
                   <div>
                     <div className="text-[10px] text-white/40">Tema</div>
-                    <div className="font-medium text-white">{currentTheme.name}</div>
+                    <div className="font-medium text-white">
+                      {currentTheme.name}
+                    </div>
                   </div>
                 </div>
                 <select
                   value={themePreset}
-                  onChange={(e) => setThemePreset(e.target.value as any)}
+                  onChange={(e) =>
+                    setThemePreset(e.target.value as typeof themePreset)
+                  }
                   className="bg-transparent text-xs text-white outline-none cursor-pointer"
                 >
                   {THEME_OPTIONS.map((t) => (
-                    <option key={t.id} value={t.id} className="bg-[#1b1c20] text-white">
+                    <option
+                      key={t.id}
+                      value={t.id}
+                      className="bg-[#1b1c20] text-white"
+                    >
                       {t.name}
                     </option>
                   ))}
@@ -417,7 +456,9 @@ export function CreateEventDialog({
                 >
                   <span className="size-2 rounded-full bg-amber-400" />
                   <span className="max-w-[200px] truncate">
-                    {activeCalendar ? activeCalendar.name : "Pilih Kalender Komunitas"}
+                    {activeCalendar
+                      ? activeCalendar.name
+                      : "Pilih Kalender Komunitas"}
                   </span>
                   <ChevronDown className="size-3 text-white/50" />
                 </button>
@@ -450,7 +491,9 @@ export function CreateEventDialog({
                           }`}
                         >
                           <span className="truncate">{cal.name}</span>
-                          {selectedCalendarId === cal.id && <Check className="size-3.5" />}
+                          {selectedCalendarId === cal.id && (
+                            <Check className="size-3.5" />
+                          )}
                         </button>
                       ))
                     )}
@@ -476,13 +519,18 @@ export function CreateEventDialog({
                 <Globe className="size-3.5 text-white/50" />
                 <select
                   value={visibility}
-                  onChange={(e) => setVisibility(e.target.value as any)}
+                  onChange={(e) =>
+                    setVisibility(e.target.value as typeof visibility)
+                  }
                   className="bg-transparent text-xs text-white outline-none cursor-pointer"
                 >
                   <option value="public" className="bg-[#1b1c20] text-white">
                     Publik
                   </option>
-                  <option value="private_link" className="bg-[#1b1c20] text-white">
+                  <option
+                    value="private_link"
+                    className="bg-[#1b1c20] text-white"
+                  >
                     Tautan Pribadi
                   </option>
                 </select>
@@ -583,7 +631,8 @@ export function CreateEventDialog({
                 className="bg-black/30 border-white/10 text-white placeholder-white/30 text-xs"
               />
               <p className="text-[10px] text-white/40">
-                Tautan hanya diberikan otomatis kepada peserta yang telah disetujui (Going).
+                Tautan hanya diberikan otomatis kepada peserta yang telah
+                disetujui (Going).
               </p>
             </div>
 
@@ -629,32 +678,36 @@ export function CreateEventDialog({
               {isLinkingWork && (
                 <div className="mt-3 space-y-3 border-t border-white/10 pt-3">
                   <div className="flex gap-2">
-                    {(["book", "film", "article", "other"] as const).map((mt) => (
-                      <button
-                        key={mt}
-                        type="button"
-                        onClick={() => {
-                          setWorkMediaType(mt);
-                          if (mt !== "book") {
-                            setSelectedBookId("");
-                          }
-                        }}
-                        className={`rounded px-2.5 py-1 text-[11px] font-medium capitalize transition-colors cursor-pointer ${
-                          workMediaType === mt
-                            ? "bg-amber-400/20 text-amber-300 border border-amber-400/40"
-                            : "bg-white/5 text-white/60 hover:bg-white/10"
-                        }`}
-                      >
-                        {mt === "book" ? "Buku" : mt === "film" ? "Film" : mt}
-                      </button>
-                    ))}
+                    {(["book", "film", "article", "other"] as const).map(
+                      (mt) => (
+                        <button
+                          key={mt}
+                          type="button"
+                          onClick={() => {
+                            setWorkMediaType(mt);
+                            if (mt !== "book") {
+                              setSelectedBookId("");
+                            }
+                          }}
+                          className={`rounded px-2.5 py-1 text-[11px] font-medium capitalize transition-colors cursor-pointer ${
+                            workMediaType === mt
+                              ? "bg-amber-400/20 text-amber-300 border border-amber-400/40"
+                              : "bg-white/5 text-white/60 hover:bg-white/10"
+                          }`}
+                        >
+                          {mt === "book" ? "Buku" : mt === "film" ? "Film" : mt}
+                        </button>
+                      ),
+                    )}
                   </div>
 
                   {workMediaType === "book" && (
                     <div className="space-y-1.5 rounded-lg border border-white/10 bg-black/30 p-2.5">
                       <label className="text-[11px] font-medium text-amber-300 flex items-center gap-1.5">
                         <BookOpen className="size-3.5" />
-                        <span>Pilih Buku Katalog AnzaBook (Auto-Unlock Sampel)</span>
+                        <span>
+                          Pilih Buku Katalog AnzaBook (Auto-Unlock Sampel)
+                        </span>
                       </label>
                       <select
                         value={selectedBookId}
@@ -669,16 +722,23 @@ export function CreateEventDialog({
                         }}
                         className="w-full rounded-lg border border-white/10 bg-[#1e2025] px-3 py-2 text-xs text-white outline-none cursor-pointer focus:border-amber-400/50"
                       >
-                        <option value="">-- Pilih Buku dari Katalog (Opsional) --</option>
+                        <option value="">
+                          -- Pilih Buku dari Katalog (Opsional) --
+                        </option>
                         {booksList.map((b) => (
-                          <option key={b.id} value={b.id} className="bg-[#1e2025] text-white">
+                          <option
+                            key={b.id}
+                            value={b.id}
+                            className="bg-[#1e2025] text-white"
+                          >
                             {b.title} — {b.author}
                           </option>
                         ))}
                       </select>
                       {selectedBookId && (
                         <p className="text-[10px] text-emerald-400">
-                          ✓ Peserta yang terdaftar & disetujui otomatis mendapatkan akses baca Bab 1 & 2 buku ini.
+                          ✓ Peserta yang terdaftar & disetujui otomatis
+                          mendapatkan akses baca Bab 1 & 2 buku ini.
                         </p>
                       )}
                     </div>
@@ -723,7 +783,11 @@ export function CreateEventDialog({
                   onClick={() => setIsPaymentPopoverOpen(!isPaymentPopoverOpen)}
                   className="flex items-center gap-1.5 rounded-md px-2 py-1 text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 >
-                  <span>{ticketPriceIdr > 0 ? `Rp ${ticketPriceIdr.toLocaleString("id-ID")}` : "Gratis"}</span>
+                  <span>
+                    {ticketPriceIdr > 0
+                      ? `Rp ${ticketPriceIdr.toLocaleString("id-ID")}`
+                      : "Gratis"}
+                  </span>
                   <Pencil className="size-3 text-white/50" />
                 </button>
 
@@ -736,9 +800,14 @@ export function CreateEventDialog({
                     <div className="mb-3 flex size-10 items-center justify-center rounded-xl bg-white/10 text-white">
                       <Ticket className="size-5 text-amber-400" />
                     </div>
-                    <h4 className="text-sm font-bold text-white mb-1.5">Terima Pembayaran</h4>
+                    <h4 className="text-sm font-bold text-white mb-1.5">
+                      Terima Pembayaran
+                    </h4>
                     <p className="text-[11px] leading-relaxed text-white/60 mb-4">
-                      Kalender ini belum diatur untuk menerima pembayaran. Kami menggunakan Stripe untuk memproses pembayaran. Hubungkan atau buat akun Stripe untuk mulai menerima pembayaran. Biasanya membutuhkan waktu kurang dari 5 menit.
+                      Kalender ini belum diatur untuk menerima pembayaran. Kami
+                      menggunakan Stripe untuk memproses pembayaran. Hubungkan
+                      atau buat akun Stripe untuk mulai menerima pembayaran.
+                      Biasanya membutuhkan waktu kurang dari 5 menit.
                     </p>
                     <button
                       type="button"
@@ -756,9 +825,12 @@ export function CreateEventDialog({
               {/* Memerlukan Persetujuan */}
               <div className="flex items-center justify-between border-t border-white/5 pt-2.5">
                 <div>
-                  <div className="font-medium text-white">Memerlukan Persetujuan</div>
+                  <div className="font-medium text-white">
+                    Memerlukan Persetujuan
+                  </div>
                   <div className="text-[11px] text-white/40">
-                    Host menyetujui setiap pendaftar sebelum alamat/tiket diberikan
+                    Host menyetujui setiap pendaftar sebelum alamat/tiket
+                    diberikan
                   </div>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
@@ -784,10 +856,16 @@ export function CreateEventDialog({
                 <div className="relative">
                   <button
                     type="button"
-                    onClick={() => setIsCapacityPopoverOpen(!isCapacityPopoverOpen)}
+                    onClick={() =>
+                      setIsCapacityPopoverOpen(!isCapacityPopoverOpen)
+                    }
                     className="flex items-center gap-1.5 rounded-md px-2 py-1 text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                   >
-                    <span>{isUnlimitedCapacity ? "Tak terbatas" : `${capacity} Peserta`}</span>
+                    <span>
+                      {isUnlimitedCapacity
+                        ? "Tak terbatas"
+                        : `${capacity} Peserta`}
+                    </span>
                     <Pencil className="size-3 text-white/50" />
                   </button>
 
@@ -797,13 +875,17 @@ export function CreateEventDialog({
                       className="absolute right-0 top-8 z-30 w-60 rounded-xl border border-white/15 bg-[#1b1c20] p-3 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 text-xs"
                       style={{ overscrollBehavior: "contain" }}
                     >
-                      <div className="font-semibold text-white mb-2">Atur Kapasitas Peserta</div>
+                      <div className="font-semibold text-white mb-2">
+                        Atur Kapasitas Peserta
+                      </div>
                       <div className="space-y-2.5">
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={isUnlimitedCapacity}
-                            onChange={(e) => setIsUnlimitedCapacity(e.target.checked)}
+                            onChange={(e) =>
+                              setIsUnlimitedCapacity(e.target.checked)
+                            }
                             className="rounded border-white/20 bg-white/10 text-amber-400 focus:ring-0"
                           />
                           <span className="text-white/80">Tak terbatas</span>
@@ -817,7 +899,9 @@ export function CreateEventDialog({
                               max="10000"
                               value={capacity}
                               onChange={(e) =>
-                                setCapacity(Math.max(1, parseInt(e.target.value) || 1))
+                                setCapacity(
+                                  Math.max(1, parseInt(e.target.value) || 1),
+                                )
                               }
                               className="w-24 rounded-lg border border-white/15 bg-white/10 px-2.5 py-1 text-white text-xs outline-none"
                               placeholder="Jumlah"
@@ -849,7 +933,9 @@ export function CreateEventDialog({
                 disabled={createEventMutation.isPending || !selectedCalendarId}
                 className="w-full h-12 rounded-xl bg-white text-black font-semibold text-sm hover:bg-white/90 active:scale-98 transition-all shadow-lg cursor-pointer disabled:opacity-50"
               >
-                {createEventMutation.isPending ? "Menerbitkan Acara..." : "Buat Acara"}
+                {createEventMutation.isPending
+                  ? "Menerbitkan Acara..."
+                  : "Buat Acara"}
               </Button>
             </div>
           </div>

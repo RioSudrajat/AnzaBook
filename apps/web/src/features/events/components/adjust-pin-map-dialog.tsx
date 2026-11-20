@@ -30,15 +30,6 @@ function lat2tile(lat: number, zoom: number) {
   );
 }
 
-function tile2lon(x: number, z: number) {
-  return (x / Math.pow(2, z)) * 360 - 180;
-}
-
-function tile2lat(y: number, z: number) {
-  const n = Math.PI - (2 * Math.PI * y) / Math.pow(2, z);
-  return (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
-}
-
 export function AdjustPinMapDialog({
   open,
   onClose,
@@ -54,13 +45,18 @@ export function AdjustPinMapDialog({
   const [pinLng, setPinLng] = React.useState(currentLng || sourceLng);
   const [zoom, setZoom] = React.useState(16);
   const [isDragging, setIsDragging] = React.useState(false);
-  const [dragStart, setDragStart] = React.useState<{ x: number; y: number } | null>(null);
+  const [dragStart, setDragStart] = React.useState<{
+    x: number;
+    y: number;
+  } | null>(null);
 
   React.useEffect(() => {
     if (open) {
-      setPinLat(currentLat || sourceLat);
-      setPinLng(currentLng || sourceLng);
-      setZoom(16);
+      queueMicrotask(() => {
+        setPinLat(currentLat || sourceLat);
+        setPinLng(currentLng || sourceLng);
+        setZoom(16);
+      });
     }
   }, [open, currentLat, currentLng, sourceLat, sourceLng]);
 
@@ -145,7 +141,9 @@ export function AdjustPinMapDialog({
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 bg-[#141518]">
           <div className="flex items-center gap-2">
             <MapPin className="size-5 text-amber-400" />
-            <h2 className="text-base font-semibold text-white">Sesuaikan Pin</h2>
+            <h2 className="text-base font-semibold text-white">
+              Sesuaikan Pin
+            </h2>
           </div>
           <button
             type="button"
@@ -185,7 +183,8 @@ export function AdjustPinMapDialog({
                     // Fallback to OSM tile with dark invert filter if cartocdn is blocked
                     const tx = centerTileX + tile.x;
                     const ty = centerTileY + tile.y;
-                    (e.target as HTMLImageElement).src = `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`;
+                    (e.target as HTMLImageElement).src =
+                      `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`;
                     (e.target as HTMLImageElement).style.filter =
                       "invert(100%) hue-rotate(180deg) brightness(90%) contrast(90%)";
                   }}
@@ -236,7 +235,9 @@ export function AdjustPinMapDialog({
                     : "bg-black/90 text-white/90 border border-white/10"
                 }`}
               >
-                {distance === 0 ? "Alamat Sumber (0 m)" : `${distance} m dari alamat`}
+                {distance === 0
+                  ? "Alamat Sumber (0 m)"
+                  : `${distance} m dari alamat`}
               </div>
             </div>
           </div>
@@ -245,7 +246,9 @@ export function AdjustPinMapDialog({
           <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-none">
             <div className="rounded-full bg-black/80 border border-white/15 px-4 py-1.5 text-xs text-white/80 backdrop-blur-md shadow-lg flex items-center gap-2">
               <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Geser peta untuk menempatkan titik pintu masuk atau kumpul</span>
+              <span>
+                Geser peta untuk menempatkan titik pintu masuk atau kumpul
+              </span>
             </div>
           </div>
 
@@ -286,11 +289,13 @@ export function AdjustPinMapDialog({
             {isOutOfRange ? (
               <span className="text-red-400 flex items-center gap-1.5 font-medium">
                 <AlertCircle className="size-4 shrink-0" />
-                Jarak melebihi batas 1 km ({distance} m). Silakan geser mendekat ke alamat awal.
+                Jarak melebihi batas 1 km ({distance} m). Silakan geser mendekat
+                ke alamat awal.
               </span>
             ) : (
               <span>
-                Seret pin atau geser peta untuk menempatkannya, maksimal 1 km dari alamat. ({distance} m dari alamat)
+                Seret pin atau geser peta untuk menempatkannya, maksimal 1 km
+                dari alamat. ({distance} m dari alamat)
               </span>
             )}
           </div>

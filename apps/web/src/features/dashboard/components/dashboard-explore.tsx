@@ -6,7 +6,6 @@ import {
   Building2,
   CheckCircle,
   Clock,
-  Feather,
   Heart,
   MapPin,
   MessageSquare,
@@ -14,7 +13,6 @@ import {
   Search,
   Share2,
   Star,
-  Users,
   X,
 } from "lucide-react";
 import type { ListBooksInput } from "@starter/shared/validators/books";
@@ -27,7 +25,6 @@ import type {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BookCatalogCard } from "@/features/books/components/book-catalog-card";
-import { BookCover } from "@/features/books/components/book-cover";
 import { useCatalogBooks, useCategories } from "@/features/books/hooks";
 import {
   useFollowUser,
@@ -35,19 +32,10 @@ import {
   useUnifiedExplore,
   useVerifiedPublishers,
 } from "@/features/social/hooks";
-import {
-  useCalendars,
-  useToggleFollowCalendar,
-} from "@/features/events/hooks";
 
 type ExploreFilters = Pick<ListBooksInput, "category" | "collection">;
 type UnifiedSubTab =
-  | "teratas"
-  | "terbaru"
-  | "postingan"
-  | "buku"
-  | "orang"
-  | "komunitas";
+  "teratas" | "terbaru" | "postingan" | "buku" | "orang" | "komunitas";
 
 const pageSize = 12;
 const selectClassName =
@@ -398,7 +386,10 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
               {result &&
                 (result.communities.length > 0 ||
                   result.publishers.length > 0) && (
-                  <section aria-label="Lingkaran Komunitas & Penerbit" className="space-y-3">
+                  <section
+                    aria-label="Lingkaran Komunitas & Penerbit"
+                    className="space-y-3"
+                  >
                     <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
                       Komunitas & Penerbit
                     </h2>
@@ -490,7 +481,9 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
                 </label>
 
                 <label className="space-y-1 text-xs font-mono text-muted-foreground">
-                  <span className="text-foreground font-semibold">Tingkat Akses</span>
+                  <span className="text-foreground font-semibold">
+                    Tingkat Akses
+                  </span>
                   <select
                     className={selectClassName}
                     value={accessTier}
@@ -509,7 +502,9 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
                 </label>
 
                 <label className="space-y-1 text-xs font-mono text-muted-foreground">
-                  <span className="text-foreground font-semibold">Skema Distribusi</span>
+                  <span className="text-foreground font-semibold">
+                    Skema Distribusi
+                  </span>
                   <select
                     className={selectClassName}
                     value={digitalPolicy}
@@ -531,7 +526,9 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
                 </label>
 
                 <label className="space-y-1 text-xs font-mono text-muted-foreground">
-                  <span className="text-foreground font-semibold">Mitra Penerbit</span>
+                  <span className="text-foreground font-semibold">
+                    Mitra Penerbit
+                  </span>
                   <select
                     className={selectClassName}
                     value={selectedPublisher}
@@ -588,7 +585,9 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
                         variant="outline"
                         disabled={bookPageOffset === 0}
                         onClick={() =>
-                          setBookPageOffset(Math.max(0, bookPageOffset - pageSize))
+                          setBookPageOffset(
+                            Math.max(0, bookPageOffset - pageSize),
+                          )
                         }
                       >
                         Halaman sebelumnya
@@ -696,7 +695,10 @@ function UserSearchRow({
 
   return (
     <div className="flex items-center justify-between gap-4 p-4 hover:bg-muted/40 transition-colors">
-      <Link to={profileLink} className="flex items-center gap-3.5 min-w-0 flex-1 group">
+      <Link
+        to={profileLink}
+        className="flex items-center gap-3.5 min-w-0 flex-1 group"
+      >
         {user.image ? (
           <img
             src={user.image}
@@ -843,7 +845,9 @@ function PostFeedItem({ post }: { post: ExplorePostItemDto }) {
               className="hover:underline flex items-center gap-1.5 truncate"
             >
               <BookOpen className="size-3.5 shrink-0" />
-              <span>{post.book.title} — {post.book.author}</span>
+              <span>
+                {post.book.title} — {post.book.author}
+              </span>
             </Link>
 
             <button
@@ -852,7 +856,9 @@ function PostFeedItem({ post }: { post: ExplorePostItemDto }) {
               className="text-[#fefae0] hover:text-[#dda15e] transition-colors p-1"
               aria-label="Simpan kutipan"
             >
-              <Bookmark className={`size-4 ${isBookmarked ? "fill-current" : ""}`} />
+              <Bookmark
+                className={`size-4 ${isBookmarked ? "fill-current" : ""}`}
+              />
             </button>
           </div>
         </div>
@@ -862,7 +868,8 @@ function PostFeedItem({ post }: { post: ExplorePostItemDto }) {
             <div className="flex items-center gap-2 font-mono text-xs font-semibold text-foreground">
               <Clock className="size-4 text-orange-600" />
               <span>
-                {Math.round((post.durationSeconds || 0) / 60)} menit baca • {post.pagesRead || 0} halaman
+                {Math.round((post.durationSeconds || 0) / 60)} menit baca •{" "}
+                {post.pagesRead || 0} halaman
               </span>
             </div>
             {post.note && (
@@ -950,7 +957,11 @@ function PostFeedItem({ post }: { post: ExplorePostItemDto }) {
 }
 
 // Sub-component: CommunityCard linking to /c/$slug
-function CommunityCard({ community }: { community: ManagedCommunitySummaryDto }) {
+function CommunityCard({
+  community,
+}: {
+  community: ManagedCommunitySummaryDto;
+}) {
   return (
     <article className="flex flex-col justify-between rounded-xl border border-border/80 bg-card p-4 space-y-3 hover:border-foreground/30 transition-colors shadow-xs">
       <div className="flex items-center gap-3">
@@ -988,7 +999,11 @@ function CommunityCard({ community }: { community: ManagedCommunitySummaryDto })
 }
 
 // Sub-component: PublisherCard linking to /p/$slug
-function PublisherCard({ publisher }: { publisher: ManagedPublisherSummaryDto }) {
+function PublisherCard({
+  publisher,
+}: {
+  publisher: ManagedPublisherSummaryDto;
+}) {
   return (
     <article className="flex flex-col justify-between rounded-xl border border-border/80 bg-card p-4 space-y-3 hover:border-foreground/30 transition-colors shadow-xs">
       <div className="flex items-center gap-3">

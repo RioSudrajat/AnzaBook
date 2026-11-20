@@ -171,7 +171,10 @@ export function getGlobalPageNumber(
     return Math.min(pagination.totalPages, Math.max(1, localPageIndex + 1));
   }
   const target = chapter.startGlobalPage + Math.max(0, localPageIndex);
-  return Math.min(chapter.endGlobalPage, Math.max(chapter.startGlobalPage, target));
+  return Math.min(
+    chapter.endGlobalPage,
+    Math.max(chapter.startGlobalPage, target),
+  );
 }
 
 export function getChapterAndPageFromGlobal(
@@ -185,10 +188,7 @@ export function getChapterAndPageFromGlobal(
     return { chapterNumber: 1, localPageIndex: 0 };
   }
 
-  const clamped = Math.min(
-    pagination.totalPages,
-    Math.max(1, globalPage),
-  );
+  const clamped = Math.min(pagination.totalPages, Math.max(1, globalPage));
 
   const found = pagination.chapters.find(
     (c) => clamped >= c.startGlobalPage && clamped <= c.endGlobalPage,

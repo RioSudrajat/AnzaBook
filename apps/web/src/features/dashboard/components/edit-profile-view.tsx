@@ -1,12 +1,10 @@
-import { useState, useRef, useEffect, type FormEvent, type ChangeEvent } from "react";
+import { useState, useRef, type FormEvent, type ChangeEvent } from "react";
 import {
   ArrowLeft,
   Camera,
   Check,
   CheckCircle,
-  ExternalLink,
   Globe,
-  Layers,
   MapPin,
   Trash2,
   X,
@@ -15,7 +13,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useMySocialProfile, useUpdateSocialProfile } from "@/features/social/hooks";
+import {
+  useMySocialProfile,
+  useUpdateSocialProfile,
+} from "@/features/social/hooks";
 import { ImageCropModal } from "@/features/social/components/image-crop-modal";
 import { authClient } from "@/lib/auth-client";
 import { ApiError } from "@/lib/api/client";
@@ -60,21 +61,51 @@ type EditProfileViewProps = {
 
 export function EditProfileView({ onBack }: EditProfileViewProps) {
   const { data: profile, isLoading } = useMySocialProfile();
+
+  if (isLoading) {
+    return (
+      <div className="py-24 text-center text-xs font-mono text-muted-foreground animate-pulse">
+        Memuat formulir profil...
+      </div>
+    );
+  }
+
+  return (
+    <EditProfileForm
+      key={profile?.id ?? "empty"}
+      profile={profile}
+      onBack={onBack}
+    />
+  );
+}
+
+function EditProfileForm({
+  profile,
+  onBack,
+}: EditProfileViewProps & {
+  profile: ReturnType<typeof useMySocialProfile>["data"];
+}) {
   const updateProfileMutation = useUpdateSocialProfile();
 
   // Profile Form States
-  const [name, setName] = useState("");
-  const [username, setUsername] = useState("");
-  const [bio, setBio] = useState("");
-  const [image, setImage] = useState("");
-  const [headerImage, setHeaderImage] = useState("");
-  const [locationCity, setLocationCity] = useState("");
+  const [name, setName] = useState(profile?.name || "");
+  const [username, setUsername] = useState(profile?.username || "");
+  const [bio, setBio] = useState(profile?.bio || "");
+  const [image, setImage] = useState(profile?.image || "");
+  const [headerImage, setHeaderImage] = useState(
+    profile?.headerImage || profile?.socialLinks?.headerImage || "",
+  );
+  const [locationCity, setLocationCity] = useState(profile?.locationCity || "");
 
   // Social Links
-  const [instagram, setInstagram] = useState("");
-  const [twitter, setTwitter] = useState("");
-  const [linkedin, setLinkedin] = useState("");
-  const [website, setWebsite] = useState("");
+  const [instagram, setInstagram] = useState(
+    profile?.socialLinks?.instagram || "",
+  );
+  const [twitter, setTwitter] = useState(profile?.socialLinks?.twitter || "");
+  const [linkedin, setLinkedin] = useState(
+    profile?.socialLinks?.linkedin || "",
+  );
+  const [website, setWebsite] = useState(profile?.socialLinks?.website || "");
 
   // Status & Feedback
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -91,25 +122,11 @@ export function EditProfileView({ onBack }: EditProfileViewProps) {
 
   // Handle Edit Substack Modal State
   const [isHandleModalOpen, setIsHandleModalOpen] = useState(false);
-  const [handleChoice, setHandleChoice] = useState<"current" | "suggested" | "custom">("current");
+  const [handleChoice, setHandleChoice] = useState<
+    "current" | "suggested" | "custom"
+  >("current");
   const [customHandleInput, setCustomHandleInput] = useState("");
   const [handleError, setHandleError] = useState<string | null>(null);
-
-  // Pre-fill existing data when profile is loaded
-  useEffect(() => {
-    if (profile) {
-      setName(profile.name || "");
-      setUsername(profile.username || "");
-      setBio(profile.bio || "");
-      setImage(profile.image || "");
-      setHeaderImage(profile.headerImage || profile.socialLinks?.headerImage || "");
-      setLocationCity(profile.locationCity || "");
-      setInstagram(profile.socialLinks?.instagram || "");
-      setTwitter(profile.socialLinks?.twitter || "");
-      setLinkedin(profile.socialLinks?.linkedin || "");
-      setWebsite(profile.socialLinks?.website || "");
-    }
-  }, [profile]);
 
   // Suggested Handle (Substack Style: e.g. "tuanlangit1")
   const suggestedHandle =
@@ -129,7 +146,9 @@ export function EditProfileView({ onBack }: EditProfileViewProps) {
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      setErrorMsg("Ukuran berkas melebihi batas 5MB. Silakan pilih foto dengan ukuran maksimal 5MB.");
+      setErrorMsg(
+        "Ukuran berkas melebihi batas 5MB. Silakan pilih foto dengan ukuran maksimal 5MB.",
+      );
       return;
     }
 
@@ -155,7 +174,9 @@ export function EditProfileView({ onBack }: EditProfileViewProps) {
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      setErrorMsg("Ukuran berkas melebihi batas 5MB. Silakan pilih gambar header dengan ukuran maksimal 5MB.");
+      setErrorMsg(
+        "Ukuran berkas melebihi batas 5MB. Silakan pilih gambar header dengan ukuran maksimal 5MB.",
+      );
       return;
     }
 
@@ -194,7 +215,9 @@ export function EditProfileView({ onBack }: EditProfileViewProps) {
         .replace(/[^a-z0-9_]/g, "")
         .slice(0, 30);
       if (cleanCustom.length < 3) {
-        setHandleError("Handle khusus minimal 3 karakter (hanya huruf, angka, underscore).");
+        setHandleError(
+          "Handle khusus minimal 3 karakter (hanya huruf, angka, underscore).",
+        );
         return;
       }
       chosen = cleanCustom;
@@ -253,14 +276,6 @@ export function EditProfileView({ onBack }: EditProfileViewProps) {
       }
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="py-24 text-center text-xs font-mono text-muted-foreground animate-pulse">
-        Memuat formulir profil...
-      </div>
-    );
-  }
 
   const avatarLetter = (name || profile?.name || "N").slice(0, 1).toUpperCase();
 
@@ -333,8 +348,12 @@ export function EditProfileView({ onBack }: EditProfileViewProps) {
                   />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white transition-opacity">
                     <Camera className="size-6 mb-1" />
-                    <span className="text-xs font-medium">Ganti gambar header</span>
-                    <span className="text-[10px] text-zinc-300 font-mono mt-0.5">Maks. 5MB</span>
+                    <span className="text-xs font-medium">
+                      Ganti gambar header
+                    </span>
+                    <span className="text-[10px] text-zinc-300 font-mono mt-0.5">
+                      Maks. 5MB
+                    </span>
                   </div>
                 </>
               ) : (
@@ -342,9 +361,12 @@ export function EditProfileView({ onBack }: EditProfileViewProps) {
                   <div className="size-10 rounded-full bg-zinc-800/80 border border-zinc-700 flex items-center justify-center mb-2">
                     <Camera className="size-5" />
                   </div>
-                  <p className="text-xs font-medium">Letakkan gambar header Anda di sini</p>
+                  <p className="text-xs font-medium">
+                    Letakkan gambar header Anda di sini
+                  </p>
                   <p className="text-[11px] text-zinc-500 mt-0.5">
-                    Klik untuk memilih gambar dari perangkat • Rasio 3:1 (Maks. 5MB)
+                    Klik untuk memilih gambar dari perangkat • Rasio 3:1 (Maks.
+                    5MB)
                   </p>
                 </div>
               )}
@@ -386,7 +408,8 @@ export function EditProfileView({ onBack }: EditProfileViewProps) {
                     Foto &amp; Header Profil
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    Klik pada foto profil atau banner di atas untuk mengunggah dari perangkat lokal.
+                    Klik pada foto profil atau banner di atas untuk mengunggah
+                    dari perangkat lokal.
                   </p>
                 </div>
               </div>
@@ -448,7 +471,10 @@ export function EditProfileView({ onBack }: EditProfileViewProps) {
 
           {/* Name Field */}
           <div className="space-y-1.5">
-            <Label htmlFor="edit-name" className="text-xs font-semibold text-foreground">
+            <Label
+              htmlFor="edit-name"
+              className="text-xs font-semibold text-foreground"
+            >
               Nama Tampilan <span className="text-red-500">*</span>
             </Label>
             <Input
@@ -466,7 +492,9 @@ export function EditProfileView({ onBack }: EditProfileViewProps) {
 
           {/* Handle Field (Substack Aesthetic) */}
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold text-foreground">Handle</Label>
+            <Label className="text-xs font-semibold text-foreground">
+              Handle
+            </Label>
             <div className="flex items-center justify-between p-3 rounded-lg border border-border/80 bg-muted/20">
               <div className="font-mono text-xs sm:text-sm text-foreground flex items-center gap-1">
                 <span className="text-muted-foreground">@</span>
@@ -488,14 +516,20 @@ export function EditProfileView({ onBack }: EditProfileViewProps) {
               </Button>
             </div>
             <p className="text-[11px] font-mono text-muted-foreground">
-              Tautan profil Anda: <span className="text-foreground">anzabook.id/u/@{username || "username"}</span>
+              Tautan profil Anda:{" "}
+              <span className="text-foreground">
+                anzabook.id/u/@{username || "username"}
+              </span>
             </p>
           </div>
 
           {/* Bio Field */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <Label htmlFor="edit-bio" className="text-xs font-semibold text-foreground">
+              <Label
+                htmlFor="edit-bio"
+                className="text-xs font-semibold text-foreground"
+              >
                 Bio
               </Label>
               <span className="text-[11px] font-mono text-muted-foreground">
@@ -528,7 +562,10 @@ export function EditProfileView({ onBack }: EditProfileViewProps) {
 
           <div className="space-y-1.5">
             <div className="space-y-1.5">
-              <Label htmlFor="edit-city" className="text-xs font-semibold text-foreground">
+              <Label
+                htmlFor="edit-city"
+                className="text-xs font-semibold text-foreground"
+              >
                 Kota Domisili (Opsional)
               </Label>
               <div className="relative">
@@ -554,14 +591,18 @@ export function EditProfileView({ onBack }: EditProfileViewProps) {
               Tautan Media Sosial &amp; Website
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Hubungkan pembaca dengan kanal publik, media sosial, atau portofolio pribadi Anda.
+              Hubungkan pembaca dengan kanal publik, media sosial, atau
+              portofolio pribadi Anda.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Instagram */}
             <div className="space-y-1.5">
-              <Label htmlFor="edit-ig" className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+              <Label
+                htmlFor="edit-ig"
+                className="text-xs font-semibold text-foreground flex items-center gap-1.5"
+              >
                 <InstagramIcon className="size-3.5 text-muted-foreground" />
                 <span>Instagram</span>
               </Label>
@@ -576,7 +617,10 @@ export function EditProfileView({ onBack }: EditProfileViewProps) {
 
             {/* X / Twitter */}
             <div className="space-y-1.5">
-              <Label htmlFor="edit-twitter" className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+              <Label
+                htmlFor="edit-twitter"
+                className="text-xs font-semibold text-foreground flex items-center gap-1.5"
+              >
                 <XTwitterIcon className="size-3.5 text-muted-foreground" />
                 <span>X / Twitter</span>
               </Label>
@@ -591,7 +635,10 @@ export function EditProfileView({ onBack }: EditProfileViewProps) {
 
             {/* LinkedIn */}
             <div className="space-y-1.5">
-              <Label htmlFor="edit-linkedin" className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+              <Label
+                htmlFor="edit-linkedin"
+                className="text-xs font-semibold text-foreground flex items-center gap-1.5"
+              >
                 <LinkedInIcon className="size-3.5 text-muted-foreground" />
                 <span>LinkedIn</span>
               </Label>
@@ -606,7 +653,10 @@ export function EditProfileView({ onBack }: EditProfileViewProps) {
 
             {/* Website Pribadi */}
             <div className="space-y-1.5">
-              <Label htmlFor="edit-website" className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+              <Label
+                htmlFor="edit-website"
+                className="text-xs font-semibold text-foreground flex items-center gap-1.5"
+              >
                 <Globe className="size-3.5 text-muted-foreground" />
                 <span>Website Pribadi / Blog</span>
               </Label>
@@ -636,7 +686,9 @@ export function EditProfileView({ onBack }: EditProfileViewProps) {
             disabled={updateProfileMutation.isPending}
             className="bg-foreground text-background hover:opacity-90 text-xs font-semibold h-10 px-6 rounded-lg cursor-pointer"
           >
-            {updateProfileMutation.isPending ? "Menyimpan Perubahan..." : "Simpan Perubahan Profil"}
+            {updateProfileMutation.isPending
+              ? "Menyimpan Perubahan..."
+              : "Simpan Perubahan Profil"}
           </Button>
         </div>
       </form>
@@ -674,11 +726,15 @@ export function EditProfileView({ onBack }: EditProfileViewProps) {
             </div>
 
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Handle Anda digunakan untuk tautan profil publik (misal: <code>anzabook.id/u/@{username}</code>) dan sebutan catatan marjinalia.
+              Handle Anda digunakan untuk tautan profil publik (misal:{" "}
+              <code>anzabook.id/u/@{username}</code>) dan sebutan catatan
+              marjinalia.
             </p>
 
             {handleError && (
-              <p className="text-xs text-destructive font-mono">{handleError}</p>
+              <p className="text-xs text-destructive font-mono">
+                {handleError}
+              </p>
             )}
 
             <div className="space-y-3">
@@ -695,7 +751,9 @@ export function EditProfileView({ onBack }: EditProfileViewProps) {
                   <p className="text-xs font-semibold text-foreground font-mono">
                     @{profile?.username || username}
                   </p>
-                  <p className="text-[11px] text-muted-foreground">Gunakan handle saat ini</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Gunakan handle saat ini
+                  </p>
                 </div>
                 <div
                   className={`size-4 rounded-full border flex items-center justify-center ${
@@ -721,7 +779,9 @@ export function EditProfileView({ onBack }: EditProfileViewProps) {
                   <p className="text-xs font-semibold text-foreground font-mono">
                     @{suggestedHandle}
                   </p>
-                  <p className="text-[11px] text-muted-foreground">Saran otomatis berbasis nama</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Saran otomatis berbasis nama
+                  </p>
                 </div>
                 <div
                   className={`size-4 rounded-full border flex items-center justify-center ${
@@ -744,7 +804,9 @@ export function EditProfileView({ onBack }: EditProfileViewProps) {
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-foreground">Tulis handle sendiri</p>
+                  <p className="text-xs font-semibold text-foreground">
+                    Tulis handle sendiri
+                  </p>
                   <div
                     className={`size-4 rounded-full border flex items-center justify-center ${
                       handleChoice === "custom"

@@ -6,13 +6,12 @@ export const adminVerifyCalendarSchema = z
     verificationStatus: z
       .enum(["pending", "verified", "trusted", "rejected"])
       .optional(),
-    status: z
-      .enum(["pending", "verified", "trusted", "rejected"])
-      .optional(),
+    status: z.enum(["pending", "verified", "trusted", "rejected"]).optional(),
     rejectionReason: z.string().max(1000).optional().nullable(),
   })
   .refine(
-    (data) => data.verificationStatus !== undefined || data.status !== undefined,
+    (data) =>
+      data.verificationStatus !== undefined || data.status !== undefined,
     {
       message: "Status verifikasi wajib diisi",
     },
@@ -28,16 +27,13 @@ export const adminReviewAuthorApplicationSchema = z
 
 export const adminVerifyPublisherSchema = z
   .object({
-    verificationStatus: z
-      .enum(["pending", "verified", "rejected"])
-      .optional(),
-    status: z
-      .enum(["pending", "verified", "rejected"])
-      .optional(),
+    verificationStatus: z.enum(["pending", "verified", "rejected"]).optional(),
+    status: z.enum(["pending", "verified", "rejected"]).optional(),
     rejectionReason: z.string().max(1000).optional().nullable(),
   })
   .refine(
-    (data) => data.verificationStatus !== undefined || data.status !== undefined,
+    (data) =>
+      data.verificationStatus !== undefined || data.status !== undefined,
     {
       message: "Status verifikasi penerbit wajib diisi",
     },
@@ -101,7 +97,9 @@ export const adminListQuerySchema = z
   })
   .strict();
 
-export type AdminVerifyCalendarInput = z.infer<typeof adminVerifyCalendarSchema>;
+export type AdminVerifyCalendarInput = z.infer<
+  typeof adminVerifyCalendarSchema
+>;
 export type AdminReviewAuthorApplicationInput = z.infer<
   typeof adminReviewAuthorApplicationSchema
 >;
@@ -111,7 +109,9 @@ export type AdminVerifyPublisherInput = z.infer<
 export type AdminEditManuscriptChapterInput = z.infer<
   typeof adminEditManuscriptChapterSchema
 >;
-export type AdminEditManuscriptInput = z.infer<typeof adminEditManuscriptSchema>;
+export type AdminEditManuscriptInput = z.infer<
+  typeof adminEditManuscriptSchema
+>;
 export type AdminPublishManuscriptInput = z.infer<
   typeof adminPublishManuscriptSchema
 >;

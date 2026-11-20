@@ -361,7 +361,8 @@ export function ManuscriptStudioDialog({
                     </p>
                   </div>
                   <div className="mt-3 pt-2 border-t border-border/40 text-[10px] font-mono text-muted-foreground">
-                    Kebijakan: <code className="text-foreground">print_claim_only</code>
+                    Kebijakan:{" "}
+                    <code className="text-foreground">print_claim_only</code>
                   </div>
                 </button>
 
@@ -393,7 +394,8 @@ export function ManuscriptStudioDialog({
                     </p>
                   </div>
                   <div className="mt-3 pt-2 border-t border-border/40 text-[10px] font-mono text-muted-foreground">
-                    Kebijakan: <code className="text-foreground">sample_only</code>
+                    Kebijakan:{" "}
+                    <code className="text-foreground">sample_only</code>
                   </div>
                 </button>
 
@@ -420,12 +422,14 @@ export function ManuscriptStudioDialog({
                       Beli Putus Ala Carte
                     </p>
                     <p className="text-[11px] text-muted-foreground leading-snug">
-                      Lisensi digital mandiri. Bagi hasil 70% penulis / penerbit,
-                      20% AnzaBook, 10% komisi afiliasi kalender komunitas.
+                      Lisensi digital mandiri. Bagi hasil 70% penulis /
+                      penerbit, 20% AnzaBook, 10% komisi afiliasi kalender
+                      komunitas.
                     </p>
                   </div>
                   <div className="mt-3 pt-2 border-t border-border/40 text-[10px] font-mono text-muted-foreground">
-                    Kebijakan: <code className="text-foreground">alacarte_only</code>
+                    Kebijakan:{" "}
+                    <code className="text-foreground">alacarte_only</code>
                   </div>
                 </button>
               </div>
@@ -439,7 +443,8 @@ export function ManuscriptStudioDialog({
                     </p>
                     <p className="text-[11px] text-muted-foreground">
                       Bagi hasil otomatis: Penulis/Penerbit Rp{" "}
-                      {Math.round(alacartePrice * 0.7).toLocaleString("id-ID")} (70%)
+                      {Math.round(alacartePrice * 0.7).toLocaleString("id-ID")}{" "}
+                      (70%)
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 max-w-[180px]">
@@ -467,7 +472,9 @@ export function ManuscriptStudioDialog({
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
                   <Sparkles className="size-3.5 text-[var(--color-accent)]" />
-                  <span>3. Berkas &amp; Bab Naskah ({chapters.length} Bab)</span>
+                  <span>
+                    3. Berkas &amp; Bab Naskah ({chapters.length} Bab)
+                  </span>
                 </h3>
 
                 <button
@@ -669,13 +676,20 @@ export function ManuscriptStudioDialog({
                       </span>{" "}
                       <strong className="text-foreground">
                         Rp{" "}
-                        {rakyatTier?.recommendedPriceIdr.toLocaleString("id-ID")}
+                        {rakyatTier?.recommendedPriceIdr.toLocaleString(
+                          "id-ID",
+                        )}
                       </strong>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Royalti 12%:</span>{" "}
+                      <span className="text-muted-foreground">
+                        Royalti 12%:
+                      </span>{" "}
                       <strong>
-                        Rp {rakyatTier?.authorRoyaltyPerUnitIdr.toLocaleString("id-ID")}
+                        Rp{" "}
+                        {rakyatTier?.authorRoyaltyPerUnitIdr.toLocaleString(
+                          "id-ID",
+                        )}
                       </strong>
                     </div>
                   </div>

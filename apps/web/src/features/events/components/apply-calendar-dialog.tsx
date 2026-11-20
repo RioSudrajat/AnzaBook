@@ -1,6 +1,5 @@
 import * as React from "react";
 import { X, Calendar as CalendarIcon, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
@@ -57,7 +56,9 @@ export function ApplyCalendarDialog({
 
     const trimmedEmail = contactEmail.trim();
     if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      setErrorMsg("Format email kontak tidak valid (contoh: halo@komunitas.id atau kosongkan jika tidak ada)");
+      setErrorMsg(
+        "Format email kontak tidak valid (contoh: halo@komunitas.id atau kosongkan jika tidak ada)",
+      );
       return;
     }
 
@@ -69,18 +70,28 @@ export function ApplyCalendarDialog({
         description: description.trim(),
         city: city.trim() || undefined,
         contactEmail: trimmedEmail || undefined,
-        socialLinks: instagram.trim() ? { instagram: instagram.trim() } : undefined,
+        socialLinks: instagram.trim()
+          ? { instagram: instagram.trim() }
+          : undefined,
       });
       if (onSuccess) onSuccess(res.slug);
       onClose();
-    } catch (err: any) {
-      if (err?.details && Array.isArray(err.details) && err.details.length > 0) {
-        const detailMessages = err.details
-          .map((d: any) => `${d.message}`)
+    } catch (err: unknown) {
+      const apiErr = err as {
+        details?: Array<{ message?: string }>;
+        message?: string;
+      };
+      if (
+        apiErr?.details &&
+        Array.isArray(apiErr.details) &&
+        apiErr.details.length > 0
+      ) {
+        const detailMessages = apiErr.details
+          .map((d) => `${d.message ?? ""}`)
           .join(" • ");
         setErrorMsg(detailMessages);
       } else {
-        setErrorMsg(err.message || "Gagal membuat kalender komunitas.");
+        setErrorMsg(apiErr?.message || "Gagal membuat kalender komunitas.");
       }
     }
   };
@@ -113,7 +124,10 @@ export function ApplyCalendarDialog({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
+        <form
+          onSubmit={handleSubmit}
+          className="flex-1 overflow-y-auto p-6 space-y-4 text-xs"
+        >
           {errorMsg && (
             <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-red-300">
               {errorMsg}
@@ -121,7 +135,9 @@ export function ApplyCalendarDialog({
           )}
 
           <div className="space-y-1.5">
-            <label className="text-white/80 font-medium">Nama Kalender / Komunitas</label>
+            <label className="text-white/80 font-medium">
+              Nama Kalender / Komunitas
+            </label>
             <Input
               value={name}
               onChange={(e) => handleNameChange(e.target.value)}
@@ -132,7 +148,9 @@ export function ApplyCalendarDialog({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-white/80 font-medium">Slug Tautan Unik</label>
+            <label className="text-white/80 font-medium">
+              Slug Tautan Unik
+            </label>
             <div className="flex items-center rounded-md border border-white/10 bg-white/5 px-3 text-xs text-white/50">
               <span>anzabook.com/c/</span>
               <input
@@ -173,7 +191,9 @@ export function ApplyCalendarDialog({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-white/80 font-medium">Deskripsi Singkat</label>
+            <label className="text-white/80 font-medium">
+              Deskripsi Singkat
+            </label>
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -184,7 +204,9 @@ export function ApplyCalendarDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-white/80 font-medium">Kota / Wilayah</label>
+              <label className="text-white/80 font-medium">
+                Kota / Wilayah
+              </label>
               <Input
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
@@ -206,7 +228,9 @@ export function ApplyCalendarDialog({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-white/80 font-medium">Instagram (Opsional)</label>
+            <label className="text-white/80 font-medium">
+              Instagram (Opsional)
+            </label>
             <Input
               value={instagram}
               onChange={(e) => setInstagram(e.target.value)}
@@ -218,7 +242,8 @@ export function ApplyCalendarDialog({
           <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3 text-[11px] text-amber-200 flex items-start gap-2">
             <Sparkles className="size-4 shrink-0 mt-0.5 text-amber-400" />
             <div>
-              Setelah dibuat, Anda dapat langsung menerbitkan acara publik atau privat ke kalender ini.
+              Setelah dibuat, Anda dapat langsung menerbitkan acara publik atau
+              privat ke kalender ini.
             </div>
           </div>
 
@@ -235,7 +260,9 @@ export function ApplyCalendarDialog({
               disabled={createCalendarMutation.isPending}
               className="rounded-xl bg-white px-5 py-2 text-xs font-semibold text-black hover:bg-white/90 disabled:opacity-50 transition-all cursor-pointer shadow-sm"
             >
-              {createCalendarMutation.isPending ? "Menyimpan..." : "Buat Kalender"}
+              {createCalendarMutation.isPending
+                ? "Menyimpan..."
+                : "Buat Kalender"}
             </button>
           </div>
         </form>

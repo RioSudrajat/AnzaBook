@@ -62,7 +62,11 @@ eventsRouter.get("/calendars/:slug", optionalAuth, async (req, res) => {
   const slug = String(req.params.slug);
   const calendar = await getCalendarBySlug(slug, req.auth?.user.id);
   if (!calendar) {
-    throw new HttpError(404, "CALENDAR_NOT_FOUND", "Kalender komunitas tidak ditemukan.");
+    throw new HttpError(
+      404,
+      "CALENDAR_NOT_FOUND",
+      "Kalender komunitas tidak ditemukan.",
+    );
   }
   res.json({ data: calendar });
 });
@@ -163,7 +167,11 @@ eventsRouter.get("/calendars/:slug/members", optionalAuth, async (req, res) => {
 eventsRouter.get("/calendars/:slug/wallet", requireAuth, async (req, res) => {
   const slug = String(req.params.slug);
   const user = getAuth(req).user;
-  const wallet = await getCommunityWallet(user.id, slug, user.role ?? undefined);
+  const wallet = await getCommunityWallet(
+    user.id,
+    slug,
+    user.role ?? undefined,
+  );
   res.json({ data: wallet });
 });
 
@@ -232,7 +240,12 @@ eventsRouter.patch(
     const user = getAuth(req).user;
     const slug = String(req.params.slug);
     const input = updateEventSchema.parse(req.body);
-    const updated = await updateEvent(slug, user.id, user.role || "user", input);
+    const updated = await updateEvent(
+      slug,
+      user.id,
+      user.role || "user",
+      input,
+    );
     res.json({ data: updated });
   },
 );
@@ -251,20 +264,12 @@ eventsRouter.delete(
 );
 
 // Get event attendees (host only)
-eventsRouter.get(
-  "/:slug/attendees",
-  requireAuth,
-  async (req, res) => {
-    const user = getAuth(req).user;
-    const slug = String(req.params.slug);
-    const attendees = await getEventAttendees(
-      slug,
-      user.id,
-      user.role || "user",
-    );
-    res.json({ data: attendees });
-  },
-);
+eventsRouter.get("/:slug/attendees", requireAuth, async (req, res) => {
+  const user = getAuth(req).user;
+  const slug = String(req.params.slug);
+  const attendees = await getEventAttendees(slug, user.id, user.role || "user");
+  res.json({ data: attendees });
+});
 
 // RSVP to an event
 eventsRouter.post(
@@ -301,12 +306,7 @@ eventsRouter.post(
     const user = getAuth(req).user;
     const slug = String(req.params.slug);
     const rsvpId = String(req.params.rsvpId);
-    const rsvp = await approveRsvp(
-      slug,
-      rsvpId,
-      user.id,
-      user.role || "user",
-    );
+    const rsvp = await approveRsvp(slug, rsvpId, user.id, user.role || "user");
     res.json({ data: rsvp });
   },
 );
@@ -320,12 +320,7 @@ eventsRouter.post(
     const user = getAuth(req).user;
     const slug = String(req.params.slug);
     const rsvpId = String(req.params.rsvpId);
-    const rsvp = await rejectRsvp(
-      slug,
-      rsvpId,
-      user.id,
-      user.role || "user",
-    );
+    const rsvp = await rejectRsvp(slug, rsvpId, user.id, user.role || "user");
     res.json({ data: rsvp });
   },
 );
@@ -340,12 +335,7 @@ eventsRouter.post(
     const user = getAuth(req).user;
     const slug = String(req.params.slug);
     const input = checkInRsvpSchema.parse(req.body);
-    const result = await checkInRsvp(
-      slug,
-      input,
-      user.id,
-      user.role || "user",
-    );
+    const result = await checkInRsvp(slug, input, user.id, user.role || "user");
     res.json({ data: result });
   },
 );

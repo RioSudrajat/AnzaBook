@@ -26,6 +26,7 @@ import type {
   BookSummaryDto,
   ExplorePostItemDto,
   ExploreUserItemDto,
+  HighlightColor,
   ManagedCommunitySummaryDto,
   ManagedPublisherSummaryDto,
   PublicProfileReviewDto,
@@ -144,7 +145,9 @@ export async function getSocialProfile(
 
   // Total reading minutes
   const [readingDurationRow] = await db
-    .select({ totalSeconds: sql<number>`coalesce(sum(${readingSessions.durationSeconds}), 0)` })
+    .select({
+      totalSeconds: sql<number>`coalesce(sum(${readingSessions.durationSeconds}), 0)`,
+    })
     .from(readingSessions)
     .where(eq(readingSessions.userId, targetUser.id));
 
@@ -387,7 +390,7 @@ export async function getSocialProfile(
         author: book.author,
         coverColor: book.coverColor,
       },
-      color: quote.color as any,
+      color: quote.color as HighlightColor,
     })),
     ...sessionRows.map(({ session, book }) => ({
       id: session.id,
@@ -483,12 +486,16 @@ export async function updateMySocialProfile(
   }
 
   if (input.username !== undefined) {
-    const cleanUsername = input.username.toLowerCase().replace(/[^a-z0-9_]/g, "");
+    const cleanUsername = input.username
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, "");
     if (cleanUsername && cleanUsername !== existingUser.username) {
       const [collision] = await db
         .select({ id: user.id })
         .from(user)
-        .where(and(eq(user.username, cleanUsername), sql`${user.id} != ${userId}`))
+        .where(
+          and(eq(user.username, cleanUsername), sql`${user.id} != ${userId}`),
+        )
         .limit(1);
       if (collision) {
         throw new HttpError(
@@ -506,7 +513,8 @@ export async function updateMySocialProfile(
   }
 
   if (input.bio !== undefined) updateData.bio = input.bio;
-  if (input.locationCity !== undefined) updateData.locationCity = input.locationCity;
+  if (input.locationCity !== undefined)
+    updateData.locationCity = input.locationCity;
 
   if (input.socialLinks !== undefined || input.headerImage !== undefined) {
     const currentSocial = existingUser.socialLinks || {};
@@ -658,6 +666,10 @@ export async function applyOfficialAuthor(
   };
 }
 
+function nonAdminUserCondition() {
+  return sql`(${user.role} is null or (',' || replace(${user.role}, ' ', '') || ',') not like '%,admin,%')`;
+}
+
 export async function exploreAuthors(
   currentUserId?: string,
   query?: string,
@@ -675,9 +687,12 @@ export async function exploreAuthors(
     })
     .from(user)
     .where(
-      or(
-        eq(user.authorStatus, "verified"),
-        sql`exists (select 1 from ${books} where ${books.authorUserId} = ${user.id})`,
+      and(
+        nonAdminUserCondition(),
+        or(
+          eq(user.authorStatus, "verified"),
+          sql`exists (select 1 from ${books} where ${books.authorUserId} = ${user.id})`,
+        ),
       ),
     )
     .orderBy(desc(user.createdAt))
@@ -691,7 +706,8 @@ export async function exploreAuthors(
           a.name.toLowerCase().includes(query.toLowerCase()) ||
           (a.authorPenName &&
             a.authorPenName.toLowerCase().includes(query.toLowerCase())) ||
-          (a.username && a.username.toLowerCase().includes(query.toLowerCase())),
+          (a.username &&
+            a.username.toLowerCase().includes(query.toLowerCase())),
       )
     : authorRows;
 
@@ -755,6 +771,7 @@ export async function exploreReaders(
       locationCity: user.locationCity,
     })
     .from(user)
+    .where(nonAdminUserCondition())
     .orderBy(desc(user.createdAt))
     .limit(50);
 
@@ -764,7 +781,8 @@ export async function exploreReaders(
     ? userRows.filter(
         (u) =>
           u.name.toLowerCase().includes(query.toLowerCase()) ||
-          (u.username && u.username.toLowerCase().includes(query.toLowerCase())),
+          (u.username &&
+            u.username.toLowerCase().includes(query.toLowerCase())),
       )
     : userRows;
 
@@ -775,7 +793,10 @@ export async function exploreReaders(
       .select({ count: sql<number>`count(*)` })
       .from(userShelves)
       .where(
-        and(eq(userShelves.userId, u.id), eq(userShelves.shelfStatus, "finished")),
+        and(
+          eq(userShelves.userId, u.id),
+          eq(userShelves.shelfStatus, "finished"),
+        ),
       );
 
     const [followerCountRow] = await db
@@ -991,15 +1012,20 @@ export async function unifiedExplore(
   const rawQ = params.q?.trim() || "";
   const cleanQ = rawQ.replace(/^@/, "").trim();
   const searchPattern = cleanQ ? `%${cleanQ}%` : null;
-  const categoryPattern = params.category?.trim() ? `%${params.category.trim()}%` : null;
+  const categoryPattern = params.category?.trim()
+    ? `%${params.category.trim()}%`
+    : null;
 
   // 1. Users
-  let userCondition = sql`true`;
+  let userCondition = nonAdminUserCondition();
   if (searchPattern) {
-    userCondition = or(
-      ilike(user.name, searchPattern),
-      ilike(user.username, searchPattern),
-      ilike(user.bio, searchPattern),
+    userCondition = and(
+      nonAdminUserCondition(),
+      or(
+        ilike(user.name, searchPattern),
+        ilike(user.username, searchPattern),
+        ilike(user.bio, searchPattern),
+      ),
     )!;
   }
 
@@ -1321,7 +1347,7 @@ export async function unifiedExplore(
       createdAt: (q.postedAt || q.createdAt).toISOString(),
       author: q.user,
       book: q.book,
-      color: q.color as any,
+      color: q.color as HighlightColor,
     })),
     ...sessionRows.map((s) => ({
       id: s.id,
@@ -1412,7 +1438,11 @@ export async function togglePostSession(
     .limit(1);
 
   if (!existing) {
-    throw new HttpError(404, "SESSION_NOT_FOUND", "Sesi membaca tidak ditemukan.");
+    throw new HttpError(
+      404,
+      "SESSION_NOT_FOUND",
+      "Sesi membaca tidak ditemukan.",
+    );
   }
 
   const nextStatus =

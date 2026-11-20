@@ -1,18 +1,12 @@
-import { useState, useRef, type FormEvent, type ChangeEvent, type DragEvent } from "react";
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import {
-  Calendar,
-  Camera,
-  Check,
-  CheckCircle,
-  ExternalLink,
-  Globe,
-  Mail,
-  MapPin,
-  Trash2,
-  Users,
-  X,
-} from "lucide-react";
+  useState,
+  useRef,
+  type FormEvent,
+  type ChangeEvent,
+  type DragEvent,
+} from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { Camera, CheckCircle, ExternalLink } from "lucide-react";
 import type { CalendarType } from "@starter/shared/validators/community";
 import { SmartBackButton } from "@/components/smart-back-button";
 import { AppShell } from "@/features/dashboard/components/app-shell";
@@ -68,7 +62,6 @@ const COMMUNITY_TYPES: { value: CalendarType; label: string }[] = [
 
 export default function NewCommunityPage() {
   const sessionUser = Route.useRouteContext().session.user;
-  const navigate = useNavigate();
 
   // General State
   const [name, setName] = useState("");
@@ -83,7 +76,7 @@ export default function NewCommunityPage() {
   const [contactEmail, setContactEmail] = useState("");
   const [instagram, setInstagram] = useState("");
   const [twitter, setTwitter] = useState("");
-  const [website, setWebsite] = useState("");
+  const [website] = useState("");
   const [docTitle, setDocTitle] = useState("");
   const [docUrl, setDocUrl] = useState("");
 
@@ -176,7 +169,9 @@ export default function NewCommunityPage() {
       return;
     }
     if (trimmedSlug.length < 3) {
-      setFormError("Slug URL minimal 3 karakter (hanya huruf kecil, angka, dan strip).");
+      setFormError(
+        "Slug URL minimal 3 karakter (hanya huruf kecil, angka, dan strip).",
+      );
       return;
     }
 
@@ -223,7 +218,11 @@ export default function NewCommunityPage() {
 
   if (createdSlug) {
     return (
-      <AppShell user={sessionUser} activeTab="events" title="Daftarkan Komunitas">
+      <AppShell
+        user={sessionUser}
+        activeTab="events"
+        title="Daftarkan Komunitas"
+      >
         <div className="max-w-2xl mx-auto py-14 text-center space-y-6">
           <div className="size-16 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
             <CheckCircle className="size-8" />
@@ -234,7 +233,11 @@ export default function NewCommunityPage() {
               Pengajuan Komunitas Berhasil Dikirim
             </h1>
             <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed max-w-md mx-auto">
-              Ruang kalender komunitas <strong>{name}</strong> telah diajukan dan sedang dalam proses peninjauan kurasi &amp; verifikasi oleh Tim Admin AnzaBook. Anda dapat memantau status persetujuan di tab Profil Anda. Setelah disetujui, Anda dapat langsung mengedit tampilan dan mempublikasikan agenda bedah buku.
+              Ruang kalender komunitas <strong>{name}</strong> telah diajukan
+              dan sedang dalam proses peninjauan kurasi &amp; verifikasi oleh
+              Tim Admin AnzaBook. Anda dapat memantau status persetujuan di tab
+              Profil Anda. Setelah disetujui, Anda dapat langsung mengedit
+              tampilan dan mempublikasikan agenda bedah buku.
             </p>
           </div>
 
@@ -271,7 +274,9 @@ export default function NewCommunityPage() {
             Pendaftaran Komunitas Literasi &amp; Ruang Baca
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed max-w-2xl">
-            Kelola ruang temu pembaca kota Anda. Publikasikan kalender agenda, kelola RSVP tiket diskusi, dan peroleh kas afiliasi 10% dari setiap pembelian buku dan keanggotaan Nakama melalui tautan komunitas Anda.
+            Kelola ruang temu pembaca kota Anda. Publikasikan kalender agenda,
+            kelola RSVP tiket diskusi, dan peroleh kas afiliasi 10% dari setiap
+            pembelian buku dan keanggotaan Nakama melalui tautan komunitas Anda.
           </p>
         </div>
 
@@ -285,12 +290,17 @@ export default function NewCommunityPage() {
         <form onSubmit={handleSubmit} className="space-y-12">
           {/* ================= SECTION 1: GENERAL ================= */}
           <section className="space-y-8">
-            <h2 className="font-serif text-xl font-bold text-foreground">1. Identitas Komunitas</h2>
+            <h2 className="font-serif text-xl font-bold text-foreground">
+              1. Identitas Komunitas
+            </h2>
 
             {/* Nama Komunitas */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
               <div className="w-full sm:w-56 shrink-0 space-y-1">
-                <Label htmlFor="comm-name" className="text-sm font-semibold text-foreground">
+                <Label
+                  htmlFor="comm-name"
+                  className="text-sm font-semibold text-foreground"
+                >
                   Nama Komunitas<span className="text-red-500">*</span>
                 </Label>
               </div>
@@ -311,7 +321,12 @@ export default function NewCommunityPage() {
                     value={slug}
                     onChange={(e) => {
                       setIsSlugManuallyEdited(true);
-                      setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 80));
+                      setSlug(
+                        e.target.value
+                          .toLowerCase()
+                          .replace(/[^a-z0-9-]/g, "")
+                          .slice(0, 80),
+                      );
                     }}
                     placeholder="nama-komunitas"
                     className="bg-transparent border-b border-border/80 focus:border-foreground outline-hidden text-foreground font-semibold px-1 py-0.5 text-xs font-mono"
@@ -350,7 +365,10 @@ export default function NewCommunityPage() {
             {/* Deskripsi Komunitas */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
               <div className="w-full sm:w-56 shrink-0 space-y-1">
-                <Label htmlFor="comm-desc" className="text-sm font-semibold text-foreground">
+                <Label
+                  htmlFor="comm-desc"
+                  className="text-sm font-semibold text-foreground"
+                >
                   Deskripsi &amp; Visi
                 </Label>
               </div>
@@ -365,7 +383,9 @@ export default function NewCommunityPage() {
                   className="text-sm rounded-lg leading-relaxed resize-none"
                 />
                 <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                  <span>Tampil pada halaman kalender publik dan pratinjau acara.</span>
+                  <span>
+                    Tampil pada halaman kalender publik dan pratinjau acara.
+                  </span>
                   <span className="font-mono">{description.length}/500</span>
                 </div>
               </div>
@@ -384,9 +404,12 @@ export default function NewCommunityPage() {
 
               <div className="flex-1 max-w-xl flex flex-col sm:flex-row items-start gap-6">
                 <div className="space-y-1.5 flex-1">
-                  <h4 className="font-semibold text-xs text-foreground">Unggah Logo</h4>
+                  <h4 className="font-semibold text-xs text-foreground">
+                    Unggah Logo
+                  </h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Tarik dan letakkan berkas gambar atau klik kotak di samping untuk memilih dari perangkat lokal.
+                    Tarik dan letakkan berkas gambar atau klik kotak di samping
+                    untuk memilih dari perangkat lokal.
                   </p>
                   <p className="text-[11px] font-mono text-muted-foreground">
                     Format: JPG, PNG, WebP • Maks. 5MB
@@ -442,12 +465,17 @@ export default function NewCommunityPage() {
 
           {/* ================= SECTION 2: LOKASI & KONTAK ================= */}
           <section className="space-y-8 border-t border-border pt-8">
-            <h2 className="font-serif text-xl font-bold text-foreground">2. Lokasi &amp; Narahubung</h2>
+            <h2 className="font-serif text-xl font-bold text-foreground">
+              2. Lokasi &amp; Narahubung
+            </h2>
 
             {/* Kota Domisili */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
               <div className="w-full sm:w-56 shrink-0 space-y-1">
-                <Label htmlFor="comm-city" className="text-sm font-semibold text-foreground">
+                <Label
+                  htmlFor="comm-city"
+                  className="text-sm font-semibold text-foreground"
+                >
                   Kota Domisili / Basecamp
                 </Label>
               </div>
@@ -466,7 +494,10 @@ export default function NewCommunityPage() {
             {/* Email Kontak */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
               <div className="w-full sm:w-56 shrink-0 space-y-1">
-                <Label htmlFor="comm-email" className="text-sm font-semibold text-foreground">
+                <Label
+                  htmlFor="comm-email"
+                  className="text-sm font-semibold text-foreground"
+                >
                   Email Narahubung
                 </Label>
               </div>
@@ -493,7 +524,10 @@ export default function NewCommunityPage() {
 
               <div className="flex-1 max-w-xl grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <Label htmlFor="comm-ig" className="text-xs font-mono text-muted-foreground flex items-center gap-1">
+                  <Label
+                    htmlFor="comm-ig"
+                    className="text-xs font-mono text-muted-foreground flex items-center gap-1"
+                  >
                     <InstagramIcon className="size-3.5" />
                     <span>Instagram</span>
                   </Label>
@@ -507,7 +541,10 @@ export default function NewCommunityPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="comm-x" className="text-xs font-mono text-muted-foreground flex items-center gap-1">
+                  <Label
+                    htmlFor="comm-x"
+                    className="text-xs font-mono text-muted-foreground flex items-center gap-1"
+                  >
                     <XTwitterIcon className="size-3.5" />
                     <span>X / Twitter</span>
                   </Label>
@@ -528,13 +565,17 @@ export default function NewCommunityPage() {
                   Dokumen Legalitas / Berkas
                 </Label>
                 <p className="text-[11px] text-muted-foreground">
-                  Opsional: sertakan tautan berkas SK / akta / surat komunitas untuk mempercepat verifikasi admin.
+                  Opsional: sertakan tautan berkas SK / akta / surat komunitas
+                  untuk mempercepat verifikasi admin.
                 </p>
               </div>
 
               <div className="flex-1 max-w-xl grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <Label htmlFor="comm-doc-title" className="text-xs font-mono text-muted-foreground">
+                  <Label
+                    htmlFor="comm-doc-title"
+                    className="text-xs font-mono text-muted-foreground"
+                  >
                     Judul Dokumen
                   </Label>
                   <Input
@@ -547,7 +588,10 @@ export default function NewCommunityPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="comm-doc-url" className="text-xs font-mono text-muted-foreground">
+                  <Label
+                    htmlFor="comm-doc-url"
+                    className="text-xs font-mono text-muted-foreground"
+                  >
                     Tautan Dokumen (Google Drive / PDF)
                   </Label>
                   <Input
@@ -576,7 +620,9 @@ export default function NewCommunityPage() {
               disabled={isSubmitting}
               className="bg-foreground text-background hover:opacity-90 min-h-11 px-8 text-xs font-semibold rounded-xl cursor-pointer"
             >
-              {isSubmitting ? "Mendaftarkan Komunitas..." : "Daftarkan Komunitas Literasi"}
+              {isSubmitting
+                ? "Mendaftarkan Komunitas..."
+                : "Daftarkan Komunitas Literasi"}
             </Button>
           </div>
         </form>

@@ -363,7 +363,13 @@ export type CommunityEventSummaryDto = {
   status: "draft" | "pending_review" | "published" | "canceled" | "completed";
   attendeeCount: number;
   attendeesPreview: EventAttendeePreviewDto[];
-  userRsvpStatus?: "going" | "pending_approval" | "waitlisted" | "canceled" | "rejected" | null;
+  userRsvpStatus?:
+    | "going"
+    | "pending_approval"
+    | "waitlisted"
+    | "canceled"
+    | "rejected"
+    | null;
   canManage?: boolean;
   pendingRsvpCount?: number;
 };

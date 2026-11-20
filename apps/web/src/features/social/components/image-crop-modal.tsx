@@ -1,5 +1,12 @@
-import { useState, useRef, useEffect, useCallback, type MouseEvent, type TouchEvent } from "react";
-import { Check, Move, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  type MouseEvent,
+  type TouchEvent,
+} from "react";
+import { Check, Move, RotateCcw, X, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type ImageCropModalProps = {
@@ -33,8 +40,10 @@ export function ImageCropModal({
   // Reset zoom & pan when imageSrc changes
   useEffect(() => {
     if (isOpen) {
-      setZoom(1);
-      setOffset({ x: 0, y: 0 });
+      queueMicrotask(() => {
+        setZoom(1);
+        setOffset({ x: 0, y: 0 });
+      });
     }
   }, [isOpen, imageSrc]);
 
@@ -112,7 +121,8 @@ export function ImageCropModal({
     // Source image dimensions and render scale
     const img = imgRef.current;
     const imgDisplayWidth = frameRect.width * zoom;
-    const imgDisplayHeight = (frameRect.width / (imgNaturalSize.width / imgNaturalSize.height)) * zoom;
+    const imgDisplayHeight =
+      (frameRect.width / (imgNaturalSize.width / imgNaturalSize.height)) * zoom;
 
     // Scale ratio between canvas target and display frame
     const scaleFactor = targetWidth / frameRect.width;
@@ -152,7 +162,9 @@ export function ImageCropModal({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border/80 pb-3">
           <div className="space-y-0.5">
-            <h3 className="font-serif text-lg font-bold text-foreground">{title}</h3>
+            <h3 className="font-serif text-lg font-bold text-foreground">
+              {title}
+            </h3>
             <p className="text-xs text-muted-foreground">
               Geser dan sesuaikan zoom gambar agar pas dengan frame.
             </p>

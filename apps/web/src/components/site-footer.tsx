@@ -17,7 +17,9 @@ type ModalType =
   | null;
 
 export function SiteFooter() {
-  const [downloadPlatform, setDownloadPlatform] = useState<"android" | "ios" | null>(null);
+  const [downloadPlatform, setDownloadPlatform] = useState<
+    "android" | "ios" | null
+  >(null);
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [feedbackCategory, setFeedbackCategory] = useState("Katalog & Naskah");
@@ -54,7 +56,9 @@ export function SiteFooter() {
               <div>
                 <Brand size="default" />
                 <p className="mt-3 text-xs text-muted-foreground font-sans leading-relaxed">
-                  Ekosistem literasi yang merawat karya penulis dan memperluas akses membaca lewat digital, cetak rakyat terjangkau, serta sudut baca di Indonesia.
+                  Ekosistem literasi yang merawat karya penulis dan memperluas
+                  akses membaca lewat digital, cetak rakyat terjangkau, serta
+                  sudut baca di Indonesia.
                 </p>
               </div>
 
@@ -293,7 +297,12 @@ export function SiteFooter() {
                           <stop offset="100%" stopColor="#285AEB" />
                         </linearGradient>
                       </defs>
-                      <rect width="24" height="24" rx="6" fill="url(#footer-ig-grad-theme)" />
+                      <rect
+                        width="24"
+                        height="24"
+                        rx="6"
+                        fill="url(#footer-ig-grad-theme)"
+                      />
                       <rect
                         x="5.5"
                         y="5.5"
@@ -493,15 +502,16 @@ export function SiteFooter() {
                 </h3>
                 <div className="text-sm text-muted-foreground leading-relaxed space-y-3 font-sans">
                   <p>
-                    AnzaBook adalah ekosistem literasi yang merawat karya penulis
-                    dan memperluas akses membaca. Menghadirkan ragam novel fiksi dan
-                    nonfiksi lewat akses digital dan cetak rakyat yang terjangkau,
-                    serta merajut ruang temu komunitas dan sudut baca di Indonesia.
+                    AnzaBook adalah ekosistem literasi yang merawat karya
+                    penulis dan memperluas akses membaca. Menghadirkan ragam
+                    novel fiksi dan nonfiksi lewat akses digital dan cetak
+                    rakyat yang terjangkau, serta merajut ruang temu komunitas
+                    dan sudut baca di Indonesia.
                   </p>
                   <p>
-                    Kami berkomitmen menjaga hak cipta penulis dengan perlindungan
-                    digital yang aman, menjunjung keadilan royalti, serta merobohkan
-                    sekat pembatas bacaan bagi masyarakat luas.
+                    Kami berkomitmen menjaga hak cipta penulis dengan
+                    perlindungan digital yang aman, menjunjung keadilan royalti,
+                    serta merobohkan sekat pembatas bacaan bagi masyarakat luas.
                   </p>
                   <div className="pt-2">
                     <Button asChild size="sm" className="w-full sm:w-auto">
@@ -578,14 +588,16 @@ export function SiteFooter() {
                   </h3>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Suara pembaca membentuk arah pengembangan kurasi dan cetak rakyat AnzaBook.
+                  Suara pembaca membentuk arah pengembangan kurasi dan cetak
+                  rakyat AnzaBook.
                 </p>
 
                 {feedbackSent ? (
                   <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/30 text-green-700 dark:text-green-300 flex items-center gap-3">
                     <Check className="size-5 shrink-0" />
                     <span className="text-sm font-medium">
-                      Terima kasih! Feedback Anda telah diterima redaksi AnzaBook.
+                      Terima kasih! Feedback Anda telah diterima redaksi
+                      AnzaBook.
                     </span>
                   </div>
                 ) : (
@@ -599,9 +611,15 @@ export function SiteFooter() {
                         onChange={(e) => setFeedbackCategory(e.target.value)}
                         className="w-full text-xs rounded-md border border-input bg-background px-3 py-2 text-foreground focus-visible:outline-2 focus-visible:outline-ring"
                       >
-                        <option value="Katalog & Naskah">Katalog & Naskah Baru</option>
-                        <option value="Kualitas Cetak Rakyat">Kualitas Buku Cetak Rakyat</option>
-                        <option value="Pengalaman E-Reader">Pengalaman Baca Digital (E-Reader)</option>
+                        <option value="Katalog & Naskah">
+                          Katalog & Naskah Baru
+                        </option>
+                        <option value="Kualitas Cetak Rakyat">
+                          Kualitas Buku Cetak Rakyat
+                        </option>
+                        <option value="Pengalaman E-Reader">
+                          Pengalaman Baca Digital (E-Reader)
+                        </option>
                         <option value="Saran Fitur">Usulan Fitur Baru</option>
                       </select>
                     </div>
@@ -653,7 +671,9 @@ export function SiteFooter() {
                   </h3>
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Kami percaya membaca paling bermakna saat dipercakapkan bersama. Bergabunglah dengan simpul literasi kami di berbagai kota:
+                  Kami percaya membaca paling bermakna saat dipercakapkan
+                  bersama. Bergabunglah dengan simpul literasi kami di berbagai
+                  kota:
                 </p>
                 <div className="space-y-2.5">
                   <a
@@ -664,10 +684,13 @@ export function SiteFooter() {
                   >
                     <div className="font-semibold text-foreground flex items-center justify-between">
                       <span>Telegram Nakama Literasi</span>
-                      <span className="text-[10px] font-mono text-[var(--color-accent)]">Aktif</span>
+                      <span className="text-[10px] font-mono text-[var(--color-accent)]">
+                        Aktif
+                      </span>
                     </div>
                     <p className="text-muted-foreground">
-                      Diskusi buku mingguan, bedah naskah bersama kurator, dan info pra-pesan edisi cetak rakyat.
+                      Diskusi buku mingguan, bedah naskah bersama kurator, dan
+                      info pra-pesan edisi cetak rakyat.
                     </p>
                   </a>
 
@@ -679,10 +702,13 @@ export function SiteFooter() {
                   >
                     <div className="font-semibold text-foreground flex items-center justify-between">
                       <span>Discord Kolektif Pembaca</span>
-                      <span className="text-[10px] font-mono text-[var(--color-accent)]">Komunitas</span>
+                      <span className="text-[10px] font-mono text-[var(--color-accent)]">
+                        Komunitas
+                      </span>
                     </div>
                     <p className="text-muted-foreground">
-                      Voice channel membaca bersama hening (Silent Reading Party) dan lokakarya penulisan.
+                      Voice channel membaca bersama hening (Silent Reading
+                      Party) dan lokakarya penulisan.
                     </p>
                   </a>
                 </div>
@@ -700,16 +726,30 @@ export function SiteFooter() {
                 </div>
                 <div className="text-sm text-muted-foreground leading-relaxed space-y-3 font-sans">
                   <p>
-                    AnzaBook mengundang penulis, pemikir, periset independen, dan pegiat literasi untuk menerbitkan naskah tanpa skema seleksi elitis.
+                    AnzaBook mengundang penulis, pemikir, periset independen,
+                    dan pegiat literasi untuk menerbitkan naskah tanpa skema
+                    seleksi elitis.
                   </p>
                   <div className="p-3 bg-muted/50 rounded-lg text-xs space-y-1.5 border border-border/70 font-mono">
-                    <p><strong>Fokus:</strong> Esai Kritis, Sastra Realis, Sejarah, Sains Populer, Ekonomi Politik.</p>
-                    <p><strong>Panjang:</strong> 15.000 – 50.000 kata.</p>
-                    <p><strong>Royalti:</strong> 12–15% dari harga jual riil, dibayarkan transparan tiap kuartal.</p>
+                    <p>
+                      <strong>Fokus:</strong> Esai Kritis, Sastra Realis,
+                      Sejarah, Sains Populer, Ekonomi Politik.
+                    </p>
+                    <p>
+                      <strong>Panjang:</strong> 15.000 – 50.000 kata.
+                    </p>
+                    <p>
+                      <strong>Royalti:</strong> 12–15% dari harga jual riil,
+                      dibayarkan transparan tiap kuartal.
+                    </p>
                   </div>
                   <p className="text-xs">
-                    Kirimkan proposal naskah beserta sinopsis dan 2 bab sampel ke{" "}
-                    <a href="mailto:naskah@anzabook.id" className="text-[var(--color-accent)] underline font-medium">
+                    Kirimkan proposal naskah beserta sinopsis dan 2 bab sampel
+                    ke{" "}
+                    <a
+                      href="mailto:naskah@anzabook.id"
+                      className="text-[var(--color-accent)] underline font-medium"
+                    >
                       naskah@anzabook.id
                     </a>{" "}
                     dengan subjek [Kirim Naskah] - Judul Buku - Nama Penulis.
@@ -725,25 +765,44 @@ export function SiteFooter() {
                   AnzaBook Talent Pool
                 </h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Kami membuka kesempatan bagi pegiat kreatif untuk berkolaborasi dalam rantai produksi buku terjangkau:
+                  Kami membuka kesempatan bagi pegiat kreatif untuk
+                  berkolaborasi dalam rantai produksi buku terjangkau:
                 </p>
                 <div className="space-y-2 text-xs text-muted-foreground">
                   <div className="p-2.5 rounded-md border border-border bg-muted/30">
-                    <p className="font-semibold text-foreground">1. Tipografer & Penata Letak Buku (Typesetter)</p>
-                    <p className="text-[11px] mt-0.5">Berpengalaman menata layout buku hemat kertas dengan tipografi presisi.</p>
+                    <p className="font-semibold text-foreground">
+                      1. Tipografer & Penata Letak Buku (Typesetter)
+                    </p>
+                    <p className="text-[11px] mt-0.5">
+                      Berpengalaman menata layout buku hemat kertas dengan
+                      tipografi presisi.
+                    </p>
                   </div>
                   <div className="p-2.5 rounded-md border border-border bg-muted/30">
-                    <p className="font-semibold text-foreground">2. Proofreader & Editor Salinan</p>
-                    <p className="text-[11px] mt-0.5">Kecermatan tinggi dalam PUEBI dan ritme kalimat bahasa Indonesia.</p>
+                    <p className="font-semibold text-foreground">
+                      2. Proofreader & Editor Salinan
+                    </p>
+                    <p className="text-[11px] mt-0.5">
+                      Kecermatan tinggi dalam PUEBI dan ritme kalimat bahasa
+                      Indonesia.
+                    </p>
                   </div>
                   <div className="p-2.5 rounded-md border border-border bg-muted/30">
-                    <p className="font-semibold text-foreground">3. Koordinator Simpul Lapak Baca Trotoar</p>
-                    <p className="text-[11px] mt-0.5">Mengorganisir titik temu baca fisik di kota atau kabupaten Anda.</p>
+                    <p className="font-semibold text-foreground">
+                      3. Koordinator Simpul Lapak Baca Trotoar
+                    </p>
+                    <p className="text-[11px] mt-0.5">
+                      Mengorganisir titik temu baca fisik di kota atau kabupaten
+                      Anda.
+                    </p>
                   </div>
                 </div>
                 <p className="text-xs pt-1">
                   Kirim portofolio atau perkenalan diri ke{" "}
-                  <a href="mailto:karir@anzabook.id" className="text-[var(--color-accent)] underline font-medium">
+                  <a
+                    href="mailto:karir@anzabook.id"
+                    className="text-[var(--color-accent)] underline font-medium"
+                  >
                     karir@anzabook.id
                   </a>
                   .

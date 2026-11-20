@@ -1,11 +1,5 @@
 import { useState } from "react";
-import {
-  Check,
-  Download,
-  MessageCircle,
-  Share2,
-  X,
-} from "lucide-react";
+import { Check, Download, MessageCircle, Share2, X } from "lucide-react";
 import type { HighlightColor } from "@starter/shared/types";
 import { Button } from "@/components/ui/button";
 

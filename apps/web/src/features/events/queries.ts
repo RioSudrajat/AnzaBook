@@ -23,7 +23,8 @@ export const eventsKeys = {
   calendar: (slug: string) => [...eventsKeys.calendars(), slug] as const,
   calendarMembers: (slug: string) =>
     [...eventsKeys.calendars(), "members", slug] as const,
-  wallet: (slug: string) => [...eventsKeys.calendars(), "wallet", slug] as const,
+  wallet: (slug: string) =>
+    [...eventsKeys.calendars(), "wallet", slug] as const,
   locations: () => [...eventsKeys.all, "locations"] as const,
 };
 

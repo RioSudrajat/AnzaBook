@@ -109,9 +109,7 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     await expect(
       page.getByRole("heading", { name: chapter.title, exact: true, level: 1 }),
     ).toBeVisible();
-    await expect(
-      page.getByText(/Page 2 of 2/i),
-    ).toBeVisible();
+    await expect(page.getByText(/Page 2 of 2/i)).toBeVisible();
     await expect(page.getByText("99%", { exact: true })).toBeVisible();
 
     await page.setViewportSize({ width: 1700, height: 1050 });

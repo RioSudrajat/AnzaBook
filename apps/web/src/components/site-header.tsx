@@ -58,7 +58,11 @@ export function SiteHeader({ session }: SiteHeaderProps) {
         {/* Right CTA */}
         <div className="flex items-center gap-1.5 sm:gap-3">
           {session ? (
-            <Button asChild size="sm" className="min-h-10 text-xs sm:text-sm px-2.5 sm:px-3">
+            <Button
+              asChild
+              size="sm"
+              className="min-h-10 text-xs sm:text-sm px-2.5 sm:px-3"
+            >
               <Link to="/app">
                 <BookOpen className="size-3.5 sm:size-4 mr-1 sm:mr-1.5" />
                 <span>Ruang Baca</span>
@@ -67,13 +71,22 @@ export function SiteHeader({ session }: SiteHeaderProps) {
             </Button>
           ) : (
             <>
-              <Button asChild variant="ghost" size="sm" className="min-h-10 px-2 sm:px-3 text-xs sm:text-sm">
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className="min-h-10 px-2 sm:px-3 text-xs sm:text-sm"
+              >
                 <Link to="/sign-in">
                   <UserIcon className="size-3.5 sm:size-4 mr-1 sm:mr-1.5" />
                   Masuk
                 </Link>
               </Button>
-              <Button asChild size="sm" className="min-h-10 px-2.5 sm:px-3 text-xs sm:text-sm">
+              <Button
+                asChild
+                size="sm"
+                className="min-h-10 px-2.5 sm:px-3 text-xs sm:text-sm"
+              >
                 <Link to="/sign-up">
                   Daftar<span className="hidden sm:inline">&nbsp;Membaca</span>
                 </Link>

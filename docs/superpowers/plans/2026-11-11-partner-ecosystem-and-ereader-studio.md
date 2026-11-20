@@ -4,7 +4,8 @@
 
 **Goal:** Unify Community, Publisher, and Author onboarding into a single-door Partner Program with Admin Profile Dossier review, multi-entity profile management, and a unified Medium/Substack-style E-Reader WYSIWYG studio for authors and publishers.
 
-**Architecture:** 
+**Architecture:**
+
 1. Database: Extend `communityCalendars`, `publishers`, `authorApplications`, and `manuscriptSubmissions` in PostgreSQL/Drizzle with verification documents, rejection reasons, rich profile assets, and a draft state machine.
 2. Shared & API: Strict Zod schemas and DTOs in `packages/shared`, Express services in `apps/api` guarding event creation by verified status, providing multi-entity user profiles, and powering draft/review lifecycle endpoints.
 3. Web: Remove duplicate modal dialogs, route all onboarding to `/partner-program`, provide Admin Profile Dossier review, add managed entity lists & "Karya" tab in profile, add profile editing to `/c/$slug` and `/p/$slug`, and integrate WYSIWYG writing/reviewing directly into the E-Reader canvas.
@@ -27,6 +28,7 @@
 ### Task 1: Skema Database & Drizzle Migrations
 
 **Files:**
+
 - Modify: `apps/api/src/db/schema/events.ts`
 - Modify: `apps/api/src/db/schema/publishers.ts`
 - Modify: `apps/api/src/db/schema/social.ts`
@@ -43,6 +45,7 @@
 ### Task 2: Shared Contracts & Validators
 
 **Files:**
+
 - Modify: `packages/shared/src/types/api.ts`
 - Modify: `packages/shared/src/validators/events.ts`
 - Modify: `packages/shared/src/validators/publisher.ts`
@@ -58,6 +61,7 @@
 ### Task 3: Backend API Services & Routes
 
 **Files:**
+
 - Modify: `apps/api/src/services/events.service.ts`
 - Modify: `apps/api/src/routes/events.routes.ts`
 - Modify: `apps/api/src/services/publisher.service.ts`
@@ -77,6 +81,7 @@
 ### Task 4: Frontend Single-Door Onboarding & Admin Dossier Review
 
 **Files:**
+
 - Modify: `apps/web/src/features/events/components/dashboard-events.tsx`
 - Modify: `apps/web/src/features/events/components/create-event-dialog.tsx`
 - Modify: `apps/web/src/routes/_protected/communities.new.tsx`
@@ -93,6 +98,7 @@
 ### Task 5: User Profile Management & Entity Pages
 
 **Files:**
+
 - Modify: `apps/web/src/features/dashboard/components/dashboard-profile.tsx`
 - Modify: `apps/web/src/routes/u.$username.tsx`
 - Modify: `apps/web/src/routes/c.$slug.tsx`
@@ -107,6 +113,7 @@
 ### Task 6: Unified E-Reader WYSIWYG Studio
 
 **Files:**
+
 - Create/Modify: `apps/web/src/features/reader/components/reader-studio-workspace.tsx`
 - Modify: `apps/web/src/routes/_protected/read.$slug.tsx` (or studio route)
 - Modify: `apps/web/src/features/social/components/manuscript-studio-dialog.tsx`

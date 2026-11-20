@@ -14,7 +14,7 @@ export type ExtractionResult = {
 };
 
 const CHAPTER_HEADING_REGEX =
-  /^(?:BAB\s+([0-9]+|[IVXLCDM]+|SATU|DUA|TIGA|EMPAT|LIMA|ENAM|TUJUH|DELAPAN|SEMBILAN|SEPULUH|[A-Z]\b)|Chapter\s+([0-9]+|[IVXLCDM]+|[A-Z]\b)|Bagian\s+(?:Ke-)?([0-9]+|[IVXLCDM]+|[A-Z]\b))(?:\s*[:\-\.]\s*|\s+)([^\n]*)$/i;
+  /^(?:BAB\s+([0-9]+|[IVXLCDM]+|SATU|DUA|TIGA|EMPAT|LIMA|ENAM|TUJUH|DELAPAN|SEMBILAN|SEPULUH|[A-Z]\b)|Chapter\s+([0-9]+|[IVXLCDM]+|[A-Z]\b)|Bagian\s+(?:Ke-)?([0-9]+|[IVXLCDM]+|[A-Z]\b))(?:\s*[:\-.]\s*|\s+)([^\n]*)$/i;
 
 function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
@@ -33,7 +33,9 @@ function decodeXmlEntities(str: string): string {
  * Client-side unzipper for extracting word/document.xml from .docx in memory
  * using native web standards (DecompressionStream).
  */
-async function extractWordDocumentXml(arrayBuffer: ArrayBuffer): Promise<string> {
+async function extractWordDocumentXml(
+  arrayBuffer: ArrayBuffer,
+): Promise<string> {
   const bytes = new Uint8Array(arrayBuffer);
   if (bytes.length < 22) {
     throw new Error("Berkas .docx terlalu kecil atau rusak.");
@@ -42,7 +44,11 @@ async function extractWordDocumentXml(arrayBuffer: ArrayBuffer): Promise<string>
   // 1. Locate End of Central Directory (EOCD) signature: 0x50, 0x4b, 0x05, 0x06
   let eocdOffset = -1;
   const maxSearch = Math.min(bytes.length - 22, 65557);
-  for (let i = bytes.length - 22; i >= bytes.length - 22 - maxSearch && i >= 0; i--) {
+  for (
+    let i = bytes.length - 22;
+    i >= bytes.length - 22 - maxSearch && i >= 0;
+    i--
+  ) {
     if (
       bytes[i] === 0x50 &&
       bytes[i + 1] === 0x4b &&
@@ -362,7 +368,9 @@ export async function extractManuscriptFromFile(
     );
 
     if (chapters.length === 0) {
-      throw new Error("Tidak ada bab yang berhasil diekstrak dari berkas .docx.");
+      throw new Error(
+        "Tidak ada bab yang berhasil diekstrak dari berkas .docx.",
+      );
     }
 
     const totalWords = chapters.reduce(
@@ -392,7 +400,9 @@ export async function extractManuscriptFromFile(
     const chapters = parseTxtToChapters(text, `Bab 1: ${baseName}`);
 
     if (chapters.length === 0) {
-      throw new Error("Tidak ada bab yang berhasil diekstrak dari berkas .txt.");
+      throw new Error(
+        "Tidak ada bab yang berhasil diekstrak dari berkas .txt.",
+      );
     }
 
     const totalWords = chapters.reduce(

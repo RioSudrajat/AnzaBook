@@ -1,18 +1,12 @@
-import { useState, useRef, type FormEvent, type ChangeEvent, type DragEvent } from "react";
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import {
-  Camera,
-  Check,
-  CheckCircle,
-  ExternalLink,
-  Globe,
-  Mail,
-  MapPin,
-  PenTool,
-  Plus,
-  Trash2,
-  X,
-} from "lucide-react";
+  useState,
+  useRef,
+  type FormEvent,
+  type ChangeEvent,
+  type DragEvent,
+} from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { Camera, CheckCircle } from "lucide-react";
 import { SmartBackButton } from "@/components/smart-back-button";
 import { AppShell } from "@/features/dashboard/components/app-shell";
 import { Button } from "@/components/ui/button";
@@ -68,7 +62,6 @@ const AUTHOR_TOPICS = [
 
 export default function NewAuthorPage() {
   const sessionUser = Route.useRouteContext().session.user;
-  const navigate = useNavigate();
   const { data: myProfile } = useMySocialProfile();
   const applyAuthorMutation = useApplyAuthor();
 
@@ -77,15 +70,17 @@ export default function NewAuthorPage() {
   const [bio, setBio] = useState(myProfile?.bio || "");
   const [avatarImage, setAvatarImage] = useState(myProfile?.image || "");
   const [portfolioUrl, setPortfolioUrl] = useState("");
-  const [claimedBookTitle, setClaimedBookTitle] = useState("");
-  const [selectedTopics, setSelectedTopics] = useState<string[]>(["Sastra & Fiksi", "Esai Kritis & Reflektif"]);
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([
+    "Sastra & Fiksi",
+    "Esai Kritis & Reflektif",
+  ]);
 
   // Social & Contact
-  const [contactEmail, setContactEmail] = useState("");
   const [city, setCity] = useState(myProfile?.locationCity || "");
   const [twitter, setTwitter] = useState(myProfile?.socialLinks?.twitter || "");
-  const [instagram, setInstagram] = useState(myProfile?.socialLinks?.instagram || "");
-  const [website, setWebsite] = useState(myProfile?.socialLinks?.website || "");
+  const [instagram, setInstagram] = useState(
+    myProfile?.socialLinks?.instagram || "",
+  );
 
   // UI state
   const [isDragOver, setIsDragOver] = useState(false);
@@ -194,7 +189,11 @@ export default function NewAuthorPage() {
 
   if (isSubmitted) {
     return (
-      <AppShell user={sessionUser} activeTab="profile" title="Pendaftaran Penulis">
+      <AppShell
+        user={sessionUser}
+        activeTab="profile"
+        title="Pendaftaran Penulis"
+      >
         <div className="max-w-2xl mx-auto py-14 text-center space-y-6">
           <div className="size-16 rounded-full bg-muted border border-border text-foreground flex items-center justify-center mx-auto">
             <CheckCircle className="size-8" />
@@ -205,7 +204,9 @@ export default function NewAuthorPage() {
               Permohonan Penulis Resmi Diterima
             </h1>
             <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed max-w-md mx-auto">
-              Terima kasih, <strong>{name}</strong>. Tim kurasi redaksi AnzaBook sedang meninjau rekam jejak kepenulisan Anda. Status verifikasi akan diperbarui langsung di profil Anda.
+              Terima kasih, <strong>{name}</strong>. Tim kurasi redaksi AnzaBook
+              sedang meninjau rekam jejak kepenulisan Anda. Status verifikasi
+              akan diperbarui langsung di profil Anda.
             </p>
           </div>
 
@@ -224,7 +225,11 @@ export default function NewAuthorPage() {
   }
 
   return (
-    <AppShell user={sessionUser} activeTab="profile" title="Pendaftaran Penulis">
+    <AppShell
+      user={sessionUser}
+      activeTab="profile"
+      title="Pendaftaran Penulis"
+    >
       <SmartBackButton fallbackTo="/partner-program" className="-ml-2" />
 
       {/* Main 2-Column Medium Style Layout */}
@@ -234,7 +239,10 @@ export default function NewAuthorPage() {
             Formulir Pendaftaran Penulis Resmi
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed max-w-2xl">
-            Bergabunglah dengan ekosistem penulis independen dan berdaulat AnzaBook. Terbitkan esai reflektif atau naskah buku multi-bab, pertahankan hak cipta 100%, dan peroleh royalti menit baca dari Nakama Royalty Pool.
+            Bergabunglah dengan ekosistem penulis independen dan berdaulat
+            AnzaBook. Terbitkan esai reflektif atau naskah buku multi-bab,
+            pertahankan hak cipta 100%, dan peroleh royalti menit baca dari
+            Nakama Royalty Pool.
           </p>
         </div>
 
@@ -248,16 +256,22 @@ export default function NewAuthorPage() {
         <form onSubmit={handleSubmit} className="space-y-12">
           {/* ================= SECTION 1: GENERAL ================= */}
           <section className="space-y-8">
-            <h2 className="font-serif text-xl font-bold text-foreground">1. Identitas Kepenulisan</h2>
+            <h2 className="font-serif text-xl font-bold text-foreground">
+              1. Identitas Kepenulisan
+            </h2>
 
             {/* Nama Penulis */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
               <div className="w-full sm:w-56 shrink-0 space-y-1">
-                <Label htmlFor="author-name" className="text-sm font-semibold text-foreground">
+                <Label
+                  htmlFor="author-name"
+                  className="text-sm font-semibold text-foreground"
+                >
                   Nama Penulis<span className="text-red-500">*</span>
                 </Label>
                 <p className="text-[11px] text-muted-foreground">
-                  Nama ini tampil di profil, sampul buku, dan katalog. Pakai nama pena kalau Anda menulis dengan nama pena.
+                  Nama ini tampil di profil, sampul buku, dan katalog. Pakai
+                  nama pena kalau Anda menulis dengan nama pena.
                 </p>
               </div>
 
@@ -276,7 +290,10 @@ export default function NewAuthorPage() {
             {/* Bio Kepenulisan */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
               <div className="w-full sm:w-56 shrink-0 space-y-1">
-                <Label htmlFor="author-bio" className="text-sm font-semibold text-foreground">
+                <Label
+                  htmlFor="author-bio"
+                  className="text-sm font-semibold text-foreground"
+                >
                   Bio &amp; Rekam Jejak<span className="text-red-500">*</span>
                 </Label>
               </div>
@@ -311,9 +328,12 @@ export default function NewAuthorPage() {
 
               <div className="flex-1 max-w-xl flex flex-col sm:flex-row items-start gap-6">
                 <div className="space-y-1.5 flex-1">
-                  <h4 className="font-semibold text-xs text-foreground">Unggah Foto</h4>
+                  <h4 className="font-semibold text-xs text-foreground">
+                    Unggah Foto
+                  </h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Tarik dan letakkan berkas gambar atau klik kotak di samping untuk memilih dari perangkat lokal.
+                    Tarik dan letakkan berkas gambar atau klik kotak di samping
+                    untuk memilih dari perangkat lokal.
                   </p>
                   <p className="text-[11px] font-mono text-muted-foreground">
                     Format: JPG, PNG, WebP • Maks. 5MB
@@ -369,7 +389,9 @@ export default function NewAuthorPage() {
 
           {/* ================= SECTION 2: TOPIK & KARYA ================= */}
           <section className="space-y-8 border-t border-border pt-8">
-            <h2 className="font-serif text-xl font-bold text-foreground">2. Topik &amp; Karya Penulis</h2>
+            <h2 className="font-serif text-xl font-bold text-foreground">
+              2. Topik &amp; Karya Penulis
+            </h2>
 
             {/* Topik Utama */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
@@ -409,7 +431,10 @@ export default function NewAuthorPage() {
             {/* Portofolio URL */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
               <div className="w-full sm:w-56 shrink-0 space-y-1">
-                <Label htmlFor="author-portfolio" className="text-sm font-semibold text-foreground">
+                <Label
+                  htmlFor="author-portfolio"
+                  className="text-sm font-semibold text-foreground"
+                >
                   URL Portofolio / Blog
                 </Label>
               </div>
@@ -428,12 +453,17 @@ export default function NewAuthorPage() {
 
           {/* ================= SECTION 3: KONTAK & MEDIA SOSIAL ================= */}
           <section className="space-y-8 border-t border-border pt-8">
-            <h2 className="font-serif text-xl font-bold text-foreground">3. Kontak &amp; Jejaring</h2>
+            <h2 className="font-serif text-xl font-bold text-foreground">
+              3. Kontak &amp; Jejaring
+            </h2>
 
             {/* Kota Domisili */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
               <div className="w-full sm:w-56 shrink-0 space-y-1">
-                <Label htmlFor="author-city" className="text-sm font-semibold text-foreground">
+                <Label
+                  htmlFor="author-city"
+                  className="text-sm font-semibold text-foreground"
+                >
                   Kota Domisili
                 </Label>
               </div>
@@ -459,7 +489,10 @@ export default function NewAuthorPage() {
 
               <div className="flex-1 max-w-xl grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <Label htmlFor="author-x" className="text-xs font-mono text-muted-foreground flex items-center gap-1">
+                  <Label
+                    htmlFor="author-x"
+                    className="text-xs font-mono text-muted-foreground flex items-center gap-1"
+                  >
                     <XTwitterIcon className="size-3.5" />
                     <span>X / Twitter</span>
                   </Label>
@@ -473,7 +506,10 @@ export default function NewAuthorPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="author-ig" className="text-xs font-mono text-muted-foreground flex items-center gap-1">
+                  <Label
+                    htmlFor="author-ig"
+                    className="text-xs font-mono text-muted-foreground flex items-center gap-1"
+                  >
                     <InstagramIcon className="size-3.5" />
                     <span>Instagram</span>
                   </Label>
@@ -503,7 +539,9 @@ export default function NewAuthorPage() {
               disabled={applyAuthorMutation.isPending}
               className="bg-foreground text-background hover:opacity-90 min-h-11 px-8 text-xs font-semibold rounded-xl cursor-pointer"
             >
-              {applyAuthorMutation.isPending ? "Mengirim Permohonan..." : "Kirim Permohonan Penulis Resmi"}
+              {applyAuthorMutation.isPending
+                ? "Mengirim Permohonan..."
+                : "Kirim Permohonan Penulis Resmi"}
             </Button>
           </div>
         </form>

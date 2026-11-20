@@ -222,7 +222,11 @@ export async function listBookSessions(bookId: string, signal?: AbortSignal) {
 
 export async function restartBookReading(bookId: string) {
   const { data } = await apiFetch<
-    DataResponse<{ success: boolean; shelfStatus: string; progressPercent: number }>
+    DataResponse<{
+      success: boolean;
+      shelfStatus: string;
+      progressPercent: number;
+    }>
   >(`/api/reading/restart/${encodeURIComponent(bookId)}`, {
     method: "POST",
   });

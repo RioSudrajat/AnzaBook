@@ -54,9 +54,10 @@ function AboutPage() {
 
             {/* Sub-headline */}
             <p className="mt-6 text-base sm:text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto font-normal leading-relaxed text-balance">
-              AnzaBook lahir dari sebuah keyakinan sederhana: membaca cerita yang
-              baik dan bernalar kritis tidak boleh terhalang oleh sekat biaya,
-              dan karya para penulis tidak boleh disandera oleh pembajakan.
+              AnzaBook lahir dari sebuah keyakinan sederhana: membaca cerita
+              yang baik dan bernalar kritis tidak boleh terhalang oleh sekat
+              biaya, dan karya para penulis tidak boleh disandera oleh
+              pembajakan.
             </p>
 
             <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
@@ -83,9 +84,9 @@ function AboutPage() {
                   Aksara Tanpa Penjara Pikiran
                 </span>
                 <blockquote className="font-serif text-2xl sm:text-3xl font-bold leading-snug tracking-tight text-foreground">
-                  &ldquo;Aksara tidak boleh dipenjara oleh dinding elitisme, sekat
-                  biaya, maupun kesunyian rak pajangan. Setiap gagasan berhak
-                  menemukan pembacanya.&rdquo;
+                  &ldquo;Aksara tidak boleh dipenjara oleh dinding elitisme,
+                  sekat biaya, maupun kesunyian rak pajangan. Setiap gagasan
+                  berhak menemukan pembacanya.&rdquo;
                 </blockquote>
                 <p className="text-xs text-muted-foreground font-mono">
                   &mdash; Manifesto AnzaBook untuk Kedaulatan Membaca
@@ -114,10 +115,10 @@ function AboutPage() {
                   tanpa mengorbankan martabat royalti sang pencipta karya.
                 </p>
                 <p>
-                  Bagi kami, membaca bukan sekadar transaksi beli-putus, melainkan
-                  sebuah percakapan yang hidup—dari tangan penulis, ke ruang temu
-                  komunitas, hingga ke sudut-sudut baca ternyaman di seluruh
-                  Indonesia.
+                  Bagi kami, membaca bukan sekadar transaksi beli-putus,
+                  melainkan sebuah percakapan yang hidup—dari tangan penulis, ke
+                  ruang temu komunitas, hingga ke sudut-sudut baca ternyaman di
+                  seluruh Indonesia.
                 </p>
               </div>
             </div>
@@ -125,7 +126,10 @@ function AboutPage() {
         </section>
 
         {/* VISI & 4 PILAR MISI */}
-        <section id="visi-misi" className="py-16 md:py-24 border-b border-border/60">
+        <section
+          id="visi-misi"
+          className="py-16 md:py-24 border-b border-border/60"
+        >
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
             {/* Bagian Visi Utama */}
             <div className="p-8 sm:p-10 md:p-12 rounded-2xl border border-border/80 bg-card/60 shadow-xs relative overflow-hidden">
@@ -150,8 +154,8 @@ function AboutPage() {
                   Empat Pilar Misi Kami
                 </h3>
                 <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-                  Langkah nyata yang kami bangun setiap hari demi mewujudkan ruang
-                  literasi yang sehat dan berkeadilan.
+                  Langkah nyata yang kami bangun setiap hari demi mewujudkan
+                  ruang literasi yang sehat dan berkeadilan.
                 </p>
               </div>
 
@@ -166,10 +170,10 @@ function AboutPage() {
                       1. Akses Membaca Tanpa Sekat
                     </h4>
                     <p className="text-sm text-muted-foreground leading-relaxed font-sans">
-                      Menghadirkan ragam novel fiksi dan nonfiksi pilihan melalui
-                      akses digital yang fleksibel serta opsi cetak rakyat yang
-                      terjangkau bagi seluruh lapisan masyarakat, tanpa terhalang
-                      biaya mahal.
+                      Menghadirkan ragam novel fiksi dan nonfiksi pilihan
+                      melalui akses digital yang fleksibel serta opsi cetak
+                      rakyat yang terjangkau bagi seluruh lapisan masyarakat,
+                      tanpa terhalang biaya mahal.
                     </p>
                   </div>
                   <div className="pt-2 text-xs font-mono text-muted-foreground border-t border-border/40">
@@ -187,10 +191,10 @@ function AboutPage() {
                       2. Perlindungan Hak & Martabat Penulis
                     </h4>
                     <p className="text-sm text-muted-foreground leading-relaxed font-sans">
-                      Menjaga karya dari ancaman pembajakan melalui proteksi baca
-                      digital yang aman, sekaligus menjamin transparansi serta
-                      keadilan royalti demi kesejahteraan berkelanjutan para
-                      penulis.
+                      Menjaga karya dari ancaman pembajakan melalui proteksi
+                      baca digital yang aman, sekaligus menjamin transparansi
+                      serta keadilan royalti demi kesejahteraan berkelanjutan
+                      para penulis.
                     </p>
                   </div>
                   <div className="pt-2 text-xs font-mono text-muted-foreground border-t border-border/40">
@@ -273,8 +277,8 @@ function AboutPage() {
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   Penulis dapat menyelenggarakan sesi peluncuran buku mandiri
                   secara langsung, dan komunitas literasi lokal dapat
-                  menginisiasi bedah buku, diskusi gagasan, hingga kegiatan nulis
-                  bareng dengan kemudahan registrasi.
+                  menginisiasi bedah buku, diskusi gagasan, hingga kegiatan
+                  nulis bareng dengan kemudahan registrasi.
                 </p>
               </div>
 
@@ -336,7 +340,9 @@ function AboutPage() {
             </p>
             <div className="flex flex-wrap items-center justify-center gap-4">
               <Button asChild size="lg">
-                <Link to="/" hash="katalog">Buka Katalog Buku</Link>
+                <Link to="/" hash="katalog">
+                  Buka Katalog Buku
+                </Link>
               </Button>
               <Button asChild variant="ghost" size="lg">
                 <Link to="/sign-up">Daftar Akun Gratis</Link>

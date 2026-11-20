@@ -199,9 +199,9 @@ describe("Admin Internal CMS API (/api/admin/*)", () => {
     expect(res.body.data.totalAffiliateCommissionsIdr).toBeGreaterThanOrEqual(
       5_000,
     );
-    expect(
-      res.body.data.estimatedNakamaRoyaltyPoolIdr,
-    ).toBeGreaterThanOrEqual(55_000); // 55% of 100,000 IDR
+    expect(res.body.data.estimatedNakamaRoyaltyPoolIdr).toBeGreaterThanOrEqual(
+      55_000,
+    ); // 55% of 100,000 IDR
   });
 
   it("verifies community calendar (PATCH /api/admin/calendars/:id/verify)", async () => {
@@ -409,7 +409,9 @@ describe("Admin Internal CMS API (/api/admin/*)", () => {
     ]);
 
     // Admin views manuscript detail
-    const detailRes = await admin.get(`/api/admin/manuscripts/${manuscript.id}`);
+    const detailRes = await admin.get(
+      `/api/admin/manuscripts/${manuscript.id}`,
+    );
     expect(detailRes.status).toBe(200);
     expect(detailRes.body.data.title).toBe("Buku Phygital Nusantara");
     expect(detailRes.body.data.chapters).toHaveLength(2);

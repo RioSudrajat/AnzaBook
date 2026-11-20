@@ -27,7 +27,7 @@ import type {
 function toPublisherDto(
   pub: typeof publishers.$inferSelect,
   totalBooks = 0,
-  currentUserRole?: typeof publisherMembers.$inferSelect["role"] | null,
+  currentUserRole?: (typeof publisherMembers.$inferSelect)["role"] | null,
 ): PublisherDto {
   return {
     id: pub.id,
@@ -164,11 +164,15 @@ export async function updatePublisher(
     .limit(1);
 
   if (!pub) {
-    throw new HttpError(404, "PUBLISHER_NOT_FOUND", "Penerbit tidak ditemukan.");
+    throw new HttpError(
+      404,
+      "PUBLISHER_NOT_FOUND",
+      "Penerbit tidak ditemukan.",
+    );
   }
 
   const isSysAdmin = userRole === "admin";
-  let memberRole: typeof publisherMembers.$inferSelect["role"] | null = null;
+  let memberRole: (typeof publisherMembers.$inferSelect)["role"] | null = null;
   if (!isSysAdmin) {
     const [member] = await db
       .select({ role: publisherMembers.role })
@@ -197,7 +201,8 @@ export async function updatePublisher(
   if (input.name !== undefined) patch.name = input.name;
   if (input.description !== undefined) patch.description = input.description;
   if (input.logoUrl !== undefined) patch.logoUrl = input.logoUrl;
-  if (input.headerImageUrl !== undefined) patch.headerImageUrl = input.headerImageUrl;
+  if (input.headerImageUrl !== undefined)
+    patch.headerImageUrl = input.headerImageUrl;
   if (input.city !== undefined) patch.city = input.city;
   if (input.address !== undefined) patch.address = input.address;
   if (input.contactEmail !== undefined) patch.contactEmail = input.contactEmail;
@@ -250,7 +255,9 @@ export async function listVerifiedPublishers(
       if (member) currentUserRole = member.role;
     }
 
-    results.push(toPublisherDto(pub, Number(bookCountRow?.count || 0), currentUserRole));
+    results.push(
+      toPublisherDto(pub, Number(bookCountRow?.count || 0), currentUserRole),
+    );
   }
 
   return results;
@@ -319,13 +326,14 @@ export async function createManuscriptDraft(
         coverUrl: input.coverUrl || null,
         category: input.category || null,
         synopsis: input.synopsis || "",
-        proposedDigitalPolicy: input.proposedDigitalPolicy || "hybrid_nakama_alacarte",
+        proposedDigitalPolicy:
+          input.proposedDigitalPolicy || "hybrid_nakama_alacarte",
         proposedAlacartePriceIdr: input.proposedAlacartePriceIdr ?? null,
         status: "draft",
       })
       .returning();
 
-    const createdChapters: typeof manuscriptChapters.$inferSelect[] = [];
+    const createdChapters: (typeof manuscriptChapters.$inferSelect)[] = [];
     const chaptersToInsert =
       input.chapters && input.chapters.length > 0
         ? input.chapters
@@ -409,7 +417,10 @@ export async function getManuscript(
         ),
       )
       .limit(1);
-    if (pubMember && (pubMember.role === "owner" || pubMember.role === "editor")) {
+    if (
+      pubMember &&
+      (pubMember.role === "owner" || pubMember.role === "editor")
+    ) {
       isPublisherEditor = true;
     }
   }
@@ -444,7 +455,7 @@ export async function updateManuscript(
 ): Promise<ManuscriptSubmissionDto> {
   const current = await getManuscript(userId, idOrSlug, userRole);
 
-  const { submission, chapters } = await db.transaction(async (tx) => {
+  await db.transaction(async (tx) => {
     const patch: Partial<typeof manuscriptSubmissions.$inferInsert> = {
       updatedAt: new Date(),
     };
@@ -456,10 +467,13 @@ export async function updateManuscript(
       patch.proposedDigitalPolicy = input.proposedDigitalPolicy;
     if (input.proposedAlacartePriceIdr !== undefined)
       patch.proposedAlacartePriceIdr = input.proposedAlacartePriceIdr;
-    if (input.printSimJson !== undefined) patch.printSimJson = input.printSimJson;
-    if (input.editorialNotes !== undefined) patch.editorialNotes = input.editorialNotes;
+    if (input.printSimJson !== undefined)
+      patch.printSimJson = input.printSimJson;
+    if (input.editorialNotes !== undefined)
+      patch.editorialNotes = input.editorialNotes;
     if (input.status !== undefined) patch.status = input.status;
-    if (input.rejectionReason !== undefined) patch.rejectionReason = input.rejectionReason;
+    if (input.rejectionReason !== undefined)
+      patch.rejectionReason = input.rejectionReason;
 
     const [updatedSub] = await tx
       .update(manuscriptSubmissions)
@@ -472,7 +486,7 @@ export async function updateManuscript(
         .delete(manuscriptChapters)
         .where(eq(manuscriptChapters.manuscriptId, current.id));
 
-      const newChapters: typeof manuscriptChapters.$inferSelect[] = [];
+      const newChapters: (typeof manuscriptChapters.$inferSelect)[] = [];
       for (const ch of input.chapters) {
         const [insertedCh] = await tx
           .insert(manuscriptChapters)
@@ -516,7 +530,11 @@ export async function submitManuscript(
       .limit(1);
 
     if (!pub) {
-      throw new HttpError(404, "PUBLISHER_NOT_FOUND", "Penerbit tidak ditemukan.");
+      throw new HttpError(
+        404,
+        "PUBLISHER_NOT_FOUND",
+        "Penerbit tidak ditemukan.",
+      );
     }
     publisherName = pub.name;
   }
@@ -552,7 +570,7 @@ export async function submitManuscript(
       })
       .returning();
 
-    const createdChapters: typeof manuscriptChapters.$inferSelect[] = [];
+    const createdChapters: (typeof manuscriptChapters.$inferSelect)[] = [];
 
     if (input.chapters && input.chapters.length > 0) {
       for (const ch of input.chapters) {
@@ -592,7 +610,7 @@ export async function submitManuscriptDraft(
     );
   }
 
-  let finalPublisherId = publisherId || current.publisherId;
+  const finalPublisherId = publisherId || current.publisherId;
   if (finalPublisherId) {
     const [pub] = await db
       .select({ id: publishers.id })
@@ -637,7 +655,11 @@ export async function listPublisherManuscripts(
     .limit(1);
 
   if (!pub) {
-    throw new HttpError(404, "PUBLISHER_NOT_FOUND", "Penerbit tidak ditemukan.");
+    throw new HttpError(
+      404,
+      "PUBLISHER_NOT_FOUND",
+      "Penerbit tidak ditemukan.",
+    );
   }
 
   const isSysAdmin = userRole === "admin";

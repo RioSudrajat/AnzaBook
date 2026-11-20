@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { z } from "zod";
 import { calculatePrintEconomics } from "@starter/shared/print-economics";
 import {
   applyPublisherSchema,
@@ -130,7 +129,12 @@ publisherRouter.patch(
     const userRole = getAuth(req).user.role || undefined;
     const idOrSlug = String(req.params.idOrSlug);
     const input = updateManuscriptSchema.parse(req.body);
-    const manuscript = await updateManuscript(userId, idOrSlug, input, userRole);
+    const manuscript = await updateManuscript(
+      userId,
+      idOrSlug,
+      input,
+      userRole,
+    );
     res.json({ data: manuscript });
   },
 );
@@ -144,8 +148,14 @@ publisherRouter.post(
   async (req, res) => {
     const userId = getAuth(req).user.id;
     const idOrSlug = String(req.params.idOrSlug);
-    const publisherId = req.body?.publisherId ? String(req.body.publisherId) : null;
-    const manuscript = await submitManuscriptDraft(userId, idOrSlug, publisherId);
+    const publisherId = req.body?.publisherId
+      ? String(req.body.publisherId)
+      : null;
+    const manuscript = await submitManuscriptDraft(
+      userId,
+      idOrSlug,
+      publisherId,
+    );
     res.json({ data: manuscript });
   },
 );
@@ -161,7 +171,12 @@ publisherRouter.post(
     const userRole = getAuth(req).user.role || undefined;
     const idOrSlug = String(req.params.idOrSlug);
     const input = reviewManuscriptSchema.parse(req.body);
-    const manuscript = await reviewManuscript(userId, idOrSlug, input, userRole);
+    const manuscript = await reviewManuscript(
+      userId,
+      idOrSlug,
+      input,
+      userRole,
+    );
     res.json({ data: manuscript });
   },
 );

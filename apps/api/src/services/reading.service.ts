@@ -100,14 +100,12 @@ export async function createReadingSession(
         .offset(10);
 
       if (excess.length > 0) {
-        await tx
-          .delete(readingSessions)
-          .where(
-            inArray(
-              readingSessions.id,
-              excess.map((r) => r.id),
-            ),
-          );
+        await tx.delete(readingSessions).where(
+          inArray(
+            readingSessions.id,
+            excess.map((r) => r.id),
+          ),
+        );
       }
 
       return inserted;

@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 import { db } from "../db";
 import {
@@ -31,7 +31,6 @@ import type {
   CommunityEventSummaryDto,
   CommunityWalletDto,
   CommunityWalletLedgerDto,
-  EventAttendeePreviewDto,
   EventRsvpDto,
   LocationSuggestionDto,
   PageMeta,
@@ -57,10 +56,7 @@ function toCalendarDto(
     contactEmail: cal.contactEmail,
     socialLinks: cal.socialLinks || null,
     verificationStatus: cal.verificationStatus as
-      | "pending"
-      | "verified"
-      | "trusted"
-      | "rejected",
+      "pending" | "verified" | "trusted" | "rejected",
     rejectionReason: cal.rejectionReason,
     verificationDocuments: cal.verificationDocuments,
     followerCount,
@@ -196,7 +192,9 @@ export async function listCalendars(
   const cals = await db
     .select()
     .from(communityCalendars)
-    .where(inArray(communityCalendars.verificationStatus, ["verified", "trusted"]))
+    .where(
+      inArray(communityCalendars.verificationStatus, ["verified", "trusted"]),
+    )
     .orderBy(desc(communityCalendars.createdAt));
 
   const results: CommunityCalendarDto[] = [];
@@ -226,7 +224,12 @@ export async function listCalendars(
     }
 
     results.push(
-      toCalendarDto(cal, Number(followers[0]?.count || 0), isFollowing, isManager),
+      toCalendarDto(
+        cal,
+        Number(followers[0]?.count || 0),
+        isFollowing,
+        isManager,
+      ),
     );
   }
 
@@ -520,7 +523,11 @@ export async function listEvents(
       .where(
         and(
           eq(eventRsvps.userId, currentUserId),
-          inArray(eventRsvps.status, ["going", "pending_approval", "waitlisted"]),
+          inArray(eventRsvps.status, [
+            "going",
+            "pending_approval",
+            "waitlisted",
+          ]),
         ),
       );
     conditions.push(inArray(communityEvents.id, userEventIdsSubquery));
@@ -646,8 +653,13 @@ export async function listEvents(
           ),
         )
         .limit(1);
-      userRsvpStatus = (rsvp?.status as any) || null;
-      isManager = await isCalendarManager(calendar.id, currentUserId, currentUserRole);
+      userRsvpStatus =
+        (rsvp?.status as CommunityEventSummaryDto["userRsvpStatus"]) || null;
+      isManager = await isCalendarManager(
+        calendar.id,
+        currentUserId,
+        currentUserRole,
+      );
     }
 
     let pendingRsvpCount = 0;
@@ -778,7 +790,7 @@ export async function getEventBySlug(
     if (r) {
       userRsvp = {
         ...r,
-        status: r.status as any,
+        status: r.status as EventRsvpDto["status"],
         checkedInAt: r.checkedInAt?.toISOString() || null,
         createdAt: r.createdAt.toISOString(),
       };
@@ -874,10 +886,7 @@ export async function rsvpEvent(
     .select({ count: sql<number>`count(*)` })
     .from(eventRsvps)
     .where(
-      and(
-        eq(eventRsvps.eventId, event.id),
-        eq(eventRsvps.status, "going"),
-      ),
+      and(eq(eventRsvps.eventId, event.id), eq(eventRsvps.status, "going")),
     );
 
   const goingCount = Number(goingRow?.count || 0);
@@ -931,7 +940,7 @@ export async function rsvpEvent(
     userName: userData?.name || "Peserta",
     userEmail: userData?.email || "",
     userImage: userData?.image || null,
-    status: row.status as any,
+    status: row.status as EventRsvpDto["status"],
     checkinCode: row.checkinCode,
     checkedInAt: row.checkedInAt?.toISOString() || null,
     createdAt: row.createdAt.toISOString(),
@@ -955,12 +964,7 @@ export async function cancelRsvp(
   const [existing] = await db
     .select()
     .from(eventRsvps)
-    .where(
-      and(
-        eq(eventRsvps.eventId, event.id),
-        eq(eventRsvps.userId, userId),
-      ),
-    )
+    .where(and(eq(eventRsvps.eventId, event.id), eq(eventRsvps.userId, userId)))
     .limit(1);
 
   if (!existing || existing.status === "canceled") {
@@ -1015,9 +1019,17 @@ export async function approveRsvp(
     throw new HttpError(404, "EVENT_NOT_FOUND", "Acara tidak ditemukan.");
   }
 
-  const canManage = await isCalendarManager(event.calendarId, hostUserId, userRole);
+  const canManage = await isCalendarManager(
+    event.calendarId,
+    hostUserId,
+    userRole,
+  );
   if (!canManage) {
-    throw new HttpError(403, "FORBIDDEN", "Hanya pengelola yang dapat menyetujui pendaftar.");
+    throw new HttpError(
+      403,
+      "FORBIDDEN",
+      "Hanya pengelola yang dapat menyetujui pendaftar.",
+    );
   }
 
   const [row] = await db
@@ -1043,7 +1055,7 @@ export async function approveRsvp(
     userName: userData?.name || "Peserta",
     userEmail: userData?.email || "",
     userImage: userData?.image || null,
-    status: row.status as any,
+    status: row.status as EventRsvpDto["status"],
     checkinCode: row.checkinCode,
     checkedInAt: row.checkedInAt?.toISOString() || null,
     createdAt: row.createdAt.toISOString(),
@@ -1066,9 +1078,17 @@ export async function checkInRsvp(
     throw new HttpError(404, "EVENT_NOT_FOUND", "Acara tidak ditemukan.");
   }
 
-  const canManage = await isCalendarManager(event.calendarId, hostUserId, userRole);
+  const canManage = await isCalendarManager(
+    event.calendarId,
+    hostUserId,
+    userRole,
+  );
   if (!canManage) {
-    throw new HttpError(403, "FORBIDDEN", "Hanya pengelola yang dapat mencatat kehadiran.");
+    throw new HttpError(
+      403,
+      "FORBIDDEN",
+      "Hanya pengelola yang dapat mencatat kehadiran.",
+    );
   }
 
   const condition = input.checkinCode
@@ -1086,7 +1106,11 @@ export async function checkInRsvp(
     .returning();
 
   if (!row) {
-    throw new HttpError(404, "RSVP_NOT_FOUND", "Pendaftaran peserta tidak ditemukan.");
+    throw new HttpError(
+      404,
+      "RSVP_NOT_FOUND",
+      "Pendaftaran peserta tidak ditemukan.",
+    );
   }
 
   const [userData] = await db
@@ -1102,7 +1126,7 @@ export async function checkInRsvp(
     userName: userData?.name || "Peserta",
     userEmail: userData?.email || "",
     userImage: userData?.image || null,
-    status: row.status as any,
+    status: row.status as EventRsvpDto["status"],
     checkinCode: row.checkinCode,
     checkedInAt: row.checkedInAt?.toISOString() || null,
     createdAt: row.createdAt.toISOString(),
@@ -1133,7 +1157,9 @@ export async function reportEvent(
   return { success: true };
 }
 
-export async function getLocationSuggestions(): Promise<LocationSuggestionDto[]> {
+export async function getLocationSuggestions(): Promise<
+  LocationSuggestionDto[]
+> {
   const branches = await db
     .select({
       id: storeBranches.id,
@@ -1210,9 +1236,17 @@ export async function getEventAttendees(
     throw new HttpError(404, "EVENT_NOT_FOUND", "Acara tidak ditemukan.");
   }
 
-  const canManage = await isCalendarManager(event.calendarId, hostUserId, userRole);
+  const canManage = await isCalendarManager(
+    event.calendarId,
+    hostUserId,
+    userRole,
+  );
   if (!canManage) {
-    throw new HttpError(403, "FORBIDDEN", "Hanya pengelola kalender yang dapat melihat daftar peserta lengkap.");
+    throw new HttpError(
+      403,
+      "FORBIDDEN",
+      "Hanya pengelola kalender yang dapat melihat daftar peserta lengkap.",
+    );
   }
 
   const rows = await db
@@ -1235,7 +1269,7 @@ export async function getEventAttendees(
 
   return rows.map((r) => ({
     ...r,
-    status: r.status as any,
+    status: r.status as EventRsvpDto["status"],
     checkedInAt: r.checkedInAt?.toISOString() || null,
     createdAt: r.createdAt.toISOString(),
   }));
@@ -1257,9 +1291,17 @@ export async function rejectRsvp(
     throw new HttpError(404, "EVENT_NOT_FOUND", "Acara tidak ditemukan.");
   }
 
-  const canManage = await isCalendarManager(event.calendarId, hostUserId, userRole);
+  const canManage = await isCalendarManager(
+    event.calendarId,
+    hostUserId,
+    userRole,
+  );
   if (!canManage) {
-    throw new HttpError(403, "FORBIDDEN", "Hanya pengelola yang dapat menolak pendaftar.");
+    throw new HttpError(
+      403,
+      "FORBIDDEN",
+      "Hanya pengelola yang dapat menolak pendaftar.",
+    );
   }
 
   const [row] = await db
@@ -1285,7 +1327,7 @@ export async function rejectRsvp(
     userName: userData?.name || "Peserta",
     userEmail: userData?.email || "",
     userImage: userData?.image || null,
-    status: row.status as any,
+    status: row.status as EventRsvpDto["status"],
     checkinCode: row.checkinCode,
     checkedInAt: row.checkedInAt?.toISOString() || null,
     createdAt: row.createdAt.toISOString(),
@@ -1308,12 +1350,22 @@ export async function updateEvent(
     throw new HttpError(404, "EVENT_NOT_FOUND", "Acara tidak ditemukan.");
   }
 
-  const canManage = await isCalendarManager(event.calendarId, hostUserId, userRole);
+  const canManage = await isCalendarManager(
+    event.calendarId,
+    hostUserId,
+    userRole,
+  );
   if (!canManage) {
-    throw new HttpError(403, "FORBIDDEN", "Hanya pengelola kalender yang dapat memperbarui acara.");
+    throw new HttpError(
+      403,
+      "FORBIDDEN",
+      "Hanya pengelola kalender yang dapat memperbarui acara.",
+    );
   }
 
-  const patch: Record<string, any> = { updatedAt: new Date() };
+  const patch: Partial<typeof communityEvents.$inferInsert> = {
+    updatedAt: new Date(),
+  };
   if (input.title !== undefined) patch.title = input.title;
   if (input.description !== undefined) patch.description = input.description;
   if (input.coverUrl !== undefined) patch.coverUrl = input.coverUrl;
@@ -1325,12 +1377,15 @@ export async function updateEvent(
   if (input.city !== undefined) patch.city = input.city;
   if (input.latitude !== undefined) patch.latitude = input.latitude;
   if (input.longitude !== undefined) patch.longitude = input.longitude;
-  if (input.onlineMeetingUrl !== undefined) patch.onlineMeetingUrl = input.onlineMeetingUrl || null;
+  if (input.onlineMeetingUrl !== undefined)
+    patch.onlineMeetingUrl = input.onlineMeetingUrl || null;
   if (input.startsAt !== undefined) patch.startsAt = new Date(input.startsAt);
   if (input.endsAt !== undefined) patch.endsAt = new Date(input.endsAt);
   if (input.capacity !== undefined) patch.capacity = input.capacity || null;
-  if (input.requiresApproval !== undefined) patch.requiresApproval = input.requiresApproval;
-  if (input.allowWaitlist !== undefined) patch.allowWaitlist = input.allowWaitlist;
+  if (input.requiresApproval !== undefined)
+    patch.requiresApproval = input.requiresApproval;
+  if (input.allowWaitlist !== undefined)
+    patch.allowWaitlist = input.allowWaitlist;
 
   await db
     .update(communityEvents)
@@ -1355,9 +1410,17 @@ export async function deleteEvent(
     throw new HttpError(404, "EVENT_NOT_FOUND", "Acara tidak ditemukan.");
   }
 
-  const canManage = await isCalendarManager(event.calendarId, hostUserId, userRole);
+  const canManage = await isCalendarManager(
+    event.calendarId,
+    hostUserId,
+    userRole,
+  );
   if (!canManage) {
-    throw new HttpError(403, "FORBIDDEN", "Hanya pengelola kalender yang dapat menghapus acara.");
+    throw new HttpError(
+      403,
+      "FORBIDDEN",
+      "Hanya pengelola kalender yang dapat menghapus acara.",
+    );
   }
 
   await db.delete(communityEvents).where(eq(communityEvents.id, event.id));
@@ -1465,7 +1528,10 @@ export async function leaveCalendar(
       ),
     );
 
-  return { success: true, message: "Berhasil keluar dari keanggotaan komunitas." };
+  return {
+    success: true,
+    message: "Berhasil keluar dari keanggotaan komunitas.",
+  };
 }
 
 export async function getCommunityWallet(
@@ -1535,17 +1601,19 @@ export async function getCommunityWallet(
     }
   }
 
-  const recentLedgers: CommunityWalletLedgerDto[] = ledgers.slice(0, 20).map((l) => ({
-    id: l.id,
-    calendarId: l.calendarId,
-    entryType: l.entryType,
-    amountIdr: l.amountIdr,
-    sourceOrderId: l.sourceOrderId,
-    sourceEventId: l.sourceEventId,
-    sourceBookPurchaseId: l.sourceBookPurchaseId,
-    description: l.description,
-    createdAt: l.createdAt.toISOString(),
-  }));
+  const recentLedgers: CommunityWalletLedgerDto[] = ledgers
+    .slice(0, 20)
+    .map((l) => ({
+      id: l.id,
+      calendarId: l.calendarId,
+      entryType: l.entryType,
+      amountIdr: l.amountIdr,
+      sourceOrderId: l.sourceOrderId,
+      sourceEventId: l.sourceEventId,
+      sourceBookPurchaseId: l.sourceBookPurchaseId,
+      description: l.description,
+      createdAt: l.createdAt.toISOString(),
+    }));
 
   return {
     calendarId: cal.id,

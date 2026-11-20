@@ -1,5 +1,10 @@
 import { useState, useEffect } from "react";
-import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  notFound,
+  useNavigate,
+} from "@tanstack/react-router";
 import {
   BookMarked,
   BookOpen,
@@ -15,7 +20,11 @@ import {
   Sparkles,
   Star,
 } from "lucide-react";
-import type { BookDetailDto, BookSummaryDto, EditionTier } from "@starter/shared/types";
+import type {
+  BookDetailDto,
+  BookSummaryDto,
+  EditionTier,
+} from "@starter/shared/types";
 import { SiteFooter } from "@/components/site-footer";
 import { SmartBackButton } from "@/components/smart-back-button";
 import { AppShell } from "@/features/dashboard/components/app-shell";
@@ -46,10 +55,12 @@ import { useUpsertShelf } from "@/features/community/hooks";
 export const Route = createFileRoute("/books/$slug")({
   loader: async ({ context, params }) => {
     try {
-      const { slug, title, author, synopsis } = await context.queryClient.ensureQueryData(
-        bookDetailQuery(params.slug),
-      );
-      return { book: { slug, title, author, synopsis }, origin: bookShareOrigin() };
+      const { slug, title, author, synopsis } =
+        await context.queryClient.ensureQueryData(bookDetailQuery(params.slug));
+      return {
+        book: { slug, title, author, synopsis },
+        origin: bookShareOrigin(),
+      };
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) throw notFound();
       throw error;
@@ -141,7 +152,8 @@ function B2B2CActionButtons({
             <span>🛡️ Eksklusif Cetak Fisik</span>
           </div>
           <p className="mt-1 text-[11px]">
-            Eksklusif Pemilik Buku Cetak Resmi — Tidak Dijual Eceran Digital. Masukkan kode unik buku fisik Anda untuk membuka akses.
+            Eksklusif Pemilik Buku Cetak Resmi — Tidak Dijual Eceran Digital.
+            Masukkan kode unik buku fisik Anda untuk membuka akses.
           </p>
         </div>
       )}
@@ -152,7 +164,8 @@ function B2B2CActionButtons({
             <span>👑 Nakama Reader Pool</span>
           </div>
           <p className="mt-1 text-[11px]">
-            Buka Penuh dengan Langganan Nakama — Buku ini termasuk dalam Ekosistem Nakama Club Reader.
+            Buka Penuh dengan Langganan Nakama — Buku ini termasuk dalam
+            Ekosistem Nakama Club Reader.
           </p>
         </div>
       )}
@@ -215,21 +228,28 @@ function B2B2CActionButtons({
             </Link>
           </Button>
 
-          {book.hasPhysical && (
-            isLoggedIn ? (
+          {book.hasPhysical &&
+            (isLoggedIn ? (
               <ClaimCodeDialog
                 slug={book.slug}
                 bookTitle={book.title}
                 hasClaimedDigital={book.hasClaimedDigital}
               />
             ) : (
-              <Button asChild variant="outline" size="sm" className="w-full h-10 text-xs">
-                <Link to="/sign-in" search={{ redirect: `/books/${book.slug}` }}>
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="w-full h-10 text-xs"
+              >
+                <Link
+                  to="/sign-in"
+                  search={{ redirect: `/books/${book.slug}` }}
+                >
                   Klaim Kode Buku Fisik
                 </Link>
               </Button>
-            )
-          )}
+            ))}
         </>
       )}
 
@@ -360,7 +380,12 @@ function B2B2CActionButtons({
 
       {/* Physical Stock Button */}
       {book.hasPhysical && (
-        <Button asChild variant="outline" size="lg" className="w-full min-h-11 font-mono text-xs">
+        <Button
+          asChild
+          variant="outline"
+          size="lg"
+          className="w-full min-h-11 font-mono text-xs"
+        >
           <a href="#stok-buku">
             <Package className="size-4 mr-1.5" />
             Lihat Stok Buku Fisik
@@ -541,8 +566,8 @@ export default function BookDetailPage() {
             className="-ml-2"
           />
 
-          {book.hasPhysical && (
-            isLoggedIn ? (
+          {book.hasPhysical &&
+            (isLoggedIn ? (
               <ClaimCodeDialog
                 slug={book.slug}
                 bookTitle={book.title}
@@ -550,10 +575,14 @@ export default function BookDetailPage() {
               />
             ) : (
               <Button asChild variant="outline" size="sm" className="min-h-11">
-                <Link to="/sign-in" search={{ redirect: `/books/${book.slug}` }}>Klaim kode cetak</Link>
+                <Link
+                  to="/sign-in"
+                  search={{ redirect: `/books/${book.slug}` }}
+                >
+                  Klaim kode cetak
+                </Link>
               </Button>
-            )
-          )}
+            ))}
         </div>
       </div>
 
@@ -577,7 +606,9 @@ export default function BookDetailPage() {
               <div className="mt-4 flex flex-wrap items-center gap-6 text-sm text-foreground/90">
                 {/* Author */}
                 <div className="flex items-center gap-2.5">
-                  <span className="text-xs font-mono text-muted-foreground">Penulis:</span>
+                  <span className="text-xs font-mono text-muted-foreground">
+                    Penulis:
+                  </span>
                   {book.authorUserId ? (
                     <Link
                       to="/u/$username"
@@ -595,7 +626,9 @@ export default function BookDetailPage() {
                           {book.author.slice(0, 1)}
                         </div>
                       )}
-                      <span className="font-semibold group-hover:text-[var(--color-accent)]">{book.author}</span>
+                      <span className="font-semibold group-hover:text-[var(--color-accent)]">
+                        {book.author}
+                      </span>
                     </Link>
                   ) : (
                     <div className="flex items-center gap-2">
@@ -617,11 +650,15 @@ export default function BookDetailPage() {
 
                 {/* Publisher */}
                 <div className="flex items-center gap-2.5">
-                  <span className="text-xs font-mono text-muted-foreground">Penerbit:</span>
+                  <span className="text-xs font-mono text-muted-foreground">
+                    Penerbit:
+                  </span>
                   {book.publisherSlug || book.publisherId ? (
                     <Link
                       to="/p/$slug"
-                      params={{ slug: (book.publisherSlug || book.publisherId)! }}
+                      params={{
+                        slug: (book.publisherSlug || book.publisherId)!,
+                      }}
                       className="flex items-center gap-2 hover:underline group cursor-pointer"
                     >
                       <img
@@ -693,7 +730,9 @@ export default function BookDetailPage() {
 
               {/* Categories Pills */}
               <div className="mt-6 flex flex-wrap items-center gap-2">
-                <span className="text-xs font-mono text-muted-foreground mr-1">Kategori:</span>
+                <span className="text-xs font-mono text-muted-foreground mr-1">
+                  Kategori:
+                </span>
                 {(book.categories || book.genres).map((cat) => (
                   <span
                     key={cat}
@@ -706,7 +745,10 @@ export default function BookDetailPage() {
 
               {/* Mobile Cover & Action Buttons Block */}
               <div className="block lg:hidden my-6 p-4 rounded-xl border border-border/80 bg-card/60 flex flex-col items-center">
-                <BookCover book={book} className="mb-6 w-[200px] max-w-full sm:w-[240px]" />
+                <BookCover
+                  book={book}
+                  className="mb-6 w-[200px] max-w-full sm:w-[240px]"
+                />
                 <B2B2CActionButtons
                   book={book}
                   isLoggedIn={isLoggedIn}
@@ -760,7 +802,10 @@ export default function BookDetailPage() {
 
             {/* Physical Store Stock Section (Map & Table) */}
             {book.hasPhysical && (
-              <div id="stok-buku" className="scroll-mt-20 space-y-6 border-t border-border pt-6">
+              <div
+                id="stok-buku"
+                className="scroll-mt-20 space-y-6 border-t border-border pt-6"
+              >
                 <div>
                   <div className="flex items-center gap-2">
                     <Package className="size-5 text-[var(--color-accent)]" />
@@ -769,7 +814,8 @@ export default function BookDetailPage() {
                     </h2>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Pantau sebaran eksemplar fisik di jaringan toko buku mitra Gramedia dan komunitas di berbagai kota.
+                    Pantau sebaran eksemplar fisik di jaringan toko buku mitra
+                    Gramedia dan komunitas di berbagai kota.
                   </p>
                 </div>
 
@@ -795,7 +841,8 @@ export default function BookDetailPage() {
                     </h2>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Catatan murni dari pembaca edisi cetak rakyat dan naskah digital dwibahasa.
+                    Catatan murni dari pembaca edisi cetak rakyat dan naskah
+                    digital dwibahasa.
                   </p>
                 </div>
 
@@ -803,7 +850,8 @@ export default function BookDetailPage() {
                   <div className="font-serif text-2xl font-bold text-foreground">
                     {book.ratingAvg.toFixed(1)}
                     <span className="text-sm font-sans font-normal text-muted-foreground">
-                      {" "}/ 5.0
+                      {" "}
+                      / 5.0
                     </span>
                   </div>
                   <div className="text-[11px] font-mono text-muted-foreground">
@@ -830,7 +878,10 @@ export default function BookDetailPage() {
                     >
                       Rating ({selectedRating} Bintang)
                     </label>
-                    <div className="flex items-center gap-1.5" id="ratingSelector">
+                    <div
+                      className="flex items-center gap-1.5"
+                      id="ratingSelector"
+                    >
                       {[1, 2, 3, 4, 5].map((star) => (
                         <button
                           key={star}
@@ -867,9 +918,15 @@ export default function BookDetailPage() {
                       }
                       className="w-full bg-background border border-border rounded-[6px] px-3 py-2 text-xs font-sans text-foreground focus:outline-none focus:ring-1 focus:ring-[var(--color-focus)]"
                     >
-                      <option value="rakyat_economy">Edisi Rakyat Newsprint 48.8 gsm</option>
-                      <option value="standard_trade">Edisi Standar Bookpaper 72 gsm</option>
-                      <option value="kolektor_hardcover">Edisi Kolektor Hardcover 80 gsm</option>
+                      <option value="rakyat_economy">
+                        Edisi Rakyat Newsprint 48.8 gsm
+                      </option>
+                      <option value="standard_trade">
+                        Edisi Standar Bookpaper 72 gsm
+                      </option>
+                      <option value="kolektor_hardcover">
+                        Edisi Kolektor Hardcover 80 gsm
+                      </option>
                       <option value="digital">Pustaka Digital Dwibahasa</option>
                     </select>
                   </div>
@@ -896,7 +953,9 @@ export default function BookDetailPage() {
                 </div>
 
                 {reviewError && (
-                  <p className="text-xs text-destructive font-mono">{reviewError}</p>
+                  <p className="text-xs text-destructive font-mono">
+                    {reviewError}
+                  </p>
                 )}
 
                 {reviewSuccess && (
@@ -909,7 +968,9 @@ export default function BookDetailPage() {
                   <Button
                     type="submit"
                     size="sm"
-                    disabled={createReviewMutation.isPending || !reviewContent.trim()}
+                    disabled={
+                      createReviewMutation.isPending || !reviewContent.trim()
+                    }
                   >
                     {createReviewMutation.isPending ? (
                       <>
@@ -929,7 +990,8 @@ export default function BookDetailPage() {
                   <div className="text-center py-8 text-muted-foreground">
                     <MessageSquare className="size-8 mx-auto mb-2 opacity-50" />
                     <p className="text-xs font-sans">
-                      Belum ada ulasan untuk buku ini. Jadilah pembaca pertama yang meninggalkan catatan!
+                      Belum ada ulasan untuk buku ini. Jadilah pembaca pertama
+                      yang meninggalkan catatan!
                     </p>
                   </div>
                 ) : (
@@ -955,7 +1017,8 @@ export default function BookDetailPage() {
                                 ? "Edisi Rakyat Newsprint"
                                 : rev.editionTierReviewed === "standard_trade"
                                   ? "Edisi Standar"
-                                  : rev.editionTierReviewed === "kolektor_hardcover"
+                                  : rev.editionTierReviewed ===
+                                      "kolektor_hardcover"
                                     ? "Edisi Kolektor"
                                     : "Pustaka Digital"}
                             </span>
@@ -963,9 +1026,11 @@ export default function BookDetailPage() {
                         </div>
 
                         <div className="flex items-center gap-1 text-amber-500">
-                          {Array.from({ length: Math.round(rev.rating) }).map((_, i) => (
-                            <Star key={i} className="size-3 fill-amber-500" />
-                          ))}
+                          {Array.from({ length: Math.round(rev.rating) }).map(
+                            (_, i) => (
+                              <Star key={i} className="size-3 fill-amber-500" />
+                            ),
+                          )}
                         </div>
                       </div>
 
@@ -989,7 +1054,10 @@ export default function BookDetailPage() {
 
           {/* Right Column: 3D Thick Book Cover & 3 Smart Action Buttons (Desktop Sticky) */}
           <div className="hidden lg:flex lg:col-span-4 sticky top-28 flex-col items-center">
-            <BookCover book={book} className="mb-8 w-[240px] max-w-full sm:w-[280px]" />
+            <BookCover
+              book={book}
+              className="mb-8 w-[240px] max-w-full sm:w-[280px]"
+            />
 
             <B2B2CActionButtons
               book={book}
@@ -1022,7 +1090,8 @@ export default function BookDetailPage() {
                   Diskusi & Acara Buku Ini
                 </h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Ikuti bedah buku, sesi baca bersama, atau temu penulis yang diselenggarakan komunitas.
+                  Ikuti bedah buku, sesi baca bersama, atau temu penulis yang
+                  diselenggarakan komunitas.
                 </p>
               </div>
 
@@ -1062,7 +1131,12 @@ export default function BookDetailPage() {
                           weekday: "short",
                           day: "numeric",
                           month: "short",
-                        })} · {new Date(ev.startsAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
+                        })}{" "}
+                        ·{" "}
+                        {new Date(ev.startsAt).toLocaleTimeString("id-ID", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </div>
                       <h3 className="font-serif text-sm font-semibold text-foreground truncate group-hover:text-[var(--color-accent)] transition-colors">
                         {ev.title}
@@ -1075,7 +1149,9 @@ export default function BookDetailPage() {
                         <span className="truncate">
                           {ev.format === "online"
                             ? "Daring (Virtual)"
-                            : ev.venueName || `${ev.district || ""}, ${ev.city || ""}`.trim() || "Lokasi Offline"}
+                            : ev.venueName ||
+                              `${ev.district || ""}, ${ev.city || ""}`.trim() ||
+                              "Lokasi Offline"}
                         </span>
                       </div>
                     </div>

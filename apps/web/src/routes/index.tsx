@@ -87,8 +87,8 @@ function LandingPage() {
             {/* Core Sentence */}
             <p className="mt-5 text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl font-normal leading-relaxed text-balance">
               Pustaka digital ragam novel fiksi dan nonfiksi, edisi cetak rakyat
-              yang terjangkau dengan perlindungan penuh bagi karya penulis, serta
-              ruang kolaborasi komunitas ke seluruh penjuru negeri.
+              yang terjangkau dengan perlindungan penuh bagi karya penulis,
+              serta ruang kolaborasi komunitas ke seluruh penjuru negeri.
             </p>
 
             {/* Primary Action Buttons */}
@@ -189,7 +189,8 @@ function LandingPage() {
                   {(() => {
                     const bulletinReadersCount = Math.max(
                       140,
-                      bulletin.ratingCount * 12 + ((bulletin.pageCount * 3) % 180),
+                      bulletin.ratingCount * 12 +
+                        ((bulletin.pageCount * 3) % 180),
                     );
                     const bulletinSharesCount = Math.max(
                       35,
@@ -246,7 +247,9 @@ function LandingPage() {
                               </span>
                             </span>
 
-                            <span className="text-border/80 text-[10px]">&bull;</span>
+                            <span className="text-border/80 text-[10px]">
+                              &bull;
+                            </span>
 
                             <span
                               className="flex items-center gap-1.5"
@@ -296,10 +299,7 @@ function LandingPage() {
                             </Link>
                           </Button>
 
-                          <Button
-                            asChild
-                            className="w-full sm:w-auto"
-                          >
+                          <Button asChild className="w-full sm:w-auto">
                             <Link
                               to="/books/$slug"
                               params={{ slug: bulletin.slug }}
@@ -422,7 +422,8 @@ function LandingPage() {
                       onClick={() => setVisibleCount((prev) => prev + 9)}
                       className="cursor-pointer font-serif min-h-11 px-8 rounded-full border-border/80 hover:bg-muted text-sm shadow-xs transition-all hover:scale-102"
                     >
-                      Lihat Lebih Banyak ({filteredBooks.length - visibleCount} buku lagi)
+                      Lihat Lebih Banyak ({filteredBooks.length - visibleCount}{" "}
+                      buku lagi)
                     </Button>
                   </div>
                 )}

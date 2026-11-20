@@ -1,4 +1,4 @@
-import { Node, mergeAttributes } from "@tiptap/core";
+import { Node, mergeAttributes, type CommandProps } from "@tiptap/core";
 
 export interface ChapterBreakOptions {
   chapterNumber?: number;
@@ -97,15 +97,23 @@ export const ChapterBreak = Node.create({
       }),
       [
         "div",
-        { class: "flex items-center justify-center gap-3 mb-6 text-current/30" },
+        {
+          class: "flex items-center justify-center gap-3 mb-6 text-current/30",
+        },
         ["div", { class: "w-16 h-px bg-current/20" }],
         [
           "div",
           { class: "flex items-center gap-1.5" },
-          ["span", { class: "size-1.5 rounded-full bg-current/40 inline-block" }],
+          [
+            "span",
+            { class: "size-1.5 rounded-full bg-current/40 inline-block" },
+          ],
           ["span", { class: "size-2 rounded-full bg-current/70 inline-block" }],
           ["span", { class: "size-2 rounded-full bg-current/70 inline-block" }],
-          ["span", { class: "size-1.5 rounded-full bg-current/40 inline-block" }],
+          [
+            "span",
+            { class: "size-1.5 rounded-full bg-current/40 inline-block" },
+          ],
         ],
         ["div", { class: "w-16 h-px bg-current/20" }],
       ],
@@ -132,7 +140,7 @@ export const ChapterBreak = Node.create({
     return {
       setChapterBreak:
         (options?: ChapterBreakOptions) =>
-        ({ chain }: { chain: () => any }) => {
+        ({ chain }: CommandProps) => {
           return chain()
             .insertContent({
               type: this.name,

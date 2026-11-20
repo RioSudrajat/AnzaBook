@@ -5,11 +5,15 @@ let lockCount = 0;
 let prevOverflow = "";
 let prevPaddingRight = "";
 
+type WindowWithLenis = Window & {
+  __lenis?: { stop?: () => void; start?: () => void } | null;
+};
+
 export function useBodyScrollLock(locked: boolean) {
   React.useEffect(() => {
     if (!locked || typeof window === "undefined") return;
 
-    const lenis = (window as any).__lenis;
+    const lenis = (window as WindowWithLenis).__lenis;
     if (lenis && typeof lenis.stop === "function") {
       lenis.stop();
     }
@@ -33,7 +37,7 @@ export function useBodyScrollLock(locked: boolean) {
         document.body.style.overflow = prevOverflow;
         document.body.style.paddingRight = prevPaddingRight;
 
-        const activeLenis = (window as any).__lenis;
+        const activeLenis = (window as WindowWithLenis).__lenis;
         if (activeLenis && typeof activeLenis.start === "function") {
           activeLenis.start();
         }

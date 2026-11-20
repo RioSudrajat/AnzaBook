@@ -5,19 +5,13 @@ import {
   Library,
   Sailboat,
   Search,
-  Settings,
   Shield,
   User,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 
 export type AppTab =
-  | "home"
-  | "explore"
-  | "events"
-  | "library"
-  | "profile"
-  | "settings";
+  "home" | "explore" | "events" | "library" | "profile" | "settings";
 
 type AppSidebarProps = {
   activeTab: AppTab;
@@ -37,7 +31,11 @@ type AppSidebarProps = {
 };
 
 // Exact replica of the collapse/sidebar toggle icon from screenshot
-export function SidebarToggleIcon({ className = "size-5" }: { className?: string }) {
+export function SidebarToggleIcon({
+  className = "size-5",
+}: {
+  className?: string;
+}) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -64,14 +62,8 @@ function GiftBoxIcon({ className = "size-4" }: { className?: string }) {
       <rect x="3" y="10" width="18" height="11" rx="2" fill="#F59E0B" />
       <rect x="2" y="6" width="20" height="4" rx="1.5" fill="#D97706" />
       <rect x="10.5" y="6" width="3" height="15" fill="#EF4444" />
-      <path
-        d="M12 6C10 4 7 3.5 7 5.5C7 7.5 11 6.5 12 6Z"
-        fill="#DC2626"
-      />
-      <path
-        d="M12 6C14 4 17 3.5 17 5.5C17 7.5 13 6.5 12 6Z"
-        fill="#DC2626"
-      />
+      <path d="M12 6C10 4 7 3.5 7 5.5C7 7.5 11 6.5 12 6Z" fill="#DC2626" />
+      <path d="M12 6C14 4 17 3.5 17 5.5C17 7.5 13 6.5 12 6Z" fill="#DC2626" />
     </svg>
   );
 }
@@ -430,7 +422,11 @@ export function AppSidebar({
                 className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-muted/30 hover:bg-muted/70 text-foreground text-xs font-medium transition-colors cursor-pointer border border-border/70 dark:border-zinc-800/80"
                 title="Unduh untuk Android"
               >
-                <svg className="size-3.5" viewBox="0 0 24 24" fill="currentColor">
+                <svg
+                  className="size-3.5"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
                   <path d="M17.523 15.3414c-.5511 0-.9993-.4486-.9993-1.0003s.4482-1.0003.9993-1.0003c.552 0 .9993.4486.9993 1.0003s-.4473 1.0003-.9993 1.0003m-11.046 0c-.5511 0-.9993-.4486-.9993-1.0003s.4482-1.0003.9993-1.0003c.5511 0 .9993.4486.9993 1.0003s-.4482 1.0003-.9993 1.0003m11.4045-6.02l1.9973-3.4592a.416.416 0 00-.1521-.5676.416.416 0 00-.5676.1521l-2.0223 3.503C15.5902 8.4116 13.8533 8.125 12 8.125c-1.854 0-3.5906.2866-5.1368.8247L4.841 5.4467a.416.416 0 00-.5676-.1521.416.416 0 00-.1521.5676l1.9973 3.4592C2.6889 10.9658.3344 14.773.3344 19.167h23.3312c0-4.394-2.3545-8.2012-5.7836-9.8456" />
                 </svg>
                 <span>Android</span>
@@ -442,7 +438,11 @@ export function AppSidebar({
                 className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-muted/30 hover:bg-muted/70 text-foreground text-xs font-medium transition-colors cursor-pointer border border-border/70 dark:border-zinc-800/80"
                 title="Unduh untuk iOS"
               >
-                <svg className="size-3.5" viewBox="0 0 24 24" fill="currentColor">
+                <svg
+                  className="size-3.5"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
                   <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.63-.77 1.06-1.84.94-2.91-.91.04-2.02.61-2.67 1.38-.58.67-1.09 1.77-.95 2.82 1.02.08 2.06-.52 2.68-1.29z" />
                 </svg>
                 <span>iOS</span>
@@ -511,18 +511,14 @@ export function AppSidebar({
         )}
 
         {/* Hairline Divider before profile in collapsed mode */}
-        {isCollapsed && (
-          <div className="w-9 h-px bg-border/80 my-1 mx-auto" />
-        )}
+        {isCollapsed && <div className="w-9 h-px bg-border/80 my-1 mx-auto" />}
 
         {/* User Profile Card */}
         <button
           type="button"
           onClick={onOpenProfile}
           className={`flex items-center gap-3 rounded-xl transition-all cursor-pointer hover:bg-muted/70 text-left ${
-            isCollapsed
-              ? "size-11 justify-center mx-auto p-0"
-              : "p-2 w-full"
+            isCollapsed ? "size-11 justify-center mx-auto p-0" : "p-2 w-full"
           }`}
           title={`Profil ${user.name}`}
         >

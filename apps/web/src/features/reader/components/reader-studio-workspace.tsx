@@ -3,35 +3,23 @@ import {
   ArrowLeft,
   BookOpen,
   Building2,
-  Check,
   CheckCircle2,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ExternalLink,
-  Eye,
-  FileText,
   Menu,
   Moon,
   PenTool,
   Plus,
-  RotateCcw,
   Save,
   Send,
-  Sparkles,
-  Sun,
   Trash2,
   X,
-  XCircle,
 } from "lucide-react";
 import type {
   DigitalPolicy,
   ManuscriptChapterDto,
-  ManuscriptSubmissionDto,
-  PublisherDto,
 } from "@starter/shared/types";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -98,7 +86,11 @@ export function ReaderStudioWorkspace({
   onBack,
   onPublished,
 }: ReaderStudioWorkspaceProps) {
-  const { data: manuscript, isLoading, refetch } = useManuscript(manuscriptIdOrSlug);
+  const {
+    data: manuscript,
+    isLoading,
+    refetch,
+  } = useManuscript(manuscriptIdOrSlug);
   const { data: verifiedPublishers = [] } = useVerifiedPublishers();
 
   const updateMutation = useUpdateManuscript();
@@ -106,59 +98,70 @@ export function ReaderStudioWorkspace({
   const reviewMutation = useReviewManuscript();
 
   const [theme, setTheme] = React.useState<ReaderTheme>("manila");
-  const [fontSize, setFontSize] = React.useState<number>(18);
+  const fontSize = 18;
   const [fontFamily, setFontFamily] = React.useState<"serif" | "sans">("serif");
 
   // Editorial workspace state
   const [title, setTitle] = React.useState("");
   const [synopsis, setSynopsis] = React.useState("");
   const [category, setCategory] = React.useState("");
-  const [proposedPolicy, setProposedPolicy] = React.useState<DigitalPolicy>("hybrid_nakama_alacarte");
+  const [proposedPolicy, setProposedPolicy] = React.useState<DigitalPolicy>(
+    "hybrid_nakama_alacarte",
+  );
   const [chapters, setChapters] = React.useState<ManuscriptChapterDto[]>([]);
   const [activeChapterIndex, setActiveChapterIndex] = React.useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
-  const [isSubmittingToPublisherOpen, setIsSubmittingToPublisherOpen] = React.useState(false);
-  const [selectedPublisherId, setSelectedPublisherId] = React.useState<string>("");
+  const [isSubmittingToPublisherOpen, setIsSubmittingToPublisherOpen] =
+    React.useState(false);
+  const [selectedPublisherId, setSelectedPublisherId] =
+    React.useState<string>("");
 
   // Review mode actions state
   const [isReviewActionOpen, setIsReviewActionOpen] = React.useState(false);
-  const [reviewAction, setReviewAction] = React.useState<"approve" | "request_revision" | "reject">("approve");
+  const [reviewAction, setReviewAction] = React.useState<
+    "approve" | "request_revision" | "reject"
+  >("approve");
   const [reviewNotes, setReviewNotes] = React.useState("");
-  const [isEditingInReviewMode, setIsEditingInReviewMode] = React.useState(false);
+  const [isEditingInReviewMode, setIsEditingInReviewMode] =
+    React.useState(false);
 
   // Auto-save tracker
-  const [saveStatus, setSaveStatus] = React.useState<"saved" | "saving" | "unsaved">("saved");
+  const [saveStatus, setSaveStatus] = React.useState<
+    "saved" | "saving" | "unsaved"
+  >("saved");
   const saveTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // Initialize data
-  React.useEffect(() => {
-    if (manuscript) {
-      setTitle(manuscript.title || "");
-      setSynopsis(manuscript.synopsis || "");
-      setCategory(manuscript.category || "Fiksi Sastra");
-      setProposedPolicy(manuscript.proposedDigitalPolicy || "hybrid_nakama_alacarte");
-      setSelectedPublisherId(manuscript.publisherId || "");
-      const loadedChapters =
-        manuscript.chapters && manuscript.chapters.length > 0
-          ? manuscript.chapters
-          : [
-              {
-                id: "initial",
-                manuscriptId: manuscript.id,
-                chapterNumber: 1,
-                titleId: "Bab 1: Awal Mula",
-                contentId: "<p>Mulai menulis karyamu di sini...</p>",
-                contentEn: null,
-                blueprintContent: null,
-                estimatedMinutes: 5,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-              },
-            ];
-      setChapters(loadedChapters);
-      setSaveStatus("saved");
-    }
-  }, [manuscript]);
+  const [prevManuscript, setPrevManuscript] = React.useState(manuscript);
+  if (manuscript && manuscript !== prevManuscript) {
+    setPrevManuscript(manuscript);
+    setTitle(manuscript.title || "");
+    setSynopsis(manuscript.synopsis || "");
+    setCategory(manuscript.category || "Fiksi Sastra");
+    setProposedPolicy(
+      manuscript.proposedDigitalPolicy || "hybrid_nakama_alacarte",
+    );
+    setSelectedPublisherId(manuscript.publisherId || "");
+    const loadedChapters =
+      manuscript.chapters && manuscript.chapters.length > 0
+        ? manuscript.chapters
+        : [
+            {
+              id: "initial",
+              manuscriptId: manuscript.id,
+              chapterNumber: 1,
+              titleId: "Bab 1: Awal Mula",
+              contentId: "<p>Mulai menulis karyamu di sini...</p>",
+              contentEn: null,
+              blueprintContent: null,
+              estimatedMinutes: 5,
+              createdAt: manuscript.createdAt,
+              updatedAt: manuscript.updatedAt,
+            },
+          ];
+    setChapters(loadedChapters);
+    setSaveStatus("saved");
+  }
 
   const activeChapter = chapters[activeChapterIndex] || chapters[0];
 
@@ -216,7 +219,11 @@ export function ReaderStudioWorkspace({
   };
 
   const handleChapterContentChange = (newContent: string) => {
-    const words = newContent.replace(/<[^>]*>/g, " ").trim().split(/\s+/).filter(Boolean).length;
+    const words = newContent
+      .replace(/<[^>]*>/g, " ")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean).length;
     const estimatedMinutes = Math.max(1, Math.round(words / 180));
 
     const updated = chapters.map((ch, idx) =>
@@ -334,8 +341,6 @@ export function ReaderStudioWorkspace({
   }
 
   const isAuthor = mode === "write";
-  const isReadOnly =
-    !isAuthor && !isEditingInReviewMode && manuscript.status !== "draft";
 
   return (
     <div
@@ -395,8 +400,8 @@ export function ReaderStudioWorkspace({
               {saveStatus === "saving"
                 ? "Menyimpan draft..."
                 : saveStatus === "saved"
-                ? "Draft tersimpan"
-                : "Perubahan belum disimpan"}
+                  ? "Draft tersimpan"
+                  : "Perubahan belum disimpan"}
             </span>
           </div>
         </div>
@@ -419,7 +424,9 @@ export function ReaderStudioWorkspace({
               type="button"
               onClick={() => setTheme("manila")}
               className={`size-6 rounded text-xs flex items-center justify-center font-serif cursor-pointer ${
-                theme === "manila" ? "ring-1 ring-amber-600 bg-amber-100/60" : ""
+                theme === "manila"
+                  ? "ring-1 ring-amber-600 bg-amber-100/60"
+                  : ""
               }`}
               title="Kertas Manila"
             >
@@ -439,7 +446,9 @@ export function ReaderStudioWorkspace({
               type="button"
               onClick={() => setTheme("night")}
               className={`size-6 rounded text-xs flex items-center justify-center font-serif cursor-pointer ${
-                theme === "night" ? "ring-1 ring-amber-400 bg-zinc-800 text-white" : ""
+                theme === "night"
+                  ? "ring-1 ring-amber-400 bg-zinc-800 text-white"
+                  : ""
               }`}
               title="Tema Malam"
             >
@@ -450,7 +459,9 @@ export function ReaderStudioWorkspace({
           {/* Typography switch */}
           <button
             type="button"
-            onClick={() => setFontFamily(fontFamily === "serif" ? "sans" : "serif")}
+            onClick={() =>
+              setFontFamily(fontFamily === "serif" ? "sans" : "serif")
+            }
             className="hidden sm:flex size-7 items-center justify-center rounded-lg border text-xs font-semibold cursor-pointer"
             style={{ borderColor: currentTheme.border }}
             title="Ganti Font"
@@ -491,12 +502,16 @@ export function ReaderStudioWorkspace({
                 type="button"
                 onClick={() => setIsEditingInReviewMode(!isEditingInReviewMode)}
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium cursor-pointer transition-colors ${
-                  isEditingInReviewMode ? "bg-amber-500 text-black font-bold" : ""
+                  isEditingInReviewMode
+                    ? "bg-amber-500 text-black font-bold"
+                    : ""
                 }`}
                 style={{ borderColor: currentTheme.border }}
               >
                 <PenTool className="size-3.5" />
-                <span>{isEditingInReviewMode ? "Selesai Koreksi" : "Koreksi Teks"}</span>
+                <span>
+                  {isEditingInReviewMode ? "Selesai Koreksi" : "Koreksi Teks"}
+                </span>
               </button>
 
               <button
@@ -538,14 +553,25 @@ export function ReaderStudioWorkspace({
               backgroundColor: currentTheme.cardBg,
             }}
           >
-            <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: currentTheme.border }}>
+            <div
+              className="p-4 border-b flex items-center justify-between"
+              style={{ borderColor: currentTheme.border }}
+            >
               <div className="space-y-0.5">
                 <h4 className="font-serif text-sm font-bold flex items-center gap-2">
                   <BookOpen className="size-4 text-amber-600" />
                   <span>Struktur Bab Naskah</span>
                 </h4>
-                <p className="text-[11px] font-mono" style={{ color: currentTheme.mutedText }}>
-                  {chapters.length} Bab • ±{chapters.reduce((acc, c) => acc + (c.estimatedMinutes || 5), 0)} mnt baca
+                <p
+                  className="text-[11px] font-mono"
+                  style={{ color: currentTheme.mutedText }}
+                >
+                  {chapters.length} Bab • ±
+                  {chapters.reduce(
+                    (acc, c) => acc + (c.estimatedMinutes || 5),
+                    0,
+                  )}{" "}
+                  mnt baca
                 </p>
               </div>
               <button
@@ -579,7 +605,10 @@ export function ReaderStudioWorkspace({
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
-                      <span className="text-[10px] font-mono" style={{ color: currentTheme.mutedText }}>
+                      <span
+                        className="text-[10px] font-mono"
+                        style={{ color: currentTheme.mutedText }}
+                      >
                         {ch.estimatedMinutes}m
                       </span>
                       {isAuthor && chapters.length > 1 && (
@@ -615,8 +644,14 @@ export function ReaderStudioWorkspace({
             </div>
 
             {/* Target Publisher Info */}
-            <div className="p-3 border-t text-xs space-y-1" style={{ borderColor: currentTheme.border }}>
-              <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: currentTheme.mutedText }}>
+            <div
+              className="p-3 border-t text-xs space-y-1"
+              style={{ borderColor: currentTheme.border }}
+            >
+              <span
+                className="text-[10px] font-mono uppercase tracking-wider"
+                style={{ color: currentTheme.mutedText }}
+              >
                 Penerbit Tujuan:
               </span>
               <p className="font-serif font-bold text-xs truncate">
@@ -640,7 +675,10 @@ export function ReaderStudioWorkspace({
             }}
           >
             {/* Book & Chapter Header */}
-            <header className="space-y-4 border-b pb-6" style={{ borderColor: currentTheme.border }}>
+            <header
+              className="space-y-4 border-b pb-6"
+              style={{ borderColor: currentTheme.border }}
+            >
               {/* Editable Book Title */}
               {isAuthor ? (
                 <input
@@ -653,7 +691,9 @@ export function ReaderStudioWorkspace({
                   }`}
                 />
               ) : (
-                <h1 className="font-serif font-bold text-2xl sm:text-3xl">{title}</h1>
+                <h1 className="font-serif font-bold text-2xl sm:text-3xl">
+                  {title}
+                </h1>
               )}
 
               {/* Editable Chapter Title */}
@@ -671,7 +711,9 @@ export function ReaderStudioWorkspace({
                     className="flex-1 bg-transparent font-serif font-semibold text-lg outline-none border-b border-dashed border-border/40 focus:border-amber-500"
                   />
                 ) : (
-                  <h2 className="font-serif font-semibold text-lg">{activeChapter?.titleId}</h2>
+                  <h2 className="font-serif font-semibold text-lg">
+                    {activeChapter?.titleId}
+                  </h2>
                 )}
               </div>
             </header>
@@ -703,7 +745,9 @@ export function ReaderStudioWorkspace({
                     color: currentTheme.text,
                   }}
                   dangerouslySetInnerHTML={{
-                    __html: activeChapter?.contentId || "<p>Belum ada isi naskah.</p>",
+                    __html:
+                      activeChapter?.contentId ||
+                      "<p>Belum ada isi naskah.</p>",
                   }}
                 />
               )}
@@ -712,7 +756,10 @@ export function ReaderStudioWorkspace({
             {/* Chapter Footer Navigation */}
             <footer
               className="pt-8 border-t flex items-center justify-between text-xs font-mono"
-              style={{ borderColor: currentTheme.border, color: currentTheme.mutedText }}
+              style={{
+                borderColor: currentTheme.border,
+                color: currentTheme.mutedText,
+              }}
             >
               <button
                 type="button"
@@ -731,7 +778,11 @@ export function ReaderStudioWorkspace({
               <button
                 type="button"
                 disabled={activeChapterIndex >= chapters.length - 1}
-                onClick={() => setActiveChapterIndex((i) => Math.min(chapters.length - 1, i + 1))}
+                onClick={() =>
+                  setActiveChapterIndex((i) =>
+                    Math.min(chapters.length - 1, i + 1),
+                  )
+                }
                 className="flex items-center gap-1.5 disabled:opacity-30 hover:text-foreground cursor-pointer"
               >
                 <span>Bab Selanjutnya</span>
@@ -749,7 +800,9 @@ export function ReaderStudioWorkspace({
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div className="flex items-center gap-2">
                 <Building2 className="size-5 text-amber-500" />
-                <h3 className="font-serif font-bold text-base">Ajukan Naskah ke Penerbit</h3>
+                <h3 className="font-serif font-bold text-base">
+                  Ajukan Naskah ke Penerbit
+                </h3>
               </div>
               <button
                 type="button"
@@ -761,18 +814,23 @@ export function ReaderStudioWorkspace({
             </div>
 
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Naskah akan dikirim langsung ke meja redaksi penerbit untuk ditinjau bab demi bab di dalam E-Reader.
+              Naskah akan dikirim langsung ke meja redaksi penerbit untuk
+              ditinjau bab demi bab di dalam E-Reader.
             </p>
 
             <div className="space-y-4 text-xs">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Pilih Penerbit Tujuan</Label>
+                <Label className="text-xs font-semibold">
+                  Pilih Penerbit Tujuan
+                </Label>
                 <select
                   value={selectedPublisherId}
                   onChange={(e) => setSelectedPublisherId(e.target.value)}
                   className="w-full rounded-xl border border-border bg-background p-2.5 text-xs outline-none"
                 >
-                  <option value="">AnzaBook Official Publishing (Standar)</option>
+                  <option value="">
+                    AnzaBook Official Publishing (Standar)
+                  </option>
                   {verifiedPublishers.map((pub) => (
                     <option key={pub.id} value={pub.id}>
                       {pub.name} ({pub.city || "Indonesia"})
@@ -782,7 +840,9 @@ export function ReaderStudioWorkspace({
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Sinopsis Ringkas</Label>
+                <Label className="text-xs font-semibold">
+                  Sinopsis Ringkas
+                </Label>
                 <Textarea
                   rows={3}
                   value={synopsis}
@@ -793,16 +853,28 @@ export function ReaderStudioWorkspace({
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Skema Distribusi Digital</Label>
+                <Label className="text-xs font-semibold">
+                  Skema Distribusi Digital
+                </Label>
                 <select
                   value={proposedPolicy}
-                  onChange={(e) => setProposedPolicy(e.target.value as DigitalPolicy)}
+                  onChange={(e) =>
+                    setProposedPolicy(e.target.value as DigitalPolicy)
+                  }
                   className="w-full rounded-xl border border-border bg-background p-2.5 text-xs outline-none"
                 >
-                  <option value="hybrid_nakama_alacarte">Hybrid: Nakama Pool + Ala Carte</option>
-                  <option value="free_open">Bebas Akses (Free Open Literasi)</option>
-                  <option value="print_claim_only">Eksklusif Klaim Cetak (Phygital)</option>
-                  <option value="alacarte_only">Hanya Penjualan Satuan (Ala Carte)</option>
+                  <option value="hybrid_nakama_alacarte">
+                    Hybrid: Nakama Pool + Ala Carte
+                  </option>
+                  <option value="free_open">
+                    Bebas Akses (Free Open Literasi)
+                  </option>
+                  <option value="print_claim_only">
+                    Eksklusif Klaim Cetak (Phygital)
+                  </option>
+                  <option value="alacarte_only">
+                    Hanya Penjualan Satuan (Ala Carte)
+                  </option>
                 </select>
               </div>
             </div>
@@ -814,7 +886,9 @@ export function ReaderStudioWorkspace({
                 disabled={submitDraftMutation.isPending}
                 className="flex-1 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs py-2.5 rounded-xl cursor-pointer"
               >
-                {submitDraftMutation.isPending ? "Mengirimkan..." : "Kirim Naskah Sekarang"}
+                {submitDraftMutation.isPending
+                  ? "Mengirimkan..."
+                  : "Kirim Naskah Sekarang"}
               </Button>
               <Button
                 type="button"
@@ -838,8 +912,8 @@ export function ReaderStudioWorkspace({
                 {reviewAction === "approve"
                   ? "Setujui & Terbitkan Buku"
                   : reviewAction === "request_revision"
-                  ? "Minta Revisi kepada Penulis"
-                  : "Tolak Pengajuan Naskah"}
+                    ? "Minta Revisi kepada Penulis"
+                    : "Tolak Pengajuan Naskah"}
               </h3>
               <button
                 type="button"
@@ -878,17 +952,17 @@ export function ReaderStudioWorkspace({
                   reviewAction === "approve"
                     ? "bg-emerald-600 hover:bg-emerald-500"
                     : reviewAction === "request_revision"
-                    ? "bg-amber-600 hover:bg-amber-500"
-                    : "bg-red-600 hover:bg-red-500"
+                      ? "bg-amber-600 hover:bg-amber-500"
+                      : "bg-red-600 hover:bg-red-500"
                 }`}
               >
                 {reviewMutation.isPending
                   ? "Memproses..."
                   : reviewAction === "approve"
-                  ? "Konfirmasi Terbitkan"
-                  : reviewAction === "request_revision"
-                  ? "Kirim Permintaan Revisi"
-                  : "Konfirmasi Tolak"}
+                    ? "Konfirmasi Terbitkan"
+                    : reviewAction === "request_revision"
+                      ? "Kirim Permintaan Revisi"
+                      : "Konfirmasi Tolak"}
               </Button>
               <Button
                 type="button"

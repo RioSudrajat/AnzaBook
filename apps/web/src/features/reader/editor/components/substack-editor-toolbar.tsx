@@ -33,7 +33,6 @@ import {
   Redo,
   Sigma,
   Strikethrough,
-  Type,
   Undo,
   Users,
   Utensils,
@@ -62,11 +61,13 @@ export function SubstackEditorToolbar({
   const [isButtonMenuOpen, setIsButtonMenuOpen] = React.useState(false);
   const [isTemplateMenuOpen, setIsTemplateMenuOpen] = React.useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = React.useState(false);
-  const [isAudienceSubmenuOpen, setIsAudienceSubmenuOpen] = React.useState(false);
+  const [isAudienceSubmenuOpen, setIsAudienceSubmenuOpen] =
+    React.useState(false);
 
   // Active color indicator
   const [currentTextColor, setCurrentTextColor] = React.useState("#ef4444"); // Red underline by default like Substack
-  const [currentHighlightColor, setCurrentHighlightColor] = React.useState("#fef08a"); // Yellow highlighter bar by default
+  const [currentHighlightColor, setCurrentHighlightColor] =
+    React.useState("#fef08a"); // Yellow highlighter bar by default
 
   // Hidden native file inputs for direct device selection (zero prompt / zero link typing)
   const imageInputRef = React.useRef<HTMLInputElement>(null);
@@ -74,9 +75,11 @@ export function SubstackEditorToolbar({
   const videoInputRef = React.useRef<HTMLInputElement>(null);
 
   // In-App Insert Dialog State for specialized blocks (LaTeX, Collapsible, Poll, etc.)
-  const [activeInsertType, setActiveInsertType] = React.useState<SubstackInsertType | null>(null);
-  const [insertInitial1, setInsertInitial1] = React.useState<string | undefined>();
-  const [insertInitial2, setInsertInitial2] = React.useState<string | undefined>();
+  const [activeInsertType, setActiveInsertType] =
+    React.useState<SubstackInsertType | null>(null);
+  const [insertInitial1, setInsertInitial1] = React.useState<
+    string | undefined
+  >();
 
   const containerRef = React.useRef<HTMLDivElement>(null);
 
@@ -231,7 +234,12 @@ export function SubstackEditorToolbar({
       .focus()
       .insertContent({
         type: "calloutBox",
-        content: [{ type: "text", text: "Tuliskan catatan penting, konteks historis, atau kutipan di sini..." }],
+        content: [
+          {
+            type: "text",
+            text: "Tuliskan catatan penting, konteks historis, atau kutipan di sini...",
+          },
+        ],
       })
       .run();
   };
@@ -254,7 +262,11 @@ export function SubstackEditorToolbar({
         .focus()
         .insertContent({
           type: "substackButton",
-          attrs: { text: "Beli Naskah / Member Nakama", variant: "paid", url: "#" },
+          attrs: {
+            text: "Beli Naskah / Member Nakama",
+            variant: "paid",
+            url: "#",
+          },
         })
         .run();
     } else if (variant === "custom") {
@@ -263,7 +275,11 @@ export function SubstackEditorToolbar({
         .focus()
         .insertContent({
           type: "substackButton",
-          attrs: { text: "Kunjungi Halaman Penting", variant: "custom", url: "#" },
+          attrs: {
+            text: "Kunjungi Halaman Penting",
+            variant: "custom",
+            url: "#",
+          },
         })
         .run();
     }
@@ -286,7 +302,10 @@ export function SubstackEditorToolbar({
   };
 
   // DIRECT INLINE CHAPTER INSERTION (Zero Modal Dialog - 1 Click!)
-  const handleInsertChapterBreak = (defaultNum?: number, defaultTitle?: string) => {
+  const handleInsertChapterBreak = (
+    defaultNum?: number,
+    defaultTitle?: string,
+  ) => {
     closeAllMenus();
     const nextNum = defaultNum ?? getSuggestedNextChapter();
     const title =
@@ -322,9 +341,18 @@ export function SubstackEditorToolbar({
     if (activeInsertType === "chapter") {
       const num = parseInt(val1, 10) || 1;
       const title = val2 || `Bab ${num}`;
-      editor.chain().focus().setChapterBreak({ chapterNumber: num, title }).run();
+      editor
+        .chain()
+        .focus()
+        .setChapterBreak({ chapterNumber: num, title })
+        .run();
     } else if (activeInsertType === "link") {
-      editor.chain().focus().extendMarkRange("link").setLink({ href: val1 }).run();
+      editor
+        .chain()
+        .focus()
+        .extendMarkRange("link")
+        .setLink({ href: val1 })
+        .run();
     } else if (activeInsertType === "image") {
       editor.chain().focus().setImage({ src: val1 }).run();
     } else if (activeInsertType === "audio") {
@@ -426,7 +454,14 @@ export function SubstackEditorToolbar({
 
   // Template Insertion (Matching SS 1, SS 2, SS 3)
   const handleInsertTemplate = (
-    type: "chapter1" | "chapter2" | "sceneBreak" | "opening" | "dialogue" | "essay" | "epilogue"
+    type:
+      | "chapter1"
+      | "chapter2"
+      | "sceneBreak"
+      | "opening"
+      | "dialogue"
+      | "essay"
+      | "epilogue",
   ) => {
     closeAllMenus();
     if (type === "chapter1" || type === "opening") {
@@ -520,20 +555,35 @@ export function SubstackEditorToolbar({
         .insertContent([
           {
             type: "calloutBox",
-            content: [{ type: "text", text: "Transkrip Wawancara Eksklusif dengan Tokoh Utama" }],
+            content: [
+              {
+                type: "text",
+                text: "Transkrip Wawancara Eksklusif dengan Tokoh Utama",
+              },
+            ],
           },
           {
             type: "paragraph",
             content: [
-              { type: "text", marks: [{ type: "bold" }], text: "Pewawancara: " },
-              { type: "text", text: "Apa yang membuat Anda berani mendirikan penerbit mandiri?" },
+              {
+                type: "text",
+                marks: [{ type: "bold" }],
+                text: "Pewawancara: ",
+              },
+              {
+                type: "text",
+                text: "Apa yang membuat Anda berani mendirikan penerbit mandiri?",
+              },
             ],
           },
           {
             type: "paragraph",
             content: [
               { type: "text", marks: [{ type: "bold" }], text: "Narasumber: " },
-              { type: "text", text: "Karena literasi adalah hak dasar, bukan kemewahan toko berpendingin udara." },
+              {
+                type: "text",
+                text: "Karena literasi adalah hak dasar, bukan kemewahan toko berpendingin udara.",
+              },
             ],
           },
         ])
@@ -543,7 +593,16 @@ export function SubstackEditorToolbar({
         .chain()
         .focus()
         .insertContent([
-          { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "Analisis Kritis: Paradoks Industri Perbukuan" }] },
+          {
+            type: "heading",
+            attrs: { level: 2 },
+            content: [
+              {
+                type: "text",
+                text: "Analisis Kritis: Paradoks Industri Perbukuan",
+              },
+            ],
+          },
           {
             type: "paragraph",
             content: [
@@ -571,7 +630,11 @@ export function SubstackEditorToolbar({
         .focus()
         .insertContent([
           { type: "pageBreak" },
-          { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "Catatan Penutup & Epilog" }] },
+          {
+            type: "heading",
+            attrs: { level: 2 },
+            content: [{ type: "text", text: "Catatan Penutup & Epilog" }],
+          },
           {
             type: "paragraph",
             content: [
@@ -583,7 +646,11 @@ export function SubstackEditorToolbar({
           },
           {
             type: "substackButton",
-            attrs: { text: "Dukung Penulis di AnzaBook", variant: "paid", url: "#" },
+            attrs: {
+              text: "Dukung Penulis di AnzaBook",
+              variant: "paid",
+              url: "#",
+            },
           },
         ])
         .run();
@@ -594,12 +661,12 @@ export function SubstackEditorToolbar({
   const currentStyleLabel = editor.isActive("heading", { level: 1 })
     ? "Judul (H1)"
     : editor.isActive("heading", { level: 2 })
-    ? "Subjudul (H2)"
-    : editor.isActive("heading", { level: 3 })
-    ? "Heading 3"
-    : editor.isActive("blockquote")
-    ? "Kutipan"
-    : "Gaya";
+      ? "Subjudul (H2)"
+      : editor.isActive("heading", { level: 3 })
+        ? "Heading 3"
+        : editor.isActive("blockquote")
+          ? "Kutipan"
+          : "Gaya";
 
   return (
     <div
@@ -687,7 +754,9 @@ export function SubstackEditorToolbar({
                   closeAllMenus();
                 }}
                 className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-muted transition-colors ${
-                  editor.isActive("paragraph") ? "font-bold text-[var(--color-accent)]" : ""
+                  editor.isActive("paragraph")
+                    ? "font-bold text-[var(--color-accent)]"
+                    : ""
                 }`}
               >
                 <span>Paragraf Normal</span>
@@ -699,7 +768,9 @@ export function SubstackEditorToolbar({
                   closeAllMenus();
                 }}
                 className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-muted transition-colors font-serif font-bold ${
-                  editor.isActive("heading", { level: 1 }) ? "text-[var(--color-accent)]" : ""
+                  editor.isActive("heading", { level: 1 })
+                    ? "text-[var(--color-accent)]"
+                    : ""
                 }`}
               >
                 <Heading1 className="size-3.5" />
@@ -712,7 +783,9 @@ export function SubstackEditorToolbar({
                   closeAllMenus();
                 }}
                 className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-muted transition-colors font-serif font-semibold ${
-                  editor.isActive("heading", { level: 2 }) ? "text-[var(--color-accent)]" : ""
+                  editor.isActive("heading", { level: 2 })
+                    ? "text-[var(--color-accent)]"
+                    : ""
                 }`}
               >
                 <Heading2 className="size-3.5" />
@@ -725,7 +798,9 @@ export function SubstackEditorToolbar({
                   closeAllMenus();
                 }}
                 className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-muted transition-colors font-serif ${
-                  editor.isActive("heading", { level: 3 }) ? "text-[var(--color-accent)]" : ""
+                  editor.isActive("heading", { level: 3 })
+                    ? "text-[var(--color-accent)]"
+                    : ""
                 }`}
               >
                 <Heading3 className="size-3.5" />
@@ -738,7 +813,9 @@ export function SubstackEditorToolbar({
                   closeAllMenus();
                 }}
                 className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-muted transition-colors italic ${
-                  editor.isActive("blockquote") ? "text-[var(--color-accent)]" : ""
+                  editor.isActive("blockquote")
+                    ? "text-[var(--color-accent)]"
+                    : ""
                 }`}
               >
                 <Quote className="size-3.5" />
@@ -824,7 +901,9 @@ export function SubstackEditorToolbar({
             aria-label="Warna Teks"
           >
             <div className="flex flex-col items-center">
-              <span className="font-serif font-bold text-xs leading-none">T</span>
+              <span className="font-serif font-bold text-xs leading-none">
+                T
+              </span>
               <div
                 className="w-3.5 h-0.5 mt-0.5 rounded-full"
                 style={{ backgroundColor: currentTextColor }}
@@ -835,7 +914,9 @@ export function SubstackEditorToolbar({
 
           {isTextColorMenuOpen && (
             <div className="absolute top-full left-0 mt-1 w-36 rounded-xl border border-border bg-popover p-1.5 shadow-lg z-50 text-xs animate-in fade-in zoom-in-95 duration-100 space-y-1">
-              <div className="px-2 py-0.5 text-[10px] font-mono uppercase text-muted-foreground">Warna Teks</div>
+              <div className="px-2 py-0.5 text-[10px] font-mono uppercase text-muted-foreground">
+                Warna Teks
+              </div>
               <button
                 type="button"
                 onClick={() => handleSetTextColor("inherit")}
@@ -910,7 +991,9 @@ export function SubstackEditorToolbar({
             aria-label="Sorotan Stabilo"
           >
             <div className="flex flex-col items-center">
-              <span className="font-serif font-bold text-xs leading-none">A</span>
+              <span className="font-serif font-bold text-xs leading-none">
+                A
+              </span>
               <div
                 className="w-3.5 h-1 mt-0.5 rounded-full"
                 style={{ backgroundColor: currentHighlightColor }}
@@ -921,7 +1004,9 @@ export function SubstackEditorToolbar({
 
           {isHighlightMenuOpen && (
             <div className="absolute top-full left-0 mt-1 w-36 rounded-xl border border-border bg-popover p-1.5 shadow-lg z-50 text-xs animate-in fade-in zoom-in-95 duration-100 space-y-1">
-              <div className="px-2 py-0.5 text-[10px] font-mono uppercase text-muted-foreground">Warna Sorotan</div>
+              <div className="px-2 py-0.5 text-[10px] font-mono uppercase text-muted-foreground">
+                Warna Sorotan
+              </div>
               <button
                 type="button"
                 onClick={() => handleSetHighlight("#fef08a")}
@@ -1185,7 +1270,9 @@ export function SubstackEditorToolbar({
                   <span className="w-5 h-px bg-current/40 group-hover:bg-foreground" />
                   <span className="font-medium">Garis Tipis</span>
                 </div>
-                <span className="text-[10px] text-muted-foreground font-mono">Hairline</span>
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  Hairline
+                </span>
               </button>
 
               {/* 2. Garis Sedang */}
@@ -1198,7 +1285,9 @@ export function SubstackEditorToolbar({
                   <span className="w-5 h-0.5 bg-current/70 group-hover:bg-foreground" />
                   <span className="font-medium">Garis Sedang</span>
                 </div>
-                <span className="text-[10px] text-muted-foreground font-mono">Medium</span>
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  Medium
+                </span>
               </button>
 
               {/* 3. Pembatas Halaman (✦ ✦ ✦ SS 2) */}
@@ -1208,10 +1297,14 @@ export function SubstackEditorToolbar({
                 className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-muted transition-colors flex items-center justify-between text-[var(--color-accent)]"
               >
                 <div className="flex items-center gap-2">
-                  <span className="font-serif text-xs tracking-widest">✦ ✦ ✦</span>
+                  <span className="font-serif text-xs tracking-widest">
+                    ✦ ✦ ✦
+                  </span>
                   <span className="font-medium">Pembatas Halaman</span>
                 </div>
-                <span className="text-[10px] text-muted-foreground font-mono">Scene Break</span>
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  Scene Break
+                </span>
               </button>
 
               <div className="h-px bg-border/60 my-1" />
@@ -1230,7 +1323,9 @@ export function SubstackEditorToolbar({
                   <BookOpen className="size-3.5 text-sky-500" />
                   <span className="font-medium">Pembatas Bab Baru</span>
                 </div>
-                <span className="text-[10px] text-muted-foreground font-mono">Chapter</span>
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  Chapter
+                </span>
               </button>
 
               {/* 5. Dinding Gratis */}
@@ -1337,7 +1432,9 @@ export function SubstackEditorToolbar({
                 <BookOpen className="size-3.5 text-[var(--color-accent)] shrink-0" />
                 <div>
                   <div className="font-medium">Bab 1: Permulaan</div>
-                  <div className="text-[10px] text-muted-foreground">Header garis atas & bawah (SS 1)</div>
+                  <div className="text-[10px] text-muted-foreground">
+                    Header garis atas & bawah (SS 1)
+                  </div>
                 </div>
               </button>
               <button
@@ -1348,7 +1445,9 @@ export function SubstackEditorToolbar({
                 <BookOpen className="size-3.5 text-sky-500 shrink-0" />
                 <div>
                   <div className="font-medium">Bab 2+: Lanjutan</div>
-                  <div className="text-[10px] text-muted-foreground">Transisi 4 manik bulat (SS 3)</div>
+                  <div className="text-[10px] text-muted-foreground">
+                    Transisi 4 manik bulat (SS 3)
+                  </div>
                 </div>
               </button>
               <button
@@ -1356,10 +1455,14 @@ export function SubstackEditorToolbar({
                 onClick={() => handleInsertTemplate("sceneBreak")}
                 className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-muted transition-colors flex items-center gap-2"
               >
-                <span className="font-serif text-xs text-amber-500 shrink-0">✦✦✦</span>
+                <span className="font-serif text-xs text-amber-500 shrink-0">
+                  ✦✦✦
+                </span>
                 <div>
                   <div className="font-medium">Jeda Halaman / Adegan</div>
-                  <div className="text-[10px] text-muted-foreground">Bintang diamond ✦ ✦ ✦ (SS 2)</div>
+                  <div className="text-[10px] text-muted-foreground">
+                    Bintang diamond ✦ ✦ ✦ (SS 2)
+                  </div>
                 </div>
               </button>
 
@@ -1422,12 +1525,16 @@ export function SubstackEditorToolbar({
               <div className="relative">
                 <button
                   type="button"
-                  onClick={() => setIsAudienceSubmenuOpen(!isAudienceSubmenuOpen)}
+                  onClick={() =>
+                    setIsAudienceSubmenuOpen(!isAudienceSubmenuOpen)
+                  }
                   className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-muted transition-colors flex items-center justify-between"
                 >
                   <div className="flex items-center gap-2.5">
                     <Users className="size-4 text-muted-foreground" />
-                    <span className="font-medium text-foreground">Konten khusus untuk audiens tertentu</span>
+                    <span className="font-medium text-foreground">
+                      Konten khusus untuk audiens tertentu
+                    </span>
                   </div>
                   <ChevronRight className="size-3 opacity-60" />
                 </button>
@@ -1443,7 +1550,12 @@ export function SubstackEditorToolbar({
                           .insertContent({
                             type: "audienceGated",
                             attrs: { tier: "free" },
-                            content: [{ type: "text", text: "Konten ini dapat dibaca oleh seluruh pengunjung gratis..." }],
+                            content: [
+                              {
+                                type: "text",
+                                text: "Konten ini dapat dibaca oleh seluruh pengunjung gratis...",
+                              },
+                            ],
                           })
                           .run();
                         closeAllMenus();
@@ -1461,7 +1573,12 @@ export function SubstackEditorToolbar({
                           .insertContent({
                             type: "audienceGated",
                             attrs: { tier: "nakama" },
-                            content: [{ type: "text", text: "Konten ini hanya dapat dibaca oleh Member Nakama terverifikasi..." }],
+                            content: [
+                              {
+                                type: "text",
+                                text: "Konten ini hanya dapat dibaca oleh Member Nakama terverifikasi...",
+                              },
+                            ],
                           })
                           .run();
                         closeAllMenus();
@@ -1479,7 +1596,12 @@ export function SubstackEditorToolbar({
                           .insertContent({
                             type: "audienceGated",
                             attrs: { tier: "physical" },
-                            content: [{ type: "text", text: "Konten eksklusif untuk pemilik buku edisi cetak fisik..." }],
+                            content: [
+                              {
+                                type: "text",
+                                text: "Konten eksklusif untuk pemilik buku edisi cetak fisik...",
+                              },
+                            ],
                           })
                           .run();
                         closeAllMenus();
@@ -1515,14 +1637,20 @@ export function SubstackEditorToolbar({
                   <Minus className="size-4 text-muted-foreground" />
                   <span>Pemisah Halaman</span>
                 </div>
-                <span className="font-serif text-xs opacity-60 tracking-wider">✦ ✦ ✦</span>
+                <span className="font-serif text-xs opacity-60 tracking-wider">
+                  ✦ ✦ ✦
+                </span>
               </button>
 
               {/* 4. Grafik keuangan */}
               <button
                 type="button"
                 onClick={() => {
-                  editor.chain().focus().insertContent({ type: "financialChart" }).run();
+                  editor
+                    .chain()
+                    .focus()
+                    .insertContent({ type: "financialChart" })
+                    .run();
                   closeAllMenus();
                 }}
                 className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-muted transition-colors flex items-center gap-2.5"
@@ -1536,12 +1664,16 @@ export function SubstackEditorToolbar({
                 type="button"
                 onClick={() => {
                   closeAllMenus();
-                  setInsertInitial1("Rujukan data dari Perpustakaan Nasional RI.");
+                  setInsertInitial1(
+                    "Rujukan data dari Perpustakaan Nasional RI.",
+                  );
                   setActiveInsertType("footnote");
                 }}
                 className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-muted transition-colors flex items-center gap-2.5"
               >
-                <span className="size-4 text-center font-bold text-muted-foreground leading-none">*</span>
+                <span className="size-4 text-center font-bold text-muted-foreground leading-none">
+                  *
+                </span>
                 <span>Catatan kaki</span>
               </button>
 
@@ -1550,7 +1682,9 @@ export function SubstackEditorToolbar({
                 type="button"
                 onClick={() => {
                   closeAllMenus();
-                  setInsertInitial1("E = mc^2 \\quad \\Longleftrightarrow \\quad \\int_0^\\infty e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}");
+                  setInsertInitial1(
+                    "E = mc^2 \\quad \\Longleftrightarrow \\quad \\int_0^\\infty e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}",
+                  );
                   setActiveInsertType("latex");
                 }}
                 className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-muted transition-colors flex items-center gap-2.5"
@@ -1621,7 +1755,9 @@ export function SubstackEditorToolbar({
                 type="button"
                 onClick={() => {
                   closeAllMenus();
-                  setInsertInitial1("Apakah Anda setuju dengan argumen di bab ini?");
+                  setInsertInitial1(
+                    "Apakah Anda setuju dengan argumen di bab ini?",
+                  );
                   setActiveInsertType("poll");
                 }}
                 className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-muted transition-colors flex items-center gap-2.5"
@@ -1635,7 +1771,9 @@ export function SubstackEditorToolbar({
                 type="button"
                 onClick={() => {
                   closeAllMenus();
-                  setInsertInitial1("Peluang adaptasi ke layar lebar dalam 2 tahun");
+                  setInsertInitial1(
+                    "Peluang adaptasi ke layar lebar dalam 2 tahun",
+                  );
                   setActiveInsertType("prediction");
                 }}
                 className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-muted transition-colors flex items-center gap-2.5"
@@ -1668,7 +1806,6 @@ export function SubstackEditorToolbar({
         onClose={() => setActiveInsertType(null)}
         type={activeInsertType}
         initialValue1={insertInitial1}
-        initialValue2={insertInitial2}
         onConfirm={handleConfirmInsert}
       />
     </div>

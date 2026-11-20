@@ -43,7 +43,7 @@
 
 - [x] **Task 2: Penyempurnaan Badge & Footer Metrik Kartu Katalog (`BookCatalogCard`)**
   - **Files**: `apps/web/src/features/books/components/book-catalog-card.tsx`
-  - **Deliverable**: Kartu katalog dengan header badge bersih (*clean pill*) untuk kategori, `FREE`/`PREMIUM`, dan `FISIK`, serta footer baru yang menampilkan metrik pembaca & share menggantikan `Edisi Rakyat: Rp...`.
+  - **Deliverable**: Kartu katalog dengan header badge bersih (_clean pill_) untuk kategori, `FREE`/`PREMIUM`, dan `FISIK`, serta footer baru yang menampilkan metrik pembaca & share menggantikan `Edisi Rakyat: Rp...`.
   - **Steps**:
     - [x] 1. Rombak baris atas kartu: tampilkan kategori di sisi kiri dengan gaya muted font mono/sans yang elegan.
     - [x] 2. Tampilkan badge akses (`FREE` / `PREMIUM`) di sisi kanan dengan soft-pill styling tanpa border neon yang kasar.

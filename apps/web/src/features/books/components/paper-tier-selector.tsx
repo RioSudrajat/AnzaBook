@@ -1,12 +1,6 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import {
-  BookOpen,
-  Check,
-  Feather,
-  Layers,
-  ShieldCheck,
-} from "lucide-react";
+import { BookOpen, Check, Feather, Layers, ShieldCheck } from "lucide-react";
 import type { BookDetailDto, EditionTier } from "@starter/shared/types";
 import { BookCover } from "./book-cover";
 import { Button } from "@/components/ui/button";

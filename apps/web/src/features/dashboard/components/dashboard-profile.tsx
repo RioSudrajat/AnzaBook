@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   AlertCircle,
@@ -11,11 +11,9 @@ import {
   CheckCircle,
   CheckCircle2,
   Clock,
-  Copy,
   Edit3,
   Flame,
   Globe,
-  ImageIcon,
   Layers,
   MapPin,
   MessageSquare,
@@ -29,20 +27,15 @@ import {
   UserCheck,
   UserPlus,
   Users,
-  X,
 } from "lucide-react";
 import type {
   ReadingSessionDto,
   SocialProfileDto,
 } from "@starter/shared/types";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useUserShelves } from "@/features/community/hooks";
 import { useReadingSessions } from "@/features/community/hooks";
 import {
-  useApplyAuthor,
   useCreateManuscriptDraft,
   useFollowUser,
   useMyManuscripts,
@@ -55,7 +48,6 @@ import { useAllHighlights } from "@/features/books/hooks";
 import { BookCover } from "@/features/books/components/book-cover";
 import { SocialRelationsDialog } from "@/features/social/components/social-relations-dialog";
 import { EditProfileView } from "./edit-profile-view";
-import { ApiError } from "@/lib/api/client";
 import {
   formatRoleName,
   formatManuscriptStatus,
@@ -106,28 +98,30 @@ type DashboardProfileProps = {
   onOpenFlexStory?: (session: ReadingSessionDto, bookTitle: string) => void;
 };
 
-export function DashboardProfile({
-  isOwnProfile = true,
-  profile: externalProfile,
-  isEditing = false,
-  onStartEdit,
-  onFinishEdit,
-  onNavigateSettings,
-  onOpenFlexStory,
-}: DashboardProfileProps) {
+export function DashboardProfile(props: DashboardProfileProps) {
   // If in edit mode, render dedicated EditProfileView inside the app canvas
-  if (isEditing) {
+  if (props.isEditing) {
     return (
       <EditProfileView
         onBack={() => {
-          if (onFinishEdit) {
-            onFinishEdit();
+          if (props.onFinishEdit) {
+            props.onFinishEdit();
           }
         }}
       />
     );
   }
 
+  return <DashboardProfileContent {...props} />;
+}
+
+function DashboardProfileContent({
+  isOwnProfile = true,
+  profile: externalProfile,
+  onStartEdit,
+  onNavigateSettings,
+  onOpenFlexStory,
+}: DashboardProfileProps) {
   // Queries
   const { data: myProfile, isLoading: isMyProfileLoading } =
     useMySocialProfile();
@@ -137,7 +131,8 @@ export function DashboardProfile({
   const { data: sessionsData } = useReadingSessions();
   const sessions = sessionsData?.data || [];
   const telemetrySummary = sessionsData?.summary;
-  const { data: manuscripts = [], refetch: refetchManuscripts } = useMyManuscripts();
+  const { data: manuscripts = [], refetch: refetchManuscripts } =
+    useMyManuscripts();
   const userHighlights = useAllHighlights();
 
   // Mutations
@@ -153,11 +148,11 @@ export function DashboardProfile({
   const isPendingAuthor = profile?.authorStatus === "pending";
   const isPublisher = Boolean(
     profile?.isPublisher ||
-      (profile?.managedPublishers && profile.managedPublishers.length > 0),
+    (profile?.managedPublishers && profile.managedPublishers.length > 0),
   );
   const isCommunityOwner = Boolean(
     profile?.isCommunityOwner ||
-      (profile?.managedCommunities && profile.managedCommunities.length > 0),
+    (profile?.managedCommunities && profile.managedCommunities.length > 0),
   );
 
   // Sub-tabs
@@ -180,9 +175,7 @@ export function DashboardProfile({
   });
 
   // E-Reader Studio & Modal states
-  const [activeStudioManuscriptId, setActiveStudioManuscriptId] = useState<
-    string | null
-  >(null);
+  const [fallbackTimestamp] = useState(() => Date.now());
   const [isCopiedLink, setIsCopiedLink] = useState(false);
   const [isCreatingDraft, setIsCreatingDraft] = useState(false);
 
@@ -406,8 +399,8 @@ export function DashboardProfile({
                                 .filter(Boolean)
                                 .pop()
                             : profile.socialLinks.instagram.startsWith("@")
-                            ? profile.socialLinks.instagram
-                            : `@${profile.socialLinks.instagram}`}
+                              ? profile.socialLinks.instagram
+                              : `@${profile.socialLinks.instagram}`}
                         </span>
                       </a>
                     )}
@@ -432,8 +425,8 @@ export function DashboardProfile({
                                 .filter(Boolean)
                                 .pop()
                             : profile.socialLinks.twitter.startsWith("@")
-                            ? profile.socialLinks.twitter
-                            : `@${profile.socialLinks.twitter}`}
+                              ? profile.socialLinks.twitter
+                              : `@${profile.socialLinks.twitter}`}
                         </span>
                       </a>
                     )}
@@ -580,79 +573,79 @@ export function DashboardProfile({
           </div>
 
           {/* Statistik Sosial & Membaca (4 Grid metrics) */}
-        <div className="mt-8 pt-6 border-t border-border grid grid-cols-2 sm:grid-cols-4 gap-4 text-center sm:text-left">
-          <button
-            type="button"
-            onClick={() =>
-              setRelationsDialogState({
-                isOpen: true,
-                initialTab: "followers",
-              })
-            }
-            className="p-3.5 rounded-xl bg-muted/30 border border-border/70 hover:border-foreground/40 hover:bg-muted/50 transition-all text-left cursor-pointer group"
-            title="Lihat daftar pengikut"
-          >
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono group-hover:text-foreground transition-colors">
-              <Users className="size-3.5 text-foreground" />
-              <span>Pengikut</span>
-            </div>
-            <p className="font-serif text-xl sm:text-2xl font-bold mt-1 text-foreground">
-              {profile?.followersCount || 0}
-            </p>
-          </button>
+          <div className="mt-8 pt-6 border-t border-border grid grid-cols-2 sm:grid-cols-4 gap-4 text-center sm:text-left">
+            <button
+              type="button"
+              onClick={() =>
+                setRelationsDialogState({
+                  isOpen: true,
+                  initialTab: "followers",
+                })
+              }
+              className="p-3.5 rounded-xl bg-muted/30 border border-border/70 hover:border-foreground/40 hover:bg-muted/50 transition-all text-left cursor-pointer group"
+              title="Lihat daftar pengikut"
+            >
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono group-hover:text-foreground transition-colors">
+                <Users className="size-3.5 text-foreground" />
+                <span>Pengikut</span>
+              </div>
+              <p className="font-serif text-xl sm:text-2xl font-bold mt-1 text-foreground">
+                {profile?.followersCount || 0}
+              </p>
+            </button>
 
-          <button
-            type="button"
-            onClick={() =>
-              setRelationsDialogState({
-                isOpen: true,
-                initialTab: "following",
-              })
-            }
-            className="p-3.5 rounded-xl bg-muted/30 border border-border/70 hover:border-foreground/40 hover:bg-muted/50 transition-all text-left cursor-pointer group"
-            title="Lihat daftar akun yang diikuti"
-          >
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono group-hover:text-foreground transition-colors">
-              <UserCheck className="size-3.5 text-foreground" />
-              <span>Mengikuti</span>
-            </div>
-            <p className="font-serif text-xl sm:text-2xl font-bold mt-1 text-foreground">
-              {profile?.followingCount || 0}
-            </p>
-          </button>
+            <button
+              type="button"
+              onClick={() =>
+                setRelationsDialogState({
+                  isOpen: true,
+                  initialTab: "following",
+                })
+              }
+              className="p-3.5 rounded-xl bg-muted/30 border border-border/70 hover:border-foreground/40 hover:bg-muted/50 transition-all text-left cursor-pointer group"
+              title="Lihat daftar akun yang diikuti"
+            >
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono group-hover:text-foreground transition-colors">
+                <UserCheck className="size-3.5 text-foreground" />
+                <span>Mengikuti</span>
+              </div>
+              <p className="font-serif text-xl sm:text-2xl font-bold mt-1 text-foreground">
+                {profile?.followingCount || 0}
+              </p>
+            </button>
 
-          <div className="p-3.5 rounded-xl bg-muted/30 border border-border/70">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
-              <BookMarked className="size-3.5 text-foreground" />
-              <span>Buku Tamat</span>
+            <div className="p-3.5 rounded-xl bg-muted/30 border border-border/70">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
+                <BookMarked className="size-3.5 text-foreground" />
+                <span>Buku Tamat</span>
+              </div>
+              <p className="font-serif text-xl sm:text-2xl font-bold mt-1 text-foreground">
+                {finishedBooks.length}
+              </p>
             </div>
-            <p className="font-serif text-xl sm:text-2xl font-bold mt-1 text-foreground">
-              {finishedBooks.length}
-            </p>
-          </div>
 
-          <div className="p-3.5 rounded-xl bg-muted/30 border border-border/70">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
-              <Clock className="size-3.5 text-foreground" />
-              <span>Total Menit Baca</span>
+            <div className="p-3.5 rounded-xl bg-muted/30 border border-border/70">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
+                <Clock className="size-3.5 text-foreground" />
+                <span>Total Menit Baca</span>
+              </div>
+              <p className="font-serif text-xl sm:text-2xl font-bold mt-1 text-foreground">
+                {profile?.totalReadingMinutes ||
+                  telemetrySummary?.totalMinutesRead ||
+                  Math.round(
+                    sessions.reduce(
+                      (acc, s) => acc + (s.durationSeconds || 0),
+                      0,
+                    ) / 60,
+                  )}{" "}
+                <span className="text-xs font-mono font-normal text-muted-foreground">
+                  menit
+                </span>
+              </p>
             </div>
-            <p className="font-serif text-xl sm:text-2xl font-bold mt-1 text-foreground">
-              {profile?.totalReadingMinutes ||
-                telemetrySummary?.totalMinutesRead ||
-                Math.round(
-                  sessions.reduce(
-                    (acc, s) => acc + (s.durationSeconds || 0),
-                    0,
-                  ) / 60,
-                )}{" "}
-              <span className="text-xs font-mono font-normal text-muted-foreground">
-                menit
-              </span>
-            </p>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
       {/* 2. Sub-Tabs Navigasi Profil (Selective by Role) */}
       <div className="border-b border-border flex items-center gap-2 overflow-x-auto no-scrollbar scrollbar-none pb-px">
@@ -686,25 +679,25 @@ export function DashboardProfile({
           (isCommunityOwner ||
             (profile?.managedCommunities &&
               profile.managedCommunities.length > 0)) && (
-          <button
-            type="button"
-            onClick={() => setActiveSubTab("community")}
-            className={`min-h-11 px-4 text-xs font-medium border-b-2 transition-all cursor-pointer whitespace-nowrap inline-flex items-center gap-2 ${
-              activeSubTab === "community"
-                ? "border-[var(--color-accent)] text-[var(--color-accent)] font-bold"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Calendar className="size-4" />
-            <span>
-              Komunitas Saya
-              {profile?.managedCommunities &&
-              profile.managedCommunities.length > 0
-                ? ` (${profile.managedCommunities.length})`
-                : ""}
-            </span>
-          </button>
-        )}
+            <button
+              type="button"
+              onClick={() => setActiveSubTab("community")}
+              className={`min-h-11 px-4 text-xs font-medium border-b-2 transition-all cursor-pointer whitespace-nowrap inline-flex items-center gap-2 ${
+                activeSubTab === "community"
+                  ? "border-[var(--color-accent)] text-[var(--color-accent)] font-bold"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Calendar className="size-4" />
+              <span>
+                Komunitas Saya
+                {profile?.managedCommunities &&
+                profile.managedCommunities.length > 0
+                  ? ` (${profile.managedCommunities.length})`
+                  : ""}
+              </span>
+            </button>
+          )}
 
         {isVerifiedAuthor && (
           <>
@@ -750,25 +743,25 @@ export function DashboardProfile({
           (isPublisher ||
             (profile?.managedPublishers &&
               profile.managedPublishers.length > 0)) && (
-          <button
-            type="button"
-            onClick={() => setActiveSubTab("publisher_studio")}
-            className={`min-h-11 px-4 text-xs font-medium border-b-2 transition-all cursor-pointer whitespace-nowrap inline-flex items-center gap-2 ${
-              activeSubTab === "publisher_studio"
-                ? "border-[var(--color-accent)] text-[var(--color-accent)] font-bold"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Layers className="size-4" />
-            <span>
-              Studio Penerbit
-              {profile?.managedPublishers &&
-              profile.managedPublishers.length > 0
-                ? ` (${profile.managedPublishers.length})`
-                : ""}
-            </span>
-          </button>
-        )}
+            <button
+              type="button"
+              onClick={() => setActiveSubTab("publisher_studio")}
+              className={`min-h-11 px-4 text-xs font-medium border-b-2 transition-all cursor-pointer whitespace-nowrap inline-flex items-center gap-2 ${
+                activeSubTab === "publisher_studio"
+                  ? "border-[var(--color-accent)] text-[var(--color-accent)] font-bold"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Layers className="size-4" />
+              <span>
+                Studio Penerbit
+                {profile?.managedPublishers &&
+                profile.managedPublishers.length > 0
+                  ? ` (${profile.managedPublishers.length})`
+                  : ""}
+              </span>
+            </button>
+          )}
       </div>
 
       {/* 3. Sub-Tab 1: Aktivitas & Rak Baca */}
@@ -826,7 +819,9 @@ export function DashboardProfile({
                           <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
                             <div
                               className="bg-[var(--color-accent)] h-1.5 rounded-full"
-                              style={{ width: `${Math.min(100, Math.max(0, shelf.progressPercent))}%` }}
+                              style={{
+                                width: `${Math.min(100, Math.max(0, shelf.progressPercent))}%`,
+                              }}
                             />
                           </div>
                           <span className="text-[10px] font-mono text-muted-foreground mt-1 inline-block">
@@ -905,14 +900,18 @@ export function DashboardProfile({
             ) : (
               <div className="space-y-2">
                 {sessions.slice(0, 5).map((session) => {
-                  const minutes = Math.floor((session.durationSeconds || 0) / 60);
+                  const minutes = Math.floor(
+                    (session.durationSeconds || 0) / 60,
+                  );
                   const seconds = (session.durationSeconds || 0) % 60;
                   const durationText =
                     minutes > 0
                       ? `${minutes} menit baca`
                       : `${seconds || 0} detik baca`;
                   const wpmText =
-                    session.avgWpm && session.avgWpm > 0 && session.avgWpm <= 600
+                    session.avgWpm &&
+                    session.avgWpm > 0 &&
+                    session.avgWpm <= 600
                       ? ` • ${session.avgWpm} WPM`
                       : "";
 
@@ -926,7 +925,8 @@ export function DashboardProfile({
                           {session.bookTitle}
                         </p>
                         <p className="text-[11px] text-muted-foreground font-mono">
-                          {durationText} • {session.pagesRead} halaman{wpmText} ({session.mode || "standar"})
+                          {durationText} • {session.pagesRead} halaman{wpmText}{" "}
+                          ({session.mode || "standar"})
                         </p>
                       </div>
 
@@ -950,7 +950,11 @@ export function DashboardProfile({
                             }`}
                           >
                             <Sparkles className="size-3.5" />
-                            <span>{session.isPosted ? "Tersiar (Tarik)" : "Post Sesi"}</span>
+                            <span>
+                              {session.isPosted
+                                ? "Tersiar (Tarik)"
+                                : "Post Sesi"}
+                            </span>
                           </Button>
                         )}
                         {onOpenFlexStory && (
@@ -984,11 +988,15 @@ export function DashboardProfile({
           <div className="space-y-3">
             <h4 className="font-serif font-bold text-base flex items-center gap-2">
               <Quote className="size-4 text-orange-600" />
-              <span>Catatan Marjinalia &amp; Kutipan ({userHighlights.data?.length || 0})</span>
+              <span>
+                Catatan Marjinalia &amp; Kutipan (
+                {userHighlights.data?.length || 0})
+              </span>
             </h4>
             {userHighlights.data?.length === 0 ? (
               <p className="text-xs text-muted-foreground p-6 rounded-xl border border-dashed border-border text-center">
-                Belum ada kutipan yang disimpan saat membaca buku. Tandai teks di E-Reader untuk membuat kutipan.
+                Belum ada kutipan yang disimpan saat membaca buku. Tandai teks
+                di E-Reader untuk membuat kutipan.
               </p>
             ) : (
               <div className="space-y-3">
@@ -1026,7 +1034,9 @@ export function DashboardProfile({
                               : "bg-orange-600 hover:bg-orange-700 text-white"
                           }`}
                         >
-                          {hl.isPosted ? "Tersiar ke Publik (Tarik)" : "Post ke Linimasa"}
+                          {hl.isPosted
+                            ? "Tersiar ke Publik (Tarik)"
+                            : "Post ke Linimasa"}
                         </Button>
                       )}
                     </div>
@@ -1085,7 +1095,8 @@ export function DashboardProfile({
                   </h3>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Kelola ruang baca, kalender agenda temu literasi, dan kas afiliasi 10% untuk keberlanjutan komunitas.
+                  Kelola ruang baca, kalender agenda temu literasi, dan kas
+                  afiliasi 10% untuk keberlanjutan komunitas.
                 </p>
               </div>
 
@@ -1098,10 +1109,12 @@ export function DashboardProfile({
               </Link>
             </div>
 
-            {(!profile?.managedCommunities || profile.managedCommunities.length === 0) ? (
+            {!profile?.managedCommunities ||
+            profile.managedCommunities.length === 0 ? (
               <div className="p-8 rounded-xl border border-dashed border-border text-center space-y-3">
                 <p className="text-xs text-muted-foreground">
-                  Anda belum memiliki komunitas terdaftar atau pengajuan Anda masih diproses.
+                  Anda belum memiliki komunitas terdaftar atau pengajuan Anda
+                  masih diproses.
                 </p>
                 <Link
                   to="/partner-program"
@@ -1161,15 +1174,15 @@ export function DashboardProfile({
                               isVerified
                                 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
                                 : isRejected
-                                ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
-                                : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                                  ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
+                                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
                             }`}
                           >
                             {isVerified
                               ? "Terverifikasi"
                               : isRejected
-                              ? "Ditolak"
-                              : "Menunggu Verifikasi"}
+                                ? "Ditolak"
+                                : "Menunggu Verifikasi"}
                           </span>
                         </div>
 
@@ -1180,21 +1193,27 @@ export function DashboardProfile({
                               <span>Catatan Penolakan:</span>
                             </p>
                             <p className="text-[11px] leading-relaxed">
-                              {c.rejectionReason || "Pengajuan belum memenuhi kelengkapan berkas legalitas atau kurasi komunitas."}
+                              {c.rejectionReason ||
+                                "Pengajuan belum memenuhi kelengkapan berkas legalitas atau kurasi komunitas."}
                             </p>
                           </div>
                         )}
 
                         {isPending && (
                           <p className="text-xs text-muted-foreground bg-muted/40 p-2.5 rounded-lg leading-relaxed">
-                            Pengajuan komunitas sedang ditinjau kurator AnzaBook. Anda akan dapat membuat agenda publik segera setelah disetujui.
+                            Pengajuan komunitas sedang ditinjau kurator
+                            AnzaBook. Anda akan dapat membuat agenda publik
+                            segera setelah disetujui.
                           </p>
                         )}
                       </div>
 
                       <div className="pt-3 border-t border-border flex items-center justify-between text-xs">
                         <span className="text-xs text-muted-foreground">
-                          Peran: <strong className="text-foreground font-medium">{formatRoleName(c.role)}</strong>
+                          Peran:{" "}
+                          <strong className="text-foreground font-medium">
+                            {formatRoleName(c.role)}
+                          </strong>
                         </span>
 
                         {isVerified ? (
@@ -1234,7 +1253,8 @@ export function DashboardProfile({
                   </h3>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Buku resmi Anda yang telah diterbitkan dan dapat diakses oleh pembaca AnzaBook.
+                  Buku resmi Anda yang telah diterbitkan dan dapat diakses oleh
+                  pembaca AnzaBook.
                 </p>
               </div>
 
@@ -1246,19 +1266,24 @@ export function DashboardProfile({
                   className="bg-foreground text-background hover:opacity-90 text-xs font-semibold px-4 py-2 rounded-xl inline-flex items-center gap-1.5 cursor-pointer"
                 >
                   <Plus className="size-3.5" />
-                  <span>{isCreatingDraft ? "Menyiapkan Draf..." : "Tulis Karya Baru"}</span>
+                  <span>
+                    {isCreatingDraft
+                      ? "Menyiapkan Draf..."
+                      : "Tulis Karya Baru"}
+                  </span>
                 </Button>
               )}
             </div>
 
-            {(!profile?.publishedBooks || profile.publishedBooks.length === 0) ? (
+            {!profile?.publishedBooks || profile.publishedBooks.length === 0 ? (
               <div className="p-10 rounded-xl border border-dashed border-border text-center space-y-2">
                 <BookOpen className="size-8 mx-auto text-muted-foreground/60" />
                 <p className="text-xs text-muted-foreground">
                   Belum ada buku resmi yang diterbitkan atas nama profil Anda.
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Gunakan Studio Penulis untuk menyusun draf naskah dan mengajukannya ke mitra penerbit resmi AnzaBook.
+                  Gunakan Studio Penulis untuk menyusun draf naskah dan
+                  mengajukannya ke mitra penerbit resmi AnzaBook.
                 </p>
               </div>
             ) : (
@@ -1304,7 +1329,9 @@ export function DashboardProfile({
                 </h3>
               </div>
               <p className="text-xs text-muted-foreground max-w-xl leading-relaxed">
-                Tulis naskah buku dengan penyunting teks yang bersih dan fokus. Simpan draf otomatis, kelola bab di daftar isi, dan ajukan langsung ke mitra penerbit untuk diterbitkan.
+                Tulis naskah buku dengan penyunting teks yang bersih dan fokus.
+                Simpan draf otomatis, kelola bab di daftar isi, dan ajukan
+                langsung ke mitra penerbit untuk diterbitkan.
               </p>
             </div>
 
@@ -1315,7 +1342,9 @@ export function DashboardProfile({
               className="bg-foreground text-background hover:opacity-90 min-h-11 px-5 text-xs font-semibold cursor-pointer shrink-0 inline-flex items-center gap-2 rounded-xl shadow-xs"
             >
               <Plus className="size-4" />
-              <span>{isCreatingDraft ? "Membuka Studio..." : "Tulis Naskah Baru"}</span>
+              <span>
+                {isCreatingDraft ? "Membuka Studio..." : "Tulis Naskah Baru"}
+              </span>
             </Button>
           </div>
 
@@ -1347,12 +1376,18 @@ export function DashboardProfile({
                 {manuscripts.map((item) => {
                   const statusColors: Record<string, string> = {
                     draft: "bg-muted text-foreground border-border",
-                    submitted: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30",
-                    under_review: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
-                    revision_requested: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30",
-                    accepted: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
-                    published: "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/40",
-                    rejected: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30",
+                    submitted:
+                      "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30",
+                    under_review:
+                      "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
+                    revision_requested:
+                      "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30",
+                    accepted:
+                      "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
+                    published:
+                      "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/40",
+                    rejected:
+                      "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30",
                   };
 
                   return (
@@ -1368,7 +1403,8 @@ export function DashboardProfile({
                             </h5>
                             <span
                               className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold uppercase border ${
-                                statusColors[item.status] || "bg-muted text-foreground"
+                                statusColors[item.status] ||
+                                "bg-muted text-foreground"
                               }`}
                             >
                               {formatManuscriptStatus(item.status)}
@@ -1399,25 +1435,37 @@ export function DashboardProfile({
                                 params: { slug: `manuscript-${item.id}` },
                                 search: {
                                   editorial:
-                                    item.status === "draft" ? "edit" : "preview",
+                                    item.status === "draft"
+                                      ? "edit"
+                                      : "preview",
                                 },
                               })
                             }
                             className="bg-foreground text-background hover:opacity-90 text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5 rounded-xl"
                           >
                             <PenTool className="size-3.5" />
-                            <span>{item.status === "draft" ? "Lanjutkan Menulis" : "Buka Editor Naskah"}</span>
+                            <span>
+                              {item.status === "draft"
+                                ? "Lanjutkan Menulis"
+                                : "Buka Editor Naskah"}
+                            </span>
                           </Button>
                         </div>
                       </div>
 
                       <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
                         <div>
-                          {item.chapters?.length || item.totalChapters || 1} Bab • Terakhir diperbarui{" "}
-                          {new Date(item.updatedAt || Date.now()).toLocaleDateString("id-ID")}
+                          {item.chapters?.length || item.totalChapters || 1} Bab
+                          • Terakhir diperbarui{" "}
+                          {new Date(
+                            item.updatedAt || fallbackTimestamp,
+                          ).toLocaleDateString("id-ID")}
                         </div>
                         <div>
-                          Skema: <strong className="text-foreground font-medium">{formatDigitalPolicy(item.proposedDigitalPolicy)}</strong>
+                          Skema:{" "}
+                          <strong className="text-foreground font-medium">
+                            {formatDigitalPolicy(item.proposedDigitalPolicy)}
+                          </strong>
                         </div>
                       </div>
                     </div>
@@ -1442,7 +1490,8 @@ export function DashboardProfile({
                   </h3>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Kelola profil penerbit, katalog naskah buku berlisensi IKAPI, dan tinjau naskah masuk dari penulis.
+                  Kelola profil penerbit, katalog naskah buku berlisensi IKAPI,
+                  dan tinjau naskah masuk dari penulis.
                 </p>
               </div>
 
@@ -1455,10 +1504,12 @@ export function DashboardProfile({
               </Link>
             </div>
 
-            {(!profile?.managedPublishers || profile.managedPublishers.length === 0) ? (
+            {!profile?.managedPublishers ||
+            profile.managedPublishers.length === 0 ? (
               <div className="p-8 rounded-xl border border-dashed border-border text-center space-y-3">
                 <p className="text-xs text-muted-foreground">
-                  Anda belum memiliki penerbit terdaftar atau pengajuan Anda masih diproses.
+                  Anda belum memiliki penerbit terdaftar atau pengajuan Anda
+                  masih diproses.
                 </p>
                 <Link
                   to="/partner-program"
@@ -1516,15 +1567,15 @@ export function DashboardProfile({
                               isVerified
                                 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
                                 : isRejected
-                                ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
-                                : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                                  ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
+                                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
                             }`}
                           >
                             {isVerified
                               ? "Terverifikasi"
                               : isRejected
-                              ? "Ditolak"
-                              : "Menunggu Verifikasi"}
+                                ? "Ditolak"
+                                : "Menunggu Verifikasi"}
                           </span>
                         </div>
 
@@ -1535,21 +1586,26 @@ export function DashboardProfile({
                               <span>Catatan Penolakan:</span>
                             </p>
                             <p className="text-[11px] leading-relaxed">
-                              {p.rejectionReason || "Legalitas atau berkas keanggotaan IKAPI belum lengkap."}
+                              {p.rejectionReason ||
+                                "Legalitas atau berkas keanggotaan IKAPI belum lengkap."}
                             </p>
                           </div>
                         )}
 
                         {isPending && (
                           <p className="text-xs text-muted-foreground bg-muted/40 p-2.5 rounded-lg leading-relaxed">
-                            Pengajuan penerbit sedang diverifikasi nomor IKAPI dan legalitasnya oleh tim AnzaBook.
+                            Pengajuan penerbit sedang diverifikasi nomor IKAPI
+                            dan legalitasnya oleh tim AnzaBook.
                           </p>
                         )}
                       </div>
 
                       <div className="pt-3 border-t border-border flex items-center justify-between text-xs">
                         <span className="text-xs text-muted-foreground">
-                          Peran: <strong className="text-foreground font-medium">{formatRoleName(p.role)}</strong>
+                          Peran:{" "}
+                          <strong className="text-foreground font-medium">
+                            {formatRoleName(p.role)}
+                          </strong>
                         </span>
 
                         {isVerified ? (
@@ -1575,8 +1631,6 @@ export function DashboardProfile({
           </div>
         </div>
       )}
-
-
 
       {/* Dialog: Relasi Sosial (Pengikut / Mengikuti Substack-Style) */}
       <SocialRelationsDialog

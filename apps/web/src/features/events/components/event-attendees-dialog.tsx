@@ -1,15 +1,5 @@
 import * as React from "react";
-import {
-  X,
-  Users,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  Search,
-  Check,
-  QrCode,
-} from "lucide-react";
-import type { EventRsvpDto } from "@starter/shared/types";
+import { X, Users, Search, Check, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
@@ -41,14 +31,17 @@ export function EventAttendeesDialog({
   const checkInMutation = useCheckInRsvp(eventSlug);
 
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [filterTab, setFilterTab] = React.useState<"all" | "pending" | "going" | "waitlisted">("all");
+  const [filterTab, setFilterTab] = React.useState<
+    "all" | "pending" | "going" | "waitlisted"
+  >("all");
   const [manualCode, setManualCode] = React.useState("");
   const [codeFeedback, setCodeFeedback] = React.useState<string | null>(null);
 
   if (!open) return null;
 
   const filteredAttendees = attendees.filter((a) => {
-    if (filterTab === "pending" && a.status !== "pending_approval") return false;
+    if (filterTab === "pending" && a.status !== "pending_approval")
+      return false;
     if (filterTab === "going" && a.status !== "going") return false;
     if (filterTab === "waitlisted" && a.status !== "waitlisted") return false;
 
@@ -63,7 +56,9 @@ export function EventAttendeesDialog({
     return true;
   });
 
-  const pendingCount = attendees.filter((a) => a.status === "pending_approval").length;
+  const pendingCount = attendees.filter(
+    (a) => a.status === "pending_approval",
+  ).length;
   const goingCount = attendees.filter((a) => a.status === "going").length;
 
   const handleManualCheckIn = async (e: React.FormEvent) => {
@@ -74,8 +69,9 @@ export function EventAttendeesDialog({
       setCodeFeedback("Check-in berhasil!");
       setManualCode("");
       setTimeout(() => setCodeFeedback(null), 2500);
-    } catch (err: any) {
-      setCodeFeedback(err.message || "Kode tiket tidak valid.");
+    } catch (err: unknown) {
+      const apiErr = err as { message?: string };
+      setCodeFeedback(apiErr?.message || "Kode tiket tidak valid.");
       setTimeout(() => setCodeFeedback(null), 3500);
     }
   };
@@ -103,9 +99,13 @@ export function EventAttendeesDialog({
           <div className="space-y-0.5">
             <div className="flex items-center gap-2">
               <Users className="size-4 text-amber-500" />
-              <h2 className="text-base font-bold text-white">Kelola Peserta Acara</h2>
+              <h2 className="text-base font-bold text-white">
+                Kelola Peserta Acara
+              </h2>
             </div>
-            <p className="text-xs text-white/50 truncate max-w-md">{eventTitle}</p>
+            <p className="text-xs text-white/50 truncate max-w-md">
+              {eventTitle}
+            </p>
           </div>
           <button
             type="button"
@@ -118,7 +118,10 @@ export function EventAttendeesDialog({
 
         {/* Quick Check-in Bar */}
         <div className="border-b border-white/10 bg-white/5 p-4">
-          <form onSubmit={handleManualCheckIn} className="flex items-center gap-2">
+          <form
+            onSubmit={handleManualCheckIn}
+            className="flex items-center gap-2"
+          >
             <div className="relative flex-1">
               <QrCode className="size-4 text-white/40 absolute left-3 top-1/2 -translate-y-1/2" />
               <Input
@@ -138,7 +141,9 @@ export function EventAttendeesDialog({
             </Button>
           </form>
           {codeFeedback && (
-            <p className={`text-[11px] mt-1.5 font-medium ${codeFeedback.includes("berhasil") ? "text-emerald-400" : "text-rose-400"}`}>
+            <p
+              className={`text-[11px] mt-1.5 font-medium ${codeFeedback.includes("berhasil") ? "text-emerald-400" : "text-rose-400"}`}
+            >
               {codeFeedback}
             </p>
           )}
@@ -151,7 +156,9 @@ export function EventAttendeesDialog({
               type="button"
               onClick={() => setFilterTab("all")}
               className={`rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer ${
-                filterTab === "all" ? "bg-white/15 text-white" : "text-white/50 hover:text-white"
+                filterTab === "all"
+                  ? "bg-white/15 text-white"
+                  : "text-white/50 hover:text-white"
               }`}
             >
               Semua ({attendees.length})
@@ -160,7 +167,9 @@ export function EventAttendeesDialog({
               type="button"
               onClick={() => setFilterTab("pending")}
               className={`rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
-                filterTab === "pending" ? "bg-white/15 text-white" : "text-white/50 hover:text-white"
+                filterTab === "pending"
+                  ? "bg-white/15 text-white"
+                  : "text-white/50 hover:text-white"
               }`}
             >
               <span>Perlu Persetujuan</span>
@@ -174,7 +183,9 @@ export function EventAttendeesDialog({
               type="button"
               onClick={() => setFilterTab("going")}
               className={`rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer ${
-                filterTab === "going" ? "bg-white/15 text-white" : "text-white/50 hover:text-white"
+                filterTab === "going"
+                  ? "bg-white/15 text-white"
+                  : "text-white/50 hover:text-white"
               }`}
             >
               Diterima ({goingCount})
@@ -229,26 +240,31 @@ export function EventAttendeesDialog({
                             att.status === "going"
                               ? "bg-emerald-500/20 text-emerald-300"
                               : att.status === "pending_approval"
-                              ? "bg-amber-500/20 text-amber-300"
-                              : att.status === "waitlisted"
-                              ? "bg-blue-500/20 text-blue-300"
-                              : "bg-white/10 text-white/40"
+                                ? "bg-amber-500/20 text-amber-300"
+                                : att.status === "waitlisted"
+                                  ? "bg-blue-500/20 text-blue-300"
+                                  : "bg-white/10 text-white/40"
                           }`}
                         >
                           {att.status === "going"
                             ? "Terdaftar"
                             : att.status === "pending_approval"
-                            ? "Perlu Persetujuan"
-                            : att.status === "waitlisted"
-                            ? "Daftar Tunggu"
-                            : att.status}
+                              ? "Perlu Persetujuan"
+                              : att.status === "waitlisted"
+                                ? "Daftar Tunggu"
+                                : att.status}
                         </span>
                       </div>
-                      <div className="text-[11px] text-white/50 truncate">{att.userEmail}</div>
+                      <div className="text-[11px] text-white/50 truncate">
+                        {att.userEmail}
+                      </div>
                       <div className="text-[10px] font-mono text-white/40 mt-0.5">
-                        Kode: <span className="text-white/70">{att.checkinCode}</span>
+                        Kode:{" "}
+                        <span className="text-white/70">{att.checkinCode}</span>
                         {isCheckedIn && (
-                          <span className="text-emerald-400 font-sans ml-2">✓ Sudah Hadir</span>
+                          <span className="text-emerald-400 font-sans ml-2">
+                            ✓ Sudah Hadir
+                          </span>
                         )}
                       </div>
                     </div>

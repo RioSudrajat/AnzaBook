@@ -215,7 +215,12 @@ export function HeroBookStage({ books }: HeroBookStageProps) {
                 </div>
 
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                  <Button asChild variant="outline" size="sm" className="flex-1 sm:flex-none">
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 sm:flex-none"
+                  >
                     <Link
                       to="/read/$slug"
                       params={{ slug: activeBook.slug }}

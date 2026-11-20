@@ -1,10 +1,5 @@
 import { useState } from "react";
-import {
-  Calculator,
-  CheckCircle2,
-  Printer,
-  TrendingUp,
-} from "lucide-react";
+import { Calculator, CheckCircle2, Printer, TrendingUp } from "lucide-react";
 import { calculatePrintEconomics } from "@starter/shared/print-economics";
 
 export function PublisherStudioPanel() {

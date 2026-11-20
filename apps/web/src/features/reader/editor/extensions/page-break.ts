@@ -1,4 +1,4 @@
-import { Node, mergeAttributes } from "@tiptap/core";
+import { Node, mergeAttributes, type CommandProps } from "@tiptap/core";
 
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
@@ -48,7 +48,7 @@ export const PageBreak = Node.create({
     return {
       setPageBreak:
         () =>
-        ({ chain }: { chain: () => any }) => {
+        ({ chain }: CommandProps) => {
           return chain()
             .insertContent({
               type: this.name,

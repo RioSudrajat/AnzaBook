@@ -1,21 +1,6 @@
-import { useState, useRef, type FormEvent, type ChangeEvent, type DragEvent } from "react";
+import { useState, useRef, type FormEvent } from "react";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import {
-  Camera,
-  Check,
-  CheckCircle,
-  ExternalLink,
-  Globe,
-  Mail,
-  MapPin,
-  PenTool,
-  Plus,
-  ShieldCheck,
-  Sparkles,
-  Trash2,
-  Users,
-  X,
-} from "lucide-react";
+import { Camera, Globe, Mail, Plus, X } from "lucide-react";
 import { SmartBackButton } from "@/components/smart-back-button";
 import { AppShell } from "@/features/dashboard/components/app-shell";
 import { Button } from "@/components/ui/button";
@@ -146,7 +131,10 @@ export default function NewPublicationPage() {
   const [websiteUrl, setWebsiteUrl] = useState("");
 
   // Topics state
-  const [topics, setTopics] = useState<string[]>(["Sastra & Fiksi", "Filsafat & Pemikiran"]);
+  const [topics, setTopics] = useState<string[]>([
+    "Sastra & Fiksi",
+    "Filsafat & Pemikiran",
+  ]);
   const [newTopicInput, setNewTopicInput] = useState("");
   const [isAddingTopic, setIsAddingTopic] = useState(false);
 
@@ -222,14 +210,17 @@ export default function NewPublicationPage() {
     setFormError(null);
 
     const cleanName = name.trim();
-    const cleanSlug = slug.trim() || cleanName.toLowerCase().replace(/[^a-z0-9-]/g, "");
+    const cleanSlug =
+      slug.trim() || cleanName.toLowerCase().replace(/[^a-z0-9-]/g, "");
 
     if (!cleanName) {
       setFormError("Nama penerbit wajib diisi.");
       return;
     }
     if (!cleanSlug || cleanSlug.length < 2) {
-      setFormError("Slug penerbit minimal 2 karakter (hanya huruf kecil, angka, tanda hubung).");
+      setFormError(
+        "Slug penerbit minimal 2 karakter (hanya huruf kecil, angka, tanda hubung).",
+      );
       return;
     }
 
@@ -266,7 +257,9 @@ export default function NewPublicationPage() {
       } else if (err instanceof Error) {
         setFormError(err.message);
       } else {
-        setFormError("Terjadi kesalahan saat mendaftarkan penerbit. Silakan coba kembali.");
+        setFormError(
+          "Terjadi kesalahan saat mendaftarkan penerbit. Silakan coba kembali.",
+        );
       }
     }
   };
@@ -276,14 +269,18 @@ export default function NewPublicationPage() {
       <div className="flex items-center justify-between gap-3 mb-6">
         <SmartBackButton fallbackTo="/partner-program" className="-ml-2" />
         <div className="flex items-center gap-3">
-          <span className="text-xs font-mono text-muted-foreground">Step 1 of 2</span>
+          <span className="text-xs font-mono text-muted-foreground">
+            Step 1 of 2
+          </span>
           <Button
             type="button"
             onClick={handleSubmit}
             disabled={applyPublisherMutation.isPending || !name.trim()}
             className="bg-foreground text-background hover:opacity-90 text-xs px-4 py-2 h-9 rounded-full font-medium cursor-pointer"
           >
-            {applyPublisherMutation.isPending ? "Menyimpan..." : "Lanjut (Next)"}
+            {applyPublisherMutation.isPending
+              ? "Menyimpan..."
+              : "Lanjut (Next)"}
           </Button>
         </div>
       </div>
@@ -296,7 +293,8 @@ export default function NewPublicationPage() {
             New publication
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground">
-            Daftarkan entitas penerbit mitra Anda untuk menerbitkan karya buku, mengelola tim redaksi, dan menjangkau ribuan pembaca setia AnzaBook.
+            Daftarkan entitas penerbit mitra Anda untuk menerbitkan karya buku,
+            mengelola tim redaksi, dan menjangkau ribuan pembaca setia AnzaBook.
           </p>
         </div>
 
@@ -310,12 +308,17 @@ export default function NewPublicationPage() {
         <form onSubmit={handleSubmit} className="space-y-12">
           {/* ================= SECTION 1: GENERAL ================= */}
           <section className="space-y-8">
-            <h2 className="font-serif text-xl font-bold text-foreground">General</h2>
+            <h2 className="font-serif text-xl font-bold text-foreground">
+              General
+            </h2>
 
             {/* Field: Name* */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
               <div className="w-full sm:w-56 shrink-0 space-y-1">
-                <Label htmlFor="pub-name" className="text-sm font-semibold text-foreground">
+                <Label
+                  htmlFor="pub-name"
+                  className="text-sm font-semibold text-foreground"
+                >
                   Name<span className="text-red-500">*</span>
                 </Label>
               </div>
@@ -345,7 +348,10 @@ export default function NewPublicationPage() {
             {/* Field: Description* */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
               <div className="w-full sm:w-56 shrink-0 space-y-1">
-                <Label htmlFor="pub-desc" className="text-sm font-semibold text-foreground">
+                <Label
+                  htmlFor="pub-desc"
+                  className="text-sm font-semibold text-foreground"
+                >
                   Description<span className="text-red-500">*</span>
                 </Label>
               </div>
@@ -362,9 +368,13 @@ export default function NewPublicationPage() {
                 />
                 <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                   <p className="max-w-md leading-normal">
-                    The description is a quick way to tell readers about your publication. It's short and appears on search results and publication preview cards.
+                    The description is a quick way to tell readers about your
+                    publication. It's short and appears on search results and
+                    publication preview cards.
                   </p>
-                  <span className="font-mono ml-2 shrink-0">{description.length}/280</span>
+                  <span className="font-mono ml-2 shrink-0">
+                    {description.length}/280
+                  </span>
                 </div>
               </div>
             </div>
@@ -382,9 +392,13 @@ export default function NewPublicationPage() {
 
               <div className="flex-1 max-w-xl flex flex-col sm:flex-row items-start justify-between gap-6">
                 <div className="space-y-1.5 flex-1">
-                  <h4 className="font-semibold text-xs text-foreground">Add avatar</h4>
+                  <h4 className="font-semibold text-xs text-foreground">
+                    Add avatar
+                  </h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    The avatar appears with your stories across AnzaBook. Seret dan letakkan gambar dari perangkat Anda atau klik kotak di samping.
+                    The avatar appears with your stories across AnzaBook. Seret
+                    dan letakkan gambar dari perangkat Anda atau klik kotak di
+                    samping.
                   </p>
                   <p className="text-[11px] font-mono text-muted-foreground">
                     Format: JPG, PNG, WebP • Maks. 5MB
@@ -403,7 +417,12 @@ export default function NewPublicationPage() {
                     e.preventDefault();
                     setIsAvatarDragOver(false);
                     const file = e.dataTransfer.files?.[0];
-                    if (file) processImageFile(file, (data) => setAvatarUrl(data), 1000);
+                    if (file)
+                      processImageFile(
+                        file,
+                        (data) => setAvatarUrl(data),
+                        1000,
+                      );
                   }}
                   className={`size-28 sm:size-32 rounded-xl border border-dashed flex flex-col items-center justify-center text-muted-foreground shrink-0 overflow-hidden relative group cursor-pointer transition-colors ${
                     isAvatarDragOver
@@ -427,7 +446,9 @@ export default function NewPublicationPage() {
                   ) : (
                     <div className="flex flex-col items-center justify-center p-2 text-center pointer-events-none">
                       <Camera className="size-6 text-muted-foreground/60 mb-1" />
-                      <span className="text-[10px] text-muted-foreground">Pilih avatar</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        Pilih avatar
+                      </span>
                     </div>
                   )}
                 </div>
@@ -438,7 +459,12 @@ export default function NewPublicationPage() {
                   accept="image/jpeg,image/png,image/webp,image/gif"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) processImageFile(file, (data) => setAvatarUrl(data), 1000);
+                    if (file)
+                      processImageFile(
+                        file,
+                        (data) => setAvatarUrl(data),
+                        1000,
+                      );
                     e.target.value = "";
                   }}
                   className="hidden"
@@ -456,9 +482,13 @@ export default function NewPublicationPage() {
 
               <div className="flex-1 max-w-xl flex flex-col sm:flex-row items-start justify-between gap-6">
                 <div className="space-y-1.5 flex-1">
-                  <h4 className="font-semibold text-xs text-foreground">Add logo</h4>
+                  <h4 className="font-semibold text-xs text-foreground">
+                    Add logo
+                  </h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    The logo is displayed at the top of your publication. Seret dan letakkan berkas logo atau klik kotak di samping untuk memilih dari perangkat lokal.
+                    The logo is displayed at the top of your publication. Seret
+                    dan letakkan berkas logo atau klik kotak di samping untuk
+                    memilih dari perangkat lokal.
                   </p>
                   <p className="text-[11px] font-mono text-muted-foreground">
                     Format: JPG, PNG, WebP • Maks. 5MB
@@ -477,7 +507,8 @@ export default function NewPublicationPage() {
                     e.preventDefault();
                     setIsLogoDragOver(false);
                     const file = e.dataTransfer.files?.[0];
-                    if (file) processImageFile(file, (data) => setLogoUrl(data), 1200);
+                    if (file)
+                      processImageFile(file, (data) => setLogoUrl(data), 1200);
                   }}
                   className={`size-28 sm:size-32 rounded-xl border border-dashed flex flex-col items-center justify-center text-muted-foreground shrink-0 overflow-hidden relative group cursor-pointer transition-colors ${
                     isLogoDragOver
@@ -501,7 +532,9 @@ export default function NewPublicationPage() {
                   ) : (
                     <div className="flex flex-col items-center justify-center p-2 text-center pointer-events-none">
                       <Camera className="size-6 text-muted-foreground/60 mb-1" />
-                      <span className="text-[10px] text-muted-foreground">Pilih logo</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        Pilih logo
+                      </span>
                     </div>
                   )}
                 </div>
@@ -512,7 +545,8 @@ export default function NewPublicationPage() {
                   accept="image/jpeg,image/png,image/webp,image/gif"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) processImageFile(file, (data) => setLogoUrl(data), 1200);
+                    if (file)
+                      processImageFile(file, (data) => setLogoUrl(data), 1200);
                     e.target.value = "";
                   }}
                   className="hidden"
@@ -533,7 +567,10 @@ export default function NewPublicationPage() {
 
               <div className="flex-1 max-w-xl grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="pub-ikapi" className="text-xs font-medium text-foreground">
+                  <Label
+                    htmlFor="pub-ikapi"
+                    className="text-xs font-medium text-foreground"
+                  >
                     Nomor Anggota IKAPI
                   </Label>
                   <Input
@@ -546,7 +583,10 @@ export default function NewPublicationPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="pub-city" className="text-xs font-medium text-foreground">
+                  <Label
+                    htmlFor="pub-city"
+                    className="text-xs font-medium text-foreground"
+                  >
                     Kota Operasional Redaksi
                   </Label>
                   <Input
@@ -559,7 +599,10 @@ export default function NewPublicationPage() {
                 </div>
 
                 <div className="sm:col-span-2 space-y-1.5">
-                  <Label htmlFor="pub-address" className="text-xs font-medium text-foreground">
+                  <Label
+                    htmlFor="pub-address"
+                    className="text-xs font-medium text-foreground"
+                  >
                     Alamat Lengkap Kantor
                   </Label>
                   <Input
@@ -572,7 +615,10 @@ export default function NewPublicationPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="pub-doc-title" className="text-xs font-medium text-foreground">
+                  <Label
+                    htmlFor="pub-doc-title"
+                    className="text-xs font-medium text-foreground"
+                  >
                     Judul Dokumen Legalitas / IKAPI
                   </Label>
                   <Input
@@ -585,7 +631,10 @@ export default function NewPublicationPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="pub-doc-url" className="text-xs font-medium text-foreground">
+                  <Label
+                    htmlFor="pub-doc-url"
+                    className="text-xs font-medium text-foreground"
+                  >
                     Tautan Berkas (PDF / Drive)
                   </Label>
                   <Input
@@ -604,7 +653,9 @@ export default function NewPublicationPage() {
 
           {/* ================= SECTION 2: SOCIAL AND TOPICS ================= */}
           <section className="space-y-8">
-            <h2 className="font-serif text-xl font-bold text-foreground">Social and topics</h2>
+            <h2 className="font-serif text-xl font-bold text-foreground">
+              Social and topics
+            </h2>
 
             {/* Field: Contact info */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
@@ -640,7 +691,9 @@ export default function NewPublicationPage() {
                     <input
                       type="text"
                       value={twitterHandle}
-                      onChange={(e) => setTwitterHandle(e.target.value.replace(/^@/, ""))}
+                      onChange={(e) =>
+                        setTwitterHandle(e.target.value.replace(/^@/, ""))
+                      }
                       placeholder="username"
                       className="w-full bg-transparent text-xs font-mono text-foreground outline-hidden"
                     />
@@ -657,7 +710,9 @@ export default function NewPublicationPage() {
                     <input
                       type="text"
                       value={instagramHandle}
-                      onChange={(e) => setInstagramHandle(e.target.value.replace(/^@/, ""))}
+                      onChange={(e) =>
+                        setInstagramHandle(e.target.value.replace(/^@/, ""))
+                      }
                       placeholder="username"
                       className="w-full bg-transparent text-xs font-mono text-foreground outline-hidden"
                     />
@@ -680,7 +735,9 @@ export default function NewPublicationPage() {
             {/* Field: Topics */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
               <div className="w-full sm:w-56 shrink-0 space-y-1">
-                <Label className="text-sm font-semibold text-foreground">Topics</Label>
+                <Label className="text-sm font-semibold text-foreground">
+                  Topics
+                </Label>
               </div>
 
               <div className="flex-1 max-w-xl space-y-3">
@@ -755,21 +812,25 @@ export default function NewPublicationPage() {
                     Saran fokus kurasi:
                   </p>
                   <div className="flex flex-wrap gap-1.5">
-                    {PRESET_TOPICS.filter((t) => !topics.includes(t)).map((preset) => (
-                      <button
-                        key={preset}
-                        type="button"
-                        onClick={() => handleAddTopic(preset)}
-                        className="text-[11px] px-2 py-0.5 rounded-md bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/40 transition-colors cursor-pointer"
-                      >
-                        + {preset}
-                      </button>
-                    ))}
+                    {PRESET_TOPICS.filter((t) => !topics.includes(t)).map(
+                      (preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => handleAddTopic(preset)}
+                          className="text-[11px] px-2 py-0.5 rounded-md bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/40 transition-colors cursor-pointer"
+                        >
+                          + {preset}
+                        </button>
+                      ),
+                    )}
                   </div>
                 </div>
 
                 <p className="text-[11px] text-muted-foreground leading-relaxed pt-1">
-                  Adding topics (up to 10) allows people to search for and discover your publication. These topics affect which stories show up in readers' recommendations.
+                  Adding topics (up to 10) allows people to search for and
+                  discover your publication. These topics affect which stories
+                  show up in readers' recommendations.
                 </p>
               </div>
             </div>
@@ -779,12 +840,16 @@ export default function NewPublicationPage() {
 
           {/* ================= SECTION 3: PEOPLE ================= */}
           <section className="space-y-8">
-            <h2 className="font-serif text-xl font-bold text-foreground">People</h2>
+            <h2 className="font-serif text-xl font-bold text-foreground">
+              People
+            </h2>
 
             {/* Row: Owner */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
               <div className="w-full sm:w-56 shrink-0 space-y-1">
-                <Label className="text-sm font-semibold text-foreground">Owner</Label>
+                <Label className="text-sm font-semibold text-foreground">
+                  Owner
+                </Label>
               </div>
 
               <div className="flex-1 max-w-xl">
@@ -798,7 +863,9 @@ export default function NewPublicationPage() {
                           className="size-full object-cover"
                         />
                       ) : (
-                        <span>{(myProfile?.name || "U").slice(0, 1).toUpperCase()}</span>
+                        <span>
+                          {(myProfile?.name || "U").slice(0, 1).toUpperCase()}
+                        </span>
                       )}
                     </div>
                     <div>
@@ -821,12 +888,15 @@ export default function NewPublicationPage() {
             {/* Row: Editors */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
               <div className="w-full sm:w-56 shrink-0 space-y-1">
-                <Label className="text-sm font-semibold text-foreground">Editors</Label>
+                <Label className="text-sm font-semibold text-foreground">
+                  Editors
+                </Label>
               </div>
 
               <div className="flex-1 max-w-xl space-y-3">
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Editors can add or remove stories. They can also review, edit and publish submissions.
+                  Editors can add or remove stories. They can also review, edit
+                  and publish submissions.
                 </p>
 
                 {editors.length > 0 && (
@@ -836,10 +906,14 @@ export default function NewPublicationPage() {
                         key={editor}
                         className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-muted/30 text-xs"
                       >
-                        <span className="font-mono text-foreground">{editor}</span>
+                        <span className="font-mono text-foreground">
+                          {editor}
+                        </span>
                         <button
                           type="button"
-                          onClick={() => setEditors(editors.filter((e) => e !== editor))}
+                          onClick={() =>
+                            setEditors(editors.filter((e) => e !== editor))
+                          }
                           className="text-muted-foreground hover:text-destructive cursor-pointer"
                         >
                           <X className="size-3.5" />
@@ -903,7 +977,8 @@ export default function NewPublicationPage() {
 
               <div className="flex-1 max-w-xl space-y-3">
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Approved writers can submit or remove their stories from this publication.
+                  Approved writers can submit or remove their stories from this
+                  publication.
                 </p>
 
                 {approvedWriters.length > 0 && (
@@ -913,11 +988,15 @@ export default function NewPublicationPage() {
                         key={writer}
                         className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-muted/30 text-xs"
                       >
-                        <span className="font-mono text-foreground">{writer}</span>
+                        <span className="font-mono text-foreground">
+                          {writer}
+                        </span>
                         <button
                           type="button"
                           onClick={() =>
-                            setApprovedWriters(approvedWriters.filter((w) => w !== writer))
+                            setApprovedWriters(
+                              approvedWriters.filter((w) => w !== writer),
+                            )
                           }
                           className="text-muted-foreground hover:text-destructive cursor-pointer"
                         >
@@ -984,7 +1063,9 @@ export default function NewPublicationPage() {
             </Link>
 
             <div className="flex items-center gap-4">
-              <span className="text-xs font-mono text-muted-foreground">Step 1 of 2</span>
+              <span className="text-xs font-mono text-muted-foreground">
+                Step 1 of 2
+              </span>
               <Button
                 type="submit"
                 disabled={applyPublisherMutation.isPending || !name.trim()}

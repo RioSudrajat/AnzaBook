@@ -35,12 +35,14 @@
 ### Task 1: Shared Zod Validators, Permissions, and DTO Types for Calendars & Events
 
 **Files:**
+
 - Modify: `packages/shared/src/permissions.ts`
 - Modify: `packages/shared/src/validators/community.ts`
 - Modify: `packages/shared/src/types/api.ts`
 - Test: `apps/api/src/test/events-validators.test.ts`
 
 **Interfaces:**
+
 - Produces in `@starter/shared/validators/community`:
   - `calendarTypeValues = ["community", "author", "publisher"] as const`
   - `eventTypeValues = ["book_club", "film_discussion", "silent_reading", "book_launch", "writing_session", "community_meetup"] as const`
@@ -54,6 +56,7 @@
 - [ ] **Step 1: Write the failing validator unit tests**
 
 Create `apps/api/src/test/events-validators.test.ts` testing:
+
 1. `createEventSchema` accepts an event without `bookId` and with `featuredWork: { mediaType: "film", title: "Laut Bercerita (Short Film)", creator: "Pritagita Arianegara" }`, `hideAddressUntilApproved: true`, `district: "Kecamatan Setiabudi"`, `city: "Daerah Khusus Ibukota Jakarta"`.
 2. `createEventSchema` rejects an offline pin where `haversineDistanceMeters(latitude, longitude, placeSourceLat, placeSourceLng) > 1000`.
 3. `createEventSchema` accepts `coverUrl` as either a valid `https://` URL or a `data:image/(jpeg|png|webp);base64,...` string up to `90000` characters, and rejects larger strings.
@@ -86,12 +89,14 @@ git commit -m "feat(shared): add community calendar and event schemas and DTOs"
 ### Task 2: Database Schema, Migrations, and Seed Data for Community Calendars & Events
 
 **Files:**
+
 - Create: `apps/api/src/db/schema/events.ts`
 - Modify: `apps/api/src/db/schema/index.ts`
 - Modify: `apps/api/src/db/seed-anzabook.ts`
 - Create: `apps/api/drizzle/<generated_migration>.sql`
 
 **Interfaces:**
+
 - Consumes: `user` from `apps/api/src/db/schema/user.ts`, `books` from `apps/api/src/db/schema/anzabook.ts`
 - Produces in `apps/api/src/db/schema`:
   - `communityCalendars`, `communityCalendarMembers`, `communityCalendarFollowers`, `communityEvents`, `eventRsvps`, `eventReports`
@@ -108,8 +113,9 @@ Expected: Migration SQL generated and applied cleanly to PostgreSQL.
 - [ ] **Step 3: Add realistic initial calendars, events, and attendee RSVPs in `apps/api/src/db/seed-anzabook.ts`**
 
 Seed 3 verified calendars and 4 upcoming events matching all Luma UI states:
-1. Event with `requiresApproval: true` and `hideAddressUntilApproved: true` in `Kecamatan Setiabudi, Daerah Khusus Ibukota Jakarta` (shows *"Daftar untuk Melihat Alamat"* & *"Minta untuk Bergabung"*).
-2. Event at full capacity with `allowWaitlist: true` at `GoWork Menara Rajawali - Coworking and Office Space` (shows badge *"Daftar Tunggu"* in timeline and *"Acara Penuh"* + *"Daftar Tunggu"* in drawer).
+
+1. Event with `requiresApproval: true` and `hideAddressUntilApproved: true` in `Kecamatan Setiabudi, Daerah Khusus Ibukota Jakarta` (shows _"Daftar untuk Melihat Alamat"_ & _"Minta untuk Bergabung"_).
+2. Event at full capacity with `allowWaitlist: true` at `GoWork Menara Rajawali - Coworking and Office Space` (shows badge _"Daftar Tunggu"_ in timeline and _"Acara Penuh"_ + _"Daftar Tunggu"_ in drawer).
 3. Offline Book Club event linked to an AnzaBook catalog book (`bookId`) with open registration and full venue map.
 4. Film & Book discussion event using `featuredWork` (`mediaType: "film"`).
 
@@ -130,6 +136,7 @@ git commit -m "feat(db): add community calendars, events, rsvps, and reports sch
 ### Task 3: Events & Calendars API Service and Routes (Privacy Masking, Concurrency-Safe RSVP, Waitlist, Check-in, Reports)
 
 **Files:**
+
 - Create: `apps/api/src/services/events.service.ts`
 - Create: `apps/api/src/routes/events.routes.ts`
 - Modify: `apps/api/src/routes/index.ts`
@@ -137,6 +144,7 @@ git commit -m "feat(db): add community calendars, events, rsvps, and reports sch
 - Test: `apps/api/src/test/events.test.ts`
 
 **Interfaces:**
+
 - Consumes: `communityCalendars`, `communityEvents`, `eventRsvps`, `eventReports` from `../db/schema`, validators from `@starter/shared/validators/community`
 - Produces HTTP endpoints mounted at `/api/events`:
   - `GET /api/events` (list public upcoming events ordered by `startsAt` with attendee preview avatars, count, and viewer RSVP status)
@@ -156,6 +164,7 @@ git commit -m "feat(db): add community calendars, events, rsvps, and reports sch
 - [ ] **Step 1: Write failing integration tests in `apps/api/src/test/events.test.ts`**
 
 Write tests covering:
+
 1. Host calendar creation and event creation with `featuredWork` (no `bookId`) vs catalog `bookId`.
 2. Offline event creation rejecting a pin > 1 km from `placeSourceLat`/`placeSourceLng` (`400 PIN_OUT_OF_BOUNDS`).
 3. Address & meeting URL privacy masking: when `hideAddressUntilApproved = true` and `requiresApproval = true`, `POST /api/events/:slug/rsvp` sets status `"pending_approval"`, and `GET /api/events/:slug` returns `isAddressHidden: true`, `venueName: null`, `venueAddress: null`, `district: "Kecamatan Setiabudi"`, `city: "Daerah Khusus Ibukota Jakarta"`. Once the host approves the RSVP (`status = "going"`), `GET /api/events/:slug` reveals the full `venueName`, `venueAddress`, and `onlineMeetingUrl`.
@@ -188,6 +197,7 @@ git commit -m "feat(api): implement community calendars, events, privacy masking
 ### Task 4: Web API Client, Hooks, 2-Column Create Event Studio, and Luma-Style Event Detail Drawer
 
 **Files:**
+
 - Create: `apps/web/src/features/events/api.ts`
 - Create: `apps/web/src/features/events/queries.ts`
 - Create: `apps/web/src/features/events/hooks.ts`
@@ -199,6 +209,7 @@ git commit -m "feat(api): implement community calendars, events, privacy masking
 - Create: `apps/web/src/features/events/components/event-detail-drawer.tsx`
 
 **Interfaces:**
+
 - Consumes: `/api/events/*` endpoints and DTOs/validators from `@starter/shared`
 - Produces:
   - Hooks in `apps/web/src/features/events/hooks.ts`
@@ -235,6 +246,7 @@ git commit -m "feat(web): add Luma event studio, interactive pin picker, and sli
 ### Task 5: Timeline Feed in `Agenda` Tab, Public Pages (`/events/$slug`, `/c/$slug`), and Home/Book Integration
 
 **Files:**
+
 - Create: `apps/web/src/features/events/components/dashboard-events.tsx`
 - Create: `apps/web/src/routes/events.$slug.tsx`
 - Create: `apps/web/src/routes/c.$slug.tsx`
@@ -244,6 +256,7 @@ git commit -m "feat(web): add Luma event studio, interactive pin picker, and sli
 - Modify: `apps/web/src/routes/books.$slug.tsx`
 
 **Interfaces:**
+
 - Consumes: components and hooks from `apps/web/src/features/events/*`
 - Produces:
   - `DashboardEvents` (`/app?tab=events`): renders the Luma-style **Vertical Timeline Feed (`Acara Terdekat`)** grouped by date (`Besok Selasa`, `12 Nov Kamis`, etc.) with horizontal event cards (time, title, host avatars + names, venue/district, `Daftar Tunggu` badge, attendee avatar stack `+N`, and 1:1 right thumbnail). Clicking any card opens `EventDetailDrawer` on the right!

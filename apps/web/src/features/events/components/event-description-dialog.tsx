@@ -95,9 +95,11 @@ export function EventDescriptionDialog({
 
   React.useEffect(() => {
     if (open) {
-      setText(value);
-      setIsMenuOpen(false);
-      setSearchQuery("");
+      queueMicrotask(() => {
+        setText(value);
+        setIsMenuOpen(false);
+        setSearchQuery("");
+      });
       setTimeout(() => textareaRef.current?.focus(), 100);
     }
   }, [open, value]);
@@ -138,7 +140,9 @@ export function EventDescriptionDialog({
       >
         {/* Header matching Screenshot 2: "Deskripsi Acara" + (X) */}
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
-          <h2 className="text-base font-semibold text-white">Deskripsi Acara</h2>
+          <h2 className="text-base font-semibold text-white">
+            Deskripsi Acara
+          </h2>
           <button
             type="button"
             onClick={onClose}

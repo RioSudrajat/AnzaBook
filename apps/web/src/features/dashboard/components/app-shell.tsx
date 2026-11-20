@@ -179,7 +179,11 @@ export function AppShell({
                 isDark ? "Ganti ke Mode Terang" : "Ganti ke Mode Gelap"
               }
             >
-              {isDark ? <Sun className="size-5" /> : <Moon className="size-5" />}
+              {isDark ? (
+                <Sun className="size-5" />
+              ) : (
+                <Moon className="size-5" />
+              )}
             </button>
           </div>
         </header>

@@ -10,7 +10,6 @@ import {
   MessageSquare,
   Quote,
   Share2,
-  Sparkles,
   Star,
   UserCheck,
   UserPlus,
@@ -56,14 +55,18 @@ function RatingStars({ value }: { value: number }) {
   );
 }
 
-function BookLine({ book }: { book: BookSummaryDto }) {
+function BookLine({ book }: { book: ExplorePostItemDto["book"] }) {
   return (
     <Link
       to="/books/$slug"
       params={{ slug: book.slug }}
       className="flex items-center gap-3 rounded-lg focus-visible:outline-2 focus-visible:outline-ring group w-fit max-w-full"
     >
-      <BookCover book={book} decorative className="w-10 shrink-0" />
+      <BookCover
+        book={book as unknown as BookSummaryDto}
+        decorative
+        className="w-10 shrink-0"
+      />
       <span className="min-w-0">
         <span className="block truncate font-serif text-sm font-bold text-foreground group-hover:underline">
           {book.title}
@@ -76,7 +79,10 @@ function BookLine({ book }: { book: BookSummaryDto }) {
   );
 }
 
-export function PublicProfileView({ profile, viewerId }: PublicProfileViewProps) {
+export function PublicProfileView({
+  profile,
+  viewerId,
+}: PublicProfileViewProps) {
   const followMutation = useFollowUser();
   const unfollowMutation = useUnfollowUser();
 
@@ -206,11 +212,11 @@ export function PublicProfileView({ profile, viewerId }: PublicProfileViewProps)
                 <span>{profile.isFollowing ? "Mengikuti" : "Ikuti"}</span>
               </Button>
             ) : (
-              <Button asChild className="min-h-11 rounded-xl bg-orange-600 hover:bg-orange-700 text-white">
-                <Link
-                  to="/sign-in"
-                  search={{ redirect: `/u/@${username}` }}
-                >
+              <Button
+                asChild
+                className="min-h-11 rounded-xl bg-orange-600 hover:bg-orange-700 text-white"
+              >
+                <Link to="/sign-in" search={{ redirect: `/u/@${username}` }}>
                   Masuk untuk mengikuti
                 </Link>
               </Button>
@@ -224,7 +230,10 @@ export function PublicProfileView({ profile, viewerId }: PublicProfileViewProps)
               </h2>
               {isVerifiedAuthor && (
                 <span className="inline-flex items-center gap-1 rounded-md border border-border/80 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 font-mono text-xs font-semibold">
-                  <CheckCircle className="size-3.5 text-emerald-600" aria-hidden="true" />
+                  <CheckCircle
+                    className="size-3.5 text-emerald-600"
+                    aria-hidden="true"
+                  />
                   Penulis Resmi
                 </span>
               )}
@@ -365,19 +374,22 @@ export function PublicProfileView({ profile, viewerId }: PublicProfileViewProps)
                             <span className="block truncate text-[11px] text-muted-foreground">
                               {item.book.author}
                             </span>
-                            {item.shelfStatus === "reading" && item.progressPercent > 0 && (
-                              <div className="space-y-1 pt-1">
-                                <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full bg-orange-600 rounded-full"
-                                    style={{ width: `${item.progressPercent}%` }}
-                                  />
+                            {item.shelfStatus === "reading" &&
+                              item.progressPercent > 0 && (
+                                <div className="space-y-1 pt-1">
+                                  <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full bg-orange-600 rounded-full"
+                                      style={{
+                                        width: `${item.progressPercent}%`,
+                                      }}
+                                    />
+                                  </div>
+                                  <span className="text-[10px] font-mono text-muted-foreground block text-right">
+                                    {item.progressPercent}%
+                                  </span>
                                 </div>
-                                <span className="text-[10px] font-mono text-muted-foreground block text-right">
-                                  {item.progressPercent}%
-                                </span>
-                              </div>
-                            )}
+                              )}
                           </div>
                         </Link>
                       </li>
@@ -392,7 +404,8 @@ export function PublicProfileView({ profile, viewerId }: PublicProfileViewProps)
       {activeTab === "activities" &&
         (activities.length === 0 ? (
           <p className="py-12 text-center text-sm text-muted-foreground">
-            {profile.name} belum membagikan kutipan, ulasan, atau sesi membaca ke linimasa.
+            {profile.name} belum membagikan kutipan, ulasan, atau sesi membaca
+            ke linimasa.
           </p>
         ) : (
           <div className="space-y-4 max-w-2xl">
@@ -443,11 +456,14 @@ function ActivityFeedCard({ activity }: { activity: ExplorePostItemDto }) {
   const [isLiked, setIsLiked] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
 
-  const formattedDate = new Date(activity.createdAt).toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  const formattedDate = new Date(activity.createdAt).toLocaleDateString(
+    "id-ID",
+    {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    },
+  );
 
   return (
     <article className="rounded-xl border border-border/80 bg-card p-5 space-y-3.5 shadow-xs hover:border-foreground/30 transition-colors">
@@ -498,7 +514,9 @@ function ActivityFeedCard({ activity }: { activity: ExplorePostItemDto }) {
               className="hover:underline flex items-center gap-1.5 truncate"
             >
               <BookOpen className="size-3.5 shrink-0" />
-              <span>{activity.book.title} — {activity.book.author}</span>
+              <span>
+                {activity.book.title} — {activity.book.author}
+              </span>
             </Link>
 
             <button
@@ -507,7 +525,9 @@ function ActivityFeedCard({ activity }: { activity: ExplorePostItemDto }) {
               className="text-[#fefae0] hover:text-[#dda15e] transition-colors p-1"
               aria-label="Simpan kutipan"
             >
-              <Bookmark className={`size-4 ${isBookmarked ? "fill-current" : ""}`} />
+              <Bookmark
+                className={`size-4 ${isBookmarked ? "fill-current" : ""}`}
+              />
             </button>
           </div>
         </div>
@@ -517,7 +537,8 @@ function ActivityFeedCard({ activity }: { activity: ExplorePostItemDto }) {
             <div className="flex items-center gap-2 font-mono text-xs font-semibold text-foreground">
               <Clock className="size-4 text-orange-600" />
               <span>
-                {Math.round((activity.durationSeconds || 0) / 60)} menit baca • {activity.pagesRead || 0} halaman
+                {Math.round((activity.durationSeconds || 0) / 60)} menit baca •{" "}
+                {activity.pagesRead || 0} halaman
               </span>
             </div>
             {activity.note && (
@@ -527,11 +548,11 @@ function ActivityFeedCard({ activity }: { activity: ExplorePostItemDto }) {
             )}
           </div>
 
-          <BookLine book={activity.book as any} />
+          <BookLine book={activity.book} />
         </div>
       ) : (
         <div className="space-y-3">
-          <BookLine book={activity.book as any} />
+          <BookLine book={activity.book} />
           <p className="whitespace-pre-line font-serif text-[15px] leading-relaxed text-foreground/90">
             {activity.content}
           </p>

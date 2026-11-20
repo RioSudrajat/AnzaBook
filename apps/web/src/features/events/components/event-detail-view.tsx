@@ -1,19 +1,12 @@
 import * as React from "react";
 import {
-  Calendar as CalendarIcon,
-  Clock,
   MapPin,
   Lock,
   ExternalLink,
   Users,
-  ShieldAlert,
   CheckCircle2,
-  AlertCircle,
-  Share2,
-  ChevronRight,
   BookOpen,
   Film,
-  Mail,
   Flag,
   Pencil,
   Trash2,
@@ -45,7 +38,7 @@ interface EventDetailViewProps {
   isDrawer?: boolean;
 }
 
-export function EventDetailView({ event: initialEvent, isDrawer = false }: EventDetailViewProps) {
+export function EventDetailView({ event: initialEvent }: EventDetailViewProps) {
   const { data: fullDetail } = useEventDetail(initialEvent.slug);
   const event = fullDetail || initialEvent;
   const detail = event as Partial<CommunityEventDetailDto>;
@@ -63,7 +56,11 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
   const deleteMutation = useDeleteEvent();
 
   const handleDeleteEvent = async () => {
-    if (confirm("Apakah Anda yakin ingin membatalkan/menghapus acara ini secara permanen?")) {
+    if (
+      confirm(
+        "Apakah Anda yakin ingin membatalkan/menghapus acara ini secara permanen?",
+      )
+    ) {
       await deleteMutation.mutateAsync(event.slug);
       window.location.reload();
     }
@@ -96,16 +93,20 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
     "Sabtu",
   ];
 
-  const dateShortMonth = monthNames[startDate.getMonth()].slice(0, 3).toUpperCase();
+  const dateShortMonth = monthNames[startDate.getMonth()]
+    .slice(0, 3)
+    .toUpperCase();
   const dayName = dayNames[startDate.getDay()];
   const dateFormatted = `${dayName}, ${startDate.getDate()} ${monthNames[startDate.getMonth()]}`;
 
   const formatTime = (d: Date) =>
-    d.toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).replace(".", ":");
+    d
+      .toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      })
+      .replace(".", ":");
 
   const timeFormatted = `${formatTime(startDate)} - ${formatTime(endDate)} WIB`;
 
@@ -156,7 +157,10 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
           `${event.district || ""} ${event.city || "Jakarta"}`,
         )}`;
 
-  const isFull = event.capacity !== null && event.capacity !== undefined && event.attendeeCount >= event.capacity;
+  const isFull =
+    event.capacity !== null &&
+    event.capacity !== undefined &&
+    event.attendeeCount >= event.capacity;
   const isGoing = event.userRsvpStatus === "going";
   const isPending = event.userRsvpStatus === "pending_approval";
   const isWaitlisted = event.userRsvpStatus === "waitlisted";
@@ -189,7 +193,9 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
           </div>
           <span>
             Diselenggarakan oleh{" "}
-            <strong className="text-white font-medium">{event.calendarName}</strong>
+            <strong className="text-white font-medium">
+              {event.calendarName}
+            </strong>
           </span>
         </div>
       </div>
@@ -205,7 +211,9 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
           </span>
         </div>
         <div className="flex-1 space-y-0.5">
-          <div className="font-semibold text-white text-sm">{dateFormatted}</div>
+          <div className="font-semibold text-white text-sm">
+            {dateFormatted}
+          </div>
           <div className="text-white/60">{timeFormatted}</div>
         </div>
       </div>
@@ -230,7 +238,8 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
                 {event.venueName || "Lokasi Acara"}
               </div>
               <div className="text-white/60">
-                {event.venueAddress || `${event.district || ""}, ${event.city || ""}`}
+                {event.venueAddress ||
+                  `${event.district || ""}, ${event.city || ""}`}
               </div>
             </div>
           )}
@@ -274,11 +283,12 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
             >
               <Users className="size-4" />
               <span>Kelola Peserta & Persetujuan</span>
-              {event.pendingRsvpCount !== undefined && event.pendingRsvpCount > 0 && (
-                <span className="rounded-full bg-rose-600 px-1.5 py-0.2 text-[10px] font-bold text-white ml-1">
-                  {event.pendingRsvpCount}
-                </span>
-              )}
+              {event.pendingRsvpCount !== undefined &&
+                event.pendingRsvpCount > 0 && (
+                  <span className="rounded-full bg-rose-600 px-1.5 py-0.2 text-[10px] font-bold text-white ml-1">
+                    {event.pendingRsvpCount}
+                  </span>
+                )}
             </Button>
 
             <div className="grid grid-cols-2 gap-2">
@@ -320,8 +330,8 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
                   isGoing
                     ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-200"
                     : isPending
-                    ? "bg-amber-500/15 border border-amber-500/30 text-amber-200"
-                    : "bg-blue-500/15 border border-blue-500/30 text-blue-200"
+                      ? "bg-amber-500/15 border border-amber-500/30 text-amber-200"
+                      : "bg-blue-500/15 border border-blue-500/30 text-blue-200"
                 }`}
               >
                 <CheckCircle2 className="size-4 shrink-0 mt-0.5" />
@@ -332,9 +342,12 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
                     {isWaitlisted && "Dalam Antrean Daftar Tunggu"}
                   </div>
                   <div className="text-[11px] opacity-80 mt-0.5">
-                    {isGoing && "Tiket dan lokasi lengkap telah terbuka untuk Anda."}
-                    {isPending && "Host akan meninjau pendaftaran Anda sebelum membuka alamat acara."}
-                    {isWaitlisted && "Anda akan otomatis dipromosikan jika kursi tersedia."}
+                    {isGoing &&
+                      "Tiket dan lokasi lengkap telah terbuka untuk Anda."}
+                    {isPending &&
+                      "Host akan meninjau pendaftaran Anda sebelum membuka alamat acara."}
+                    {isWaitlisted &&
+                      "Anda akan otomatis dipromosikan jika kursi tersedia."}
                   </div>
                 </div>
               </div>
@@ -354,7 +367,9 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
                           type="button"
                           onClick={() => {
                             if (detail.userRsvp?.checkinCode) {
-                              navigator.clipboard.writeText(detail.userRsvp.checkinCode);
+                              navigator.clipboard.writeText(
+                                detail.userRsvp.checkinCode,
+                              );
                               setCopiedTicket(true);
                               setTimeout(() => setCopiedTicket(false), 2000);
                             }
@@ -378,7 +393,8 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
                         {detail.userRsvp.checkinCode}
                       </div>
                       <p className="text-[10px] text-white/40 text-center">
-                        Tunjukkan kode tiket ini kepada host saat verifikasi kedatangan
+                        Tunjukkan kode tiket ini kepada host saat verifikasi
+                        kedatangan
                       </p>
                     </div>
                   )}
@@ -430,7 +446,9 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
                 onClick={handleCancelRsvp}
                 className="w-full border-white/20 text-white/70 hover:bg-white/10 hover:text-white"
               >
-                {cancelRsvpMutation.isPending ? "Membatalkan..." : "Batalkan Pendaftaran"}
+                {cancelRsvpMutation.isPending
+                  ? "Membatalkan..."
+                  : "Batalkan Pendaftaran"}
               </Button>
             </div>
           ) : event.requiresApproval ? (
@@ -439,7 +457,9 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
               <div className="flex items-center gap-2 text-white/80">
                 <Lock className="size-4 text-amber-400" />
                 <div>
-                  <div className="font-semibold text-white">Persetujuan Diperlukan</div>
+                  <div className="font-semibold text-white">
+                    Persetujuan Diperlukan
+                  </div>
                   <div className="text-[11px] text-white/50">
                     Pendaftaran Anda memerlukan persetujuan host.
                   </div>
@@ -447,7 +467,8 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
               </div>
 
               <p className="text-white/70 text-[11px]">
-                Silakan klik tombol di bawah untuk meminta akses bergabung ke acara ini.
+                Silakan klik tombol di bawah untuk meminta akses bergabung ke
+                acara ini.
               </p>
 
               <Button
@@ -456,7 +477,9 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
                 onClick={handleRsvp}
                 className="w-full h-11 rounded-xl bg-white text-black font-semibold hover:bg-white/90 text-sm shadow-lg cursor-pointer"
               >
-                {rsvpMutation.isPending ? "Mengirim Permintaan..." : "Minta untuk Bergabung"}
+                {rsvpMutation.isPending
+                  ? "Mengirim Permintaan..."
+                  : "Minta untuk Bergabung"}
               </Button>
             </div>
           ) : isFull && event.allowWaitlist ? (
@@ -467,13 +490,15 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
                 <div>
                   <div className="font-semibold text-white">Acara Penuh</div>
                   <div className="text-[11px] text-white/50">
-                    Kapasitas kursi penuh. Anda dapat bergabung dengan daftar tunggu.
+                    Kapasitas kursi penuh. Anda dapat bergabung dengan daftar
+                    tunggu.
                   </div>
                 </div>
               </div>
 
               <p className="text-white/70 text-[11px]">
-                Klik tombol di bawah untuk bergabung dengan daftar tunggu. Anda akan otomatis masuk jika tempat tambahan tersedia.
+                Klik tombol di bawah untuk bergabung dengan daftar tunggu. Anda
+                akan otomatis masuk jika tempat tambahan tersedia.
               </p>
 
               <Button
@@ -522,8 +547,12 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
                   decorative
                 />
                 <div>
-                  <div className="font-semibold text-white">{event.bookSummary.title}</div>
-                  <div className="text-white/50">{event.bookSummary.author}</div>
+                  <div className="font-semibold text-white">
+                    {event.bookSummary.title}
+                  </div>
+                  <div className="text-white/50">
+                    {event.bookSummary.author}
+                  </div>
                 </div>
               </div>
               <a
@@ -535,9 +564,13 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
             </div>
           ) : (
             <div className="pt-1 space-y-1">
-              <div className="font-semibold text-white">{event.featuredWork?.title}</div>
+              <div className="font-semibold text-white">
+                {event.featuredWork?.title}
+              </div>
               {event.featuredWork?.creator && (
-                <div className="text-white/50">{event.featuredWork.creator}</div>
+                <div className="text-white/50">
+                  {event.featuredWork.creator}
+                </div>
               )}
               {event.featuredWork?.externalUrl && (
                 <a
@@ -589,19 +622,36 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
         <div className="relative h-44 w-full overflow-hidden rounded-xl border border-white/10 bg-[#161a22]">
           {/* Simulated OpenStreetMap Vector Background */}
           <svg className="absolute inset-0 size-full stroke-white/5 [stroke-width:1]">
-            <pattern id="detail-grid" width="30" height="30" patternUnits="userSpaceOnUse">
+            <pattern
+              id="detail-grid"
+              width="30"
+              height="30"
+              patternUnits="userSpaceOnUse"
+            >
               <path d="M 30 0 L 0 0 0 30" fill="none" />
             </pattern>
             <rect width="100%" height="100%" fill="url(#detail-grid)" />
-            <path d="M 0 90 Q 150 70, 400 120" stroke="#25354d" strokeWidth="8" fill="none" />
-            <path d="M 180 0 L 210 200" stroke="#1f2c3e" strokeWidth="6" fill="none" />
+            <path
+              d="M 0 90 Q 150 70, 400 120"
+              stroke="#25354d"
+              strokeWidth="8"
+              fill="none"
+            />
+            <path
+              d="M 180 0 L 210 200"
+              stroke="#1f2c3e"
+              strokeWidth="6"
+              fill="none"
+            />
           </svg>
 
           {/* Map Pin */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
             <div className="size-4 rounded-full border-2 border-white bg-red-500 shadow-lg animate-bounce" />
             <span className="mt-1 rounded bg-black/80 px-1.5 py-0.5 text-[10px] text-white">
-              {event.isAddressHidden ? event.city || "Jakarta" : event.venueName || "Venue"}
+              {event.isAddressHidden
+                ? event.city || "Jakarta"
+                : event.venueName || "Venue"}
             </span>
           </div>
 
@@ -628,7 +678,9 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
           </div>
           <div>
             <div className="font-semibold text-white">{event.calendarName}</div>
-            <div className="text-[11px] text-white/50">Komunitas Terverifikasi AnzaBook</div>
+            <div className="text-[11px] text-white/50">
+              Komunitas Terverifikasi AnzaBook
+            </div>
           </div>
         </div>
 
@@ -639,7 +691,9 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
                 <span className="size-1.5 rounded-full bg-amber-400" />
                 <span className="text-white">{ch.name}</span>
                 {ch.roleLabel && (
-                  <span className="text-[10px] text-white/40">({ch.roleLabel})</span>
+                  <span className="text-[10px] text-white/40">
+                    ({ch.roleLabel})
+                  </span>
                 )}
               </div>
             ))}
@@ -663,7 +717,11 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
                   className="inline-block size-7 rounded-full ring-2 ring-[#121316] bg-amber-500/30 text-amber-200 text-[11px] font-bold flex items-center justify-center overflow-hidden"
                 >
                   {att.image ? (
-                    <img src={att.image} alt={att.name} className="size-full object-cover" />
+                    <img
+                      src={att.image}
+                      alt={att.name}
+                      className="size-full object-cover"
+                    />
                   ) : (
                     att.name[0]
                   )}
@@ -672,9 +730,7 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
             </div>
 
             {/* Names string */}
-            <div className="text-[11px] text-white/60">
-              {attendeeNamesText}
-            </div>
+            <div className="text-[11px] text-white/60">{attendeeNamesText}</div>
           </div>
         )}
       </div>
@@ -735,7 +791,8 @@ export function EventDetailView({ event: initialEvent, isDrawer = false }: Event
             ) : (
               <form onSubmit={handleSendReport} className="mt-3 space-y-3">
                 <p className="text-[11px] text-white/70">
-                  Sampaikan alasan pelaporan (misal: spam, konten tidak pantas, atau lokasi fiktif):
+                  Sampaikan alasan pelaporan (misal: spam, konten tidak pantas,
+                  atau lokasi fiktif):
                 </p>
                 <textarea
                   value={reportReason}

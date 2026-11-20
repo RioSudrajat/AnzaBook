@@ -61,7 +61,9 @@ export function RatingDialog({
         onClose();
       }, 1500);
     } catch {
-      setErrorMessage("Gagal mengirim ulasan. Silakan periksa koneksi lalu coba lagi.");
+      setErrorMessage(
+        "Gagal mengirim ulasan. Silakan periksa koneksi lalu coba lagi.",
+      );
     }
   };
 
@@ -90,7 +92,8 @@ export function RatingDialog({
             </div>
             <h3 className="font-serif text-lg font-bold">Terima Kasih!</h3>
             <p className="text-xs text-muted-foreground font-sans max-w-xs mx-auto">
-              Rating dan apresiasi Anda untuk <strong>{bookTitle}</strong> berhasil dicatat.
+              Rating dan apresiasi Anda untuk <strong>{bookTitle}</strong>{" "}
+              berhasil dicatat.
             </p>
           </div>
         ) : (
@@ -99,7 +102,10 @@ export function RatingDialog({
               <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
                 Ulasan Pembaca
               </div>
-              <h3 id="rating-dialog-title" className="font-serif text-lg font-bold">
+              <h3
+                id="rating-dialog-title"
+                className="font-serif text-lg font-bold"
+              >
                 Beri Penilaian Naskah
               </h3>
               <p className="text-xs text-muted-foreground truncate max-w-xs mx-auto">
@@ -109,7 +115,11 @@ export function RatingDialog({
 
             {/* Interactive Star Picker */}
             <div className="flex flex-col items-center gap-1.5 py-3">
-              <div className="flex items-center gap-1.5" role="group" aria-label="Pilih rating bintang">
+              <div
+                className="flex items-center gap-1.5"
+                role="group"
+                aria-label="Pilih rating bintang"
+              >
                 {[1, 2, 3, 4, 5].map((starVal) => {
                   const isFilled = starVal <= activeStars;
                   return (
@@ -158,7 +168,10 @@ export function RatingDialog({
             </div>
 
             {errorMessage && (
-              <p role="alert" className="text-xs text-destructive font-mono text-center">
+              <p
+                role="alert"
+                className="text-xs text-destructive font-mono text-center"
+              >
                 {errorMessage}
               </p>
             )}
@@ -180,7 +193,9 @@ export function RatingDialog({
                 disabled={createReviewMutation.isPending}
                 className="text-xs font-mono bg-[var(--color-accent)] text-white hover:brightness-110"
               >
-                {createReviewMutation.isPending ? "Mengirim..." : "Kirim Penilaian"}
+                {createReviewMutation.isPending
+                  ? "Mengirim..."
+                  : "Kirim Penilaian"}
               </Button>
             </div>
           </form>

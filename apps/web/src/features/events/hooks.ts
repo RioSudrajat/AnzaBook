@@ -15,7 +15,6 @@ import {
   createCalendar,
   createEvent,
   deleteEvent,
-  getEventAttendees,
   joinCalendar,
   leaveCalendar,
   rejectRsvp,

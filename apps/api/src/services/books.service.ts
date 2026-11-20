@@ -31,6 +31,7 @@ import type {
   BookPurchaseDto,
   BookReaderPayloadDto,
   BookSummaryDto,
+  CommunityEventSummaryDto,
   DigitalPolicy,
   EditionTier,
   PartnerType,
@@ -145,7 +146,11 @@ export async function getBookReadAccess(
 
   // 3. Skema A: print_claim_only requires physical claim code redemption. Nakama does not unlock.
   if (book.digitalPolicy === "print_claim_only") {
-    return { hasFullAccess: false, accessExpiresAt: null, hasEventSampleAccess };
+    return {
+      hasFullAccess: false,
+      accessExpiresAt: null,
+      hasEventSampleAccess,
+    };
   }
 
   // 4. Check ala carte purchase for alacarte_only and hybrid_nakama_alacarte
@@ -161,7 +166,11 @@ export async function getBookReadAccess(
 
   // 5. Skema C: alacarte_only requires purchase or physical claim. Nakama does not unlock.
   if (book.digitalPolicy === "alacarte_only") {
-    return { hasFullAccess: false, accessExpiresAt: null, hasEventSampleAccess };
+    return {
+      hasFullAccess: false,
+      accessExpiresAt: null,
+      hasEventSampleAccess,
+    };
   }
 
   // 6. Skema B (sample_only) and Skema Hibrida (hybrid_nakama_alacarte) check active Nakama membership
@@ -408,9 +417,15 @@ export async function getReadableParagraphCount(
 
   if (!chapter)
     throw new HttpError(404, "CHAPTER_NOT_FOUND", "Bab tidak ditemukan.");
-  const { hasFullAccess, hasEventSampleAccess } = await getBookReadAccess(chapter, userId);
+  const { hasFullAccess, hasEventSampleAccess } = await getBookReadAccess(
+    chapter,
+    userId,
+  );
   if (hasFullAccess) return splitParagraphs(chapter.contentId).length;
-  if (hasEventSampleAccess && (chapter.chapterNumber === 1 || chapter.chapterNumber === 2)) {
+  if (
+    hasEventSampleAccess &&
+    (chapter.chapterNumber === 1 || chapter.chapterNumber === 2)
+  ) {
     return splitParagraphs(chapter.contentId).length;
   }
   if (chapter.chapterNumber === 1)
@@ -497,7 +512,10 @@ export async function listBooks(query: ListBooksQuery) {
       .from(publishers)
       .where(
         isUuid
-          ? or(eq(publishers.id, query.publisher), eq(publishers.slug, query.publisher))
+          ? or(
+              eq(publishers.id, query.publisher),
+              eq(publishers.slug, query.publisher),
+            )
           : eq(publishers.slug, query.publisher),
       )
       .limit(1);
@@ -631,12 +649,12 @@ export async function getBookBySlug(
         title: ev.title,
         description: ev.description,
         coverUrl: ev.coverUrl,
-        themePreset: ev.themePreset as any,
-        visibility: ev.visibility as any,
-        eventType: ev.eventType as any,
+        themePreset: ev.themePreset as CommunityEventSummaryDto["themePreset"],
+        visibility: ev.visibility as CommunityEventSummaryDto["visibility"],
+        eventType: ev.eventType as CommunityEventSummaryDto["eventType"],
         categoryTag: ev.categoryTag,
         coHosts: ev.coHosts,
-        format: ev.format as any,
+        format: ev.format as CommunityEventSummaryDto["format"],
         district: ev.district,
         city: ev.city,
         venueName: ev.hideAddressUntilApproved ? null : ev.venueName,
@@ -651,7 +669,7 @@ export async function getBookBySlug(
         capacity: ev.capacity,
         requiresApproval: ev.requiresApproval,
         allowWaitlist: ev.allowWaitlist,
-        status: ev.status as any,
+        status: ev.status as CommunityEventSummaryDto["status"],
         attendeeCount: goingCount,
         attendeesPreview: [],
         userRsvpStatus: null,

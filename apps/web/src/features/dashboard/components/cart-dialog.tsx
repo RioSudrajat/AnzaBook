@@ -50,9 +50,12 @@ export function CartDialog({
           </div>
 
           <div className="space-y-1">
-            <p className="font-serif font-bold text-base">Keranjang Kamu Kosong</p>
+            <p className="font-serif font-bold text-base">
+              Keranjang Kamu Kosong
+            </p>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Kamu belum memasukkan edisi cetak rakyat atau cinderamata literasi ke dalam keranjang.
+              Kamu belum memasukkan edisi cetak rakyat atau cinderamata literasi
+              ke dalam keranjang.
             </p>
           </div>
 

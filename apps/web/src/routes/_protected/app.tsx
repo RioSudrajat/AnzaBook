@@ -133,7 +133,10 @@ export default function AppPage() {
       ? "events"
       : activeTab === "publisher"
         ? "profile"
-        : (activeTab as Exclude<AppTab, "community" | "publisher" | "shelves" | "history" | "share">);
+        : (activeTab as Exclude<
+            AppTab,
+            "community" | "publisher" | "shelves" | "history" | "share"
+          >);
 
   const title =
     activeTab === "profile"
@@ -259,9 +262,7 @@ export default function AppPage() {
       {quoteStoryState.highlight && (
         <HighlightStoryDialog
           isOpen={quoteStoryState.isOpen}
-          onClose={() =>
-            setQuoteStoryState({ isOpen: false, highlight: null })
-          }
+          onClose={() => setQuoteStoryState({ isOpen: false, highlight: null })}
           bookTitle="Sains, Logika, dan Seni untuk Hidup Bermutu"
           bookAuthor="Zenius"
           chapterNumber={quoteStoryState.highlight.chapterNumber}

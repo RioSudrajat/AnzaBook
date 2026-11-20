@@ -66,8 +66,14 @@ describe("Social Profile, 4D Explore, Community Membership & Manuscript Studio A
     const userB = agent();
     const emailB = await signUp(userB, "User Bintang");
 
-    const [dbUserA] = await db.select().from(user).where(eq(user.email, emailA));
-    const [dbUserB] = await db.select().from(user).where(eq(user.email, emailB));
+    const [dbUserA] = await db
+      .select()
+      .from(user)
+      .where(eq(user.email, emailA));
+    const [dbUserB] = await db
+      .select()
+      .from(user)
+      .where(eq(user.email, emailB));
 
     // Self follow should fail with 400 CANNOT_FOLLOW_SELF
     const selfFollowRes = await userA
@@ -237,9 +243,51 @@ describe("Social Profile, 4D Explore, Community Membership & Manuscript Studio A
     expect(pubListRes.status).toBe(200);
     const pubs = pubListRes.body.data;
     expect(pubs.some((p: { slug: string }) => p.slug === pubSlug)).toBe(true);
-    expect(pubs.some((p: { slug: string }) => p.slug === unverifiedPubSlug)).toBe(
-      false,
+    expect(
+      pubs.some((p: { slug: string }) => p.slug === unverifiedPubSlug),
+    ).toBe(false);
+
+    // 5. Admin accounts must be excluded from explore endpoints
+    const adminAgent = agent();
+    const adminEmail = await signUp(adminAgent, "Admin Rahasia Explore");
+    const [adminDb] = await db
+      .select()
+      .from(user)
+      .where(eq(user.email, adminEmail));
+    await db
+      .update(user)
+      .set({ role: "admin", authorStatus: "verified" })
+      .where(eq(user.id, adminDb.id));
+
+    const exploreAllRes = await viewer.get(
+      "/api/social/explore?q=Admin+Rahasia+Explore",
     );
+    expect(exploreAllRes.status).toBe(200);
+    expect(
+      exploreAllRes.body.data.users.some(
+        (u: { id: string }) => u.id === adminDb.id,
+      ),
+    ).toBe(false);
+
+    const readersAfterAdminRes = await viewer.get(
+      "/api/social/explore/readers?q=Admin+Rahasia+Explore",
+    );
+    expect(readersAfterAdminRes.status).toBe(200);
+    expect(
+      readersAfterAdminRes.body.data.some(
+        (u: { id: string }) => u.id === adminDb.id,
+      ),
+    ).toBe(false);
+
+    const authorsAfterAdminRes = await viewer.get(
+      "/api/social/explore/authors?q=Admin+Rahasia+Explore",
+    );
+    expect(authorsAfterAdminRes.status).toBe(200);
+    expect(
+      authorsAfterAdminRes.body.data.some(
+        (u: { id: string }) => u.id === adminDb.id,
+      ),
+    ).toBe(false);
   });
 
   it("manages community membership (/join, /leave) and enforces wallet RBAC", async () => {
@@ -307,7 +355,9 @@ describe("Social Profile, 4D Explore, Community Membership & Manuscript Studio A
     expect(ownerWalletRes.status).toBe(200);
     expect(ownerWalletRes.body.data.balanceIdr).toBe(65_000);
     expect(ownerWalletRes.body.data.totalAffiliateNakamaIdr).toBe(50_000);
-    expect(ownerWalletRes.body.data.totalAffiliateBookPurchasesIdr).toBe(15_000);
+    expect(ownerWalletRes.body.data.totalAffiliateBookPurchasesIdr).toBe(
+      15_000,
+    );
     expect(ownerWalletRes.body.data.recentLedgers).toHaveLength(2);
 
     // Owner attempts to leave -> REJECTED (400 OWNER_CANNOT_LEAVE)
@@ -337,7 +387,8 @@ describe("Social Profile, 4D Explore, Community Membership & Manuscript Studio A
         slug: pubSlug,
         city: "Jakarta Pusat",
         ikapiNumber: "IKAPI-JKT-2026-99",
-        description: "Penerbit independen karya fiksi dan literatur kontemporer.",
+        description:
+          "Penerbit independen karya fiksi dan literatur kontemporer.",
         contactEmail: "redaksi@nusantarakreatif.id",
       });
 

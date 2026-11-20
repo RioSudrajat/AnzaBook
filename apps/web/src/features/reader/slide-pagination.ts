@@ -53,17 +53,22 @@ export function extractCleanSlideParagraphs(content?: string | null): string[] {
   const trimmed = content.trim();
   if (trimmed.startsWith("{") && trimmed.includes('"type"')) {
     try {
-      const parsed = JSON.parse(trimmed);
+      interface TipTapAstNode {
+        type?: string;
+        text?: string;
+        content?: TipTapAstNode[];
+      }
+      const parsed = JSON.parse(trimmed) as TipTapAstNode;
       const paras: string[] = [];
-      const traverse = (node: any) => {
+      const traverse = (node: TipTapAstNode) => {
         if (!node) return;
         if (node.type === "chapterBreak" || node.type === "pageBreak") return;
         if (node.type === "text" && node.text) {
           paras.push(node.text);
         } else if (node.content && Array.isArray(node.content)) {
           const directText = node.content
-            .filter((c: any) => c.type === "text")
-            .map((c: any) => c.text || "")
+            .filter((c: TipTapAstNode) => c.type === "text")
+            .map((c: TipTapAstNode) => c.text || "")
             .join("")
             .trim();
           if (directText) {

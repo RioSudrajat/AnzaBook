@@ -57,10 +57,7 @@ export function DashboardHome({
     <div className="space-y-12 pb-16">
       {bulletinBook && (
         <section aria-labelledby="bulletin-heading" className="space-y-3">
-          <h2
-            id="bulletin-heading"
-            className="font-serif text-lg font-bold"
-          >
+          <h2 id="bulletin-heading" className="font-serif text-lg font-bold">
             Buletin Mingguan
           </h2>
           <div className="flex flex-col items-start gap-5 rounded-xl border bg-card p-5 sm:flex-row sm:items-center sm:p-6">
@@ -253,7 +250,10 @@ export function DashboardHome({
       </section>
 
       {upcomingEvents.length > 0 && (
-        <section aria-labelledby="community-agenda-heading" className="space-y-4">
+        <section
+          aria-labelledby="community-agenda-heading"
+          className="space-y-4"
+        >
           <div className="flex items-center justify-between">
             <div>
               <h2
@@ -311,7 +311,9 @@ export function DashboardHome({
                 <div className="pt-2 text-[10px] text-muted-foreground flex items-center gap-1">
                   <MapPin className="size-3 text-muted-foreground/60" />
                   <span className="truncate">
-                    {ev.isAddressHidden ? ev.city || "Jakarta" : ev.venueName || "Lokasi Acara"}
+                    {ev.isAddressHidden
+                      ? ev.city || "Jakarta"
+                      : ev.venueName || "Lokasi Acara"}
                   </span>
                 </div>
               </Link>

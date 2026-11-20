@@ -214,14 +214,19 @@ export function CompletedBookDialog({
                         dateTime={session.createdAt}
                         className="block font-mono text-xs font-semibold text-foreground/90"
                       >
-                        {sessionDateFormat.format(new Date(session.createdAt))} WIB
+                        {sessionDateFormat.format(new Date(session.createdAt))}{" "}
+                        WIB
                       </time>
                       <p className="text-[11px] text-muted-foreground flex items-center gap-2">
                         <span>{session.pagesRead} hal</span>
                         <span>·</span>
                         <span className="flex items-center gap-1">
                           <Clock className="size-3 inline" />
-                          {Math.max(1, Math.round(session.durationSeconds / 60))} menit
+                          {Math.max(
+                            1,
+                            Math.round(session.durationSeconds / 60),
+                          )}{" "}
+                          menit
                         </span>
                         <span>·</span>
                         <span>{session.avgWpm} WPM</span>

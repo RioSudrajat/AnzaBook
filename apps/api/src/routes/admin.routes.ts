@@ -124,7 +124,10 @@ adminRouter.get("/manuscripts/:id", async (req, res) => {
 
 adminRouter.patch("/manuscripts/:id", jsonBody, async (req, res) => {
   const input = adminEditManuscriptSchema.parse(req.body);
-  const manuscript = await updateAdminManuscript(req.params.id as string, input);
+  const manuscript = await updateAdminManuscript(
+    req.params.id as string,
+    input,
+  );
   res.json({ data: manuscript });
 });
 

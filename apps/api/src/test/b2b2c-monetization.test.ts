@@ -65,7 +65,8 @@ async function createTestBook(params: {
       bookId: book.id,
       chapterNumber: 1,
       titleId: "Bab 1: Sampel Awal",
-      contentId: "Paragraf pembuka sampel bab 1.\n\nParagraf kedua sampel bab 1.",
+      contentId:
+        "Paragraf pembuka sampel bab 1.\n\nParagraf kedua sampel bab 1.",
     },
     {
       bookId: book.id,
@@ -119,11 +120,7 @@ describe("B2B2C Monetization & DRM Engine", () => {
 
   it("unlocks full access when physical claim code is redeemed on print_claim_only book", async () => {
     const client = agent();
-    const email = await signUp(client, "Claimer Reader");
-    const [usr] = await db
-      .select({ id: user.id })
-      .from(user)
-      .where(eq(user.email, email));
+    await signUp(client, "Claimer Reader");
 
     const slug = `claimable-book-${randomUUID().slice(0, 8)}`;
     const book = await createTestBook({
@@ -289,7 +286,7 @@ describe("B2B2C Monetization & DRM Engine", () => {
     });
 
     const bookSlug = `auto-attrib-book-${randomUUID().slice(0, 8)}`;
-    const book = await createTestBook({
+    await createTestBook({
       slug: bookSlug,
       title: "Buku Pembelajaran Mandiri",
       digitalPolicy: "alacarte_only",

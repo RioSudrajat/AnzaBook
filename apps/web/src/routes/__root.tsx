@@ -100,7 +100,9 @@ function ErrorPage() {
   return (
     <div className="min-h-screen flex flex-col justify-between">
       <main id="main-content" className="mx-auto max-w-lg px-6 py-24 flex-1">
-        <h1 className="text-2xl font-semibold">Terjadi Kendala Memuat Halaman</h1>
+        <h1 className="text-2xl font-semibold">
+          Terjadi Kendala Memuat Halaman
+        </h1>
         <p className="my-4 leading-7 text-muted-foreground">
           Silakan muat ulang halaman ini.
         </p>
