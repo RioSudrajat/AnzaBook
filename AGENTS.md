@@ -126,7 +126,7 @@ Read `CONTRIBUTING.md` for team roles, area ownership, and release rules. Every 
 - **Branching**: Always work on a scoped branch (`feat|fix|ops|chore/<issue>-<slug>`); never commit or push directly to `main` or `production`.
 - **Issue-Scoped PRs**: Tie every PR to a single GitHub Issue (`Closes #<id>`) and keep diffs focused (`<= ~400` logic lines where practical).
 - **Contract-First**: Define or update shared Zod schemas and DTOs in `packages/shared/` first before parallelizing `apps/api` and `apps/web` work.
-- **Drizzle Migrations**: Coordinate with `@SalmanMuhammadRidwan` before running `pnpm db:generate` in `apps/api/drizzle/`, and rebase onto latest `origin/main` first so `apps/api/drizzle/meta/_journal.json` stays linear.
+- **Drizzle Migrations**: Coordinate with `@SalmanMuhammadRidwan` before running `pnpm db:generate` from the repo root (writes migrations under `apps/api/drizzle/`), and rebase onto latest `origin/main` first so `apps/api/drizzle/meta/_journal.json` stays linear.
 - **Generated Route Tree**: Never hand-resolve merge conflicts in `apps/web/src/routeTree.gen.ts`; rebase onto `main` and regenerate via TanStack Router (`pnpm dev` or `pnpm build`).
 - **Pre-PR Verification**: Run `pnpm check && pnpm format:check && pnpm build` locally before opening a PR (plus `pnpm test:e2e` for auth, routing, session, CORS, or critical UI changes).
 
@@ -165,12 +165,13 @@ Always write `pnpm run setup` and `pnpm run doctor`: `pnpm setup` and `pnpm doct
 
 Use the relevant skill below. Clients without skill discovery should open its file directly. `agent.md` is an alternate entrypoint to these canonical instructions.
 
-| Task                                                   | Project skill                            |
-| ------------------------------------------------------ | ---------------------------------------- |
-| First app prompt or setup problem                      | `.agents/skills/starter-setup/SKILL.md`  |
-| Start, inspect, stop, or troubleshoot the dev database | `.agents/skills/dev-database/SKILL.md`   |
-| Build a feature, change the UI, or add data            | `.agents/skills/build-feature/SKILL.md`  |
-| Create a dashboard/chatbot/other derivative            | `.agents/skills/create-variant/SKILL.md` |
+| Task                                                   | Project skill                             |
+| ------------------------------------------------------ | ----------------------------------------- |
+| First app prompt or setup problem                      | `.agents/skills/starter-setup/SKILL.md`   |
+| Start, inspect, stop, or troubleshoot the dev database | `.agents/skills/dev-database/SKILL.md`    |
+| Build a feature, change the UI, or add data            | `.agents/skills/build-feature/SKILL.md`   |
+| Create a dashboard/chatbot/other derivative            | `.agents/skills/create-variant/SKILL.md`  |
+| Delegate team tasks, manage Kanban #1, or release      | `.agents/skills/team-delegation/SKILL.md` |
 
 ## Development database
 
