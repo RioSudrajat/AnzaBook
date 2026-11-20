@@ -24,6 +24,7 @@ import {
   getChapterAndPageFromGlobal,
 } from "@starter/shared/chapter-pagination";
 import { bookProgressPercent } from "@starter/shared/reading-progress";
+import { resolveReaderDrmPolicy } from "@starter/shared/validators/drm";
 import type {
   BookChapterSummaryDto,
   BookHighlightDto,
@@ -42,8 +43,10 @@ import {
   useCreateHighlight,
   useDeleteHighlight,
   useReadingProgress,
+  useRecordDrmEvent,
   useSaveReadingProgress,
 } from "@/features/books/hooks";
+import { IS_DRM_TOGGLE_ENABLED } from "@/lib/env";
 import { booksKeys } from "@/features/books/queries";
 import { bookPagePath } from "@/features/books/book-share";
 import { BookShareDialog } from "@/features/books/components/book-share-dialog";
@@ -57,7 +60,10 @@ import {
 import { ApiError } from "@/lib/api/client";
 import { useCreateReadingSession } from "@/features/community/hooks";
 import { AudiobookBar } from "@/features/reader/components/audiobook-bar";
-import { DrmShield } from "@/features/reader/components/drm-shield";
+import {
+  DrmShield,
+  type DrmShieldTriggerEvent,
+} from "@/features/reader/components/drm-shield";
 import { GlossyProgressBar } from "@/features/reader/components/glossy-progress-bar";
 import { HighlightPopover } from "@/features/reader/components/highlight-popover";
 import { HighlightStoryDialog } from "@/features/reader/components/highlight-story-dialog";
@@ -631,9 +637,17 @@ function ReaderBook() {
   const [languageView, setLanguageView] = useState<LanguageView>("id");
   const [readingLayout, setReadingLayout] = useState<ReadingLayout>("scroll");
   const [isAudioOpen, setIsAudioOpen] = useState(false);
-  const [isDrmEnabled, setIsDrmEnabled] = useState<boolean>(
-    search.drm ?? false,
+  const [drmToggleState, setDrmToggleState] = useState<boolean>(
+    IS_DRM_TOGGLE_ENABLED ? (search.drm ?? true) : true,
   );
+  const drmPolicy = resolveReaderDrmPolicy({
+    toggleAvailable: IS_DRM_TOGGLE_ENABLED,
+    requestedDrm: search.drm,
+    toggleState: drmToggleState,
+    isAuthorEditing: isAuthorOrPublisher && editMode === "edit",
+  });
+  const { mutate: recordDrmEvent } = useRecordDrmEvent();
+  const lastDrmLogRef = useRef<Map<string, number>>(new Map());
   const [isHighlightsOpen, setIsHighlightsOpen] = useState(false);
   const [isRatingOpen, setIsRatingOpen] = useState(false);
   const [share, setShare] = useState<{
@@ -730,6 +744,33 @@ function ReaderBook() {
     accessibleChapters[0] ??
     payload?.currentChapter;
   const activeChapterNum = chapter?.chapterNumber ?? requestedChapter;
+
+  const handleDrmSecurityTrigger = useCallback(
+    (event: DrmShieldTriggerEvent) => {
+      if (!drmPolicy.isEnabled || !payload?.watermark) return;
+      const now = Date.now();
+      const key = event.eventType;
+      const last = lastDrmLogRef.current.get(key) ?? 0;
+      if (now - last < 2000) return;
+      lastDrmLogRef.current.set(key, now);
+
+      recordDrmEvent({
+        bookSlug: slug,
+        chapterNumber: activeChapterNum,
+        eventType: event.eventType,
+        triggerDetail: event.triggerDetail,
+        watermarkCode: payload.watermark,
+        clientOs: event.clientOs,
+      });
+    },
+    [
+      activeChapterNum,
+      drmPolicy.isEnabled,
+      payload?.watermark,
+      recordDrmEvent,
+      slug,
+    ],
+  );
   const fontClass =
     fontFamily === "serif"
       ? "font-serif"
@@ -1460,7 +1501,12 @@ function ReaderBook() {
     : scrollPosition.percent;
 
   return (
-    <DrmShield watermarkText={watermark} enabled={isDrmEnabled}>
+    <DrmShield
+      watermarkText={watermark}
+      enabled={drmPolicy.isEnabled}
+      theme={theme}
+      onSecurityTrigger={handleDrmSecurityTrigger}
+    >
       <div
         data-theme={theme}
         className={`${
@@ -1495,8 +1541,12 @@ function ReaderBook() {
                 ? () => setIsAudioOpen(!isAudioOpen)
                 : undefined
             }
-            isDrmEnabled={isDrmEnabled}
-            onToggleDrm={() => setIsDrmEnabled((prev) => !prev)}
+            isDrmEnabled={drmPolicy.isEnabled}
+            onToggleDrm={
+              drmPolicy.showToggle
+                ? () => setDrmToggleState((prev) => !prev)
+                : undefined
+            }
             isHighlightsOpen={isHighlightsOpen}
             onToggleHighlights={() => setIsHighlightsOpen(!isHighlightsOpen)}
             highlightCount={allHighlights.length}

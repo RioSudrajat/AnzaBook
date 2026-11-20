@@ -93,8 +93,8 @@ booksRouter.get("/:slug/read", requireAuth, async (req, res) => {
   const payload = await getBookReaderPayload(
     slug,
     auth.user.id,
-    auth.user.email,
     query,
+    auth.session.id,
   );
   res.json({ data: payload });
 });

@@ -12,6 +12,7 @@ import type {
   AdminVerifyCalendarInput,
   AdminVerifyPublisherInput,
 } from "@starter/shared/validators/admin";
+import type { AdminDrmEventsQueryInput } from "@starter/shared/validators/drm";
 import type { ListNotesInput } from "@starter/shared/validators/notes";
 import type { CreateClaimBatchInput } from "@starter/shared/validators/publisher";
 import { notesKeys } from "@/features/notes/queries";
@@ -28,6 +29,8 @@ import {
   adminAuthorApplicationsQuery,
   adminCalendarsQuery,
   adminClaimBatchCodesQuery,
+  adminDrmEventsQuery,
+  adminDrmTraceQuery,
   adminKeys,
   adminManuscriptDetailQuery,
   adminManuscriptsQuery,
@@ -183,6 +186,16 @@ export function useCreateClaimBatch() {
 
 export function useClaimBatchCodes(batchId: string) {
   return useQuery(adminClaimBatchCodesQuery(batchId));
+}
+
+// ---------------- DRM Security Audit Monitoring ---------------- //
+
+export function useAdminDrmEvents(params?: AdminDrmEventsQueryInput) {
+  return useQuery(adminDrmEventsQuery(params));
+}
+
+export function useAdminDrmTrace(watermarkCode: string) {
+  return useQuery(adminDrmTraceQuery(watermarkCode));
 }
 
 // ---------------- Notes Utility (starter base) ---------------- //

@@ -33,6 +33,7 @@ import {
   user,
 } from "../db/schema";
 import { HttpError } from "../lib/http-error";
+import { countRecentHighRiskDrmEvents24h } from "./drm.service";
 
 function slugify(text: string): string {
   return text
@@ -56,6 +57,7 @@ export async function getAdminOverview(): Promise<AdminOverviewDto> {
     [membershipRevRow],
     [alacarteRevRow],
     [affiliateRow],
+    highRiskDrmEvents24hCount,
   ] = await Promise.all([
     db
       .select({ count: sql<number>`count(*)` })
@@ -94,6 +96,7 @@ export async function getAdminOverview(): Promise<AdminOverviewDto> {
           "affiliate_book_purchase",
         ]),
       ),
+    countRecentHighRiskDrmEvents24h(),
   ]);
 
   const membershipTotal = Number(membershipRevRow?.total ?? 0);
@@ -104,6 +107,7 @@ export async function getAdminOverview(): Promise<AdminOverviewDto> {
     pendingAuthorsCount: Number(pendingAuthorRow?.count ?? 0),
     pendingPublishersCount: Number(pendingPubRow?.count ?? 0),
     pendingManuscriptsCount: Number(pendingManuRow?.count ?? 0),
+    highRiskDrmEvents24hCount,
     estimatedNakamaRoyaltyPoolIdr,
     totalAlacarteSalesIdr: Number(alacarteRevRow?.totalSales ?? 0),
     totalPublisherShareIdr: Number(alacarteRevRow?.totalPublisherShare ?? 0),

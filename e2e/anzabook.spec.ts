@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { API_URL, fitsWidth, signUp, WEB_URL } from "./helpers";
+import { API_URL, fitsWidth, setRole, signUp, WEB_URL } from "./helpers";
 
 test.describe("AnzaBook Core End-to-End Flows", () => {
   test("ignores external auth destinations", async ({ page }) => {
@@ -305,14 +305,15 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     ).toBeVisible();
   });
 
-  test("protected web reader renders layout mode switcher and enforces DRM shield upon PrintScreen", async ({
+  test("protected web reader enforces production DRM ON without toggle, defends against capture/DevTools/DOM tampering, and logs high-risk events for Admin review", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.emulateMedia({ reducedMotion: "reduce" });
 
-    await signUp(page.request, "Surya DRM");
-    await page.goto("/read/kecerdasan-sosial-homo-sapiens?chapter=1&drm=true");
+    const readerEmail = await signUp(page.request, "Surya DRM");
+    // Even if a user passes ?drm=false, production ignores it and enforces DRM ON
+    await page.goto("/read/kecerdasan-sosial-homo-sapiens?chapter=1&drm=false");
     await page.waitForLoadState("networkidle");
 
     // Verify reader rendered chapter content
@@ -322,24 +323,58 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
         .first(),
     ).toBeVisible();
 
+    // Production build removes the DRM ON/OFF toggle from the toolbar
+    await expect(page.getByText(/DRM (ON|OFF)/i)).toHaveCount(0);
+
+    // Canvas watermark renders with opaque ANZ- session ID (never exposing raw email)
+    const canvas = page.getByTestId("drm-watermark-canvas");
+    await expect(canvas).toBeVisible();
+    const watermarkCode = await canvas.getAttribute("data-watermark-code");
+    expect(watermarkCode).toMatch(/^ANZ-[A-F0-9]{12}$/);
+    expect(watermarkCode).not.toContain("@");
+
     // Glossy progress bar at bottom
     await expect(page.getByText(/Bab 1\//i).first()).toBeVisible();
 
-    // Trigger DRM pre-trigger by pressing PrintScreen
+    // 1. Trigger DRM shield via PrintScreen
     await page.keyboard.press("PrintScreen");
-
-    // Expect the DRM alert dialog
     const drmDialog = page.getByRole("alertdialog");
     await expect(drmDialog).toBeVisible();
     await expect(
       page.getByText(/Tampilan Naskah Terkunci Sementara/i),
     ).toBeVisible();
 
-    // Click "Lanjutkan Membaca" to resume
-    const resumeBtn = page.getByRole("button", { name: /Lanjutkan Membaca/i });
-    await resumeBtn.click();
-
-    // Ensure DRM shield is dismissed
+    // Dismiss shield
+    await page.getByRole("button", { name: /Lanjutkan Membaca/i }).click();
     await expect(drmDialog).not.toBeVisible();
+
+    // 2. Trigger DRM shield via DevTools shortcut (F12)
+    await page.keyboard.press("F12");
+    await expect(drmDialog).toBeVisible();
+    await page.getByRole("button", { name: /Lanjutkan Membaca/i }).click();
+    await expect(drmDialog).not.toBeVisible();
+
+    // 3. Simulate DevTools DOM node deletion of watermark canvas -> MutationObserver recovers & locks
+    await page.evaluate(() => {
+      document.querySelector('[data-testid="drm-watermark-canvas"]')?.remove();
+    });
+    await expect(drmDialog).toBeVisible();
+    await expect(canvas).toBeAttached();
+    await page.getByRole("button", { name: /Lanjutkan Membaca/i }).click();
+    await expect(drmDialog).not.toBeVisible();
+
+    // 4. Admin can monitor high-risk triggers and trace the opaque ANZ- watermark ID
+    await setRole(readerEmail, "admin");
+    await page.goto("/admin?tab=drm-security");
+    await expect(
+      page.getByRole("heading", { name: "Monitor Keamanan DRM", level: 1 }),
+    ).toBeVisible();
+    await expect(page.getByText("HIGH RISK").first()).toBeVisible();
+    await expect(page.getByText(watermarkCode!).first()).toBeVisible();
+
+    // Use Watermark Session ID tracer
+    await page.getByLabel("ID Sesi Watermark").fill(watermarkCode!);
+    await page.getByRole("button", { name: /Lacak Sesi/i }).click();
+    await expect(page.getByText(readerEmail).first()).toBeVisible();
   });
 });

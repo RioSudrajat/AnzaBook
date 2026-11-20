@@ -8,6 +8,10 @@ import {
   adminVerifyPublisherSchema,
 } from "@starter/shared/validators/admin";
 import {
+  adminDrmEventsQuerySchema,
+  watermarkCodeParamSchema,
+} from "@starter/shared/validators/drm";
+import {
   listNotesSchema,
   noteIdSchema,
 } from "@starter/shared/validators/notes";
@@ -32,6 +36,10 @@ import {
   verifyAdminPublisher,
 } from "../services/admin-cms.service";
 import { deleteAnyNote, listAnyNotes } from "../services/notes.service";
+import {
+  listAdminDrmEvents,
+  traceDrmWatermarkSession,
+} from "../services/drm.service";
 
 export const adminRouter = Router();
 
@@ -147,6 +155,22 @@ adminRouter.post("/claim-batches", jsonBody, async (req, res) => {
 
 adminRouter.get("/claim-batches/:id/codes", async (req, res) => {
   const result = await getAdminClaimBatchCodes(req.params.id as string);
+  res.json({ data: result });
+});
+
+// ---------------- DRM Security Monitoring ---------------- //
+
+adminRouter.get("/drm-events", async (req, res) => {
+  const query = adminDrmEventsQuerySchema.parse(req.query);
+  const result = await listAdminDrmEvents(query);
+  res.json(result);
+});
+
+adminRouter.get("/drm-events/trace/:watermarkCode", async (req, res) => {
+  const { watermarkCode } = watermarkCodeParamSchema.parse({
+    watermarkCode: req.params.watermarkCode,
+  });
+  const result = await traceDrmWatermarkSession(watermarkCode);
   res.json({ data: result });
 });
 

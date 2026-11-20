@@ -10,6 +10,7 @@ test("web pages carry the browser hardening headers", async ({ request }) => {
   expect(headers["x-frame-options"]).toBe("DENY");
   expect(headers["x-content-type-options"]).toBe("nosniff");
   expect(headers["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+  expect(headers["permissions-policy"]).toContain("display-capture=()");
   // The browser tests run the production build, which sends HSTS.
   expect(headers["strict-transport-security"]).toContain("max-age=");
 });

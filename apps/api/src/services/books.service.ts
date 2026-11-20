@@ -17,6 +17,7 @@ import {
   userShelves,
 } from "../db/schema";
 import { HttpError } from "../lib/http-error";
+import { issueOrGetDrmWatermarkSession } from "./drm.service";
 import { getActiveMembership } from "./membership.service";
 import type {
   ListBooksQuery,
@@ -835,8 +836,8 @@ export async function claimPrintCode(
 export async function getBookReaderPayload(
   slug: string,
   userId: string,
-  userEmail: string,
   query: ReadBookQuery,
+  authSessionId?: string | null,
 ): Promise<BookReaderPayloadDto & { watermark: string }> {
   const [book] = await db
     .select()
@@ -912,7 +913,14 @@ export async function getBookReaderPayload(
     throw new HttpError(404, "CHAPTER_NOT_FOUND", "Bab tidak ditemukan.");
   }
 
-  const allChapters = await listBookChapters(book.id, userId);
+  const [allChapters, watermarkCode] = await Promise.all([
+    listBookChapters(book.id, userId),
+    issueOrGetDrmWatermarkSession({
+      userId,
+      bookId: book.id,
+      authSessionId,
+    }),
+  ]);
 
   return {
     book: toBookSummary(book),
@@ -921,7 +929,7 @@ export async function getBookReaderPayload(
     chapters,
     allChapters,
     ...access,
-    watermark: `${userEmail} : ${userId.slice(0, 8)} : ${new Date().toISOString()}`,
+    watermark: watermarkCode,
   };
 }
 

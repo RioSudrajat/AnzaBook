@@ -7,9 +7,11 @@ import {
   readingProgressQuerySchema,
   saveReadingProgressSchema,
 } from "@starter/shared/validators/reading";
+import { recordDrmEventSchema } from "@starter/shared/validators/drm";
 import { getAuth, requireAuth } from "../middleware/auth";
 import { jsonBody } from "../middleware/body";
 import { requireTrustedOrigin } from "../middleware/origin";
+import { recordDrmSecurityEvent } from "../services/drm.service";
 import {
   createHighlight,
   createReadingSession,
@@ -117,5 +119,22 @@ readingRouter.post(
     const { bookId } = readingBookParamsSchema.parse(req.params);
     const result = await restartBookReading(getAuth(req).user.id, bookId);
     res.json({ data: result });
+  },
+);
+
+// DRM security trigger logging
+readingRouter.post(
+  "/drm-events",
+  requireTrustedOrigin,
+  jsonBody,
+  async (req, res) => {
+    const input = recordDrmEventSchema.parse(req.body);
+    const result = await recordDrmSecurityEvent({
+      userId: getAuth(req).user.id,
+      input,
+      userAgent: req.get("user-agent") ?? null,
+      ipAddress: req.ip ?? req.socket.remoteAddress ?? null,
+    });
+    res.status(201).json({ data: result });
   },
 );

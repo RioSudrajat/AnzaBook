@@ -708,11 +708,71 @@ export type AdminOverviewDto = {
   pendingAuthorsCount: number;
   pendingPublishersCount: number;
   pendingManuscriptsCount: number;
+  highRiskDrmEvents24hCount: number;
   estimatedNakamaRoyaltyPoolIdr: number;
   totalAlacarteSalesIdr: number;
   totalPublisherShareIdr: number;
   totalAffiliateCommissionsIdr: number;
   totalNetAnzabookIdr: number;
+};
+
+export type DrmSecurityEventType =
+  | "screenshot_shortcut"
+  | "clipboard_copy"
+  | "devtools_attempt"
+  | "dom_tampering"
+  | "print_save_attempt"
+  | "context_menu"
+  | "drag_attempt"
+  | "window_blur"
+  | "visibility_hidden"
+  | "multi_touch";
+
+export type DrmSecurityRiskLevel = "high" | "medium" | "low";
+
+export type DrmSecurityEventDto = {
+  id: string;
+  userId: string;
+  userName: string;
+  username: string | null;
+  userEmail: string;
+  watermarkCode: string;
+  bookId: string | null;
+  bookSlug: string;
+  bookTitle: string | null;
+  chapterNumber: number | null;
+  eventType: DrmSecurityEventType;
+  riskLevel: DrmSecurityRiskLevel;
+  triggerDetail: string;
+  clientOs: string;
+  createdAt: string;
+};
+
+export type AdminDrmEventsSummaryDto = {
+  totalEvents: number;
+  highRiskCount: number;
+  mediumRiskCount: number;
+  lowRiskCount: number;
+  last24hHighRiskCount: number;
+  uniqueFlaggedUsersCount: number;
+};
+
+export type AdminDrmEventsListResponse = Paginated<DrmSecurityEventDto> & {
+  summary: AdminDrmEventsSummaryDto;
+};
+
+export type DrmWatermarkTraceDto = {
+  watermarkCode: string;
+  userId: string;
+  userName: string;
+  username: string | null;
+  userEmail: string;
+  bookId: string;
+  bookSlug: string;
+  bookTitle: string;
+  createdAt: string;
+  lastSeenAt: string;
+  recentEvents: DrmSecurityEventDto[];
 };
 
 export type AdminCalendarDto = {

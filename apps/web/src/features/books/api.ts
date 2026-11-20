@@ -29,6 +29,7 @@ import type {
   SaveReadingProgressInput,
 } from "@starter/shared/validators/reading";
 import type { PurchaseBookAlacarteInput } from "@starter/shared/validators/publisher";
+import type { RecordDrmEventInput } from "@starter/shared/validators/drm";
 import { apiFetch } from "@/lib/api/client";
 
 export type BooksListResponse = {
@@ -244,5 +245,16 @@ export async function purchaseBookAlacarte(
       body: input || {},
     },
   );
+  return data;
+}
+
+export async function recordDrmEvent(input: RecordDrmEventInput) {
+  const { data } = await apiFetch<
+    DataResponse<{ id: string; riskLevel: string; createdAt: string }>
+  >("/api/reading/drm-events", {
+    method: "POST",
+    body: input,
+    keepalive: true,
+  });
   return data;
 }

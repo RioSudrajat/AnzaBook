@@ -17,6 +17,7 @@ import type {
   CreateHighlightInput,
   SaveReadingProgressInput,
 } from "@starter/shared/validators/reading";
+import type { RecordDrmEventInput } from "@starter/shared/validators/drm";
 import type {
   BookHighlightDto,
   ReadingProgressDto,
@@ -30,6 +31,7 @@ import {
   createHighlight,
   deleteHighlight,
   purchaseBookAlacarte,
+  recordDrmEvent,
   restartBookReading,
   saveReadingProgress,
 } from "./api";
@@ -251,5 +253,11 @@ export function usePurchaseBookAlacarte(slug: string) {
         queryKey: booksKeys.readers(),
       });
     },
+  });
+}
+
+export function useRecordDrmEvent() {
+  return useMutation({
+    mutationFn: (input: RecordDrmEventInput) => recordDrmEvent(input),
   });
 }

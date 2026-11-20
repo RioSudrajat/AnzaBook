@@ -8,3 +8,8 @@ const apiUrl = z
 
 // The API origin the browser calls (Better Auth + application routes).
 export const API_URL = new URL(apiUrl).origin;
+
+// Public build-time toggle for DRM testing in local dev and main (Staging).
+// Production builds omit this flag so the DRM disable toggle is removed and DRM defaults ON.
+export const IS_DRM_TOGGLE_ENABLED =
+  import.meta.env.DEV || import.meta.env.VITE_ENABLE_DRM_TOGGLE === "true";

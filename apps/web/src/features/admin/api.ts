@@ -3,14 +3,17 @@ import type {
   AdminCalendarDto,
   AdminClaimBatchCodesDto,
   AdminCreateClaimBatchResultDto,
+  AdminDrmEventsListResponse,
   AdminNoteDto,
   AdminOverviewDto,
   AdminPublishManuscriptResultDto,
   DataResponse,
+  DrmWatermarkTraceDto,
   ManuscriptSubmissionDto,
   Paginated,
   PublisherDto,
 } from "@starter/shared/types";
+import type { AdminDrmEventsQueryInput } from "@starter/shared/validators/drm";
 import type {
   AdminEditManuscriptInput,
   AdminListQueryInput,
@@ -216,6 +219,29 @@ export async function getClaimBatchCodes(
 ): Promise<AdminClaimBatchCodesDto> {
   const { data } = await apiFetch<DataResponse<AdminClaimBatchCodesDto>>(
     `/api/admin/claim-batches/${encodeURIComponent(batchId)}/codes`,
+    { signal },
+  );
+  return data;
+}
+
+// ---------------- DRM Security Audit Monitoring ---------------- //
+
+export function getAdminDrmEvents(
+  params?: AdminDrmEventsQueryInput,
+  signal?: AbortSignal,
+): Promise<AdminDrmEventsListResponse> {
+  return apiFetch<AdminDrmEventsListResponse>("/api/admin/drm-events", {
+    query: params,
+    signal,
+  });
+}
+
+export async function traceAdminDrmWatermark(
+  watermarkCode: string,
+  signal?: AbortSignal,
+): Promise<DrmWatermarkTraceDto> {
+  const { data } = await apiFetch<DataResponse<DrmWatermarkTraceDto>>(
+    `/api/admin/drm-events/trace/${encodeURIComponent(watermarkCode)}`,
     { signal },
   );
   return data;

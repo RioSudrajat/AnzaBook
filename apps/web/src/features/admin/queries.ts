@@ -1,15 +1,18 @@
 import { queryOptions } from "@tanstack/react-query";
 import type { AdminListQueryInput } from "@starter/shared/validators/admin";
+import type { AdminDrmEventsQueryInput } from "@starter/shared/validators/drm";
 import type { ListNotesInput } from "@starter/shared/validators/notes";
 import {
   getAdminAuthorApplications,
   getAdminCalendars,
+  getAdminDrmEvents,
   getAdminManuscriptDetail,
   getAdminManuscripts,
   getAdminOverview,
   getAdminPublishers,
   getClaimBatchCodes,
   listAnyNotes,
+  traceAdminDrmWatermark,
 } from "./api";
 
 export const adminKeys = {
@@ -27,6 +30,10 @@ export const adminKeys = {
     [...adminKeys.all, "manuscript-detail", id] as const,
   claimBatchCodes: (batchId: string) =>
     [...adminKeys.all, "claim-batch-codes", batchId] as const,
+  drmEvents: (params?: AdminDrmEventsQueryInput) =>
+    [...adminKeys.all, "drm-events", params ?? {}] as const,
+  drmTrace: (watermarkCode: string) =>
+    [...adminKeys.all, "drm-trace", watermarkCode] as const,
   notes: (params: ListNotesInput) =>
     [...adminKeys.all, "notes", params] as const,
 };
@@ -88,5 +95,21 @@ export function adminNotesQuery(
   return queryOptions({
     queryKey: adminKeys.notes(params),
     queryFn: ({ signal }) => listAnyNotes(params, signal),
+  });
+}
+
+export function adminDrmEventsQuery(params?: AdminDrmEventsQueryInput) {
+  return queryOptions({
+    queryKey: adminKeys.drmEvents(params),
+    queryFn: ({ signal }) => getAdminDrmEvents(params, signal),
+  });
+}
+
+export function adminDrmTraceQuery(watermarkCode: string) {
+  return queryOptions({
+    queryKey: adminKeys.drmTrace(watermarkCode),
+    queryFn: ({ signal }) => traceAdminDrmWatermark(watermarkCode, signal),
+    enabled: Boolean(watermarkCode.trim()),
+    retry: false,
   });
 }
