@@ -1,5 +1,76 @@
 import { Link } from "@tanstack/react-router";
 import { siteConfig } from "@/config/site";
+import {
+  ANZA_ARCH_LOGO_PATHS,
+  ANZA_ARCH_VIEWBOX,
+  ANZA_BRAND_COLORS,
+} from "@/lib/brand-mark";
+
+type AnzaLogoMarkProps = {
+  variant?: "mark" | "badge";
+  className?: string;
+};
+
+export function AnzaLogoMark({
+  variant = "mark",
+  className,
+}: AnzaLogoMarkProps) {
+  if (variant === "badge") {
+    return (
+      <svg
+        viewBox="0 0 64 64"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className={className}
+        data-brand-mark="anza-arch"
+        aria-hidden="true"
+      >
+        <rect
+          x="0.5"
+          y="0.5"
+          width="63"
+          height="63"
+          rx="15.5"
+          fill={ANZA_BRAND_COLORS.paper}
+          stroke={ANZA_BRAND_COLORS.paperRule}
+          strokeWidth="1"
+        />
+        <g transform="translate(8, 8)">
+          <path
+            d={ANZA_ARCH_LOGO_PATHS.leftSweep}
+            fill={ANZA_BRAND_COLORS.ink}
+          />
+          <path
+            d={ANZA_ARCH_LOGO_PATHS.innerFold}
+            fill={ANZA_BRAND_COLORS.accent}
+          />
+          <path
+            d={ANZA_ARCH_LOGO_PATHS.rightWing}
+            fill={ANZA_BRAND_COLORS.ink}
+          />
+        </g>
+      </svg>
+    );
+  }
+
+  return (
+    <svg
+      viewBox={ANZA_ARCH_VIEWBOX}
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      data-brand-mark="anza-arch"
+      aria-hidden="true"
+    >
+      <path d={ANZA_ARCH_LOGO_PATHS.leftSweep} fill="currentColor" />
+      <path
+        d={ANZA_ARCH_LOGO_PATHS.innerFold}
+        fill={ANZA_BRAND_COLORS.accent}
+      />
+      <path d={ANZA_ARCH_LOGO_PATHS.rightWing} fill="currentColor" />
+    </svg>
+  );
+}
 
 type BrandProps = {
   className?: string;
