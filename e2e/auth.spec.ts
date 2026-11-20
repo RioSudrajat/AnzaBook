@@ -30,15 +30,15 @@ test("signup, persisted session, signout, rejected password, and signin work acr
     .getByRole("button", { name: "Create account", exact: true })
     .click();
   await expect(page).toHaveURL(/\/app$/);
-  const settings = page
-    .getByRole("navigation", { name: "Navigasi Utama" })
-    .getByRole("button", { name: "Settings" });
-  await expect(settings).toBeVisible();
+  const profileNav = page
+    .getByRole("navigation", { name: "Menu Utama" })
+    .getByRole("button", { name: "Profil Saya" });
+  await expect(profileNav).toBeVisible();
   // A full reload is rendered by the web server, which reads the session
   // from the API with the browser's cookie.
   await page.reload();
   await expect(page).toHaveURL(/\/app$/);
-  await expect(settings).toBeVisible();
+  await expect(profileNav).toBeVisible();
   const cookies = await context.cookies(API_URL);
   expect(
     cookies.some(
@@ -47,7 +47,8 @@ test("signup, persisted session, signout, rejected password, and signin work acr
   ).toBe(true);
   await page.goto("/sign-in");
   await expect(page).toHaveURL(/\/app$/);
-  await settings.click();
+  await profileNav.click();
+  await page.getByRole("button", { name: "Pengaturan" }).click();
   await page.getByRole("button", { name: "Keluar", exact: true }).click();
   await expect(page).toHaveURL("/");
   await page.goto("/app");
@@ -67,6 +68,7 @@ test("signup, persisted session, signout, rejected password, and signin work acr
 test("auth rejects untrusted origins and invalid signup data", async ({
   request,
 }) => {
+  test.setTimeout(90_000);
   let crossOrigin = await request.post(`${API_URL}/api/auth/sign-up/email`, {
     headers: { Origin: "https://untrusted.example" },
     data: {
@@ -75,9 +77,13 @@ test("auth rejects untrusted origins and invalid signup data", async ({
       password: "Test-password-123",
     },
   });
-  if (crossOrigin.status() === 429) {
-    const seconds = Number(crossOrigin.headers()["retry-after"] || 5);
-    await delay((Math.min(seconds, 5) + 0.5) * 1000);
+  for (
+    let attempt = 0;
+    attempt < 2 && crossOrigin.status() === 429;
+    attempt++
+  ) {
+    const seconds = Number(crossOrigin.headers()["retry-after"] || 10);
+    await delay((Math.min(seconds, 60) + 1) * 1000);
     crossOrigin = await request.post(`${API_URL}/api/auth/sign-up/email`, {
       headers: { Origin: "https://untrusted.example" },
       data: {

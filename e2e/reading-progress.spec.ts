@@ -40,11 +40,10 @@ test("Home and Library use the same books and show history only for the selected
   await expect(
     home.getByRole("heading", { name: titles[1], exact: true }),
   ).toBeVisible();
-  await expect(home.locator("[data-book-cover]")).toHaveCount(1);
-  await expect(home.getByRole("link", { name: "Lanjut Baca" })).toHaveAttribute(
-    "href",
-    "/read/kecerdasan-sosial-homo-sapiens",
-  );
+  await expect(home.locator("[data-book-cover]")).toHaveCount(2);
+  await expect(
+    home.getByRole("link", { name: "Lanjut" }).first(),
+  ).toHaveAttribute("href", "/read/kecerdasan-sosial-homo-sapiens");
   await home.getByRole("link", { name: "Rak Saya" }).click();
 
   const reading = page.getByRole("region", { name: "Sedang Dibaca" });
@@ -69,7 +68,7 @@ test("Explore category filters return real titles with the shared cover", async 
   await page.goto("/app?tab=explore");
   await page.getByRole("button", { name: /Berpikir Kritis/ }).click();
 
-  const results = page.getByRole("region", { name: "Buku di katalog" });
+  const results = page.getByRole("region", { name: "Buku Terkait" });
   await expect(
     results
       .getByRole("link", {

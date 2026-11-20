@@ -41,18 +41,24 @@ test("the admin page renders only for a permitted role and can delete any note",
   const email = await signUp(page.request, "Page Viewer");
   await page.goto("/app");
   await expect(page).toHaveURL(/\/app$/);
-  await expect(page.getByRole("link", { name: "Admin" })).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: "CMS Internal (/admin)" }),
+  ).toHaveCount(0);
 
-  await page.goto("/admin");
-  await expect(page.getByText("Every account’s notes")).toHaveCount(0);
+  await page.goto("/admin?tab=notes");
+  await expect(page.getByText("Utilitas & Catatan Sistem")).toHaveCount(0);
 
   await setRole(email, "admin");
-  await page.goto("/admin");
+  await page.goto("/admin?tab=notes");
   await expect(
-    page.getByRole("heading", { name: "Every account’s notes" }),
+    page.getByRole("heading", { name: "Utilitas & Catatan Sistem" }),
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: "Admin" })).toBeVisible();
-  await page.getByRole("button", { name: `Delete ${note.title}` }).click();
+  await page.goto("/app");
+  await expect(
+    page.getByRole("link", { name: "CMS Internal (/admin)" }),
+  ).toBeVisible();
+  await page.goto("/admin?tab=notes");
+  await page.getByRole("button", { name: `Hapus ${note.title}` }).click();
   await expect(page.getByText(note.title)).toHaveCount(0);
   expect(
     (
@@ -62,7 +68,7 @@ test("the admin page renders only for a permitted role and can delete any note",
 
   // Revoking the role takes effect on the next request.
   await setRole(email, null);
-  await page.goto("/admin");
-  await expect(page.getByText("Every account’s notes")).toHaveCount(0);
+  await page.goto("/admin?tab=notes");
+  await expect(page.getByText("Utilitas & Catatan Sistem")).toHaveCount(0);
   await ownerContext.close();
 });

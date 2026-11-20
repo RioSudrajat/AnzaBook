@@ -1114,11 +1114,11 @@ export async function unifiedExplore(
   }
   if (categoryPattern) {
     bookConditions.push(
-      sql`exists (
-        select 1 from unnest(${books.categories}) as cat where cat ilike ${categoryPattern}
+      sql`(exists (
+        select 1 from jsonb_array_elements_text(${books.categories}) as cat where cat ilike ${categoryPattern}
       ) or exists (
-        select 1 from unnest(${books.genres}) as g where g ilike ${categoryPattern}
-      )`,
+        select 1 from jsonb_array_elements_text(${books.genres}) as g where g ilike ${categoryPattern}
+      ))`,
     );
   }
 
