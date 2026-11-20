@@ -1,5 +1,32 @@
+import { ANZA_ARCH_LOGO_PATHS, ANZA_BRAND_COLORS } from "@/lib/brand-mark";
+
 export type CardFormat = "speed_sticker" | "receipt" | "quote";
 export type CardAspect = "square" | "story";
+
+function drawAnzaArchMark(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  colors: { ink: string; accent: string },
+) {
+  if (typeof Path2D === "undefined") return;
+  const scale = size / 48;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+
+  ctx.fillStyle = colors.ink;
+  ctx.fill(new Path2D(ANZA_ARCH_LOGO_PATHS.leftSweep));
+
+  ctx.fillStyle = colors.accent;
+  ctx.fill(new Path2D(ANZA_ARCH_LOGO_PATHS.innerFold));
+
+  ctx.fillStyle = colors.ink;
+  ctx.fill(new Path2D(ANZA_ARCH_LOGO_PATHS.rightWing));
+
+  ctx.restore();
+}
 
 export type RenderCanvasOptions = {
   format: CardFormat;
@@ -57,6 +84,12 @@ function renderSpeedSticker(
 
   const cx = width / 2;
   const topY = opts.aspect === "story" ? 420 : 140;
+
+  // Open-Page Arch brand crest
+  drawAnzaArchMark(ctx, cx - 22, topY - 68, 44, {
+    ink: ANZA_BRAND_COLORS.paper,
+    accent: ANZA_BRAND_COLORS.accent,
+  });
 
   // Header Badge
   ctx.save();
@@ -156,11 +189,16 @@ function renderReceipt(
   ctx.fillRect(paperX, topY, paperW, height - topY * 2);
   ctx.strokeRect(paperX, topY, paperW, height - topY * 2);
 
+  drawAnzaArchMark(ctx, cx - 15, topY + 12, 30, {
+    ink: ANZA_BRAND_COLORS.ink,
+    accent: ANZA_BRAND_COLORS.accent,
+  });
+
   // Jagged paper header border
   ctx.fillStyle = "#221E1B";
   ctx.textAlign = "center";
   ctx.font = "bold 34px 'Red Hat Mono', monospace";
-  ctx.fillText("ANZABOOK LITERACY RECEIPT", cx, topY + 70);
+  ctx.fillText("ANZABOOK LITERACY RECEIPT", cx, topY + 76);
 
   ctx.font = "20px 'Red Hat Mono', monospace";
   ctx.fillStyle = "#6B6357";
@@ -258,6 +296,11 @@ function renderQuoteCard(
     "Buku tidak seharusnya menjadi barang mewah. Ilmu pengetahuan adalah hak setiap insan yang bernapas.";
 
   const topY = opts.aspect === "story" ? 480 : 260;
+
+  drawAnzaArchMark(ctx, cx - 22, opts.aspect === "story" ? 210 : 84, 44, {
+    ink: ANZA_BRAND_COLORS.paper,
+    accent: ANZA_BRAND_COLORS.accent,
+  });
 
   // Huge stylized quotes
   ctx.save();

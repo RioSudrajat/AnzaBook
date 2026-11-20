@@ -2,6 +2,7 @@ import { initWasm, Resvg } from "@resvg/resvg-wasm";
 import wasmAsset from "@resvg/resvg-wasm/index_bg.wasm?url&inline";
 import fontAsset from "@fontsource/literata/files/literata-latin-600-normal.woff2?inline";
 import type { BookSummaryDto } from "@starter/shared/types";
+import { ANZA_ARCH_LOGO_PATHS, ANZA_BRAND_COLORS } from "@/lib/brand-mark";
 
 const assetBytes = (asset: string) =>
   Buffer.from(asset.split(",", 2)[1], "base64");
@@ -55,10 +56,10 @@ export async function renderBookPreview(
       throw error;
     }
   }
-  const paper = "#F6F2E9";
-  const ink = "#13110F";
-  const rule = "#DDD6C7";
-  const accent = "#F06A24";
+  const paper = ANZA_BRAND_COLORS.paper;
+  const ink = ANZA_BRAND_COLORS.ink;
+  const rule = ANZA_BRAND_COLORS.paperRule;
+  const accent = ANZA_BRAND_COLORS.accent;
   const cover = /^#[0-9a-f]{6}$/i.test(book.coverColor)
     ? book.coverColor
     : "#3D3229";
@@ -71,9 +72,13 @@ export async function renderBookPreview(
     </defs>
     <rect width="1200" height="630" fill="${paper}"/>
     <path d="M68 111H1132 M68 524H1132 M730 111V524" fill="none" stroke="${rule}" stroke-width="2"/>
-    <path d="M68 79h12v-32h-12z" fill="${accent}"/>
+    <g transform="translate(66 47) scale(0.75)">
+      <path d="${ANZA_ARCH_LOGO_PATHS.leftSweep}" fill="${ink}"/>
+      <path d="${ANZA_ARCH_LOGO_PATHS.innerFold}" fill="${accent}"/>
+      <path d="${ANZA_ARCH_LOGO_PATHS.rightWing}" fill="${ink}"/>
+    </g>
     <g fill="${ink}" font-family="Literata" font-weight="600">
-      <text x="94" y="75" font-size="25">AnzaBook</text>
+      <text x="110" y="75" font-size="25">AnzaBook</text>
       <text x="68" y="171" font-size="23">Katalog Buku</text>
       <text transform="translate(68 257)" font-size="50">${titleLines(book.title, 24, 4)}</text>
       <text x="68" y="574" font-size="27">${author}</text>
@@ -89,8 +94,16 @@ export async function renderBookPreview(
         <circle cx="140" cy="127" r="43"/><ellipse cx="140" cy="127" rx="63" ry="23" transform="rotate(-28 140 127)"/>
       </g>
       <circle cx="140" cy="127" r="5" fill="${accent}"/>
+      <g transform="translate(80 26)">
+        <rect width="18" height="18" rx="4" fill="${paper}"/>
+        <g transform="translate(2.25 2.25) scale(0.28125)">
+          <path d="${ANZA_ARCH_LOGO_PATHS.leftSweep}" fill="${ink}"/>
+          <path d="${ANZA_ARCH_LOGO_PATHS.innerFold}" fill="${accent}"/>
+          <path d="${ANZA_ARCH_LOGO_PATHS.rightWing}" fill="${ink}"/>
+        </g>
+      </g>
       <g fill="${paper}" font-family="Literata" font-weight="600" text-anchor="middle">
-        <text x="140" y="41" font-size="16">AnzaBook</text>
+        <text x="148" y="41" font-size="16">AnzaBook</text>
         <text transform="translate(140 215)" font-size="27">${titleLines(book.title, 15, 4)}</text>
         <text x="140" y="375" font-size="15">${escapeXml(book.author.length > 24 ? `${book.author.slice(0, 23)}…` : book.author)}</text>
       </g>
