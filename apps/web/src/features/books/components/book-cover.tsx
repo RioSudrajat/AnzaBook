@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import type { BookSummaryDto } from "@starter/shared/types";
+import { AnzaLogoMark } from "@/components/brand";
 import { cn } from "@/lib/utils";
 
 type CoverBook = Pick<
@@ -341,23 +342,7 @@ export function BookCover({
 
           {/* AnzaBook Logo & Brand Name on Top Right */}
           <div className="flex items-center gap-[1.5cqw] text-[var(--book-cover-text)]">
-            <svg
-              viewBox="0 0 64 64"
-              className="size-[4.4cqw] shrink-0"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              aria-hidden="true"
-            >
-              <rect width="64" height="64" rx="14" fill="#13110F" />
-              <path
-                d="M14 50V16C14 12.5 17 9.5 20.5 9.5H25V50H14Z"
-                fill="#F6F2E9"
-              />
-              <path
-                d="M25 11.5H38C44 11.5 48 15 48 20C48 23.8 45.2 26.5 41.5 27.2C46.2 28 50 31.5 50 36.8C50 42.5 45 46.5 38 46.5H25V40.5H37C40.8 40.5 43.2 38.8 43.2 35.6C43.2 32.2 40.5 30.5 36.2 30.5H25V11.5Z"
-                fill="#F06A24"
-              />
-            </svg>
+            <AnzaLogoMark variant="badge" className="size-[4.4cqw] shrink-0" />
             <span className="font-sans font-bold text-[3.8cqw] tracking-wider uppercase">
               AnzaBook
             </span>
