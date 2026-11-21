@@ -88,6 +88,15 @@ Drizzle migration under `apps/api/drizzle/` is needed (coordinate with
 3. Add it to Project #1 and set `Status`, `Priority`, and `Area` via `addProjectV2ItemById` + `updateProjectV2ItemFieldValue` using the IDs above.
 4. Verify with `gh project item-list 1 --owner RioSudrajat`.
 
+### Co-Assignment Rule for RBAC & Security-Sensitive API Issues
+
+- When an `apps/api/` issue modifies RBAC boundaries, role checks, admin bypasses, auth/session handling, or sensitive seeding/credentials, co-assign `@luminariadev` alongside `@SalmanMuhammadRidwan` with explicit responsibility split (API implementation vs RBAC/security audit & adversarial tests).
+
+### Multi-Slice Contract-First & Handoff Protocol
+
+- **Keep `main` green across slices (Staged Deprecation):** Never delete a legacy validator or DTO field in Slice 1 (`packages/shared/`) while downstream `apps/api/` or `apps/web/` callers belong to follow-up Issues. Mark legacy exports `@deprecated` (or optional) in Slice 1 so CI stays green.
+- **Mandatory Downstream Handoff Comments:** Right after opening a prerequisite PR (e.g. Slice 1 Contracts/DB), post a structured comment on every dependent Issue listing: (1) the prerequisite PR link & migration tag, (2) exact `@deprecated` symbols that MUST be deleted once callers switch over, (3) new shared exports/types ready to use, and (4) integration gotchas found during audit.
+
 ## 4. Non-Negotiable Release, CI & Security Invariants
 
 - **Branching & Merge Methods:**
@@ -97,3 +106,15 @@ Drizzle migration under `apps/api/drizzle/` is needed (coordinate with
 - **CI Concurrency:** Keep `.github/workflows/ci.yml` `cancel-in-progress` scoped to `${{ github.event_name == 'pull_request' }}` so consecutive `main`/`production` pushes never cancel each other.
 - **GitHub Custodian Rule (Personal Repo):** Until post-hackathon Organization migration (Issue #3), `@luminariadev` lists secret **names** only in Issues/docs and hands actual values out-of-band to `@RioSudrajat` for GitHub Environments (`staging`, `production`). Never put credentials in Issues, PRs, or git.
 - **Pre-PR Checks:** Every PR must pass `lint-typecheck-build`, `unit-test`, and `e2e` (locally: `pnpm check && pnpm format:check && pnpm build`).
+
+### Parallel Drizzle Migration Sequencing
+
+- Before pushing a PR that adds a migration under `apps/api/drizzle/`, check open PRs touching `apps/api/drizzle/`. If another PR with more migrations and green CI/E2E is ready to merge first, merge it first, then rebase the smaller PR onto `origin/main`:
+  1. `git checkout --ours apps/api/drizzle/meta/_journal.json apps/api/drizzle/meta/<conflicting>_snapshot.json`
+  2. `git rm -f` the old generated `.sql` file from the rebased branch
+  3. Re-run `pnpm db:generate` cleanly on top of the latest snapshot and inspect the new SQL before running `pnpm check`.
+- Never hand-merge `apps/api/drizzle/meta/_journal.json` or `*_snapshot.json`.
+
+### Kanban Automation Verification (`GH_PROJECT_PAT`)
+
+- `.github/workflows/kanban-automation.yml` skips silently (green `success`) when repo secret `GH_PROJECT_PAT` (Classic PAT with `project` + `repo` scopes) is missing. If cards do not move after merge, inspect `gh run view <run-id> --log` and `gh secret list`. Adding `GH_PROJECT_PAT` does not retroactively update old runs — verify immediately via `gh run rerun <run-id>` and `gh project item-list 1 --owner RioSudrajat`.
