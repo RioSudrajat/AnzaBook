@@ -28,6 +28,7 @@
     "db:status": "node scripts/database.mjs status",
     "db:logs": "node scripts/database.mjs logs",
     "role:set": "pnpm --filter @starter/api run role:set",
+    "publisher:assign-owner": "pnpm --filter @starter/api run publisher:assign-owner",
     "doctor": "node scripts/doctor.mjs",
     "test": "node scripts/test.mjs unit",
     "test:e2e": "node scripts/test.mjs e2e",

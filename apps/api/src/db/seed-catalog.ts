@@ -1,9 +1,249 @@
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "./schema";
 import { allBooksData } from "./seeds/books-data";
+
+const ANZABOOK_PUBLISHER_SEED = {
+  slug: "anzabook",
+  name: "AnzaBook",
+  logoUrl: "/icon.svg",
+  city: "Jakarta",
+  contactEmail: "redaksi@anzabook.id",
+  description:
+    "Lini penerbitan resmi AnzaBook untuk literasi berdaulat, edisi cetak rakyat, dan kurasi karya penulis independen Indonesia.",
+  topics: [
+    "Ekonomi",
+    "Sejarah",
+    "Politik",
+    "Sains & Filsafat",
+    "Sastra & Fiksi",
+    "Non-Fiksi Populer",
+  ],
+  verificationStatus: "verified" as const,
+  isAcceptingSubmissions: true,
+};
+
+const ANZABOOK_EDITORIAL_USER = {
+  email: "redaksi@anzabook.id",
+  username: "anzabook",
+  name: "AnzaBook",
+  authorPenName: "Redaksi AnzaBook",
+  role: "user",
+  emailVerified: true,
+  authorStatus: "verified" as const,
+};
+
+async function upsertAnzaBookPublisherRecord(
+  db: NodePgDatabase<typeof schema>,
+): Promise<typeof schema.publishers.$inferSelect> {
+  const [existing] = await db
+    .select()
+    .from(schema.publishers)
+    .where(eq(schema.publishers.slug, ANZABOOK_PUBLISHER_SEED.slug))
+    .limit(1);
+
+  if (existing) {
+    const topics =
+      Array.isArray(existing.topics) && existing.topics.length > 0
+        ? existing.topics
+        : ANZABOOK_PUBLISHER_SEED.topics;
+    const [updated] = await db
+      .update(schema.publishers)
+      .set({
+        name: ANZABOOK_PUBLISHER_SEED.name,
+        logoUrl: ANZABOOK_PUBLISHER_SEED.logoUrl,
+        city: ANZABOOK_PUBLISHER_SEED.city,
+        contactEmail: ANZABOOK_PUBLISHER_SEED.contactEmail,
+        description: ANZABOOK_PUBLISHER_SEED.description,
+        topics,
+        verificationStatus: ANZABOOK_PUBLISHER_SEED.verificationStatus,
+        verifiedAt: existing.verifiedAt ?? new Date(),
+        isAcceptingSubmissions: ANZABOOK_PUBLISHER_SEED.isAcceptingSubmissions,
+      })
+      .where(eq(schema.publishers.id, existing.id))
+      .returning();
+    return updated;
+  }
+
+  const [inserted] = await db
+    .insert(schema.publishers)
+    .values({
+      ...ANZABOOK_PUBLISHER_SEED,
+      verifiedAt: new Date(),
+    })
+    .onConflictDoNothing({ target: schema.publishers.slug })
+    .returning();
+
+  if (inserted) return inserted;
+
+  const [concurrent] = await db
+    .select()
+    .from(schema.publishers)
+    .where(eq(schema.publishers.slug, ANZABOOK_PUBLISHER_SEED.slug))
+    .limit(1);
+  return concurrent;
+}
+
+async function upsertAnzaBookEditorialUser(
+  db: NodePgDatabase<typeof schema>,
+): Promise<typeof schema.user.$inferSelect> {
+  const [existingByEmail] = await db
+    .select()
+    .from(schema.user)
+    .where(eq(sql`lower(${schema.user.email})`, ANZABOOK_EDITORIAL_USER.email))
+    .limit(1);
+
+  const [usernameHolder] = await db
+    .select({ id: schema.user.id })
+    .from(schema.user)
+    .where(
+      eq(sql`lower(${schema.user.username})`, ANZABOOK_EDITORIAL_USER.username),
+    )
+    .limit(1);
+
+  let editorialUser: typeof schema.user.$inferSelect;
+
+  if (existingByEmail) {
+    const canClaimUsername =
+      !usernameHolder || usernameHolder.id === existingByEmail.id;
+    const [updated] = await db
+      .update(schema.user)
+      .set({
+        name: ANZABOOK_EDITORIAL_USER.name,
+        ...(canClaimUsername
+          ? { username: ANZABOOK_EDITORIAL_USER.username }
+          : {}),
+        authorPenName: ANZABOOK_EDITORIAL_USER.authorPenName,
+        // Never set role = "admin": nonAdminUserCondition() excludes admins from Explore.
+        role: ANZABOOK_EDITORIAL_USER.role,
+        emailVerified: ANZABOOK_EDITORIAL_USER.emailVerified,
+        authorStatus: ANZABOOK_EDITORIAL_USER.authorStatus,
+      })
+      .where(eq(schema.user.id, existingByEmail.id))
+      .returning();
+    editorialUser = updated;
+  } else {
+    const userId = randomUUID();
+    const [inserted] = await db
+      .insert(schema.user)
+      .values({
+        id: userId,
+        email: ANZABOOK_EDITORIAL_USER.email,
+        username: usernameHolder ? null : ANZABOOK_EDITORIAL_USER.username,
+        name: ANZABOOK_EDITORIAL_USER.name,
+        authorPenName: ANZABOOK_EDITORIAL_USER.authorPenName,
+        role: ANZABOOK_EDITORIAL_USER.role,
+        emailVerified: ANZABOOK_EDITORIAL_USER.emailVerified,
+        authorStatus: ANZABOOK_EDITORIAL_USER.authorStatus,
+      })
+      .returning();
+    editorialUser = inserted;
+  }
+
+  // Never insert hardcoded credential passwords in production environments.
+  if (process.env.NODE_ENV !== "production") {
+    const [existingCredential] = await db
+      .select({ id: schema.account.id })
+      .from(schema.account)
+      .where(
+        and(
+          eq(schema.account.userId, editorialUser.id),
+          eq(schema.account.providerId, "credential"),
+        ),
+      )
+      .limit(1);
+
+    if (!existingCredential) {
+      const devPassword =
+        process.env.ANZABOOK_DEV_EDITORIAL_PASSWORD || "RedaksiAnza123!";
+      const passwordHash = await hashPassword(devPassword);
+      await db.insert(schema.account).values({
+        id: randomUUID(),
+        accountId: editorialUser.id,
+        providerId: "credential",
+        userId: editorialUser.id,
+        password: passwordHash,
+      });
+    }
+  }
+
+  return editorialUser;
+}
+
+async function findAnzaBookOwnerCandidate(
+  db: NodePgDatabase<typeof schema>,
+): Promise<{ id: string } | undefined> {
+  const ownerEmail = process.env.ANZABOOK_OWNER_EMAIL?.trim();
+  if (ownerEmail) {
+    const [candidate] = await db
+      .select({ id: schema.user.id })
+      .from(schema.user)
+      .where(eq(sql`lower(${schema.user.email})`, ownerEmail.toLowerCase()))
+      .limit(1);
+    return candidate;
+  }
+
+  const [candidate] = await db
+    .select({ id: schema.user.id })
+    .from(schema.user)
+    .where(
+      or(
+        eq(sql`lower(${schema.user.username})`, "selembarawan"),
+        eq(sql`lower(${schema.user.name})`, "selembar awan"),
+      ),
+    )
+    .orderBy(asc(schema.user.createdAt), asc(schema.user.id))
+    .limit(1);
+  return candidate;
+}
+
+/**
+ * Idempotently ensures the official AnzaBook publisher, its @anzabook editorial
+ * account, and any configured owner account link exist.
+ */
+export async function ensureAnzaBookPublisher(
+  db: NodePgDatabase<typeof schema>,
+): Promise<typeof schema.publishers.$inferSelect> {
+  const anzabookPublisher = await upsertAnzaBookPublisherRecord(db);
+  const editorialUser = await upsertAnzaBookEditorialUser(db);
+
+  // Preserve manual promotion of @anzabook (e.g. to "owner") across reruns.
+  await db
+    .insert(schema.publisherMembers)
+    .values({
+      publisherId: anzabookPublisher.id,
+      userId: editorialUser.id,
+      role: "editor",
+    })
+    .onConflictDoNothing({
+      target: [
+        schema.publisherMembers.publisherId,
+        schema.publisherMembers.userId,
+      ],
+    });
+
+  const ownerCandidate = await findAnzaBookOwnerCandidate(db);
+  if (ownerCandidate) {
+    await db
+      .insert(schema.publisherMembers)
+      .values({
+        publisherId: anzabookPublisher.id,
+        userId: ownerCandidate.id,
+        role: "owner",
+      })
+      .onConflictDoUpdate({
+        target: [
+          schema.publisherMembers.publisherId,
+          schema.publisherMembers.userId,
+        ],
+        set: { role: "owner" },
+      });
+  }
+
+  return anzabookPublisher;
+}
 
 export async function seedCatalog(
   db: NodePgDatabase<typeof schema>,
@@ -11,6 +251,8 @@ export async function seedCatalog(
   console.log(
     "Menyelaraskan data katalog AnzaBook, toko rekanan, dan bab buku...",
   );
+
+  const anzabookPublisher = await ensureAnzaBookPublisher(db);
 
   // 1. Cabang Toko Mitra & Titik GPS Peta
   const branchSeeds = [
@@ -120,7 +362,10 @@ export async function seedCatalog(
     const { chapters, editions, claimCodes, ...bookRow } = bookItem;
 
     const [existingBook] = await db
-      .select({ id: schema.books.id })
+      .select({
+        id: schema.books.id,
+        publisherId: schema.books.publisherId,
+      })
       .from(schema.books)
       .where(eq(schema.books.slug, bookRow.slug))
       .limit(1);
@@ -132,6 +377,7 @@ export async function seedCatalog(
       await db
         .update(schema.books)
         .set({
+          publisherId: existingBook.publisherId ?? anzabookPublisher.id,
           title: bookRow.title,
           originalTitle: bookRow.originalTitle,
           author: bookRow.author,
@@ -166,7 +412,10 @@ export async function seedCatalog(
     } else {
       const [insertedBook] = await db
         .insert(schema.books)
-        .values(bookRow)
+        .values({
+          ...bookRow,
+          publisherId: anzabookPublisher.id,
+        })
         .returning();
       bookId = insertedBook.id;
     }
