@@ -60,7 +60,7 @@ async function upsertAnzaBookPublisherRecord(
         topics,
         verificationStatus: ANZABOOK_PUBLISHER_SEED.verificationStatus,
         verifiedAt: existing.verifiedAt ?? new Date(),
-        isAcceptingSubmissions: ANZABOOK_PUBLISHER_SEED.isAcceptingSubmissions,
+        isAcceptingSubmissions: existing.isAcceptingSubmissions,
       })
       .where(eq(schema.publishers.id, existing.id))
       .returning();
@@ -174,6 +174,7 @@ async function upsertAnzaBookEditorialUser(
 
 async function findAnzaBookOwnerCandidate(
   db: NodePgDatabase<typeof schema>,
+  publisherId: string,
 ): Promise<{ id: string } | undefined> {
   const ownerEmail = process.env.ANZABOOK_OWNER_EMAIL?.trim();
   if (ownerEmail) {
@@ -183,6 +184,25 @@ async function findAnzaBookOwnerCandidate(
       .where(eq(sql`lower(${schema.user.email})`, ownerEmail.toLowerCase()))
       .limit(1);
     return candidate;
+  }
+
+  // Never bind a publisher owner by mutable display name/username in production.
+  if (process.env.NODE_ENV === "production") {
+    return undefined;
+  }
+
+  const [existingOwner] = await db
+    .select({ id: schema.publisherMembers.id })
+    .from(schema.publisherMembers)
+    .where(
+      and(
+        eq(schema.publisherMembers.publisherId, publisherId),
+        eq(schema.publisherMembers.role, "owner"),
+      ),
+    )
+    .limit(1);
+  if (existingOwner) {
+    return undefined;
   }
 
   const [candidate] = await db
@@ -224,7 +244,10 @@ export async function ensureAnzaBookPublisher(
       ],
     });
 
-  const ownerCandidate = await findAnzaBookOwnerCandidate(db);
+  const ownerCandidate = await findAnzaBookOwnerCandidate(
+    db,
+    anzabookPublisher.id,
+  );
   if (ownerCandidate) {
     await db
       .insert(schema.publisherMembers)

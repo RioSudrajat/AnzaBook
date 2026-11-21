@@ -1,5 +1,24 @@
 import { z } from "zod";
 
+const ROOT_RELATIVE_ASSET_PATH_REGEX = /^\/(?!\/)[^\s]*$/;
+const HTTP_URL_SCHEMA = z.string().url({ protocol: /^https?$/ });
+
+/**
+ * Validates an asset reference as an HTTP(S) URL, a root-relative path
+ * (rejecting protocol-relative `//` URLs), or an empty string.
+ */
+export function safeAssetUrlSchema(invalidMessage = "URL tidak valid") {
+  return z
+    .string()
+    .refine(
+      (value) =>
+        value === "" ||
+        ROOT_RELATIVE_ASSET_PATH_REGEX.test(value) ||
+        HTTP_URL_SCHEMA.safeParse(value).success,
+      { message: invalidMessage },
+    );
+}
+
 export const simulatePrintSchema = z
   .object({
     pageCount: z
@@ -44,16 +63,8 @@ export const applyPublisherSchema = z
       .max(2000, "Deskripsi maksimal 2000 karakter")
       .optional()
       .nullable(),
-    logoUrl: z
-      .string()
-      .url("URL logo tidak valid")
-      .or(z.literal(""))
-      .optional()
-      .nullable(),
-    headerImageUrl: z
-      .string()
-      .url("URL banner tidak valid")
-      .or(z.literal(""))
+    logoUrl: safeAssetUrlSchema("URL logo tidak valid").optional().nullable(),
+    headerImageUrl: safeAssetUrlSchema("URL banner tidak valid")
       .optional()
       .nullable(),
     city: z.string().max(80, "Kota maksimal 80 karakter").optional().nullable(),
@@ -253,7 +264,10 @@ export const listSubmissionTargetsQuerySchema = z
   .object({
     q: z.string().trim().max(120).optional(),
     topic: z.string().trim().max(80).optional(),
-    limit: z.coerce.number().int().min(1).max(100).default(50),
+    limit: z.preprocess(
+      (val) => (typeof val === "string" && val.trim() === "" ? undefined : val),
+      z.coerce.number().int().min(1).max(100).default(50),
+    ),
   })
   .strict();
 
@@ -374,10 +388,18 @@ export type PublisherReviewManuscriptInput = z.infer<
   typeof publisherReviewManuscriptSchema
 >;
 export type PublishManuscriptInput = z.infer<typeof publishManuscriptSchema>;
-export type ListSubmissionTargetsQuery = z.infer<
+export type ListSubmissionTargetsInput = {
+  q?: string;
+  topic?: string;
+  limit?: number;
+};
+export type ListSubmissionTargetsQuery = z.output<
   typeof listSubmissionTargetsQuerySchema
 >;
-export type AddPublisherMemberInput = z.infer<typeof addPublisherMemberSchema>;
+export type AddPublisherMemberInput = z.input<typeof addPublisherMemberSchema>;
+export type AddPublisherMemberOutput = z.output<
+  typeof addPublisherMemberSchema
+>;
 export type UpdatePublisherMemberInput = z.infer<
   typeof updatePublisherMemberSchema
 >;

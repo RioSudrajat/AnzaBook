@@ -14,7 +14,9 @@ import {
   updatePublisherMemberSchema,
   updatePublisherSchema,
   type AddPublisherMemberInput,
+  type AddPublisherMemberOutput,
   type AuthorUpdateManuscriptInput,
+  type ListSubmissionTargetsInput,
   type ListSubmissionTargetsQuery,
   type PublishManuscriptInput,
   type PublisherEditManuscriptInput,
@@ -82,6 +84,52 @@ describe("Publisher & Manuscript Shared Contracts", () => {
         unknownField: "nope",
       }).success,
     ).toBe(false);
+  });
+
+  it("validates logoUrl and headerImageUrl with root-relative asset paths, http(s) URLs, or empty string while rejecting protocol-relative or invalid paths", () => {
+    for (const validUrl of [
+      "/icon.svg",
+      "/assets/banners/anzabook.webp",
+      "https://example.com/logo.png",
+      "http://localhost:3101/banner.png",
+      "",
+      null,
+    ]) {
+      expect(
+        applyPublisherSchema.safeParse({
+          name: "AnzaBook",
+          slug: "anzabook",
+          logoUrl: validUrl,
+          headerImageUrl: validUrl,
+        }).success,
+      ).toBe(true);
+      expect(
+        updatePublisherSchema.safeParse({
+          logoUrl: validUrl,
+          headerImageUrl: validUrl,
+        }).success,
+      ).toBe(true);
+    }
+
+    for (const invalidUrl of [
+      "//evil.com/x.png",
+      "icon.svg",
+      "javascript:alert(1)",
+      "/path with spaces.png",
+    ]) {
+      expect(
+        applyPublisherSchema.safeParse({
+          name: "AnzaBook",
+          slug: "anzabook",
+          logoUrl: invalidUrl,
+        }).success,
+      ).toBe(false);
+      expect(
+        updatePublisherSchema.safeParse({
+          headerImageUrl: invalidUrl,
+        }).success,
+      ).toBe(false);
+    }
   });
 
   it("rejects status, publishedBookId, editorialNotes, and rejectionReason inside authorUpdateManuscriptSchema", () => {
@@ -203,6 +251,16 @@ describe("Publisher & Manuscript Shared Contracts", () => {
   });
 
   it("validates listSubmissionTargetsQuerySchema defaults and bounds", () => {
+    const queryInput: ListSubmissionTargetsInput = {
+      q: "gramedia",
+      topic: "Fiksi",
+    };
+    expect(listSubmissionTargetsQuerySchema.parse(queryInput)).toEqual({
+      q: "gramedia",
+      topic: "Fiksi",
+      limit: 50,
+    });
+
     const parsed = listSubmissionTargetsQuerySchema.safeParse({
       q: "  gramedia ",
       topic: " Fiksi ",
@@ -219,6 +277,18 @@ describe("Publisher & Manuscript Shared Contracts", () => {
     }
 
     expect(listSubmissionTargetsQuerySchema.parse({})).toEqual({ limit: 50 });
+    expect(listSubmissionTargetsQuerySchema.parse({ limit: "" })).toEqual({
+      limit: 50,
+    });
+    expect(listSubmissionTargetsQuerySchema.parse({ limit: "   " })).toEqual({
+      limit: 50,
+    });
+    expect(
+      listSubmissionTargetsQuerySchema.parse({ limit: undefined }),
+    ).toEqual({ limit: 50 });
+    expect(
+      listSubmissionTargetsQuerySchema.safeParse({ limit: 0 }).success,
+    ).toBe(false);
     expect(
       listSubmissionTargetsQuerySchema.safeParse({ limit: 101 }).success,
     ).toBe(false);
@@ -234,12 +304,13 @@ describe("Publisher & Manuscript Shared Contracts", () => {
       "finance",
     ]);
 
-    const parsedAdd = addPublisherMemberSchema.safeParse({
+    const addInputWithoutRole: AddPublisherMemberInput = {
       email: "  editor@anzabook.id ",
-    });
+    };
+    const parsedAdd = addPublisherMemberSchema.safeParse(addInputWithoutRole);
     expect(parsedAdd.success).toBe(true);
     if (parsedAdd.success) {
-      const typed: AddPublisherMemberInput = parsedAdd.data;
+      const typed: AddPublisherMemberOutput = parsedAdd.data;
       expect(typed).toEqual({
         email: "editor@anzabook.id",
         role: "editor",

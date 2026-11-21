@@ -107,7 +107,7 @@ describe("AnzaBook Official Publisher Seed & Owner Assignment CLI", () => {
         .where(eq(books.id, bookWithCustomPublisher.id));
       await db
         .update(publishers)
-        .set({ topics: [] })
+        .set({ topics: [], isAcceptingSubmissions: false })
         .where(eq(publishers.id, anzabookPub.id));
 
       await seedCatalog(db);
@@ -118,6 +118,7 @@ describe("AnzaBook Official Publisher Seed & Owner Assignment CLI", () => {
         .where(eq(publishers.id, anzabookPub.id));
       expect(updatedPub.verifiedAt?.getTime()).toBe(firstVerifiedAt);
       expect(updatedPub.topics).toEqual(ANZABOOK_EXPECTED_TOPICS);
+      expect(updatedPub.isAcceptingSubmissions).toBe(false);
 
       const [backfilledBook] = await db
         .select({ publisherId: books.publisherId })
@@ -131,6 +132,10 @@ describe("AnzaBook Official Publisher Seed & Owner Assignment CLI", () => {
         .where(eq(books.id, bookWithCustomPublisher.id));
       expect(preservedBook.publisherId).toBe(customPub.id);
     } finally {
+      await db
+        .update(publishers)
+        .set({ isAcceptingSubmissions: true })
+        .where(eq(publishers.id, anzabookPub.id));
       await db
         .update(books)
         .set({ publisherId: anzabookPub.id })
@@ -269,6 +274,7 @@ describe("AnzaBook Official Publisher Seed & Owner Assignment CLI", () => {
         .where(eq(user.email, "redaksi@anzabook.id"));
       expect(createdEditorial).toBeDefined();
       expect(createdEditorial.id).not.toBe(holderId);
+      expect(createdEditorial?.username).toBeNull();
       expect(createdEditorial.role).toBe("user");
       expect(createdEditorial.authorStatus).toBe("verified");
     } finally {
@@ -516,5 +522,89 @@ describe("AnzaBook Official Publisher Seed & Owner Assignment CLI", () => {
     );
     expect(cliMissingUser.status).toBe(1);
     expect(cliMissingUser.stderr).toContain("nobody@example.com");
+  });
+
+  it("does not promote Selembar Awan via display-name or username fallback when NODE_ENV=production or an owner already exists", async () => {
+    const anzabookPub = await ensureAnzaBookPublisher(db);
+    const selembarUserId = `selembar-prod-${randomUUID()}`;
+    const explicitOwnerId = `explicit-owner-${randomUUID()}`;
+    const explicitOwnerEmail = `explicit-owner-${randomUUID()}@example.com`;
+    const prevNodeEnv = process.env.NODE_ENV;
+    const prevOwnerEmail = process.env.ANZABOOK_OWNER_EMAIL;
+
+    try {
+      await db.insert(user).values([
+        {
+          id: selembarUserId,
+          name: "Selembar Awan",
+          username: "selembarawan",
+          email: `selembar-prod-${randomUUID()}@example.com`,
+          role: "user",
+        },
+        {
+          id: explicitOwnerId,
+          name: "Pemilik Resmi",
+          email: explicitOwnerEmail,
+          role: "user",
+        },
+      ]);
+
+      // 1. In production without ANZABOOK_OWNER_EMAIL, display-name / username fallback is disabled
+      delete process.env.ANZABOOK_OWNER_EMAIL;
+      process.env.NODE_ENV = "production";
+      await ensureAnzaBookPublisher(db);
+
+      const [prodSelembarMembership] = await db
+        .select()
+        .from(publisherMembers)
+        .where(
+          and(
+            eq(publisherMembers.publisherId, anzabookPub.id),
+            eq(publisherMembers.userId, selembarUserId),
+          ),
+        );
+      expect(prodSelembarMembership).toBeUndefined();
+
+      // 2. In production WITH ANZABOOK_OWNER_EMAIL, explicit owner binding still succeeds
+      process.env.ANZABOOK_OWNER_EMAIL = explicitOwnerEmail;
+      await ensureAnzaBookPublisher(db);
+
+      const [prodExplicitMembership] = await db
+        .select()
+        .from(publisherMembers)
+        .where(
+          and(
+            eq(publisherMembers.publisherId, anzabookPub.id),
+            eq(publisherMembers.userId, explicitOwnerId),
+          ),
+        );
+      expect(prodExplicitMembership?.role).toBe("owner");
+
+      // 3. Outside production without ANZABOOK_OWNER_EMAIL, skip fallback if an owner already exists
+      delete process.env.ANZABOOK_OWNER_EMAIL;
+      process.env.NODE_ENV = "test";
+      await ensureAnzaBookPublisher(db);
+
+      const [devSelembarMembership] = await db
+        .select()
+        .from(publisherMembers)
+        .where(
+          and(
+            eq(publisherMembers.publisherId, anzabookPub.id),
+            eq(publisherMembers.userId, selembarUserId),
+          ),
+        );
+      expect(devSelembarMembership).toBeUndefined();
+    } finally {
+      if (prevNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = prevNodeEnv;
+
+      if (prevOwnerEmail === undefined) delete process.env.ANZABOOK_OWNER_EMAIL;
+      else process.env.ANZABOOK_OWNER_EMAIL = prevOwnerEmail;
+
+      await db
+        .delete(user)
+        .where(inArray(user.id, [selembarUserId, explicitOwnerId]));
+    }
   });
 });
