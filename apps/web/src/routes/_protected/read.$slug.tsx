@@ -1826,7 +1826,7 @@ function ReaderBook() {
                   required
                   rows={3}
                   placeholder="Jelaskan kronologi aktivitas Anda agar Admin dapat meninjau pemulihan akses E-Reader..."
-                  className="w-full rounded-[6px] border border-border bg-background px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                  className="w-full resize-none rounded-[6px] border border-border bg-background px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
                 />
                 {appealFeedback && (
                   <p className="text-xs text-muted-foreground">
@@ -1839,7 +1839,7 @@ function ReaderBook() {
                     submitAppealMutation.isPending ||
                     appealMessageInput.trim().length < 10
                   }
-                  className="w-full min-h-11 font-mono text-xs bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
+                  className="w-full min-h-11 font-mono text-xs bg-[var(--color-accent)] text-[var(--color-accent-ink)] font-semibold hover:brightness-105 disabled:bg-[var(--color-accent)]/45 disabled:text-[var(--color-accent-ink)]/80 disabled:opacity-100"
                 >
                   {submitAppealMutation.isPending
                     ? "Mengirim..."
