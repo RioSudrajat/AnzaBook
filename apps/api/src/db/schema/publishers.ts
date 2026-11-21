@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   jsonb,
@@ -51,6 +52,11 @@ export const publishers = pgTable(
       .notNull()
       .default(500),
     claimCodeFeeIdr: integer("claim_code_fee_idr").notNull().default(2000),
+    topics: jsonb("topics").$type<string[]>().notNull().default([]),
+    isAcceptingSubmissions: boolean("is_accepting_submissions")
+      .notNull()
+      .default(true),
+    submissionGuidelines: text("submission_guidelines"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
