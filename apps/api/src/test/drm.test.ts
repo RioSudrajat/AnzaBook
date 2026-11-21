@@ -225,4 +225,62 @@ describe("DRM Policy, Opaque Session Watermarks, & Admin Audit Logging", () => {
     );
     expect(missingTraceRes.status).toBe(404);
   });
+
+  it("enforces bounded chapter windows (max 2), ignores repeated refetches, and blocks rapid distinct-chapter scraping with 429 + high-risk log", async () => {
+    expect(getDrmEventRiskLevel("api_scrape_anomaly")).toBe("high");
+
+    const scraper = agent();
+    const scraperEmail = await signUp(scraper, "Penyedot Naskah API");
+    const slug = "revolusi-cetak-kedaulatan-membaca";
+
+    const invalidWindow = await scraper.get(
+      `/api/books/${slug}/read?continuous=true&windowSize=5`,
+    );
+    expect(invalidWindow.status).toBe(422);
+
+    // Repeating the same chapter window (e.g. tab refocus) must NOT trigger rate limiting.
+    for (let i = 0; i < 8; i += 1) {
+      const refetch = await scraper.get(
+        `/api/books/${slug}/read?chapter=1&continuous=true`,
+      );
+      expect(refetch.status).toBe(200);
+      expect(
+        refetch.body.data.chapters.map(
+          (ch: { chapterNumber: number }) => ch.chapterNumber,
+        ),
+      ).toEqual([1, 2]);
+    }
+
+    // Rapidly harvesting >6 distinct chapters in a short burst triggers 429 RATE_LIMITED
+    // and records a high-risk api_scrape_anomaly event for admin audit.
+    let blockedStatus = 0;
+    let blockedCode = "";
+    for (let ch = 3; ch <= 8; ch += 1) {
+      const res = await scraper.get(
+        `/api/books/${slug}/read?chapter=${ch}&continuous=false`,
+      );
+      if (res.status === 429) {
+        blockedStatus = res.status;
+        blockedCode = res.body?.error?.code ?? "";
+        break;
+      }
+      expect(res.status).toBe(200);
+    }
+
+    expect(blockedStatus).toBe(429);
+    expect(blockedCode).toBe("RATE_LIMITED");
+
+    const admin = agent();
+    const adminEmail = await signUp(admin, "Admin Scrape Auditor");
+    await setRole(adminEmail, "admin");
+
+    const eventsRes = await admin.get(
+      `/api/admin/drm-events?eventType=api_scrape_anomaly&search=${encodeURIComponent(scraperEmail)}`,
+    );
+    expect(eventsRes.status).toBe(200);
+    expect(eventsRes.body.data.length).toBeGreaterThanOrEqual(1);
+    expect(eventsRes.body.data[0].eventType).toBe("api_scrape_anomaly");
+    expect(eventsRes.body.data[0].riskLevel).toBe("high");
+    expect(eventsRes.body.data[0].userEmail).toBe(scraperEmail);
+  });
 });

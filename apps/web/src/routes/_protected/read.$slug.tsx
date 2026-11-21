@@ -37,6 +37,7 @@ import type {
 } from "@starter/shared/types";
 import type { SaveReadingProgressInput } from "@starter/shared/validators/reading";
 import { Button } from "@/components/ui/button";
+import { getBookReader } from "@/features/books/api";
 import {
   useBookHighlights,
   useBookReader,
@@ -300,6 +301,18 @@ function ReaderBook() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const requestedChapter = search.chapter ?? 1;
+  const [anchorChapter, setAnchorChapter] = useState(requestedChapter);
+  const [extraChapters, setExtraChapters] = useState<BookReaderChapterDto[]>(
+    [],
+  );
+  const stableBookPayloadRef = useRef<
+    (BookReaderPayloadDto & { watermark: string }) | null
+  >(null);
+  const prefetchingChaptersRef = useRef<Set<number>>(new Set());
+  const pendingChapterNavRef = useRef<{
+    chapter: number;
+    layout: ReadingLayout;
+  } | null>(null);
 
   const isManuscript =
     slug.startsWith("manuscript-") || slug.startsWith("manu-");
@@ -325,9 +338,14 @@ function ReaderBook() {
     refetch: refetchBook,
   } = useBookReader(isManuscript ? "" : slug, {
     mode: "full",
-    chapter: requestedChapter,
+    chapter: anchorChapter,
     continuous: true,
+    windowSize: 2,
   });
+  if (bookPayload) {
+    stableBookPayloadRef.current = bookPayload;
+  }
+  const resolvedBookPayload = bookPayload ?? stableBookPayloadRef.current;
 
   const manuscriptPayload:
     (BookReaderPayloadDto & { watermark: string }) | null = useMemo(() => {
@@ -401,8 +419,10 @@ function ReaderBook() {
     };
   }, [manuscript, user.name]);
 
-  const payload = isManuscript ? manuscriptPayload : bookPayload;
-  const isLoading = isManuscript ? isManuscriptLoading : isBookLoading;
+  const payload = isManuscript ? manuscriptPayload : resolvedBookPayload;
+  const isLoading = isManuscript
+    ? isManuscriptLoading
+    : isBookLoading && !resolvedBookPayload;
   const isError = isManuscript ? false : isBookError;
   const error = isManuscript ? null : bookError;
   const refetch = isManuscript ? refetchManuscript : refetchBook;
@@ -710,6 +730,27 @@ function ReaderBook() {
     return () => clearTimeout(pendingCheckpoint.current);
   }, []);
 
+  const loadedChapters = useMemo(() => {
+    const base = payload?.chapters?.length
+      ? payload.chapters
+      : payload?.currentChapter
+        ? [payload.currentChapter]
+        : [];
+    if (extraChapters.length === 0) return base;
+    const byChapter = new Map<number, BookReaderChapterDto>();
+    for (const item of base) {
+      byChapter.set(item.chapterNumber, item);
+    }
+    for (const item of extraChapters) {
+      if (!byChapter.has(item.chapterNumber)) {
+        byChapter.set(item.chapterNumber, item);
+      }
+    }
+    return Array.from(byChapter.values()).sort(
+      (a, b) => a.chapterNumber - b.chapterNumber,
+    );
+  }, [extraChapters, payload?.chapters, payload?.currentChapter]);
+
   const accessibleChapters = useMemo(() => {
     if (isAuthorOrPublisher && liveChapters.length > 0) {
       return liveChapters.map((c) => ({
@@ -723,17 +764,51 @@ function ReaderBook() {
         audioDurationSeconds: null,
       }));
     }
-    return payload?.chapters?.length
-      ? payload.chapters
-      : payload?.currentChapter
-        ? [payload.currentChapter]
-        : [];
-  }, [
-    isAuthorOrPublisher,
-    liveChapters,
-    payload?.chapters,
-    payload?.currentChapter,
-  ]);
+    return loadedChapters;
+  }, [isAuthorOrPublisher, liveChapters, loadedChapters]);
+
+  const prefetchChapter = useCallback(
+    async (targetChapter: number) => {
+      if (isManuscript || isAuthorOrPublisher || !payload?.hasFullAccess) {
+        return;
+      }
+      const existsInBook = payload.allChapters.some(
+        (c) => c.chapterNumber === targetChapter,
+      );
+      if (!existsInBook) return;
+      if (
+        loadedChapters.some((c) => c.chapterNumber === targetChapter) ||
+        prefetchingChaptersRef.current.has(targetChapter)
+      ) {
+        return;
+      }
+
+      prefetchingChaptersRef.current.add(targetChapter);
+      try {
+        const nextPayload = await getBookReader(slug, {
+          mode: "full",
+          chapter: targetChapter,
+          continuous: false,
+        });
+        const nextChapterObj =
+          nextPayload.chapters?.find(
+            (c) => c.chapterNumber === targetChapter,
+          ) ?? nextPayload.currentChapter;
+        if (nextChapterObj) {
+          setExtraChapters((prev) =>
+            prev.some((c) => c.chapterNumber === nextChapterObj.chapterNumber)
+              ? prev
+              : [...prev, nextChapterObj],
+          );
+        }
+      } catch {
+        // Silent fallback on background prefetch (rate limit or offline) so active reading stays uninterrupted.
+      } finally {
+        prefetchingChaptersRef.current.delete(targetChapter);
+      }
+    },
+    [isAuthorOrPublisher, isManuscript, loadedChapters, payload, slug],
+  );
 
   const selectedChapter =
     readingLayout === "scroll" ? scrollPosition.chapter : slidePosition.chapter;
@@ -796,12 +871,40 @@ function ReaderBook() {
     search.chapter === undefined &&
     (progressPending ||
       (scope === "full" && !savedProgress && previewCheckpoint.isPending));
+  const checkpointTargetOutOfWindow =
+    search.chapter === undefined &&
+    !isAuthorOrPublisher &&
+    !isManuscript &&
+    !waitingForCheckpoint &&
+    Boolean(payload?.hasFullAccess) &&
+    Boolean(progress?.lastChapterNumber) &&
+    !loadedChapters.some(
+      (item: BookReaderChapterDto) =>
+        item.chapterNumber === progress?.lastChapterNumber,
+    ) &&
+    Boolean(
+      payload?.allChapters.some(
+        (item: BookChapterSummaryDto) =>
+          item.chapterNumber === progress?.lastChapterNumber,
+      ),
+    );
 
   useEffect(() => {
     if (!payload || hasRestoredRef.current) return;
     if (waitingForCheckpoint) return;
     const checkpoint = search.chapter === undefined ? progress : null;
-    const savedChapter = payload.chapters?.find(
+    if (checkpointTargetOutOfWindow && checkpoint?.lastChapterNumber) {
+      const targetChapter = checkpoint.lastChapterNumber;
+      if (targetChapter !== anchorChapter) {
+        const frame = requestAnimationFrame(() => {
+          setExtraChapters([]);
+          setAnchorChapter(targetChapter);
+        });
+        return () => cancelAnimationFrame(frame);
+      }
+      return;
+    }
+    const savedChapter = loadedChapters.find(
       (item: BookReaderChapterDto) =>
         item.chapterNumber === checkpoint?.lastChapterNumber,
     );
@@ -845,7 +948,7 @@ function ReaderBook() {
       }
       if (
         !savedChapter &&
-        requestedChapter === payload.chapters?.[0]?.chapterNumber
+        requestedChapter === loadedChapters[0]?.chapterNumber
       )
         return;
 
@@ -860,7 +963,8 @@ function ReaderBook() {
         payload.hasFullAccess &&
         checkpoint === savedProgress &&
         savedChapter &&
-        savedChapter.id === payload.chapters?.at(-1)?.id &&
+        savedChapter.chapterNumber ===
+          payload.allChapters.at(-1)?.chapterNumber &&
         checkpoint?.layout === "scroll" &&
         checkpoint.lastScrollPercent === 100
       ) {
@@ -892,7 +996,10 @@ function ReaderBook() {
     return () => cancelAnimationFrame(frame);
   }, [
     accessibleChapters,
+    anchorChapter,
+    checkpointTargetOutOfWindow,
     languageView,
+    loadedChapters,
     payload,
     progress,
     requestedChapter,
@@ -900,6 +1007,30 @@ function ReaderBook() {
     search.chapter,
     waitingForCheckpoint,
   ]);
+
+  useEffect(() => {
+    const pending = pendingChapterNavRef.current;
+    if (!pending) return;
+    const isLoaded = loadedChapters.some(
+      (item: BookReaderChapterDto) => item.chapterNumber === pending.chapter,
+    );
+    if (!isLoaded) return;
+
+    const targetChapter = pending.chapter;
+    const targetLayout = pending.layout;
+    const frame = requestAnimationFrame(() => {
+      pendingChapterNavRef.current = null;
+      hasRestoredRef.current = true;
+      if (targetLayout === "slide") {
+        setSlidePosition({ chapter: targetChapter, paragraph: -1, offset: 0 });
+        window.scrollTo({ top: 0 });
+        return;
+      }
+      setScrollPosition({ chapter: targetChapter, percent: 0 });
+      chapterSection(targetChapter)?.scrollIntoView({ block: "start" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [loadedChapters]);
 
   useEffect(() => {
     const deadline = payload?.accessExpiresAt;
@@ -966,6 +1097,11 @@ function ReaderBook() {
     );
     if (!sections?.length) return null;
     const finalSection = sections[sections.length - 1];
+    const finalSectionChapterNum = Number(finalSection.dataset.chapterNumber);
+    const bookFinalChapterNum = payload?.allChapters.at(-1)?.chapterNumber;
+    const isRenderedFinalChapter =
+      bookFinalChapterNum !== undefined &&
+      finalSectionChapterNum === bookFinalChapterNum;
     const viewportMarker = window.innerHeight * 0.36;
     const scrollRoot = document.scrollingElement;
     const scrollTop = scrollRoot?.scrollTop ?? 0;
@@ -973,7 +1109,8 @@ function ReaderBook() {
       ? scrollRoot.scrollHeight - scrollRoot.clientHeight
       : 0;
     const atBookEnd =
-      payload?.hasFullAccess &&
+      Boolean(payload?.hasFullAccess) &&
+      isRenderedFinalChapter &&
       maxScroll > 0 &&
       scrollTop > 0 &&
       maxScroll - scrollTop <= 1;
@@ -983,7 +1120,7 @@ function ReaderBook() {
       body = section;
     }
     if (atBookEnd) body = finalSection;
-    const visibleChapter = payload?.chapters?.find(
+    const visibleChapter = loadedChapters.find(
       (item: BookReaderChapterDto) =>
         item.chapterNumber === Number(body.dataset.chapterNumber),
     );
@@ -995,7 +1132,11 @@ function ReaderBook() {
     const rect = body.getBoundingClientRect();
     if (atBookEnd) {
       percent = 100;
-    } else if (payload?.hasFullAccess && body === finalSection) {
+    } else if (
+      payload?.hasFullAccess &&
+      body === finalSection &&
+      isRenderedFinalChapter
+    ) {
       // A short final chapter may never reach the top before scrolling ends.
       const chapterStart = Math.max(
         0,
@@ -1040,7 +1181,8 @@ function ReaderBook() {
     captureSlidePosition,
     chapter,
     chapterParagraphCount,
-    payload?.chapters,
+    loadedChapters,
+    payload?.allChapters,
     payload?.hasFullAccess,
     readingLayout,
     activeSpread,
@@ -1098,6 +1240,25 @@ function ReaderBook() {
             },
       );
       queueCheckpoint(position);
+      if (
+        !isAuthorOrPublisher &&
+        !isManuscript &&
+        payload?.hasFullAccess &&
+        loadedChapters.length > 0
+      ) {
+        const lastLoaded =
+          loadedChapters[loadedChapters.length - 1].chapterNumber;
+        const bookLast =
+          payload.allChapters.at(-1)?.chapterNumber ?? lastLoaded;
+        if (
+          lastLoaded < bookLast &&
+          (position.lastChapterNumber >= lastLoaded ||
+            (position.lastChapterNumber >= lastLoaded - 1 &&
+              position.lastScrollPercent >= 65))
+        ) {
+          void prefetchChapter(lastLoaded + 1);
+        }
+      }
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
@@ -1107,7 +1268,12 @@ function ReaderBook() {
     chapter,
     expiredAccess,
     isAuthorOrPublisher,
+    isManuscript,
+    loadedChapters,
+    payload?.allChapters,
     payload?.accessExpiresAt,
+    payload?.hasFullAccess,
+    prefetchChapter,
     queueCheckpoint,
     readingLayout,
   ]);
@@ -1116,6 +1282,29 @@ function ReaderBook() {
     setSlidePosition(target.position);
     const position = captureSlidePosition(target);
     if (position) queueCheckpoint(position);
+    if (
+      !isAuthorOrPublisher &&
+      !isManuscript &&
+      payload?.hasFullAccess &&
+      loadedChapters.length > 0 &&
+      spreads.length > 0
+    ) {
+      const targetIndex = spreads.findIndex(
+        (item) =>
+          item.position.chapter === target.position.chapter &&
+          item.position.paragraph === target.position.paragraph &&
+          item.position.offset === target.position.offset,
+      );
+      const lastLoaded =
+        loadedChapters[loadedChapters.length - 1].chapterNumber;
+      const bookLast = payload.allChapters.at(-1)?.chapterNumber ?? lastLoaded;
+      if (
+        lastLoaded < bookLast &&
+        targetIndex >= Math.max(0, spreads.length - 3)
+      ) {
+        void prefetchChapter(lastLoaded + 1);
+      }
+    }
   }
 
   function changeReadingLayout(layout: ReadingLayout) {
@@ -1148,12 +1337,11 @@ function ReaderBook() {
   }
 
   async function handleSelectChapter(ch: number) {
-    if (readingLayout === "slide") {
-      setSlidePosition({ chapter: ch, paragraph: -1, offset: 0 });
-      return;
-    }
-
     if (isAuthorOrPublisher) {
+      if (readingLayout === "slide") {
+        setSlidePosition({ chapter: ch, paragraph: -1, offset: 0 });
+        return;
+      }
       setScrollPosition((prev) => ({ ...prev, chapter: ch }));
       if (ch === 1) {
         const chap1Break = document.querySelector(
@@ -1185,23 +1373,41 @@ function ReaderBook() {
       paywallRef.current?.focus();
       return;
     }
-    if (readingLayout === "scroll") {
+
+    const isAlreadyLoaded = loadedChapters.some(
+      (item: BookReaderChapterDto) => item.chapterNumber === ch,
+    );
+
+    if (readingLayout === "slide") {
+      const position = capturePosition();
+      clearTimeout(pendingCheckpoint.current);
+      if (position) {
+        try {
+          await saveProgressAsync(position);
+        } catch {
+          setSaveError(true);
+          return;
+        }
+      }
+      setSaveError(false);
+      if (isAlreadyLoaded) {
+        setSlidePosition({ chapter: ch, paragraph: -1, offset: 0 });
+        window.scrollTo({ top: 0 });
+        return;
+      }
+    } else if (isAlreadyLoaded) {
       chapterSection(ch)?.scrollIntoView({ block: "start" });
       return;
     }
-    const position = capturePosition();
-    clearTimeout(pendingCheckpoint.current);
-    if (position) {
-      try {
-        await saveProgressAsync(position);
-      } catch {
-        setSaveError(true);
-        return;
-      }
+
+    pendingChapterNavRef.current = { chapter: ch, layout: readingLayout };
+    const lastLoadedNum = loadedChapters.at(-1)?.chapterNumber ?? 0;
+    if (ch === lastLoadedNum + 1) {
+      void prefetchChapter(ch);
+    } else {
+      setExtraChapters([]);
+      setAnchorChapter(ch);
     }
-    setSaveError(false);
-    setSlidePosition({ chapter: ch, paragraph: -1, offset: 0 });
-    window.scrollTo({ top: 0 });
   }
 
   // Handle Flexing a specific highlight
@@ -1332,7 +1538,7 @@ function ReaderBook() {
             28_800,
             Math.max(1, Math.round((Date.now() - startTimeRef.current) / 1000)),
           );
-          const positionChapter = payload?.chapters?.find(
+          const positionChapter = loadedChapters.find(
             (item: BookReaderChapterDto) =>
               item.chapterNumber === position.lastChapterNumber,
           );
@@ -1409,9 +1615,23 @@ function ReaderBook() {
     expiredAccess !== null && expiredAccess === payload?.accessExpiresAt;
   const isMissing = error instanceof ApiError && error.status === 404;
 
+  const lastLoadedChapterNum = loadedChapters.at(-1)?.chapterNumber ?? 0;
+  const bookLastChapterNum = payload?.allChapters.at(-1)?.chapterNumber;
+  const hasMoreChapters =
+    !isAuthorOrPublisher &&
+    !isManuscript &&
+    Boolean(payload?.hasFullAccess) &&
+    bookLastChapterNum !== undefined &&
+    lastLoadedChapterNum < bookLastChapterNum;
+  const hasReachedBookEnd = Boolean(payload?.hasFullAccess) && !hasMoreChapters;
+
   if (
     isLoading ||
-    (payload && !isError && !isExpired && waitingForCheckpoint)
+    (payload &&
+      !isError &&
+      !isExpired &&
+      (waitingForCheckpoint ||
+        (!hasRestoredRef.current && checkpointTargetOutOfWindow)))
   ) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -1483,7 +1703,8 @@ function ReaderBook() {
 
   const { book, allChapters, watermark } = payload;
   const currentChapter = chapter ?? payload.currentChapter;
-  const chaptersList = payload.chapters ?? [currentChapter];
+  const chaptersList =
+    loadedChapters.length > 0 ? loadedChapters : [currentChapter];
   const isPremiumPreview =
     !payload.hasFullAccess && book.accessTier === "premium";
   const chapterIndex = allChapters.findIndex(
@@ -1846,8 +2067,28 @@ function ReaderBook() {
                 )
               )}
 
-              {/* End of Reading Completion Section */}
-              {payload.hasFullAccess && (
+              {/* End of Reading Completion Section / Seamless Chapter Prefetch Footer */}
+              {payload.hasFullAccess && hasMoreChapters && (
+                <div className="pt-12 border-t border-current/10 text-center space-y-3">
+                  <p className="text-xs font-mono text-muted-foreground">
+                    Menyiapkan Bab {lastLoadedChapterNum + 1} agar baca tetap
+                    mengalir...
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      void prefetchChapter(lastLoadedChapterNum + 1)
+                    }
+                    className="font-mono text-xs"
+                  >
+                    Muat Bab {lastLoadedChapterNum + 1}
+                  </Button>
+                </div>
+              )}
+
+              {hasReachedBookEnd && (
                 <div className="pt-16 border-t border-current/15 text-center space-y-4">
                   <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
                     Akhir buku

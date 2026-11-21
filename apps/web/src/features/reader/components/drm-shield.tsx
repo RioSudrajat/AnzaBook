@@ -36,6 +36,13 @@ const WATERMARK_HOST_CLASS =
   "pointer-events-none fixed inset-0 z-20 overflow-hidden select-none";
 const WATERMARK_CANVAS_CLASS =
   "block size-full pointer-events-none select-none";
+const CONTENT_BASE_CLASS = "transition-all duration-150";
+const CONTENT_LOCKED_CLASS =
+  "transition-none blur-2xl opacity-10 pointer-events-none filter";
+const CURTAIN_HIDDEN_CLASS =
+  "fixed inset-0 z-49 hidden items-center justify-center bg-background/95 backdrop-blur-2xl pointer-events-none select-none";
+const CURTAIN_ACTIVE_CLASS =
+  "fixed inset-0 z-49 flex items-center justify-center bg-background/95 backdrop-blur-2xl pointer-events-none select-none";
 
 function detectClientOs(): DrmClientOs {
   if (typeof navigator === "undefined") return "unknown";
@@ -152,6 +159,7 @@ export function DrmShield({
   const watermarkHostRef = useRef<HTMLDivElement>(null);
   const watermarkCanvasRef = useRef<HTMLCanvasElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const curtainRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const resumeBtnRef = useRef<HTMLButtonElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
@@ -159,6 +167,7 @@ export function DrmShield({
   const onTriggerRef = useRef(onSecurityTrigger);
   const enabledRef = useRef(enabled);
   const activeRef = useRef(false);
+  const renderedActiveRef = useRef(false);
   const lastVisibilityHiddenAtRef = useRef(0);
   const isEffectiveShieldActive = enabled && isShieldActive;
 
@@ -166,7 +175,23 @@ export function DrmShield({
     onTriggerRef.current = onSecurityTrigger;
     enabledRef.current = enabled;
     activeRef.current = isEffectiveShieldActive;
+    renderedActiveRef.current = isEffectiveShieldActive;
   }, [onSecurityTrigger, enabled, isEffectiveShieldActive]);
+
+  const applySynchronousCurtain = useCallback((locked: boolean) => {
+    const curtain = curtainRef.current;
+    const content = contentRef.current;
+    activeRef.current = locked;
+    if (curtain) {
+      curtain.removeAttribute("hidden");
+      curtain.className = locked ? CURTAIN_ACTIVE_CLASS : CURTAIN_HIDDEN_CLASS;
+    }
+    if (content) {
+      content.className = locked
+        ? `${CONTENT_BASE_CLASS} ${CONTENT_LOCKED_CLASS}`
+        : `${CONTENT_BASE_CLASS} blur-none opacity-100`;
+    }
+  }, []);
 
   const activateShield = useCallback(
     (eventType: DrmEventType, reason: string, detail?: string) => {
@@ -178,6 +203,8 @@ export function DrmShield({
       ) {
         previousFocusRef.current = document.activeElement;
       }
+      // Lock prose synchronously before React schedules state updates so the earliest frame is already blanked.
+      applySynchronousCurtain(true);
       setShieldReason(reason);
       setIsShieldActive(true);
       onTriggerRef.current?.({
@@ -186,10 +213,11 @@ export function DrmShield({
         clientOs: detectClientOs(),
       });
     },
-    [],
+    [applySynchronousCurtain],
   );
 
   const handleResume = useCallback(() => {
+    applySynchronousCurtain(false);
     setIsShieldActive(false);
     const previous = previousFocusRef.current;
     previousFocusRef.current = null;
@@ -198,7 +226,7 @@ export function DrmShield({
         previous.focus({ preventScroll: true });
       });
     }
-  }, []);
+  }, [applySynchronousCurtain]);
 
   // Move focus into the DRM alertdialog when locked (PRD DRM-04)
   useEffect(() => {
@@ -361,11 +389,15 @@ export function DrmShield({
       }
     };
 
-    const handleWindowBlur = () => {
+    const handleWindowBlur = (e: FocusEvent) => {
+      // Because this listener runs in capture phase, child element focus transitions
+      // also pass through window with e.target !== window; only react to window-level blur.
+      if (e.target !== window) return;
       if (document.activeElement instanceof HTMLIFrameElement) {
         if (shieldRootRef.current?.contains(document.activeElement)) return;
       }
       if (Date.now() - lastVisibilityHiddenAtRef.current < 300) {
+        applySynchronousCurtain(true);
         setIsShieldActive(true);
         return;
       }
@@ -386,30 +418,49 @@ export function DrmShield({
       }
     };
 
-    window.addEventListener("contextmenu", handleContextMenu);
-    window.addEventListener("copy", handleCopyCut);
-    window.addEventListener("cut", handleCopyCut);
-    window.addEventListener("dragstart", handleDragStart);
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
-    window.addEventListener("beforeprint", handleBeforePrint);
-    window.addEventListener("blur", handleWindowBlur);
-    window.addEventListener("touchstart", handleTouchStart, { passive: true });
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("contextmenu", handleContextMenu, {
+      capture: true,
+    });
+    window.addEventListener("copy", handleCopyCut, { capture: true });
+    window.addEventListener("cut", handleCopyCut, { capture: true });
+    window.addEventListener("dragstart", handleDragStart, { capture: true });
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
+    window.addEventListener("keyup", handleKeyUp, { capture: true });
+    window.addEventListener("beforeprint", handleBeforePrint, {
+      capture: true,
+    });
+    window.addEventListener("blur", handleWindowBlur, { capture: true });
+    window.addEventListener("touchstart", handleTouchStart, {
+      passive: true,
+      capture: true,
+    });
+    document.addEventListener("visibilitychange", handleVisibilityChange, {
+      capture: true,
+    });
 
     return () => {
-      window.removeEventListener("contextmenu", handleContextMenu);
-      window.removeEventListener("copy", handleCopyCut);
-      window.removeEventListener("cut", handleCopyCut);
-      window.removeEventListener("dragstart", handleDragStart);
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
-      window.removeEventListener("beforeprint", handleBeforePrint);
-      window.removeEventListener("blur", handleWindowBlur);
-      window.removeEventListener("touchstart", handleTouchStart);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("contextmenu", handleContextMenu, {
+        capture: true,
+      });
+      window.removeEventListener("copy", handleCopyCut, { capture: true });
+      window.removeEventListener("cut", handleCopyCut, { capture: true });
+      window.removeEventListener("dragstart", handleDragStart, {
+        capture: true,
+      });
+      window.removeEventListener("keydown", handleKeyDown, { capture: true });
+      window.removeEventListener("keyup", handleKeyUp, { capture: true });
+      window.removeEventListener("beforeprint", handleBeforePrint, {
+        capture: true,
+      });
+      window.removeEventListener("blur", handleWindowBlur, { capture: true });
+      window.removeEventListener("touchstart", handleTouchStart, {
+        capture: true,
+      });
+      document.removeEventListener("visibilitychange", handleVisibilityChange, {
+        capture: true,
+      });
     };
-  }, [enabled, activateShield]);
+  }, [enabled, activateShield, applySynchronousCurtain]);
 
   // MutationObserver self-healing anti-tampering guard against DevTools DOM deletion/hiding
   useEffect(() => {
@@ -418,6 +469,7 @@ export function DrmShield({
     const watermarkHost = watermarkHostRef.current;
     const canvas = watermarkCanvasRef.current;
     const content = contentRef.current;
+    const curtain = curtainRef.current;
     if (!root || !watermarkHost || !canvas || !content) return;
 
     let checkScheduled = false;
@@ -460,31 +512,51 @@ export function DrmShield({
         tampered = true;
       }
 
+      if (curtain && (!curtain.isConnected || curtain.parentElement !== root)) {
+        isRecovering = true;
+        content.insertAdjacentElement("afterend", curtain);
+        tampered = true;
+      }
+
       if (activeRef.current) {
-        const overlay = overlayRef.current;
         if (
-          overlay &&
-          (!overlay.isConnected || overlay.parentElement !== root)
+          curtain &&
+          (curtain.hasAttribute("hidden") ||
+            curtain.hasAttribute("style") ||
+            curtain.className !== CURTAIN_ACTIVE_CLASS)
         ) {
           isRecovering = true;
-          root.appendChild(overlay);
+          curtain.removeAttribute("hidden");
+          curtain.removeAttribute("style");
+          curtain.className = CURTAIN_ACTIVE_CLASS;
           tampered = true;
         }
-        if (overlay && isComputedHidden(overlay)) {
-          isRecovering = true;
-          overlay.removeAttribute("hidden");
-          overlay.removeAttribute("style");
-          tampered = true;
+        if (renderedActiveRef.current) {
+          const overlay = overlayRef.current;
+          if (
+            overlay &&
+            (!overlay.isConnected || overlay.parentElement !== root)
+          ) {
+            isRecovering = true;
+            root.appendChild(overlay);
+            tampered = true;
+          }
+          if (!overlay || isComputedHidden(overlay)) {
+            if (overlay) {
+              isRecovering = true;
+              overlay.removeAttribute("hidden");
+              overlay.removeAttribute("style");
+            }
+            tampered = true;
+          }
         }
         if (
-          !overlay ||
           !content.classList.contains("blur-2xl") ||
           content.hasAttribute("style")
         ) {
           isRecovering = true;
           content.removeAttribute("style");
-          content.className =
-            "transition-all duration-150 blur-2xl opacity-10 pointer-events-none filter";
+          content.className = `${CONTENT_BASE_CLASS} ${CONTENT_LOCKED_CLASS}`;
           tampered = true;
         }
       }
@@ -525,6 +597,12 @@ export function DrmShield({
       attributes: true,
       attributeFilter: ["style", "class", "hidden"],
     });
+    if (curtain) {
+      observer.observe(curtain, {
+        attributes: true,
+        attributeFilter: ["style", "class", "hidden"],
+      });
+    }
 
     return () => {
       observer.disconnect();
@@ -575,18 +653,32 @@ export function DrmShield({
         </div>
       )}
 
-      {/* Actual Content with Blur Filter on Shield Active */}
+      {/* Actual Content with Synchronous + Reactive Blur Filter on Shield Active */}
       <div
         ref={contentRef}
         data-drm-content="true"
-        className={`transition-all duration-150 ${
+        className={
           isEffectiveShieldActive
-            ? "blur-2xl opacity-10 pointer-events-none filter"
-            : "blur-none opacity-100"
-        }`}
+            ? `${CONTENT_BASE_CLASS} ${CONTENT_LOCKED_CLASS}`
+            : `${CONTENT_BASE_CLASS} blur-none opacity-100`
+        }
       >
         {children}
       </div>
+
+      {/* Zero-Latency Synchronous Curtain (mutated on the event frame before React re-render) */}
+      {enabled && (
+        <div
+          ref={curtainRef}
+          data-drm-curtain="true"
+          aria-hidden="true"
+          className={
+            isEffectiveShieldActive
+              ? CURTAIN_ACTIVE_CLASS
+              : CURTAIN_HIDDEN_CLASS
+          }
+        />
+      )}
 
       {/* Print-Only DRM Blocker Notice (Shown only inside @media print) */}
       {enabled && (

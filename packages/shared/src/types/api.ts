@@ -722,6 +722,7 @@ export type DrmSecurityEventType =
   | "devtools_attempt"
   | "dom_tampering"
   | "print_save_attempt"
+  | "api_scrape_anomaly"
   | "context_menu"
   | "drag_attempt"
   | "window_blur"

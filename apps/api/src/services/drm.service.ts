@@ -8,6 +8,7 @@ import type {
 import {
   getDrmEventRiskLevel,
   type AdminDrmEventsQueryOutput,
+  type DrmClientOs,
   type RecordDrmEventOutput,
 } from "@starter/shared/validators/drm";
 import { db } from "../db";
@@ -22,6 +23,127 @@ import { HttpError } from "../lib/http-error";
 
 const DEDUP_WINDOW_MS = 1500;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const SCRAPE_SHORT_WINDOW_MS = 15_000;
+const SCRAPE_SHORT_MAX_CHAPTERS = 6;
+const SCRAPE_LONG_WINDOW_MS = 60_000;
+const SCRAPE_LONG_MAX_CHAPTERS = 12;
+
+type ChapterDeliveryEntry = { chapterNumber: number; deliveredAt: number };
+const chapterDeliveryHistory = new Map<string, ChapterDeliveryEntry[]>();
+
+function inferClientOsFromUserAgent(userAgent?: string | null): DrmClientOs {
+  const ua = (userAgent ?? "").toLowerCase();
+  if (ua.includes("android")) return "android";
+  if (ua.includes("iphone") || ua.includes("ipad") || ua.includes("ipod")) {
+    return "ios";
+  }
+  if (ua.includes("windows")) return "windows";
+  if (ua.includes("mac os") || ua.includes("macintosh")) return "macos";
+  if (ua.includes("linux")) return "linux";
+  return "unknown";
+}
+
+function pruneChapterDeliveryHistory(now: number) {
+  if (chapterDeliveryHistory.size <= 5000) return;
+  for (const [key, entries] of chapterDeliveryHistory.entries()) {
+    const active = entries.filter(
+      (entry) => now - entry.deliveredAt <= SCRAPE_LONG_WINDOW_MS,
+    );
+    if (active.length === 0) {
+      chapterDeliveryHistory.delete(key);
+    } else {
+      chapterDeliveryHistory.set(key, active);
+    }
+  }
+}
+
+/**
+ * Blocks rapid distinct-chapter harvesting per user and book while allowing
+ * repeated refetches of already-delivered chapters (e.g. window focus reloads).
+ */
+export async function enforceChapterWindowRateLimit(params: {
+  userId: string;
+  bookId: string;
+  bookSlug: string;
+  requestedChapterNum: number;
+  deliveredChapters: number[];
+  watermarkCode: string;
+  userAgent?: string | null;
+  ipAddress?: string | null;
+}): Promise<void> {
+  const {
+    userId,
+    bookId,
+    bookSlug,
+    requestedChapterNum,
+    deliveredChapters,
+    watermarkCode,
+    userAgent,
+    ipAddress,
+  } = params;
+  if (deliveredChapters.length === 0) return;
+
+  const now = Date.now();
+  pruneChapterDeliveryHistory(now);
+  const key = `${userId}:${bookId}`;
+  const recentLong = (chapterDeliveryHistory.get(key) ?? []).filter(
+    (entry) => now - entry.deliveredAt <= SCRAPE_LONG_WINDOW_MS,
+  );
+
+  const shortDistinct = new Set(
+    recentLong
+      .filter((entry) => now - entry.deliveredAt <= SCRAPE_SHORT_WINDOW_MS)
+      .map((entry) => entry.chapterNumber),
+  );
+  const longDistinct = new Set(recentLong.map((entry) => entry.chapterNumber));
+
+  const newForShort = deliveredChapters.filter((ch) => !shortDistinct.has(ch));
+  const newForLong = deliveredChapters.filter((ch) => !longDistinct.has(ch));
+
+  // Refetches inside the already-delivered window never consume scrape quota.
+  if (newForShort.length === 0 && newForLong.length === 0) {
+    chapterDeliveryHistory.set(key, recentLong);
+    return;
+  }
+
+  const projectedShortCount = new Set([...shortDistinct, ...newForShort]).size;
+  const projectedLongCount = new Set([...longDistinct, ...newForLong]).size;
+
+  const exceedsShort =
+    newForShort.length > 0 && projectedShortCount > SCRAPE_SHORT_MAX_CHAPTERS;
+  const exceedsLong =
+    newForLong.length > 0 && projectedLongCount > SCRAPE_LONG_MAX_CHAPTERS;
+
+  if (exceedsShort || exceedsLong) {
+    chapterDeliveryHistory.set(key, recentLong);
+    const windowSummary = exceedsShort
+      ? `${projectedShortCount} bab unik / 15 detik`
+      : `${projectedLongCount} bab unik / 60 detik`;
+    await recordDrmSecurityEvent({
+      userId,
+      input: {
+        bookSlug,
+        chapterNumber: requestedChapterNum,
+        eventType: "api_scrape_anomaly",
+        triggerDetail: `Burst fetch API terlalu cepat (${windowSummary}, target bab ${requestedChapterNum})`,
+        watermarkCode,
+        clientOs: inferClientOsFromUserAgent(userAgent),
+      },
+      userAgent,
+      ipAddress,
+    });
+    throw new HttpError(
+      429,
+      "RATE_LIMITED",
+      "Permintaan bab terlalu cepat terdeteksi. Akses dibatasi sementara demi keamanan naskah.",
+    );
+  }
+
+  for (const ch of newForShort) {
+    recentLong.push({ chapterNumber: ch, deliveredAt: now });
+  }
+  chapterDeliveryHistory.set(key, recentLong);
+}
 
 function generateWatermarkCode(): string {
   return `ANZ-${randomBytes(6).toString("hex").toUpperCase()}`;

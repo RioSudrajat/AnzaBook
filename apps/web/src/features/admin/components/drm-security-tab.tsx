@@ -23,6 +23,7 @@ const EVENT_TYPE_LABELS: Record<DrmSecurityEventType, string> = {
   devtools_attempt: "Buka DevTools / Source",
   dom_tampering: "Manipulasi Node Watermark",
   print_save_attempt: "Cetak / Simpan Halaman",
+  api_scrape_anomaly: "Anomali Scrape Bab (API)",
   context_menu: "Klik Kanan (Context Menu)",
   drag_attempt: "Seret Konten (Drag)",
   visibility_hidden: "Pindah Tab / Minimize",

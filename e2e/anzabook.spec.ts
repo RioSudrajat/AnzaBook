@@ -124,6 +124,20 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
       page.getByRole("dialog", { name: "Prapemuat Literasi AnzaBook" }),
     ).toHaveCount(0);
     await expect(page.getByText("Bab 1/8", { exact: true })).toBeVisible();
+    // Bounded DRM-02 sliding window: initially [1, 2], later chapters not dumped upfront
+    await expect(page.locator("#chapter-sec-8")).toHaveCount(0);
+    await page
+      .locator("#chapter-sec-2")
+      .evaluate((section) => section.scrollIntoView({ block: "start" }));
+    await expect(page.locator("#chapter-sec-3")).toBeAttached();
+
+    // Jump to final chapter via TOC sidebar, then scroll to bottom for 100% completion
+    await page
+      .getByRole("navigation", { name: "Daftar Bab Naskah" })
+      .getByRole("button")
+      .nth(7)
+      .click();
+    await expect(page.locator("#chapter-sec-8")).toBeVisible();
     await page.evaluate(() =>
       window.scrollTo({
         top: document.documentElement.scrollHeight,
@@ -336,8 +350,10 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     // Glossy progress bar at bottom
     await expect(page.getByText(/Bab 1\//i).first()).toBeVisible();
 
-    // 1. Trigger DRM shield via PrintScreen
+    // 1. Trigger DRM shield via PrintScreen (verifies synchronous curtain + alertdialog lock)
     await page.keyboard.press("PrintScreen");
+    const drmCurtain = page.locator('[data-drm-curtain="true"]');
+    await expect(drmCurtain).toHaveClass(/\bflex\b/);
     const drmDialog = page.getByRole("alertdialog");
     await expect(drmDialog).toBeVisible();
     await expect(
@@ -347,6 +363,7 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     // Dismiss shield
     await page.getByRole("button", { name: /Lanjutkan Membaca/i }).click();
     await expect(drmDialog).not.toBeVisible();
+    await expect(drmCurtain).toHaveClass(/\bhidden\b/);
 
     // 2. Trigger DRM shield via DevTools shortcut (F12)
     await page.keyboard.press("F12");

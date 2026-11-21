@@ -95,6 +95,10 @@ booksRouter.get("/:slug/read", requireAuth, async (req, res) => {
     auth.user.id,
     query,
     auth.session.id,
+    {
+      userAgent: req.get("user-agent") ?? null,
+      ipAddress: req.ip ?? req.socket.remoteAddress ?? null,
+    },
   );
   res.json({ data: payload });
 });
