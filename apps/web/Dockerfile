@@ -26,9 +26,11 @@ FROM deps AS builder
 COPY --from=pruner /app/out/full/ .
 COPY tsconfig.base.json starter.config.json ./
 ARG VITE_API_URL
+ARG VITE_ENABLE_DRM_TOGGLE=false
 RUN test -n "$VITE_API_URL" || { echo "Pass --build-arg VITE_API_URL=<the API's public origin>"; exit 1; }
 ENV NODE_ENV=production \
-    VITE_API_URL=$VITE_API_URL
+    VITE_API_URL=$VITE_API_URL \
+    VITE_ENABLE_DRM_TOGGLE=$VITE_ENABLE_DRM_TOGGLE
 RUN pnpm --filter @starter/web run build
 
 # --- Runner: Nitro's node-server output is self-contained -------------------

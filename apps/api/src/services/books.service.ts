@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, ilike, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import { env } from "../config/env";
 import {
@@ -17,6 +17,11 @@ import {
   userShelves,
 } from "../db/schema";
 import { HttpError } from "../lib/http-error";
+import {
+  assertReaderNotSuspended,
+  enforceChapterWindowRateLimit,
+  issueOrGetDrmWatermarkSession,
+} from "./drm.service";
 import { getActiveMembership } from "./membership.service";
 import type {
   ListBooksQuery,
@@ -835,8 +840,13 @@ export async function claimPrintCode(
 export async function getBookReaderPayload(
   slug: string,
   userId: string,
-  userEmail: string,
   query: ReadBookQuery,
+  authSessionId?: string | null,
+  requestContext?: {
+    userRole?: string | null;
+    userAgent?: string | null;
+    ipAddress?: string | null;
+  },
 ): Promise<BookReaderPayloadDto & { watermark: string }> {
   const [book] = await db
     .select()
@@ -846,6 +856,8 @@ export async function getBookReaderPayload(
 
   if (!book)
     throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+
+  await assertReaderNotSuspended(userId, requestContext?.userRole);
 
   const access = await getBookReadAccess(book, userId);
   const requestedChapterNum = query.chapter;
@@ -865,6 +877,10 @@ export async function getBookReaderPayload(
     query.continuous === "true" &&
     access.hasFullAccess &&
     query.mode === "full";
+  const windowSize = continuous
+    ? Math.min(2, Math.max(1, query.windowSize ?? 2))
+    : 1;
+  const maxChapterNum = requestedChapterNum + windowSize - 1;
   const rows = await db
     .select()
     .from(bookChapters)
@@ -872,7 +888,10 @@ export async function getBookReaderPayload(
       and(
         eq(bookChapters.bookId, book.id),
         continuous
-          ? undefined
+          ? and(
+              gte(bookChapters.chapterNumber, requestedChapterNum),
+              lte(bookChapters.chapterNumber, maxChapterNum),
+            )
           : eq(bookChapters.chapterNumber, requestedChapterNum),
       ),
     )
@@ -912,7 +931,26 @@ export async function getBookReaderPayload(
     throw new HttpError(404, "CHAPTER_NOT_FOUND", "Bab tidak ditemukan.");
   }
 
-  const allChapters = await listBookChapters(book.id, userId);
+  const [allChapters, watermarkCode] = await Promise.all([
+    listBookChapters(book.id, userId),
+    issueOrGetDrmWatermarkSession({
+      userId,
+      bookId: book.id,
+      authSessionId,
+    }),
+  ]);
+
+  await enforceChapterWindowRateLimit({
+    userId,
+    userRole: requestContext?.userRole ?? null,
+    bookId: book.id,
+    bookSlug: book.slug,
+    requestedChapterNum,
+    deliveredChapters: rows.map((row) => row.chapterNumber),
+    watermarkCode,
+    userAgent: requestContext?.userAgent ?? null,
+    ipAddress: requestContext?.ipAddress ?? null,
+  });
 
   return {
     book: toBookSummary(book),
@@ -921,7 +959,7 @@ export async function getBookReaderPayload(
     chapters,
     allChapters,
     ...access,
-    watermark: `${userEmail} : ${userId.slice(0, 8)} : ${new Date().toISOString()}`,
+    watermark: watermarkCode,
   };
 }
 

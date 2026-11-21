@@ -46,6 +46,7 @@ export const readBookQuerySchema = z
     mode: z.enum(["full", "blueprint", "audio"]).default("full"),
     chapter: z.coerce.number().int().min(1).default(1),
     continuous: z.enum(["true", "false"]).optional(),
+    windowSize: z.coerce.number().int().min(1).max(2).optional().default(2),
   })
   .strict();
 
@@ -94,6 +95,7 @@ export type ReadBookInput = {
   mode?: "full" | "blueprint" | "audio";
   chapter?: number;
   continuous?: boolean;
+  windowSize?: number;
 };
 export type ReadBookQuery = z.infer<typeof readBookQuerySchema>;
 

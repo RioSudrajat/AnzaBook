@@ -19,11 +19,16 @@ import {
 } from "lucide-react";
 import { z } from "zod";
 import {
+  encodeZeroWidthFingerprint,
+  stripZeroWidthCharacters,
+} from "@starter/shared/drm-steganography";
+import {
   splitChapterIntoPages,
   computeBookPagination,
   getChapterAndPageFromGlobal,
 } from "@starter/shared/chapter-pagination";
 import { bookProgressPercent } from "@starter/shared/reading-progress";
+import { resolveReaderDrmPolicy } from "@starter/shared/validators/drm";
 import type {
   BookChapterSummaryDto,
   BookHighlightDto,
@@ -36,16 +41,22 @@ import type {
 } from "@starter/shared/types";
 import type { SaveReadingProgressInput } from "@starter/shared/validators/reading";
 import { Button } from "@/components/ui/button";
+import { getBookReader } from "@/features/books/api";
 import {
   useBookHighlights,
   useBookReader,
   useCreateHighlight,
   useDeleteHighlight,
+  useReaderDrmStatus,
   useReadingProgress,
+  useRecordDrmEvent,
   useSaveReadingProgress,
+  useSubmitReaderDrmAppeal,
 } from "@/features/books/hooks";
+import { IS_DRM_TOGGLE_ENABLED } from "@/lib/env";
 import { booksKeys } from "@/features/books/queries";
 import { bookPagePath } from "@/features/books/book-share";
+import { Brand } from "@/components/brand";
 import { BookShareDialog } from "@/features/books/components/book-share-dialog";
 import {
   findSlide,
@@ -57,7 +68,10 @@ import {
 import { ApiError } from "@/lib/api/client";
 import { useCreateReadingSession } from "@/features/community/hooks";
 import { AudiobookBar } from "@/features/reader/components/audiobook-bar";
-import { DrmShield } from "@/features/reader/components/drm-shield";
+import {
+  DrmShield,
+  type DrmShieldTriggerEvent,
+} from "@/features/reader/components/drm-shield";
 import { GlossyProgressBar } from "@/features/reader/components/glossy-progress-bar";
 import { HighlightPopover } from "@/features/reader/components/highlight-popover";
 import { HighlightStoryDialog } from "@/features/reader/components/highlight-story-dialog";
@@ -166,6 +180,16 @@ function splitParagraphs(text?: string | null): string[] {
     .split(/\n\n+/)
     .map((p) => p.trim())
     .filter(Boolean);
+}
+
+// Helper to embed an invisible zero-width forensic session fingerprint inside prose
+function DrmStegoFingerprint({ fingerprint }: { fingerprint: string }) {
+  if (!fingerprint) return null;
+  return (
+    <span aria-hidden="true" data-drm-fp="true" className="select-text">
+      {fingerprint}
+    </span>
+  );
 }
 
 // Helper to render text with interactive fluorescent stabilo marks
@@ -294,6 +318,18 @@ function ReaderBook() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const requestedChapter = search.chapter ?? 1;
+  const [anchorChapter, setAnchorChapter] = useState(requestedChapter);
+  const [extraChapters, setExtraChapters] = useState<BookReaderChapterDto[]>(
+    [],
+  );
+  const stableBookPayloadRef = useRef<
+    (BookReaderPayloadDto & { watermark: string }) | null
+  >(null);
+  const prefetchingChaptersRef = useRef<Set<number>>(new Set());
+  const pendingChapterNavRef = useRef<{
+    chapter: number;
+    layout: ReadingLayout;
+  } | null>(null);
 
   const isManuscript =
     slug.startsWith("manuscript-") || slug.startsWith("manu-");
@@ -319,9 +355,14 @@ function ReaderBook() {
     refetch: refetchBook,
   } = useBookReader(isManuscript ? "" : slug, {
     mode: "full",
-    chapter: requestedChapter,
+    chapter: anchorChapter,
     continuous: true,
+    windowSize: 2,
   });
+  if (bookPayload) {
+    stableBookPayloadRef.current = bookPayload;
+  }
+  const resolvedBookPayload = bookPayload ?? stableBookPayloadRef.current;
 
   const manuscriptPayload:
     (BookReaderPayloadDto & { watermark: string }) | null = useMemo(() => {
@@ -395,8 +436,10 @@ function ReaderBook() {
     };
   }, [manuscript, user.name]);
 
-  const payload = isManuscript ? manuscriptPayload : bookPayload;
-  const isLoading = isManuscript ? isManuscriptLoading : isBookLoading;
+  const payload = isManuscript ? manuscriptPayload : resolvedBookPayload;
+  const isLoading = isManuscript
+    ? isManuscriptLoading
+    : isBookLoading && !resolvedBookPayload;
   const isError = isManuscript ? false : isBookError;
   const error = isManuscript ? null : bookError;
   const refetch = isManuscript ? refetchManuscript : refetchBook;
@@ -631,9 +674,23 @@ function ReaderBook() {
   const [languageView, setLanguageView] = useState<LanguageView>("id");
   const [readingLayout, setReadingLayout] = useState<ReadingLayout>("scroll");
   const [isAudioOpen, setIsAudioOpen] = useState(false);
-  const [isDrmEnabled, setIsDrmEnabled] = useState<boolean>(
-    search.drm ?? false,
+  const [drmToggleState, setDrmToggleState] = useState<boolean>(
+    IS_DRM_TOGGLE_ENABLED ? (search.drm ?? true) : true,
   );
+  const drmPolicy = resolveReaderDrmPolicy({
+    toggleAvailable: IS_DRM_TOGGLE_ENABLED,
+    requestedDrm: search.drm,
+    toggleState: drmToggleState,
+    isAuthorEditing: isAuthorOrPublisher && editMode === "edit",
+  });
+  const { mutate: recordDrmEvent } = useRecordDrmEvent();
+  const { data: readerDrmStatus, refetch: refetchDrmStatus } =
+    useReaderDrmStatus();
+  const submitAppealMutation = useSubmitReaderDrmAppeal();
+  const [appealMessageInput, setAppealMessageInput] = useState("");
+  const [appealFeedback, setAppealFeedback] = useState<string | null>(null);
+  const [suspendedNow, setSuspendedNow] = useState(false);
+  const lastDrmLogRef = useRef<Map<string, number>>(new Map());
   const [isHighlightsOpen, setIsHighlightsOpen] = useState(false);
   const [isRatingOpen, setIsRatingOpen] = useState(false);
   const [share, setShare] = useState<{
@@ -696,6 +753,27 @@ function ReaderBook() {
     return () => clearTimeout(pendingCheckpoint.current);
   }, []);
 
+  const loadedChapters = useMemo(() => {
+    const base = payload?.chapters?.length
+      ? payload.chapters
+      : payload?.currentChapter
+        ? [payload.currentChapter]
+        : [];
+    if (extraChapters.length === 0) return base;
+    const byChapter = new Map<number, BookReaderChapterDto>();
+    for (const item of base) {
+      byChapter.set(item.chapterNumber, item);
+    }
+    for (const item of extraChapters) {
+      if (!byChapter.has(item.chapterNumber)) {
+        byChapter.set(item.chapterNumber, item);
+      }
+    }
+    return Array.from(byChapter.values()).sort(
+      (a, b) => a.chapterNumber - b.chapterNumber,
+    );
+  }, [extraChapters, payload?.chapters, payload?.currentChapter]);
+
   const accessibleChapters = useMemo(() => {
     if (isAuthorOrPublisher && liveChapters.length > 0) {
       return liveChapters.map((c) => ({
@@ -709,17 +787,51 @@ function ReaderBook() {
         audioDurationSeconds: null,
       }));
     }
-    return payload?.chapters?.length
-      ? payload.chapters
-      : payload?.currentChapter
-        ? [payload.currentChapter]
-        : [];
-  }, [
-    isAuthorOrPublisher,
-    liveChapters,
-    payload?.chapters,
-    payload?.currentChapter,
-  ]);
+    return loadedChapters;
+  }, [isAuthorOrPublisher, liveChapters, loadedChapters]);
+
+  const prefetchChapter = useCallback(
+    async (targetChapter: number) => {
+      if (isManuscript || isAuthorOrPublisher || !payload?.hasFullAccess) {
+        return;
+      }
+      const existsInBook = payload.allChapters.some(
+        (c) => c.chapterNumber === targetChapter,
+      );
+      if (!existsInBook) return;
+      if (
+        loadedChapters.some((c) => c.chapterNumber === targetChapter) ||
+        prefetchingChaptersRef.current.has(targetChapter)
+      ) {
+        return;
+      }
+
+      prefetchingChaptersRef.current.add(targetChapter);
+      try {
+        const nextPayload = await getBookReader(slug, {
+          mode: "full",
+          chapter: targetChapter,
+          continuous: false,
+        });
+        const nextChapterObj =
+          nextPayload.chapters?.find(
+            (c) => c.chapterNumber === targetChapter,
+          ) ?? nextPayload.currentChapter;
+        if (nextChapterObj) {
+          setExtraChapters((prev) =>
+            prev.some((c) => c.chapterNumber === nextChapterObj.chapterNumber)
+              ? prev
+              : [...prev, nextChapterObj],
+          );
+        }
+      } catch {
+        // Silent fallback on background prefetch (rate limit or offline) so active reading stays uninterrupted.
+      } finally {
+        prefetchingChaptersRef.current.delete(targetChapter);
+      }
+    },
+    [isAuthorOrPublisher, isManuscript, loadedChapters, payload, slug],
+  );
 
   const selectedChapter =
     readingLayout === "scroll" ? scrollPosition.chapter : slidePosition.chapter;
@@ -730,6 +842,49 @@ function ReaderBook() {
     accessibleChapters[0] ??
     payload?.currentChapter;
   const activeChapterNum = chapter?.chapterNumber ?? requestedChapter;
+
+  const handleDrmSecurityTrigger = useCallback(
+    (event: DrmShieldTriggerEvent) => {
+      if (!drmPolicy.isEnabled || !payload?.watermark) return;
+      const now = Date.now();
+      // Group PrintScreen keydown+keyup as one physical trigger while allowing distinct actions.
+      const dedupKey =
+        event.eventType === "screenshot_shortcut" &&
+        event.triggerDetail.startsWith("PrintScreen")
+          ? "screenshot_shortcut:PrintScreen"
+          : `${event.eventType}:${event.triggerDetail}`;
+      const last = lastDrmLogRef.current.get(dedupKey) ?? 0;
+      if (now - last < 1500) return;
+      lastDrmLogRef.current.set(dedupKey, now);
+
+      recordDrmEvent(
+        {
+          bookSlug: slug,
+          chapterNumber: activeChapterNum,
+          eventType: event.eventType,
+          triggerDetail: event.triggerDetail,
+          watermarkCode: payload.watermark,
+          clientOs: event.clientOs,
+        },
+        {
+          onSuccess: (result) => {
+            if (result.suspensionTriggered) {
+              setSuspendedNow(true);
+              void refetchDrmStatus();
+            }
+          },
+        },
+      );
+    },
+    [
+      activeChapterNum,
+      drmPolicy.isEnabled,
+      payload?.watermark,
+      recordDrmEvent,
+      refetchDrmStatus,
+      slug,
+    ],
+  );
   const fontClass =
     fontFamily === "serif"
       ? "font-serif"
@@ -755,12 +910,40 @@ function ReaderBook() {
     search.chapter === undefined &&
     (progressPending ||
       (scope === "full" && !savedProgress && previewCheckpoint.isPending));
+  const checkpointTargetOutOfWindow =
+    search.chapter === undefined &&
+    !isAuthorOrPublisher &&
+    !isManuscript &&
+    !waitingForCheckpoint &&
+    Boolean(payload?.hasFullAccess) &&
+    Boolean(progress?.lastChapterNumber) &&
+    !loadedChapters.some(
+      (item: BookReaderChapterDto) =>
+        item.chapterNumber === progress?.lastChapterNumber,
+    ) &&
+    Boolean(
+      payload?.allChapters.some(
+        (item: BookChapterSummaryDto) =>
+          item.chapterNumber === progress?.lastChapterNumber,
+      ),
+    );
 
   useEffect(() => {
     if (!payload || hasRestoredRef.current) return;
     if (waitingForCheckpoint) return;
     const checkpoint = search.chapter === undefined ? progress : null;
-    const savedChapter = payload.chapters?.find(
+    if (checkpointTargetOutOfWindow && checkpoint?.lastChapterNumber) {
+      const targetChapter = checkpoint.lastChapterNumber;
+      if (targetChapter !== anchorChapter) {
+        const frame = requestAnimationFrame(() => {
+          setExtraChapters([]);
+          setAnchorChapter(targetChapter);
+        });
+        return () => cancelAnimationFrame(frame);
+      }
+      return;
+    }
+    const savedChapter = loadedChapters.find(
       (item: BookReaderChapterDto) =>
         item.chapterNumber === checkpoint?.lastChapterNumber,
     );
@@ -804,7 +987,7 @@ function ReaderBook() {
       }
       if (
         !savedChapter &&
-        requestedChapter === payload.chapters?.[0]?.chapterNumber
+        requestedChapter === loadedChapters[0]?.chapterNumber
       )
         return;
 
@@ -819,7 +1002,8 @@ function ReaderBook() {
         payload.hasFullAccess &&
         checkpoint === savedProgress &&
         savedChapter &&
-        savedChapter.id === payload.chapters?.at(-1)?.id &&
+        savedChapter.chapterNumber ===
+          payload.allChapters.at(-1)?.chapterNumber &&
         checkpoint?.layout === "scroll" &&
         checkpoint.lastScrollPercent === 100
       ) {
@@ -851,7 +1035,10 @@ function ReaderBook() {
     return () => cancelAnimationFrame(frame);
   }, [
     accessibleChapters,
+    anchorChapter,
+    checkpointTargetOutOfWindow,
     languageView,
+    loadedChapters,
     payload,
     progress,
     requestedChapter,
@@ -859,6 +1046,30 @@ function ReaderBook() {
     search.chapter,
     waitingForCheckpoint,
   ]);
+
+  useEffect(() => {
+    const pending = pendingChapterNavRef.current;
+    if (!pending) return;
+    const isLoaded = loadedChapters.some(
+      (item: BookReaderChapterDto) => item.chapterNumber === pending.chapter,
+    );
+    if (!isLoaded) return;
+
+    const targetChapter = pending.chapter;
+    const targetLayout = pending.layout;
+    const frame = requestAnimationFrame(() => {
+      pendingChapterNavRef.current = null;
+      hasRestoredRef.current = true;
+      if (targetLayout === "slide") {
+        setSlidePosition({ chapter: targetChapter, paragraph: -1, offset: 0 });
+        window.scrollTo({ top: 0 });
+        return;
+      }
+      setScrollPosition({ chapter: targetChapter, percent: 0 });
+      chapterSection(targetChapter)?.scrollIntoView({ block: "start" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [loadedChapters]);
 
   useEffect(() => {
     const deadline = payload?.accessExpiresAt;
@@ -925,6 +1136,11 @@ function ReaderBook() {
     );
     if (!sections?.length) return null;
     const finalSection = sections[sections.length - 1];
+    const finalSectionChapterNum = Number(finalSection.dataset.chapterNumber);
+    const bookFinalChapterNum = payload?.allChapters.at(-1)?.chapterNumber;
+    const isRenderedFinalChapter =
+      bookFinalChapterNum !== undefined &&
+      finalSectionChapterNum === bookFinalChapterNum;
     const viewportMarker = window.innerHeight * 0.36;
     const scrollRoot = document.scrollingElement;
     const scrollTop = scrollRoot?.scrollTop ?? 0;
@@ -932,7 +1148,8 @@ function ReaderBook() {
       ? scrollRoot.scrollHeight - scrollRoot.clientHeight
       : 0;
     const atBookEnd =
-      payload?.hasFullAccess &&
+      Boolean(payload?.hasFullAccess) &&
+      isRenderedFinalChapter &&
       maxScroll > 0 &&
       scrollTop > 0 &&
       maxScroll - scrollTop <= 1;
@@ -942,7 +1159,7 @@ function ReaderBook() {
       body = section;
     }
     if (atBookEnd) body = finalSection;
-    const visibleChapter = payload?.chapters?.find(
+    const visibleChapter = loadedChapters.find(
       (item: BookReaderChapterDto) =>
         item.chapterNumber === Number(body.dataset.chapterNumber),
     );
@@ -954,7 +1171,11 @@ function ReaderBook() {
     const rect = body.getBoundingClientRect();
     if (atBookEnd) {
       percent = 100;
-    } else if (payload?.hasFullAccess && body === finalSection) {
+    } else if (
+      payload?.hasFullAccess &&
+      body === finalSection &&
+      isRenderedFinalChapter
+    ) {
       // A short final chapter may never reach the top before scrolling ends.
       const chapterStart = Math.max(
         0,
@@ -999,7 +1220,8 @@ function ReaderBook() {
     captureSlidePosition,
     chapter,
     chapterParagraphCount,
-    payload?.chapters,
+    loadedChapters,
+    payload?.allChapters,
     payload?.hasFullAccess,
     readingLayout,
     activeSpread,
@@ -1057,6 +1279,25 @@ function ReaderBook() {
             },
       );
       queueCheckpoint(position);
+      if (
+        !isAuthorOrPublisher &&
+        !isManuscript &&
+        payload?.hasFullAccess &&
+        loadedChapters.length > 0
+      ) {
+        const lastLoaded =
+          loadedChapters[loadedChapters.length - 1].chapterNumber;
+        const bookLast =
+          payload.allChapters.at(-1)?.chapterNumber ?? lastLoaded;
+        if (
+          lastLoaded < bookLast &&
+          (position.lastChapterNumber >= lastLoaded ||
+            (position.lastChapterNumber >= lastLoaded - 1 &&
+              position.lastScrollPercent >= 65))
+        ) {
+          void prefetchChapter(lastLoaded + 1);
+        }
+      }
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
@@ -1066,7 +1307,12 @@ function ReaderBook() {
     chapter,
     expiredAccess,
     isAuthorOrPublisher,
+    isManuscript,
+    loadedChapters,
+    payload?.allChapters,
     payload?.accessExpiresAt,
+    payload?.hasFullAccess,
+    prefetchChapter,
     queueCheckpoint,
     readingLayout,
   ]);
@@ -1075,6 +1321,29 @@ function ReaderBook() {
     setSlidePosition(target.position);
     const position = captureSlidePosition(target);
     if (position) queueCheckpoint(position);
+    if (
+      !isAuthorOrPublisher &&
+      !isManuscript &&
+      payload?.hasFullAccess &&
+      loadedChapters.length > 0 &&
+      spreads.length > 0
+    ) {
+      const targetIndex = spreads.findIndex(
+        (item) =>
+          item.position.chapter === target.position.chapter &&
+          item.position.paragraph === target.position.paragraph &&
+          item.position.offset === target.position.offset,
+      );
+      const lastLoaded =
+        loadedChapters[loadedChapters.length - 1].chapterNumber;
+      const bookLast = payload.allChapters.at(-1)?.chapterNumber ?? lastLoaded;
+      if (
+        lastLoaded < bookLast &&
+        targetIndex >= Math.max(0, spreads.length - 3)
+      ) {
+        void prefetchChapter(lastLoaded + 1);
+      }
+    }
   }
 
   function changeReadingLayout(layout: ReadingLayout) {
@@ -1107,12 +1376,11 @@ function ReaderBook() {
   }
 
   async function handleSelectChapter(ch: number) {
-    if (readingLayout === "slide") {
-      setSlidePosition({ chapter: ch, paragraph: -1, offset: 0 });
-      return;
-    }
-
     if (isAuthorOrPublisher) {
+      if (readingLayout === "slide") {
+        setSlidePosition({ chapter: ch, paragraph: -1, offset: 0 });
+        return;
+      }
       setScrollPosition((prev) => ({ ...prev, chapter: ch }));
       if (ch === 1) {
         const chap1Break = document.querySelector(
@@ -1144,23 +1412,41 @@ function ReaderBook() {
       paywallRef.current?.focus();
       return;
     }
-    if (readingLayout === "scroll") {
+
+    const isAlreadyLoaded = loadedChapters.some(
+      (item: BookReaderChapterDto) => item.chapterNumber === ch,
+    );
+
+    if (readingLayout === "slide") {
+      const position = capturePosition();
+      clearTimeout(pendingCheckpoint.current);
+      if (position) {
+        try {
+          await saveProgressAsync(position);
+        } catch {
+          setSaveError(true);
+          return;
+        }
+      }
+      setSaveError(false);
+      if (isAlreadyLoaded) {
+        setSlidePosition({ chapter: ch, paragraph: -1, offset: 0 });
+        window.scrollTo({ top: 0 });
+        return;
+      }
+    } else if (isAlreadyLoaded) {
       chapterSection(ch)?.scrollIntoView({ block: "start" });
       return;
     }
-    const position = capturePosition();
-    clearTimeout(pendingCheckpoint.current);
-    if (position) {
-      try {
-        await saveProgressAsync(position);
-      } catch {
-        setSaveError(true);
-        return;
-      }
+
+    pendingChapterNavRef.current = { chapter: ch, layout: readingLayout };
+    const lastLoadedNum = loadedChapters.at(-1)?.chapterNumber ?? 0;
+    if (ch === lastLoadedNum + 1) {
+      void prefetchChapter(ch);
+    } else {
+      setExtraChapters([]);
+      setAnchorChapter(ch);
     }
-    setSaveError(false);
-    setSlidePosition({ chapter: ch, paragraph: -1, offset: 0 });
-    window.scrollTo({ top: 0 });
   }
 
   // Handle Flexing a specific highlight
@@ -1194,6 +1480,10 @@ function ReaderBook() {
     note?: string;
     chapterNumber?: number;
   }) => {
+    const cleanSelectedText = stripZeroWidthCharacters(
+      data.selectedText,
+    ).trim();
+    if (!cleanSelectedText) return;
     const targetChapter = data.chapterNumber ?? activeChapterNum;
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const optHighlight: BookHighlightDto = {
@@ -1203,7 +1493,7 @@ function ReaderBook() {
       chapterId: null,
       chapterNumber: targetChapter,
       pageNumber: activeSpread?.chapterPage ?? 1,
-      selectedText: data.selectedText.trim(),
+      selectedText: cleanSelectedText,
       color: data.color,
       note: data.note || null,
       createdAt: new Date().toISOString(),
@@ -1220,7 +1510,7 @@ function ReaderBook() {
         bookId,
         chapterNumber: targetChapter,
         pageNumber: activeSpread?.chapterPage ?? 1,
-        selectedText: data.selectedText.trim(),
+        selectedText: cleanSelectedText,
         color: data.color,
         note: data.note,
       });
@@ -1291,7 +1581,7 @@ function ReaderBook() {
             28_800,
             Math.max(1, Math.round((Date.now() - startTimeRef.current) / 1000)),
           );
-          const positionChapter = payload?.chapters?.find(
+          const positionChapter = loadedChapters.find(
             (item: BookReaderChapterDto) =>
               item.chapterNumber === position.lastChapterNumber,
           );
@@ -1364,13 +1654,44 @@ function ReaderBook() {
 
   const isLocked =
     error instanceof ApiError && error.code === "FORBIDDEN_DIGITAL_ACCESS";
+  const isDrmSuspendedError =
+    error instanceof ApiError && error.code === "READER_SUSPENDED";
+  const isReaderSuspended =
+    !isAuthorOrPublisher &&
+    !isManuscript &&
+    (suspendedNow ||
+      isDrmSuspendedError ||
+      (readerDrmStatus?.status !== undefined &&
+        readerDrmStatus.status !== "active"));
   const isExpired =
     expiredAccess !== null && expiredAccess === payload?.accessExpiresAt;
   const isMissing = error instanceof ApiError && error.status === 404;
 
+  const hiddenFingerprint = useMemo(
+    () =>
+      drmPolicy.isEnabled && payload?.watermark
+        ? encodeZeroWidthFingerprint(payload.watermark)
+        : "",
+    [drmPolicy.isEnabled, payload?.watermark],
+  );
+
+  const lastLoadedChapterNum = loadedChapters.at(-1)?.chapterNumber ?? 0;
+  const bookLastChapterNum = payload?.allChapters.at(-1)?.chapterNumber;
+  const hasMoreChapters =
+    !isAuthorOrPublisher &&
+    !isManuscript &&
+    Boolean(payload?.hasFullAccess) &&
+    bookLastChapterNum !== undefined &&
+    lastLoadedChapterNum < bookLastChapterNum;
+  const hasReachedBookEnd = Boolean(payload?.hasFullAccess) && !hasMoreChapters;
+
   if (
     isLoading ||
-    (payload && !isError && !isExpired && waitingForCheckpoint)
+    (payload &&
+      !isError &&
+      !isExpired &&
+      (waitingForCheckpoint ||
+        (!hasRestoredRef.current && checkpointTargetOutOfWindow)))
   ) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -1381,6 +1702,180 @@ function ReaderBook() {
           </p>
         </div>
       </div>
+    );
+  }
+
+  if (isReaderSuspended) {
+    const suspension = readerDrmStatus?.latestSuspension ?? null;
+    const status = readerDrmStatus?.status ?? "suspended";
+    const canAppeal = status === "suspended" || status === "rejected";
+    const statusText =
+      status === "appeal_pending"
+        ? "Peninjauan Diajukan"
+        : status === "rejected"
+          ? "Peninjauan Ditolak"
+          : "Pembekuan Aktif";
+
+    return (
+      <main
+        id="main-content"
+        className="mx-auto flex min-h-svh max-w-lg flex-col items-center justify-center px-4 py-12"
+      >
+        <section
+          aria-labelledby="drm-suspended-title"
+          className="w-full rounded-[10px] border border-border bg-card overflow-hidden"
+        >
+          {/* Editorial Masthead Bar: Authentic AnzaBook Logo + Plain Monospace Status Indicator */}
+          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-4">
+            <Brand asLink={false} size="sm" />
+            <span className="inline-flex items-center gap-2 font-mono text-[11px] font-medium uppercase tracking-wider text-destructive tabular-nums">
+              <span
+                className="size-1.5 shrink-0 rounded-full bg-destructive"
+                aria-hidden="true"
+              />
+              {statusText}
+            </span>
+          </header>
+
+          {/* Main Content Sheet */}
+          <div className="p-6 sm:p-7 space-y-6 text-left">
+            <div className="space-y-2.5 border-b border-border/70 pb-5 text-center">
+              <h1
+                id="drm-suspended-title"
+                className="font-serif text-2xl font-semibold tracking-tight text-foreground"
+              >
+                Akses E-Reader Dibekukan Sementara
+              </h1>
+              <p className="mx-auto max-w-md text-sm text-muted-foreground leading-relaxed">
+                Sistem keamanan DRM mendeteksi{" "}
+                <strong className="font-semibold text-foreground tabular-nums">
+                  {suspension?.triggerCount ?? 7} /{" "}
+                  {readerDrmStatus?.strikeLimit ?? 7} pelanggaran prioritas
+                  tinggi
+                </strong>{" "}
+                <span className="font-mono text-xs text-muted-foreground tabular-nums">
+                  (siklus ke-{suspension?.cycleNumber ?? 1})
+                </span>
+                . Akses baca ditahan sementara untuk melindungi hak cipta
+                penulis dan penerbit.
+              </p>
+            </div>
+
+            {suspension?.reviewNote && (
+              <div className="border-l-2 border-destructive pl-3.5 py-0.5 text-xs space-y-1">
+                <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground block">
+                  Catatan Admin
+                </span>
+                <p className="text-foreground leading-relaxed">
+                  {suspension.reviewNote}
+                </p>
+              </div>
+            )}
+
+            {status === "appeal_pending" ? (
+              <div className="border-l-2 border-[var(--color-accent)] pl-3.5 py-0.5 text-xs space-y-1.5">
+                <p className="font-semibold text-foreground">
+                  Permintaan Peninjauan Terkirim
+                </p>
+                <p className="text-muted-foreground leading-relaxed">
+                  Tim Admin AnzaBook sedang meninjau laporan Anda. Klik periksa
+                  status setelah Admin menyetujui pemulihan akses baca.
+                </p>
+                {suspension?.appealMessage && (
+                  <p className="pt-1 italic text-muted-foreground">
+                    &ldquo;{suspension.appealMessage}&rdquo;
+                  </p>
+                )}
+              </div>
+            ) : canAppeal ? (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setAppealFeedback(null);
+                  try {
+                    await submitAppealMutation.mutateAsync({
+                      appealMessage: appealMessageInput.trim(),
+                    });
+                    setAppealMessageInput("");
+                    setAppealFeedback(
+                      "Permintaan peninjauan berhasil dikirim ke Admin.",
+                    );
+                  } catch (err) {
+                    setAppealFeedback(
+                      err instanceof Error
+                        ? err.message
+                        : "Gagal mengirim permintaan peninjauan.",
+                    );
+                  }
+                }}
+                className="space-y-3"
+              >
+                <label
+                  htmlFor="drm-appeal-message"
+                  className="block font-mono text-[11px] uppercase tracking-wider text-muted-foreground"
+                >
+                  Ajukan Peninjauan Akses ke Admin
+                </label>
+                <textarea
+                  id="drm-appeal-message"
+                  aria-label="Alasan Peninjauan Akses"
+                  value={appealMessageInput}
+                  onChange={(e) => setAppealMessageInput(e.target.value)}
+                  minLength={10}
+                  maxLength={1000}
+                  required
+                  rows={3}
+                  placeholder="Jelaskan kronologi aktivitas Anda agar Admin dapat meninjau pemulihan akses E-Reader..."
+                  className="w-full resize-none rounded-[6px] border border-border bg-background px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                />
+                {appealFeedback && (
+                  <p className="text-xs text-muted-foreground">
+                    {appealFeedback}
+                  </p>
+                )}
+                <Button
+                  type="submit"
+                  disabled={
+                    submitAppealMutation.isPending ||
+                    appealMessageInput.trim().length < 10
+                  }
+                  className="w-full min-h-11 font-mono text-xs bg-[var(--color-accent)] text-[var(--color-accent-ink)] font-semibold hover:brightness-105 disabled:bg-[var(--color-accent)]/45 disabled:text-[var(--color-accent-ink)]/80 disabled:opacity-100"
+                >
+                  {submitAppealMutation.isPending
+                    ? "Mengirim..."
+                    : "Ajukan Peninjauan Akses"}
+                </Button>
+              </form>
+            ) : null}
+          </div>
+
+          {/* Ruled Footer Utility Actions */}
+          <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/20 px-6 py-3.5">
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11 font-mono text-xs"
+              onClick={async () => {
+                lastDrmLogRef.current.clear();
+                setSuspendedNow(false);
+                await queryClient.invalidateQueries({
+                  queryKey: booksKeys.readers(),
+                });
+                await Promise.all([refetchDrmStatus(), refetchBook()]);
+              }}
+            >
+              Periksa Status Akses
+            </Button>
+            <Link
+              to="/app"
+              search={{ tab: "home" }}
+              className="inline-flex min-h-11 items-center rounded-sm px-2 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              Kembali ke Home
+            </Link>
+          </footer>
+        </section>
+      </main>
     );
   }
 
@@ -1442,7 +1937,8 @@ function ReaderBook() {
 
   const { book, allChapters, watermark } = payload;
   const currentChapter = chapter ?? payload.currentChapter;
-  const chaptersList = payload.chapters ?? [currentChapter];
+  const chaptersList =
+    loadedChapters.length > 0 ? loadedChapters : [currentChapter];
   const isPremiumPreview =
     !payload.hasFullAccess && book.accessTier === "premium";
   const chapterIndex = allChapters.findIndex(
@@ -1460,7 +1956,12 @@ function ReaderBook() {
     : scrollPosition.percent;
 
   return (
-    <DrmShield watermarkText={watermark} enabled={isDrmEnabled}>
+    <DrmShield
+      watermarkText={watermark}
+      enabled={drmPolicy.isEnabled}
+      theme={theme}
+      onSecurityTrigger={handleDrmSecurityTrigger}
+    >
       <div
         data-theme={theme}
         className={`${
@@ -1495,8 +1996,12 @@ function ReaderBook() {
                 ? () => setIsAudioOpen(!isAudioOpen)
                 : undefined
             }
-            isDrmEnabled={isDrmEnabled}
-            onToggleDrm={() => setIsDrmEnabled((prev) => !prev)}
+            isDrmEnabled={drmPolicy.isEnabled}
+            onToggleDrm={
+              drmPolicy.showToggle
+                ? () => setDrmToggleState((prev) => !prev)
+                : undefined
+            }
             isHighlightsOpen={isHighlightsOpen}
             onToggleHighlights={() => setIsHighlightsOpen(!isHighlightsOpen)}
             highlightCount={allHighlights.length}
@@ -1705,6 +2210,9 @@ function ReaderBook() {
                                         highlights,
                                         handleFlexHighlight,
                                       )}
+                                      <DrmStegoFingerprint
+                                        fingerprint={hiddenFingerprint}
+                                      />
                                     </p>
                                     <p
                                       className={`border-t md:border-t-0 md:border-l border-current/15 pt-2 md:pt-0 md:pl-6 opacity-75 italic leading-relaxed text-justify ${fontClass}`}
@@ -1781,6 +2289,9 @@ function ReaderBook() {
                                             highlights,
                                             handleFlexHighlight,
                                           )}
+                                          <DrmStegoFingerprint
+                                            fingerprint={hiddenFingerprint}
+                                          />
                                         </p>
                                       )}
                                     </div>
@@ -1796,8 +2307,28 @@ function ReaderBook() {
                 )
               )}
 
-              {/* End of Reading Completion Section */}
-              {payload.hasFullAccess && (
+              {/* End of Reading Completion Section / Seamless Chapter Prefetch Footer */}
+              {payload.hasFullAccess && hasMoreChapters && (
+                <div className="pt-12 border-t border-current/10 text-center space-y-3">
+                  <p className="text-xs font-mono text-muted-foreground">
+                    Menyiapkan Bab {lastLoadedChapterNum + 1} agar baca tetap
+                    mengalir...
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      void prefetchChapter(lastLoadedChapterNum + 1)
+                    }
+                    className="font-mono text-xs"
+                  >
+                    Muat Bab {lastLoadedChapterNum + 1}
+                  </Button>
+                </div>
+              )}
+
+              {hasReachedBookEnd && (
                 <div className="pt-16 border-t border-current/15 text-center space-y-4">
                   <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
                     Akhir buku
@@ -1839,16 +2370,19 @@ function ReaderBook() {
               fontSize={fontSize}
               coverColor={book.coverColor}
               isPremiumPreview={isPremiumPreview}
-              renderFragment={(fragment, chapterNumber) =>
-                renderHighlightedText(
-                  fragment.source,
-                  allHighlights.filter(
-                    (item) => item.chapterNumber === chapterNumber,
-                  ),
-                  handleFlexHighlight,
-                  fragment,
-                )
-              }
+              renderFragment={(fragment, chapterNumber) => (
+                <>
+                  {renderHighlightedText(
+                    fragment.source,
+                    allHighlights.filter(
+                      (item) => item.chapterNumber === chapterNumber,
+                    ),
+                    handleFlexHighlight,
+                    fragment,
+                  )}
+                  <DrmStegoFingerprint fingerprint={hiddenFingerprint} />
+                </>
+              )}
             />
           )}
           {!payload.hasFullAccess && readingLayout === "scroll" && (

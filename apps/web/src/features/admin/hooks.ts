@@ -12,13 +12,20 @@ import type {
   AdminVerifyCalendarInput,
   AdminVerifyPublisherInput,
 } from "@starter/shared/validators/admin";
+import type {
+  AdminDrmEventsQueryInput,
+  AdminDrmSuspensionsQueryInput,
+  AdminReviewDrmAppealInput,
+} from "@starter/shared/validators/drm";
 import type { ListNotesInput } from "@starter/shared/validators/notes";
 import type { CreateClaimBatchInput } from "@starter/shared/validators/publisher";
+import { booksKeys } from "@/features/books/queries";
 import { notesKeys } from "@/features/notes/queries";
 import {
   createClaimBatch,
   deleteAnyNote,
   publishAdminManuscript,
+  reviewAdminDrmSuspension,
   reviewAuthorApplication,
   updateAdminManuscript,
   verifyCalendar,
@@ -28,6 +35,9 @@ import {
   adminAuthorApplicationsQuery,
   adminCalendarsQuery,
   adminClaimBatchCodesQuery,
+  adminDrmEventsQuery,
+  adminDrmSuspensionsQuery,
+  adminDrmTraceQuery,
   adminKeys,
   adminManuscriptDetailQuery,
   adminManuscriptsQuery,
@@ -183,6 +193,39 @@ export function useCreateClaimBatch() {
 
 export function useClaimBatchCodes(batchId: string) {
   return useQuery(adminClaimBatchCodesQuery(batchId));
+}
+
+// ---------------- DRM Security Audit Monitoring ---------------- //
+
+export function useAdminDrmEvents(params?: AdminDrmEventsQueryInput) {
+  return useQuery(adminDrmEventsQuery(params));
+}
+
+export function useAdminDrmTrace(watermarkCode: string) {
+  return useQuery(adminDrmTraceQuery(watermarkCode));
+}
+
+export function useAdminDrmSuspensions(params?: AdminDrmSuspensionsQueryInput) {
+  return useQuery(adminDrmSuspensionsQuery(params));
+}
+
+export function useReviewAdminDrmSuspension() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      input,
+    }: {
+      id: string;
+      input: AdminReviewDrmAppealInput;
+    }) => reviewAdminDrmSuspension(id, input),
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: adminKeys.all }),
+        queryClient.invalidateQueries({ queryKey: booksKeys.drmStatus() }),
+        queryClient.invalidateQueries({ queryKey: booksKeys.readers() }),
+      ]),
+  });
 }
 
 // ---------------- Notes Utility (starter base) ---------------- //

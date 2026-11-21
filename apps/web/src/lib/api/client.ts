@@ -32,6 +32,7 @@ type ApiRequest = {
   query?: Record<string, string | number | boolean | undefined>;
   body?: unknown;
   signal?: AbortSignal;
+  keepalive?: boolean;
 };
 
 // Where and how to call the API from the current environment. The .server()
@@ -56,7 +57,7 @@ const target = createIsomorphicFn()
 
 export async function apiFetch<T>(
   path: string,
-  { method = "GET", query, body, signal }: ApiRequest = {},
+  { method = "GET", query, body, signal, keepalive }: ApiRequest = {},
 ): Promise<T> {
   const { baseUrl, headers, onFailure } = target();
   const url = new URL(path, baseUrl);
@@ -68,6 +69,7 @@ export async function apiFetch<T>(
     response = await fetch(url, {
       method,
       signal,
+      keepalive,
       credentials: "include",
       headers: {
         accept: "application/json",

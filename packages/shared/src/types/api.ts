@@ -708,12 +708,122 @@ export type AdminOverviewDto = {
   pendingAuthorsCount: number;
   pendingPublishersCount: number;
   pendingManuscriptsCount: number;
+  highRiskDrmEvents24hCount: number;
   estimatedNakamaRoyaltyPoolIdr: number;
   totalAlacarteSalesIdr: number;
   totalPublisherShareIdr: number;
   totalAffiliateCommissionsIdr: number;
   totalNetAnzabookIdr: number;
 };
+
+export type DrmSecurityEventType =
+  | "screenshot_shortcut"
+  | "clipboard_copy"
+  | "devtools_attempt"
+  | "dom_tampering"
+  | "print_save_attempt"
+  | "api_scrape_anomaly"
+  | "context_menu"
+  | "drag_attempt"
+  | "window_blur"
+  | "visibility_hidden"
+  | "multi_touch";
+
+export type DrmSecurityRiskLevel = "high" | "medium" | "low";
+
+export type DrmSecurityEventDto = {
+  id: string;
+  userId: string;
+  userName: string;
+  username: string | null;
+  userEmail: string;
+  watermarkCode: string;
+  bookId: string | null;
+  bookSlug: string;
+  bookTitle: string | null;
+  chapterNumber: number | null;
+  eventType: DrmSecurityEventType;
+  riskLevel: DrmSecurityRiskLevel;
+  triggerDetail: string;
+  clientOs: string;
+  createdAt: string;
+};
+
+export type AdminDrmEventsSummaryDto = {
+  totalEvents: number;
+  highRiskCount: number;
+  mediumRiskCount: number;
+  lowRiskCount: number;
+  last24hHighRiskCount: number;
+  uniqueFlaggedUsersCount: number;
+};
+
+export type AdminDrmEventsListResponse = Paginated<DrmSecurityEventDto> & {
+  summary: AdminDrmEventsSummaryDto;
+};
+
+export type DrmWatermarkTraceDto = {
+  watermarkCode: string;
+  userId: string;
+  userName: string;
+  username: string | null;
+  userEmail: string;
+  bookId: string;
+  bookSlug: string;
+  bookTitle: string;
+  createdAt: string;
+  lastSeenAt: string;
+  recentEvents: DrmSecurityEventDto[];
+};
+
+export type DrmSuspensionStatus =
+  "suspended" | "appeal_pending" | "reinstated" | "rejected";
+
+export type DrmReaderSuspensionDto = {
+  id: string;
+  userId: string;
+  userName: string;
+  username: string | null;
+  userEmail: string;
+  status: DrmSuspensionStatus;
+  cycleNumber: number;
+  triggerCount: number;
+  lastEventType: DrmSecurityEventType;
+  lastBookSlug: string | null;
+  suspendedAt: string;
+  appealMessage: string | null;
+  appealedAt: string | null;
+  reviewNote: string | null;
+  reviewedAt: string | null;
+  reinstatedAt: string | null;
+};
+
+export type ReaderDrmStatusDto = {
+  status: "active" | DrmSuspensionStatus;
+  highRiskCount: number;
+  strikeLimit: number;
+  latestSuspension: DrmReaderSuspensionDto | null;
+};
+
+export type RecordDrmEventResultDto = {
+  id: string;
+  riskLevel: DrmSecurityRiskLevel;
+  createdAt: string;
+  highRiskCount: number;
+  strikeLimit: number;
+  suspensionTriggered: boolean;
+  readerStatus: "active" | DrmSuspensionStatus;
+};
+
+export type AdminDrmSuspensionsListResponse =
+  Paginated<DrmReaderSuspensionDto> & {
+    summary: {
+      activeSuspendedCount: number;
+      appealPendingCount: number;
+      reinstatedCount: number;
+      rejectedCount: number;
+    };
+  };
 
 export type AdminCalendarDto = {
   id: string;

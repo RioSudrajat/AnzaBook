@@ -260,8 +260,8 @@ export function ReaderToolbar({
               }`}
               title={
                 isDrmEnabled
-                  ? "Perlindungan Hak Cipta Aktif (Klik untuk screenshot)"
-                  : "DRM Nonaktif (Mode Bebas Tangkapan Layar)"
+                  ? "Perlindungan Hak Cipta Aktif (Dev/Staging Toggle)"
+                  : "DRM Nonaktif (Mode Dev/Staging)"
               }
             >
               {isDrmEnabled ? (

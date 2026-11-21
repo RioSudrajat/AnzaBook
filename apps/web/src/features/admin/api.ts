@@ -3,14 +3,23 @@ import type {
   AdminCalendarDto,
   AdminClaimBatchCodesDto,
   AdminCreateClaimBatchResultDto,
+  AdminDrmEventsListResponse,
+  AdminDrmSuspensionsListResponse,
   AdminNoteDto,
   AdminOverviewDto,
   AdminPublishManuscriptResultDto,
   DataResponse,
+  DrmReaderSuspensionDto,
+  DrmWatermarkTraceDto,
   ManuscriptSubmissionDto,
   Paginated,
   PublisherDto,
 } from "@starter/shared/types";
+import type {
+  AdminDrmEventsQueryInput,
+  AdminDrmSuspensionsQueryInput,
+  AdminReviewDrmAppealInput,
+} from "@starter/shared/validators/drm";
 import type {
   AdminEditManuscriptInput,
   AdminListQueryInput,
@@ -217,6 +226,56 @@ export async function getClaimBatchCodes(
   const { data } = await apiFetch<DataResponse<AdminClaimBatchCodesDto>>(
     `/api/admin/claim-batches/${encodeURIComponent(batchId)}/codes`,
     { signal },
+  );
+  return data;
+}
+
+// ---------------- DRM Security Audit Monitoring ---------------- //
+
+export function getAdminDrmEvents(
+  params?: AdminDrmEventsQueryInput,
+  signal?: AbortSignal,
+): Promise<AdminDrmEventsListResponse> {
+  return apiFetch<AdminDrmEventsListResponse>("/api/admin/drm-events", {
+    query: params,
+    signal,
+  });
+}
+
+export async function traceAdminDrmWatermark(
+  watermarkCode: string,
+  signal?: AbortSignal,
+): Promise<DrmWatermarkTraceDto> {
+  const { data } = await apiFetch<DataResponse<DrmWatermarkTraceDto>>(
+    `/api/admin/drm-events/trace/${encodeURIComponent(watermarkCode)}`,
+    { signal },
+  );
+  return data;
+}
+
+export function getAdminDrmSuspensions(
+  params?: AdminDrmSuspensionsQueryInput,
+  signal?: AbortSignal,
+): Promise<AdminDrmSuspensionsListResponse> {
+  return apiFetch<AdminDrmSuspensionsListResponse>(
+    "/api/admin/drm-suspensions",
+    {
+      query: params,
+      signal,
+    },
+  );
+}
+
+export async function reviewAdminDrmSuspension(
+  id: string,
+  input: AdminReviewDrmAppealInput,
+): Promise<DrmReaderSuspensionDto> {
+  const { data } = await apiFetch<DataResponse<DrmReaderSuspensionDto>>(
+    `/api/admin/drm-suspensions/${encodeURIComponent(id)}/review`,
+    {
+      method: "PATCH",
+      body: input,
+    },
   );
   return data;
 }

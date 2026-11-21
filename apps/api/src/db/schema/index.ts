@@ -9,3 +9,4 @@ export * from "./membership";
 export * from "./events";
 export * from "./publishers";
 export * from "./social";
+export * from "./drm";

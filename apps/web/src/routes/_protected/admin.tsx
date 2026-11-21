@@ -16,6 +16,7 @@ const adminSearchSchema = z.object({
       "manuscripts",
       "claim-batches",
       "financials",
+      "drm-security",
       "notes",
     ])
     .optional(),

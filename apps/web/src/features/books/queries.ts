@@ -9,6 +9,7 @@ import {
   getBook,
   getBookReader,
   getBookStock,
+  getReaderDrmStatus,
   getReadingProgress,
   listAllHighlights,
   listAuthors,
@@ -47,6 +48,7 @@ export const booksKeys = {
   progress: (bookId: string, scope: ReadingProgressScope) =>
     [...booksKeys.all, "progress", bookId, scope] as const,
   sessions: (bookId: string) => [...booksKeys.all, "sessions", bookId] as const,
+  drmStatus: () => [...booksKeys.all, "drm-status"] as const,
 };
 
 export function booksListQuery(params?: ListBooksInput) {
@@ -143,5 +145,13 @@ export function chapterCommentsQuery(slug: string, chapterId: string) {
   return queryOptions({
     queryKey: booksKeys.commentList(slug, chapterId),
     queryFn: ({ signal }) => listChapterComments(slug, chapterId, signal),
+  });
+}
+
+export function readerDrmStatusQuery() {
+  return queryOptions({
+    queryKey: booksKeys.drmStatus(),
+    queryFn: ({ signal }) => getReaderDrmStatus(signal),
+    staleTime: 0,
   });
 }

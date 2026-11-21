@@ -18,6 +18,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  ShieldAlert,
   ShieldCheck,
   Sun,
   Trash2,
@@ -44,6 +45,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { SiteFooter } from "@/components/site-footer";
 import { useCatalogBooks } from "@/features/books/hooks";
 import { AdminSidebar, type AdminTab } from "./admin-sidebar";
+import { DrmSecurityTab } from "./drm-security-tab";
 import {
   useAdminAuthorApplications,
   useAdminCalendars,
@@ -204,6 +206,7 @@ export function AdminCmsDashboard({
     manuscripts: "Kurasi Naskah",
     "claim-batches": "Kode Klaim Phygital",
     financials: "Keuangan & Royalti",
+    "drm-security": "Monitor Keamanan DRM",
     notes: "Catatan Sistem",
   };
 
@@ -220,6 +223,7 @@ export function AdminCmsDashboard({
           calendars: pendingCalendars,
           partners: pendingAuthors + pendingPublishers,
           manuscripts: pendingManuscripts,
+          drmHighRisk: overview?.highRiskDrmEvents24hCount ?? 0,
         }}
       />
 
@@ -301,6 +305,7 @@ export function AdminCmsDashboard({
           {activeTab === "manuscripts" && <TabManuscripts />}
           {activeTab === "claim-batches" && <TabClaimBatches />}
           {activeTab === "financials" && <TabFinancials overview={overview} />}
+          {activeTab === "drm-security" && <DrmSecurityTab />}
           {activeTab === "notes" && (
             <TabNotes userRole={currentUser.role ?? undefined} />
           )}
@@ -371,7 +376,7 @@ export function AdminCmsDashboard({
         <button
           type="button"
           onClick={() => setActiveTab("financials")}
-          className={`flex flex-col items-center justify-center min-h-[48px] min-w-[50px] px-1 py-1 text-[10px] font-mono cursor-pointer rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
+          className={`flex flex-col items-center justify-center min-h-[48px] min-w-[44px] px-1 py-1 text-[10px] font-mono cursor-pointer rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
             activeTab === "financials"
               ? "text-[var(--color-accent)] font-bold bg-muted/40"
               : "text-muted-foreground hover:text-foreground"
@@ -379,6 +384,19 @@ export function AdminCmsDashboard({
         >
           <Coins className="size-4" />
           <span>Royalti</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("drm-security")}
+          className={`flex flex-col items-center justify-center min-h-[48px] min-w-[44px] px-1 py-1 text-[10px] font-mono cursor-pointer rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
+            activeTab === "drm-security"
+              ? "text-[var(--color-accent)] font-bold bg-muted/40"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <ShieldAlert className="size-4" />
+          <span>DRM</span>
         </button>
 
         <button

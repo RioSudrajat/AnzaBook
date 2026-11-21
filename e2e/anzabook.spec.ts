@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { API_URL, fitsWidth, signUp, WEB_URL } from "./helpers";
+import { API_URL, fitsWidth, setRole, signUp, WEB_URL } from "./helpers";
 
 test.describe("AnzaBook Core End-to-End Flows", () => {
   test("ignores external auth destinations", async ({ page }) => {
@@ -124,6 +124,20 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
       page.getByRole("dialog", { name: "Prapemuat Literasi AnzaBook" }),
     ).toHaveCount(0);
     await expect(page.getByText("Bab 1/8", { exact: true })).toBeVisible();
+    // Bounded DRM-02 sliding window: initially [1, 2], later chapters not dumped upfront
+    await expect(page.locator("#chapter-sec-8")).toHaveCount(0);
+    await page
+      .locator("#chapter-sec-2")
+      .evaluate((section) => section.scrollIntoView({ block: "start" }));
+    await expect(page.locator("#chapter-sec-3")).toBeAttached();
+
+    // Jump to final chapter via TOC sidebar, then scroll to bottom for 100% completion
+    await page
+      .getByRole("navigation", { name: "Daftar Bab Naskah" })
+      .getByRole("button")
+      .nth(7)
+      .click();
+    await expect(page.locator("#chapter-sec-8")).toBeVisible();
     await page.evaluate(() =>
       window.scrollTo({
         top: document.documentElement.scrollHeight,
@@ -305,14 +319,15 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     ).toBeVisible();
   });
 
-  test("protected web reader renders layout mode switcher and enforces DRM shield upon PrintScreen", async ({
+  test("protected web reader enforces production DRM ON without toggle, defends against capture/DevTools/DOM tampering, and logs high-risk events for Admin review", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.emulateMedia({ reducedMotion: "reduce" });
 
-    await signUp(page.request, "Surya DRM");
-    await page.goto("/read/kecerdasan-sosial-homo-sapiens?chapter=1&drm=true");
+    const readerEmail = await signUp(page.request, "Surya DRM");
+    // Even if a user passes ?drm=false, production ignores it and enforces DRM ON
+    await page.goto("/read/kecerdasan-sosial-homo-sapiens?chapter=1&drm=false");
     await page.waitForLoadState("networkidle");
 
     // Verify reader rendered chapter content
@@ -322,24 +337,216 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
         .first(),
     ).toBeVisible();
 
+    // Production build removes the DRM ON/OFF toggle from the toolbar
+    await expect(page.getByText(/DRM (ON|OFF)/i)).toHaveCount(0);
+
+    // Reading canvas stays visually clean without obtrusive diagonal watermark overlays,
+    // while keeping the opaque ANZ- session ID bound on the DRM root & steganography.
+    await expect(page.getByTestId("drm-watermark-canvas")).toHaveCount(0);
+    await expect(page.locator('[data-drm-watermark="true"]')).toHaveCount(0);
+    const drmRoot = page.locator('[data-drm-protected="true"]');
+    await expect(drmRoot).toBeAttached();
+    const watermarkCode = await drmRoot.getAttribute("data-watermark-code");
+    expect(watermarkCode).toMatch(/^ANZ-[A-F0-9]{12}$/);
+    expect(watermarkCode).not.toContain("@");
+
     // Glossy progress bar at bottom
     await expect(page.getByText(/Bab 1\//i).first()).toBeVisible();
 
-    // Trigger DRM pre-trigger by pressing PrintScreen
+    // 1. Trigger DRM shield via PrintScreen (verifies synchronous curtain + alertdialog lock)
     await page.keyboard.press("PrintScreen");
-
-    // Expect the DRM alert dialog
+    const drmCurtain = page.locator('[data-drm-curtain="true"]');
+    await expect(drmCurtain).toHaveClass(/\bflex\b/);
     const drmDialog = page.getByRole("alertdialog");
     await expect(drmDialog).toBeVisible();
     await expect(
       page.getByText(/Tampilan Naskah Terkunci Sementara/i),
     ).toBeVisible();
 
-    // Click "Lanjutkan Membaca" to resume
-    const resumeBtn = page.getByRole("button", { name: /Lanjutkan Membaca/i });
-    await resumeBtn.click();
-
-    // Ensure DRM shield is dismissed
+    // Dismiss shield
+    await page.getByRole("button", { name: /Lanjutkan Membaca/i }).click();
     await expect(drmDialog).not.toBeVisible();
+    await expect(drmCurtain).toHaveClass(/\bhidden\b/);
+
+    // 1b. Trigger DRM shield via Ctrl+Shift+S (Firefox / Edge Web Capture screenshot shortcut)
+    await page.keyboard.press("Control+Shift+KeyS");
+    await expect(drmCurtain).toHaveClass(/\bflex\b/);
+    await expect(drmDialog).toBeVisible();
+    await page.getByRole("button", { name: /Lanjutkan Membaca/i }).click();
+    await expect(drmDialog).not.toBeVisible();
+
+    // 2. Trigger DRM shield via DevTools shortcut (F12)
+    await page.keyboard.press("F12");
+    await expect(drmDialog).toBeVisible();
+    await page.getByRole("button", { name: /Lanjutkan Membaca/i }).click();
+    await expect(drmDialog).not.toBeVisible();
+
+    // 3. Simulate DevTools DOM node deletion of DRM curtain guard -> MutationObserver recovers & locks
+    await page.evaluate(() => {
+      document.querySelector('[data-drm-curtain="true"]')?.remove();
+    });
+    await expect(drmDialog).toBeVisible();
+    await expect(drmCurtain).toBeAttached();
+    await page.getByRole("button", { name: /Lanjutkan Membaca/i }).click();
+    await expect(drmDialog).not.toBeVisible();
+
+    // 4. Admin can monitor high-risk triggers and trace the opaque ANZ- watermark ID
+    await setRole(readerEmail, "admin");
+    await page.goto("/admin?tab=drm-security");
+    await expect(
+      page.getByRole("heading", { name: "Monitor Keamanan DRM", level: 1 }),
+    ).toBeVisible();
+    await expect(page.getByText("HIGH RISK").first()).toBeVisible();
+    await expect(page.getByText(watermarkCode!).first()).toBeVisible();
+
+    // Use Watermark Session ID tracer
+    await page.getByLabel("ID Sesi Watermark").fill(watermarkCode!);
+    await page.getByRole("button", { name: /Lacak Sesi/i }).click();
+    await expect(page.getByText(readerEmail).first()).toBeVisible();
+  });
+
+  test("extracts zero-width steganographic watermark, auto-suspends on 7 high-risk strikes, supports appeal & admin reinstatement, and re-bans on 7 more violations", async ({
+    page,
+    browser,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+
+    const readerEmail = await signUp(page.request, "Rama Striker E2E");
+    const slug = "revolusi-cetak-kedaulatan-membaca";
+    await page.goto(`/read/${slug}?chapter=1`);
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("drm-watermark-canvas")).toHaveCount(0);
+    const drmRoot = page.locator('[data-drm-protected="true"]');
+    await expect(drmRoot).toBeAttached();
+    const watermarkCode = (await drmRoot.getAttribute("data-watermark-code"))!;
+    expect(watermarkCode).toMatch(/^ANZ-[A-F0-9]{12}$/);
+
+    // Verify zero-width steganography fingerprint is embedded in DOM paragraph text
+    const leakedProse = await page
+      .locator("#chapter-sec-1 p")
+      .first()
+      .innerText();
+    expect(/(?:\u200B|\u200C|\u200D|\u2060|\u2063)/.test(leakedProse)).toBe(
+      true,
+    );
+
+    const triggerSevenHighRiskStrikes = async () => {
+      const keyboardShortcuts = [
+        "PrintScreen",
+        "Control+Shift+KeyS",
+        "F12",
+        "Control+KeyU",
+        "Control+KeyP",
+        "Control+KeyS",
+      ];
+      for (const shortcut of keyboardShortcuts) {
+        const postDone = page.waitForResponse(
+          (res) =>
+            res.url().includes("/api/reading/drm-events") &&
+            res.request().method() === "POST",
+        );
+        await page.keyboard.press(shortcut);
+        await postDone;
+        await expect(page.getByRole("alertdialog")).toBeVisible();
+        await page.getByRole("button", { name: /Lanjutkan Membaca/i }).click();
+        await expect(page.getByRole("alertdialog")).not.toBeVisible();
+      }
+
+      // 7th distinct high-risk strike via DevTools DOM removal
+      const strike7Done = page.waitForResponse(
+        (res) =>
+          res.url().includes("/api/reading/drm-events") &&
+          res.request().method() === "POST",
+      );
+      await page.evaluate(() => {
+        document.querySelector('[data-drm-curtain="true"]')?.remove();
+      });
+      await strike7Done;
+    };
+
+    // 1. Cycle 1: 7 high-risk strikes trigger immediate auto-suspend in E-Reader
+    await triggerSevenHighRiskStrikes();
+    await expect(
+      page.getByRole("heading", { name: "Akses E-Reader Dibekukan Sementara" }),
+    ).toBeVisible();
+    await expect(page.getByText(/siklus ke-1/i)).toBeVisible();
+
+    // Reloading confirms backend GET /read enforces 403 READER_SUSPENDED
+    await page.reload();
+    await expect(
+      page.getByRole("heading", { name: "Akses E-Reader Dibekukan Sementara" }),
+    ).toBeVisible();
+
+    // 2. Reader submits appeal for Admin review
+    await page
+      .getByLabel("Alasan Peninjauan Akses")
+      .fill(
+        "Pintasan kepencet tidak sengaja saat bekerja, mohon tinjau ulang akses membaca saya.",
+      );
+    await page.getByRole("button", { name: "Ajukan Peninjauan Akses" }).click();
+    await expect(
+      page.getByText("Permintaan Peninjauan Terkirim"),
+    ).toBeVisible();
+
+    // 3. Separate Admin context verifies Stego Decoder & approves reinstatement
+    const adminContext = await browser.newContext();
+    const adminPage = await adminContext.newPage();
+    await adminPage.setViewportSize({ width: 1280, height: 800 });
+    const adminEmail = await signUp(adminPage.request, "Admin Appeal Reviewer");
+    await setRole(adminEmail, "admin");
+
+    await adminPage.goto("/admin?tab=drm-security");
+    await expect(
+      adminPage.getByRole("heading", {
+        name: "Monitor Keamanan DRM",
+        level: 1,
+      }),
+    ).toBeVisible();
+
+    // Test Opsi B steganography decoder directly with the leaked paragraph string
+    await adminPage
+      .getByLabel("Tempel Teks Bocoran Steganografi")
+      .fill(leakedProse);
+    await adminPage
+      .getByRole("button", { name: "Ekstrak ID Watermark" })
+      .click();
+    await expect(
+      adminPage.getByText(`Sidik jari terungkap: ${watermarkCode}`),
+    ).toBeVisible();
+    await expect(adminPage.getByText(readerEmail).first()).toBeVisible();
+
+    // Approve reader appeal in Suspensions queue
+    const reviewNoteInput = adminPage.getByLabel(
+      `Catatan tinjauan untuk ${readerEmail}`,
+    );
+    await reviewNoteInput.fill(
+      "Akses dipulihkan untuk pengetesan siklus ke-2.",
+    );
+    await adminPage
+      .getByRole("button", { name: "Pulihkan Akses Baca" })
+      .first()
+      .click();
+    await expect(adminPage.getByText("Dipulihkan").first()).toBeVisible();
+    await adminContext.close();
+
+    // 4. Reader verifies access is restored, then commits 7 MORE strikes -> Cycle 2 re-ban!
+    await page.getByRole("button", { name: "Periksa Status Akses" }).click();
+    await expect(page.locator("#chapter-sec-1")).toBeVisible();
+    await expect(
+      page.getByText(/Anatomi Buku Mahal di Negeri Kepulauan/i).first(),
+    ).toBeVisible();
+
+    await triggerSevenHighRiskStrikes();
+    await expect(
+      page.getByRole("heading", { name: "Akses E-Reader Dibekukan Sementara" }),
+    ).toBeVisible();
+    await expect(page.getByText(/siklus ke-2/i)).toBeVisible();
+
+    await page.reload();
+    await expect(
+      page.getByRole("heading", { name: "Akses E-Reader Dibekukan Sementara" }),
+    ).toBeVisible();
   });
 });

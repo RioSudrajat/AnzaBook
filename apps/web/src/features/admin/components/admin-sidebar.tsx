@@ -6,6 +6,7 @@ import {
   Coins,
   FileCode,
   FileText,
+  ShieldAlert,
   UserCheck,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -17,6 +18,7 @@ export type AdminTab =
   | "manuscripts"
   | "claim-batches"
   | "financials"
+  | "drm-security"
   | "notes";
 
 type AdminSidebarProps = {
@@ -35,6 +37,7 @@ type AdminSidebarProps = {
     calendars: number;
     partners: number;
     manuscripts: number;
+    drmHighRisk?: number;
   };
 };
 
@@ -76,6 +79,12 @@ export function AdminSidebar({
       label: "Keuangan & Royalti",
       icon: Coins,
       badge: 0,
+    },
+    {
+      id: "drm-security" as const,
+      label: "Keamanan DRM",
+      icon: ShieldAlert,
+      badge: pendingCounts.drmHighRisk ?? 0,
     },
     {
       id: "notes" as const,

@@ -414,3 +414,18 @@
     mask-image: none;
   }
 }
+
+[data-drm-print-block="true"] {
+  display: none;
+}
+
+@media print {
+  [data-drm-protected="true"] [data-drm-content="true"],
+  [data-drm-protected="true"] [role="alertdialog"] {
+    display: none !important;
+  }
+
+  [data-drm-protected="true"] [data-drm-print-block="true"] {
+    display: flex !important;
+  }
+}

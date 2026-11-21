@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { agent, originHeader, signUp } from "./helpers";
 
 describe("AnzaBook Core API", () => {
-  it("returns continuous manuscript chapters only when the reader has full access", async () => {
+  it("returns bounded sliding manuscript chapters (max 2) when the reader has full access", async () => {
     const client = agent();
     await signUp(client, "Pembaca Scroll");
     const full = await client.get(
@@ -13,8 +13,18 @@ describe("AnzaBook Core API", () => {
       full.body.data.chapters.map(
         (chapter: { chapterNumber: number }) => chapter.chapterNumber,
       ),
-    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    ).toEqual([1, 2]);
     expect(full.body.data.chapters[1].contentId).toBeTruthy();
+
+    const nextWindow = await client.get(
+      "/api/books/revolusi-cetak-kedaulatan-membaca/read?chapter=2&continuous=true",
+    );
+    expect(nextWindow.status).toBe(200);
+    expect(
+      nextWindow.body.data.chapters.map(
+        (chapter: { chapterNumber: number }) => chapter.chapterNumber,
+      ),
+    ).toEqual([2, 3]);
 
     const preview = await client.get(
       "/api/books/sains-logika-seni-hidup-bermutu/read?continuous=true",
