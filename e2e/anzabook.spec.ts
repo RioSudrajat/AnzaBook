@@ -340,10 +340,13 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     // Production build removes the DRM ON/OFF toggle from the toolbar
     await expect(page.getByText(/DRM (ON|OFF)/i)).toHaveCount(0);
 
-    // Canvas watermark renders with opaque ANZ- session ID (never exposing raw email)
-    const canvas = page.getByTestId("drm-watermark-canvas");
-    await expect(canvas).toBeVisible();
-    const watermarkCode = await canvas.getAttribute("data-watermark-code");
+    // Reading canvas stays visually clean without obtrusive diagonal watermark overlays,
+    // while keeping the opaque ANZ- session ID bound on the DRM root & steganography.
+    await expect(page.getByTestId("drm-watermark-canvas")).toHaveCount(0);
+    await expect(page.locator('[data-drm-watermark="true"]')).toHaveCount(0);
+    const drmRoot = page.locator('[data-drm-protected="true"]');
+    await expect(drmRoot).toBeAttached();
+    const watermarkCode = await drmRoot.getAttribute("data-watermark-code");
     expect(watermarkCode).toMatch(/^ANZ-[A-F0-9]{12}$/);
     expect(watermarkCode).not.toContain("@");
 
@@ -378,12 +381,12 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     await page.getByRole("button", { name: /Lanjutkan Membaca/i }).click();
     await expect(drmDialog).not.toBeVisible();
 
-    // 3. Simulate DevTools DOM node deletion of watermark canvas -> MutationObserver recovers & locks
+    // 3. Simulate DevTools DOM node deletion of DRM curtain guard -> MutationObserver recovers & locks
     await page.evaluate(() => {
-      document.querySelector('[data-testid="drm-watermark-canvas"]')?.remove();
+      document.querySelector('[data-drm-curtain="true"]')?.remove();
     });
     await expect(drmDialog).toBeVisible();
-    await expect(canvas).toBeAttached();
+    await expect(drmCurtain).toBeAttached();
     await page.getByRole("button", { name: /Lanjutkan Membaca/i }).click();
     await expect(drmDialog).not.toBeVisible();
 
@@ -414,9 +417,10 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     await page.goto(`/read/${slug}?chapter=1`);
     await page.waitForLoadState("networkidle");
 
-    const canvas = page.getByTestId("drm-watermark-canvas");
-    await expect(canvas).toBeVisible();
-    const watermarkCode = (await canvas.getAttribute("data-watermark-code"))!;
+    await expect(page.getByTestId("drm-watermark-canvas")).toHaveCount(0);
+    const drmRoot = page.locator('[data-drm-protected="true"]');
+    await expect(drmRoot).toBeAttached();
+    const watermarkCode = (await drmRoot.getAttribute("data-watermark-code"))!;
     expect(watermarkCode).toMatch(/^ANZ-[A-F0-9]{12}$/);
 
     // Verify zero-width steganography fingerprint is embedded in DOM paragraph text
@@ -457,9 +461,7 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
           res.request().method() === "POST",
       );
       await page.evaluate(() => {
-        document
-          .querySelector('[data-testid="drm-watermark-canvas"]')
-          ?.remove();
+        document.querySelector('[data-drm-curtain="true"]')?.remove();
       });
       await strike7Done;
     };

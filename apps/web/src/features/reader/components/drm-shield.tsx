@@ -26,16 +26,6 @@ type DrmShieldProps = {
   children: React.ReactNode;
 };
 
-const WATERMARK_INK: Record<ReaderTheme, string> = {
-  manila: "rgba(26, 22, 18, 0.115)",
-  sepia: "rgba(38, 28, 16, 0.125)",
-  night: "rgba(242, 234, 222, 0.135)",
-};
-
-const WATERMARK_HOST_CLASS =
-  "pointer-events-none fixed inset-0 z-20 overflow-hidden select-none";
-const WATERMARK_CANVAS_CLASS =
-  "block size-full pointer-events-none select-none";
 const CONTENT_BASE_CLASS = "blur-none opacity-100";
 const CONTENT_LOCKED_CLASS =
   "transition-none blur-2xl opacity-0 invisible pointer-events-none filter select-none";
@@ -67,61 +57,6 @@ function detectClientOs(): DrmClientOs {
   if (platform.includes("mac") || ua.includes("mac os")) return "macos";
   if (platform.includes("linux") || ua.includes("linux")) return "linux";
   return "unknown";
-}
-
-function hashSeed(input: string): number {
-  let hash = 0;
-  for (let i = 0; i < input.length; i++) {
-    hash = (hash * 31 + input.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash);
-}
-
-function paintWatermarkCanvas(
-  canvas: HTMLCanvasElement | null,
-  watermarkText: string,
-  theme: ReaderTheme,
-) {
-  if (!canvas || typeof window === "undefined") return;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-
-  const width = Math.max(1, window.innerWidth);
-  const height = Math.max(1, window.innerHeight);
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-
-  canvas.width = Math.ceil(width * dpr);
-  canvas.height = Math.ceil(height * dpr);
-
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, width, height);
-
-  const ink = WATERMARK_INK[theme] ?? WATERMARK_INK.manila;
-  const label = watermarkText.toUpperCase();
-  const seed = hashSeed(label);
-  const offsetX = seed % 57;
-  const offsetY = seed % 37;
-
-  ctx.save();
-  ctx.fillStyle = ink;
-  ctx.font = '600 11px "Red Hat Mono", ui-monospace, SFMono-Regular, monospace';
-  ctx.textBaseline = "middle";
-  ctx.textAlign = "center";
-
-  const stepX = 240;
-  const stepY = 104;
-  const diagSpan = Math.hypot(width, height) + 280;
-
-  ctx.translate(width / 2, height / 2);
-  ctx.rotate((-25 * Math.PI) / 180);
-
-  for (let y = -diagSpan; y <= diagSpan; y += stepY) {
-    const rowShift = Math.round(y / stepY) % 2 === 0 ? 0 : stepX / 2;
-    for (let x = -diagSpan; x <= diagSpan; x += stepX) {
-      ctx.fillText(label, x + rowShift + offsetX, y + offsetY);
-    }
-  }
-  ctx.restore();
 }
 
 function isComputedHidden(el: HTMLElement | null): boolean {
@@ -221,8 +156,6 @@ export function DrmShield({
   );
 
   const shieldRootRef = useRef<HTMLDivElement>(null);
-  const watermarkHostRef = useRef<HTMLDivElement>(null);
-  const watermarkCanvasRef = useRef<HTMLCanvasElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const curtainRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -231,6 +164,7 @@ export function DrmShield({
 
   const onTriggerRef = useRef(onSecurityTrigger);
   const enabledRef = useRef(enabled);
+  const watermarkTextRef = useRef(watermarkText);
   const activeRef = useRef(false);
   const renderedActiveRef = useRef(false);
   const lastVisibilityHiddenAtRef = useRef(0);
@@ -239,9 +173,10 @@ export function DrmShield({
   useLayoutEffect(() => {
     onTriggerRef.current = onSecurityTrigger;
     enabledRef.current = enabled;
+    watermarkTextRef.current = watermarkText;
     activeRef.current = isEffectiveShieldActive;
     renderedActiveRef.current = isEffectiveShieldActive;
-  }, [onSecurityTrigger, enabled, isEffectiveShieldActive]);
+  }, [onSecurityTrigger, enabled, watermarkText, isEffectiveShieldActive]);
 
   const applySynchronousCurtain = useCallback((locked: boolean) => {
     const curtain = curtainRef.current;
@@ -299,26 +234,6 @@ export function DrmShield({
       });
     }
   }, [isEffectiveShieldActive]);
-
-  // Paint & maintain theme-adaptive canvas watermark
-  useEffect(() => {
-    if (!enabled) return;
-    let frameId = 0;
-
-    const schedulePaint = () => {
-      cancelAnimationFrame(frameId);
-      frameId = requestAnimationFrame(() => {
-        paintWatermarkCanvas(watermarkCanvasRef.current, watermarkText, theme);
-      });
-    };
-
-    schedulePaint();
-    window.addEventListener("resize", schedulePaint, { passive: true });
-    return () => {
-      cancelAnimationFrame(frameId);
-      window.removeEventListener("resize", schedulePaint);
-    };
-  }, [enabled, watermarkText, theme]);
 
   // Input, shortcut, visibility, print, drag, and DevTools deterrence
   useEffect(() => {
@@ -512,11 +427,9 @@ export function DrmShield({
   useEffect(() => {
     if (!enabled) return;
     const root = shieldRootRef.current;
-    const watermarkHost = watermarkHostRef.current;
-    const canvas = watermarkCanvasRef.current;
     const content = contentRef.current;
     const curtain = curtainRef.current;
-    if (!root || !watermarkHost || !canvas || !content) return;
+    if (!root || !content || !curtain) return;
 
     let checkScheduled = false;
     let isRecovering = false;
@@ -526,39 +439,28 @@ export function DrmShield({
       if (!enabledRef.current || isRecovering) return;
 
       let tampered = false;
-
-      if (!watermarkHost.isConnected || watermarkHost.parentElement !== root) {
-        isRecovering = true;
-        root.prepend(watermarkHost);
-        tampered = true;
-      }
-
-      if (!canvas.isConnected || canvas.parentElement !== watermarkHost) {
-        isRecovering = true;
-        watermarkHost.appendChild(canvas);
-        tampered = true;
-      }
+      const expectedCode = watermarkTextRef.current;
 
       if (
-        isComputedHidden(watermarkHost) ||
-        isComputedHidden(canvas) ||
-        canvas.width < 1 ||
-        canvas.height < 1 ||
-        watermarkHost.className !== WATERMARK_HOST_CLASS ||
-        canvas.className !== WATERMARK_CANVAS_CLASS
+        root.getAttribute("data-drm-protected") !== "true" ||
+        (expectedCode &&
+          root.getAttribute("data-watermark-code") !== expectedCode)
       ) {
         isRecovering = true;
-        watermarkHost.removeAttribute("hidden");
-        watermarkHost.removeAttribute("style");
-        watermarkHost.className = WATERMARK_HOST_CLASS;
-        canvas.removeAttribute("hidden");
-        canvas.removeAttribute("style");
-        canvas.className = WATERMARK_CANVAS_CLASS;
-        paintWatermarkCanvas(canvas, watermarkText, theme);
+        root.setAttribute("data-drm-protected", "true");
+        if (expectedCode) {
+          root.setAttribute("data-watermark-code", expectedCode);
+        }
         tampered = true;
       }
 
-      if (curtain && (!curtain.isConnected || curtain.parentElement !== root)) {
+      if (!content.isConnected || content.parentElement !== root) {
+        isRecovering = true;
+        root.prepend(content);
+        tampered = true;
+      }
+
+      if (!curtain.isConnected || curtain.parentElement !== root) {
         isRecovering = true;
         content.insertAdjacentElement("afterend", curtain);
         tampered = true;
@@ -566,10 +468,9 @@ export function DrmShield({
 
       if (activeRef.current) {
         if (
-          curtain &&
-          (curtain.hasAttribute("hidden") ||
-            curtain.hasAttribute("style") ||
-            curtain.className !== CURTAIN_ACTIVE_CLASS)
+          curtain.hasAttribute("hidden") ||
+          curtain.hasAttribute("style") ||
+          curtain.className !== CURTAIN_ACTIVE_CLASS
         ) {
           isRecovering = true;
           curtain.removeAttribute("hidden");
@@ -605,6 +506,29 @@ export function DrmShield({
           content.className = CONTENT_LOCKED_CLASS;
           tampered = true;
         }
+      } else {
+        if (
+          curtain.hasAttribute("hidden") ||
+          curtain.hasAttribute("style") ||
+          curtain.className !== CURTAIN_HIDDEN_CLASS
+        ) {
+          isRecovering = true;
+          curtain.removeAttribute("hidden");
+          curtain.removeAttribute("style");
+          curtain.className = CURTAIN_HIDDEN_CLASS;
+          tampered = true;
+        }
+        if (
+          content.hasAttribute("hidden") ||
+          content.hasAttribute("style") ||
+          content.className !== CONTENT_BASE_CLASS
+        ) {
+          isRecovering = true;
+          content.removeAttribute("hidden");
+          content.removeAttribute("style");
+          content.className = CONTENT_BASE_CLASS;
+          tampered = true;
+        }
       }
 
       if (isRecovering) {
@@ -616,8 +540,8 @@ export function DrmShield({
       if (tampered) {
         activateShield(
           "dom_tampering",
-          "Manipulasi node watermark atau pelindung DRM lewat DevTools terdeteksi.",
-          "MutationObserver: node/style watermark atau shield dimodifikasi",
+          "Manipulasi elemen pelindung DRM lewat DevTools terdeteksi.",
+          "MutationObserver: elemen pelindung DRM atau tirai dimodifikasi",
         );
       }
     };
@@ -629,31 +553,24 @@ export function DrmShield({
     };
 
     const observer = new MutationObserver(scheduleVerify);
-    observer.observe(root, { childList: true });
-    observer.observe(watermarkHost, {
+    observer.observe(root, {
       childList: true,
       attributes: true,
-      attributeFilter: ["style", "class", "hidden", "aria-hidden"],
-    });
-    observer.observe(canvas, {
-      attributes: true,
-      attributeFilter: ["style", "class", "hidden", "width", "height"],
+      attributeFilter: ["data-drm-protected", "data-watermark-code"],
     });
     observer.observe(content, {
       attributes: true,
       attributeFilter: ["style", "class", "hidden"],
     });
-    if (curtain) {
-      observer.observe(curtain, {
-        attributes: true,
-        attributeFilter: ["style", "class", "hidden"],
-      });
-    }
+    observer.observe(curtain, {
+      attributes: true,
+      attributeFilter: ["style", "class", "hidden"],
+    });
 
     return () => {
       observer.disconnect();
     };
-  }, [enabled, watermarkText, theme, activateShield]);
+  }, [enabled, activateShield]);
 
   // Production-only interactive DevTools probe (0ms cost unless Debugger domain is attached)
   useEffect(() => {
@@ -678,27 +595,10 @@ export function DrmShield({
     <div
       ref={shieldRootRef}
       data-drm-protected={enabled ? "true" : "false"}
+      data-watermark-code={enabled ? watermarkText : undefined}
       data-theme={theme}
       className="relative select-text"
     >
-      {/* Theme-Adaptive Repeating Canvas Watermark (Only when DRM is enabled) */}
-      {enabled && (
-        <div
-          ref={watermarkHostRef}
-          data-drm-watermark="true"
-          className={WATERMARK_HOST_CLASS}
-          aria-hidden="true"
-        >
-          <canvas
-            ref={watermarkCanvasRef}
-            data-testid="drm-watermark-canvas"
-            data-watermark-code={watermarkText}
-            data-watermark-theme={theme}
-            className={WATERMARK_CANVAS_CLASS}
-          />
-        </div>
-      )}
-
       {/* Actual Content with Synchronous + Reactive Blur Filter on Shield Active */}
       <div
         ref={contentRef}
@@ -777,7 +677,7 @@ export function DrmShield({
 
             <div className="p-3 bg-muted/40 rounded-[6px] border border-border text-[11px] font-mono text-muted-foreground text-left break-all">
               <span className="opacity-70 block text-[9px] uppercase tracking-wider mb-0.5">
-                ID Sesi Watermark Pembaca:
+                ID Sesi Keamanan Pembaca:
               </span>
               {watermarkText}
             </div>

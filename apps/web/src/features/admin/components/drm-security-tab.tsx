@@ -257,10 +257,10 @@ export function DrmSecurityTab() {
             Pelacakan ID Sesi Watermark (DRM-03)
           </h3>
           <p className="text-xs text-muted-foreground">
-            Masukkan kode watermark dari bukti tangkapan layar (contoh:{" "}
-            <code className="font-mono">ANZ-A1B2C3D4E5F6</code>) untuk
-            mengetahui akun pembaca terkait tanpa menampilkan email di layar
-            pembaca.
+            Masukkan kode sesi DRM (contoh:{" "}
+            <code className="font-mono">ANZ-A1B2C3D4E5F6</code>) dari ekstraktor
+            steganografi, layar kunci, atau log keamanan untuk mengetahui akun
+            pembaca terkait tanpa menampilkan email di layar pembaca.
           </p>
         </div>
 

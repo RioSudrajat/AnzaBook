@@ -421,7 +421,6 @@
 
 @media print {
   [data-drm-protected="true"] [data-drm-content="true"],
-  [data-drm-protected="true"] [data-drm-watermark="true"],
   [data-drm-protected="true"] [role="alertdialog"] {
     display: none !important;
   }
