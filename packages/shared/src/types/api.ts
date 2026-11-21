@@ -105,6 +105,8 @@ export type BookSummaryDto = {
   genres: string[];
   publisherId?: string | null;
   publisherSlug?: string | null;
+  publisherName?: string | null;
+  publisherLogoUrl?: string | null;
   authorUserId?: string | null;
   alacartePriceIdr?: number | null;
 };
@@ -432,9 +434,10 @@ export type ManagedPublisherSummaryDto = {
   logoUrl: string | null;
   headerImageUrl: string | null;
   city: string | null;
+  topics?: string[];
   verificationStatus: PublisherVerificationStatus;
   rejectionReason?: string | null;
-  role: PublisherMemberRole;
+  role: PublisherMemberRole | null;
 };
 
 export type PublicProfileReviewDto = {
@@ -583,6 +586,11 @@ export type PublisherDto = {
   city: string | null;
   address: string | null;
   contactEmail: string | null;
+  topics?: string[];
+  isAcceptingSubmissions?: boolean;
+  submissionGuidelines?: string | null;
+  topicMatchScore?: number;
+  matchedTopics?: string[];
   verificationStatus: PublisherVerificationStatus;
   rejectionReason?: string | null;
   verificationDocuments?: VerificationDocumentDto[] | null;
@@ -599,6 +607,18 @@ export type PublisherDto = {
   currentUserRole?: PublisherMemberRole | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type PublisherMemberDto = {
+  id: string;
+  publisherId: string;
+  userId: string;
+  role: PublisherMemberRole;
+  name: string;
+  username: string | null;
+  email?: string;
+  image: string | null;
+  createdAt: string;
 };
 
 export type ManuscriptSubmissionStatus =
@@ -660,6 +680,12 @@ export type BookClaimBatchDto = {
   createdAt: string;
 };
 
+export type PublishManuscriptResultDto = {
+  publishedBookId: string;
+  book: BookSummaryDto;
+  claimBatch: BookClaimBatchDto | null;
+};
+
 export type BookPurchaseDto = {
   id: string;
   userId: string;
@@ -707,7 +733,8 @@ export type AdminOverviewDto = {
   pendingCalendarsCount: number;
   pendingAuthorsCount: number;
   pendingPublishersCount: number;
-  pendingManuscriptsCount: number;
+  /** @deprecated Removed across Issues #9 and #10 */
+  pendingManuscriptsCount?: number;
   highRiskDrmEvents24hCount: number;
   estimatedNakamaRoyaltyPoolIdr: number;
   totalAlacarteSalesIdr: number;
