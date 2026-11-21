@@ -12,7 +12,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/migrate.ts",
     "db:studio": "drizzle-kit studio",
-    "role:set": "tsx src/set-role.ts"
+    "role:set": "tsx src/set-role.ts",
+    "publisher:assign-owner": "tsx src/assign-publisher-owner.ts"
   },
   "dependencies": {
     "@starter/shared": "workspace:*",

@@ -39,6 +39,7 @@ export const adminVerifyPublisherSchema = z
     },
   );
 
+/** @deprecated Removed in Issue #9 (Slice 2) */
 export const adminEditManuscriptChapterSchema = z
   .object({
     id: z.string().uuid().optional(),
@@ -51,6 +52,7 @@ export const adminEditManuscriptChapterSchema = z
   })
   .strict();
 
+/** @deprecated Removed in Issue #9 (Slice 2) */
 export const adminEditManuscriptSchema = z
   .object({
     title: z.string().min(2).max(255).optional(),
@@ -71,6 +73,7 @@ export const adminEditManuscriptSchema = z
   })
   .strict();
 
+/** @deprecated Removed in Issue #9 (Slice 2) */
 export const adminPublishManuscriptSchema = z
   .object({
     coverUrl: z.string().optional().nullable(),
@@ -106,12 +109,15 @@ export type AdminReviewAuthorApplicationInput = z.infer<
 export type AdminVerifyPublisherInput = z.infer<
   typeof adminVerifyPublisherSchema
 >;
+/** @deprecated Removed in Issue #9 (Slice 2) */
 export type AdminEditManuscriptChapterInput = z.infer<
   typeof adminEditManuscriptChapterSchema
 >;
+/** @deprecated Removed in Issue #9 (Slice 2) */
 export type AdminEditManuscriptInput = z.infer<
   typeof adminEditManuscriptSchema
 >;
+/** @deprecated Removed in Issue #9 (Slice 2) */
 export type AdminPublishManuscriptInput = z.infer<
   typeof adminPublishManuscriptSchema
 >;

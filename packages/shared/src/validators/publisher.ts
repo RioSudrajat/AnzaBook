@@ -1,5 +1,24 @@
 import { z } from "zod";
 
+const ROOT_RELATIVE_ASSET_PATH_REGEX = /^\/(?!\/)[^\s]*$/;
+const HTTP_URL_SCHEMA = z.string().url({ protocol: /^https?$/ });
+
+/**
+ * Validates an asset reference as an HTTP(S) URL, a root-relative path
+ * (rejecting protocol-relative `//` URLs), or an empty string.
+ */
+export function safeAssetUrlSchema(invalidMessage = "URL tidak valid") {
+  return z
+    .string()
+    .refine(
+      (value) =>
+        value === "" ||
+        ROOT_RELATIVE_ASSET_PATH_REGEX.test(value) ||
+        HTTP_URL_SCHEMA.safeParse(value).success,
+      { message: invalidMessage },
+    );
+}
+
 export const simulatePrintSchema = z
   .object({
     pageCount: z
@@ -44,16 +63,8 @@ export const applyPublisherSchema = z
       .max(2000, "Deskripsi maksimal 2000 karakter")
       .optional()
       .nullable(),
-    logoUrl: z
-      .string()
-      .url("URL logo tidak valid")
-      .or(z.literal(""))
-      .optional()
-      .nullable(),
-    headerImageUrl: z
-      .string()
-      .url("URL banner tidak valid")
-      .or(z.literal(""))
+    logoUrl: safeAssetUrlSchema("URL logo tidak valid").optional().nullable(),
+    headerImageUrl: safeAssetUrlSchema("URL banner tidak valid")
       .optional()
       .nullable(),
     city: z.string().max(80, "Kota maksimal 80 karakter").optional().nullable(),
@@ -86,6 +97,9 @@ export const applyPublisherSchema = z
         }),
       )
       .optional(),
+    topics: z.array(z.string().trim().min(1).max(60)).max(15).optional(),
+    isAcceptingSubmissions: z.boolean().optional(),
+    submissionGuidelines: z.string().max(2000).optional().nullable(),
   })
   .strict();
 
@@ -174,6 +188,122 @@ export const submitManuscriptSchema = z
   })
   .strict();
 
+const manuscriptEditableFields = {
+  title: z.string().min(1).max(255).optional(),
+  slug: z.string().max(255).optional().nullable(),
+  coverUrl: z.string().optional().nullable(),
+  category: z.string().max(80).optional().nullable(),
+  synopsis: z.string().max(5000).optional(),
+  proposedDigitalPolicy: digitalPolicyEnum.optional(),
+  proposedAlacartePriceIdr: z
+    .number()
+    .int()
+    .min(0)
+    .max(10_000_000)
+    .optional()
+    .nullable(),
+  printSimJson: z.record(z.string(), z.unknown()).optional().nullable(),
+  chapters: z.array(submitManuscriptChapterSchema).optional(),
+};
+
+export const authorUpdateManuscriptSchema = z
+  .object({
+    publisherId: z
+      .string()
+      .uuid("ID penerbit tidak valid")
+      .optional()
+      .nullable(),
+    ...manuscriptEditableFields,
+  })
+  .strict();
+
+export const publisherEditManuscriptSchema = z
+  .object({
+    ...manuscriptEditableFields,
+    editorialNotes: z.string().max(2000).optional().nullable(),
+  })
+  .strict();
+
+export const publisherReviewManuscriptSchema = z
+  .object({
+    action: z.enum(["start_editing", "request_revision", "reject"]),
+    notes: z.string().max(2000).optional().nullable(),
+  })
+  .strict()
+  .superRefine((data, ctx) => {
+    if (
+      (data.action === "request_revision" || data.action === "reject") &&
+      !data.notes?.trim()
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["notes"],
+        message: "Catatan revisi atau alasan penolakan wajib diisi",
+      });
+    }
+  });
+
+export const publishManuscriptSchema = z
+  .object({
+    coverUrl: z.string().optional().nullable(),
+    author: z.string().min(1).max(255).optional(),
+    digitalPolicy: digitalPolicyEnum.optional(),
+    alacartePriceIdr: z
+      .number()
+      .int()
+      .min(0)
+      .max(10_000_000)
+      .optional()
+      .nullable(),
+    categories: z.array(z.string().trim().min(1).max(60)).max(10).optional(),
+  })
+  .strict()
+  .optional();
+
+export const listSubmissionTargetsQuerySchema = z
+  .object({
+    q: z.string().trim().max(120).optional(),
+    topic: z.string().trim().max(80).optional(),
+    limit: z.preprocess(
+      (val) => (typeof val === "string" && val.trim() === "" ? undefined : val),
+      z.coerce.number().int().min(1).max(100).default(50),
+    ),
+  })
+  .strict();
+
+export const publisherMemberRoleEnum = z.enum(["owner", "editor", "finance"]);
+
+export const addPublisherMemberSchema = z
+  .object({
+    email: z.string().trim().email("Email tidak valid").max(255),
+    role: publisherMemberRoleEnum.default("editor"),
+  })
+  .strict();
+
+export const updatePublisherMemberSchema = z
+  .object({
+    role: publisherMemberRoleEnum,
+  })
+  .strict();
+
+export const updatePublisherBookSchema = z
+  .object({
+    title: z.string().min(2).max(255).optional(),
+    synopsis: z.string().min(10).max(5000).optional(),
+    coverUrl: z.string().optional().nullable(),
+    categories: z.array(z.string().trim().min(1).max(60)).max(10).optional(),
+    digitalPolicy: digitalPolicyEnum.optional(),
+    alacartePriceIdr: z
+      .number()
+      .int()
+      .min(0)
+      .max(10_000_000)
+      .optional()
+      .nullable(),
+  })
+  .strict();
+
+/** @deprecated Removed in Issue #9 (Slice 2) */
 export const updateManuscriptSchema = z
   .object({
     title: z.string().min(1).max(255).optional(),
@@ -201,6 +331,7 @@ export const updateManuscriptSchema = z
   })
   .strict();
 
+/** @deprecated Removed in Issue #9 (Slice 2) */
 export const reviewManuscriptSchema = z
   .object({
     action: z.enum(["approve", "request_revision", "reject"]),
@@ -247,7 +378,37 @@ export type CreateManuscriptDraftInput = z.infer<
   typeof createManuscriptDraftSchema
 >;
 export type SubmitManuscriptInput = z.infer<typeof submitManuscriptSchema>;
+export type AuthorUpdateManuscriptInput = z.infer<
+  typeof authorUpdateManuscriptSchema
+>;
+export type PublisherEditManuscriptInput = z.infer<
+  typeof publisherEditManuscriptSchema
+>;
+export type PublisherReviewManuscriptInput = z.infer<
+  typeof publisherReviewManuscriptSchema
+>;
+export type PublishManuscriptInput = z.infer<typeof publishManuscriptSchema>;
+export type ListSubmissionTargetsInput = {
+  q?: string;
+  topic?: string;
+  limit?: number;
+};
+export type ListSubmissionTargetsQuery = z.output<
+  typeof listSubmissionTargetsQuerySchema
+>;
+export type AddPublisherMemberInput = z.input<typeof addPublisherMemberSchema>;
+export type AddPublisherMemberOutput = z.output<
+  typeof addPublisherMemberSchema
+>;
+export type UpdatePublisherMemberInput = z.infer<
+  typeof updatePublisherMemberSchema
+>;
+export type UpdatePublisherBookInput = z.infer<
+  typeof updatePublisherBookSchema
+>;
+/** @deprecated Removed in Issue #9 (Slice 2) */
 export type UpdateManuscriptInput = z.infer<typeof updateManuscriptSchema>;
+/** @deprecated Removed in Issue #9 (Slice 2) */
 export type ReviewManuscriptInput = z.infer<typeof reviewManuscriptSchema>;
 export type CreateClaimBatchInput = z.infer<typeof createClaimBatchSchema>;
 export type PurchaseBookAlacarteInput = z.infer<
