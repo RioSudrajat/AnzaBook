@@ -365,6 +365,13 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     await expect(drmDialog).not.toBeVisible();
     await expect(drmCurtain).toHaveClass(/\bhidden\b/);
 
+    // 1b. Trigger DRM shield via Ctrl+Shift+S (Firefox / Edge Web Capture screenshot shortcut)
+    await page.keyboard.press("Control+Shift+KeyS");
+    await expect(drmCurtain).toHaveClass(/\bflex\b/);
+    await expect(drmDialog).toBeVisible();
+    await page.getByRole("button", { name: /Lanjutkan Membaca/i }).click();
+    await expect(drmDialog).not.toBeVisible();
+
     // 2. Trigger DRM shield via DevTools shortcut (F12)
     await page.keyboard.press("F12");
     await expect(drmDialog).toBeVisible();

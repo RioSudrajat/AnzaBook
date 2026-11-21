@@ -36,13 +36,13 @@ const WATERMARK_HOST_CLASS =
   "pointer-events-none fixed inset-0 z-20 overflow-hidden select-none";
 const WATERMARK_CANVAS_CLASS =
   "block size-full pointer-events-none select-none";
-const CONTENT_BASE_CLASS = "transition-all duration-150";
+const CONTENT_BASE_CLASS = "blur-none opacity-100";
 const CONTENT_LOCKED_CLASS =
-  "transition-none blur-2xl opacity-10 pointer-events-none filter";
+  "transition-none blur-2xl opacity-0 invisible pointer-events-none filter select-none";
 const CURTAIN_HIDDEN_CLASS =
-  "fixed inset-0 z-49 hidden items-center justify-center bg-background/95 backdrop-blur-2xl pointer-events-none select-none";
+  "fixed inset-0 z-49 hidden items-center justify-center bg-background pointer-events-none select-none";
 const CURTAIN_ACTIVE_CLASS =
-  "fixed inset-0 z-49 flex items-center justify-center bg-background/95 backdrop-blur-2xl pointer-events-none select-none";
+  "fixed inset-0 z-49 flex items-center justify-center bg-background pointer-events-none select-none";
 
 function detectClientOs(): DrmClientOs {
   if (typeof navigator === "undefined") return "unknown";
@@ -142,6 +142,71 @@ function isEditableTarget(target: EventTarget | null): boolean {
   );
 }
 
+function getScreenshotShortcutDetail(
+  e: KeyboardEvent,
+  clientOs: DrmClientOs,
+  phase: "keydown" | "keyup",
+): string | null {
+  if (e.key === "PrintScreen" || e.code === "PrintScreen" || e.keyCode === 44) {
+    return `PrintScreen (${phase})`;
+  }
+  if (phase === "keyup") return null;
+
+  // Pre-empt Windows/Linux system combos (Win+Shift+S, Win+PrtSc, Super+Shift+S, Win+G)
+  // before the final key completes, while preserving Cmd combinations on macOS.
+  if (
+    clientOs !== "macos" &&
+    (e.key === "Meta" ||
+      e.key === "OS" ||
+      e.code === "MetaLeft" ||
+      e.code === "MetaRight" ||
+      e.code === "OSLeft" ||
+      e.code === "OSRight")
+  ) {
+    return `Tombol sistem ${e.code || e.key} (pre-emptive)`;
+  }
+
+  if (
+    (e.ctrlKey || e.metaKey) &&
+    e.shiftKey &&
+    ([
+      "KeyS",
+      "Digit3",
+      "Digit4",
+      "Digit5",
+      "Digit6",
+      "KeyA",
+      "KeyX",
+      "KeyR",
+    ].includes(e.code) ||
+      ["3", "4", "5", "6", "s", "S"].includes(e.key))
+  ) {
+    return `Pintasan screenshot (${e.ctrlKey ? "Ctrl+" : "Meta+"}Shift+${e.code || e.key})`;
+  }
+
+  if (e.metaKey && (e.code === "KeyG" || (e.altKey && e.code === "KeyR"))) {
+    return `Overlay screen capture (${e.code})`;
+  }
+
+  return null;
+}
+
+function isDevToolsShortcutEvent(e: KeyboardEvent): boolean {
+  const hasPrimaryMod = e.ctrlKey || e.metaKey;
+  return (
+    e.key === "F12" ||
+    e.code === "F12" ||
+    (hasPrimaryMod &&
+      e.shiftKey &&
+      ["KeyI", "KeyJ", "KeyC", "KeyK", "KeyE", "KeyM"].includes(e.code)) ||
+    (e.shiftKey && ["F5", "F7", "F9"].includes(e.code)) ||
+    (e.metaKey &&
+      e.altKey &&
+      ["KeyI", "KeyJ", "KeyC", "KeyU"].includes(e.code)) ||
+    (hasPrimaryMod && !e.shiftKey && e.code === "KeyU")
+  );
+}
+
 /** Protects reader prose against casual capture, printing, DevTools tampering, and DOM scraping. */
 export function DrmShield({
   watermarkText,
@@ -187,9 +252,7 @@ export function DrmShield({
       curtain.className = locked ? CURTAIN_ACTIVE_CLASS : CURTAIN_HIDDEN_CLASS;
     }
     if (content) {
-      content.className = locked
-        ? `${CONTENT_BASE_CLASS} ${CONTENT_LOCKED_CLASS}`
-        : `${CONTENT_BASE_CLASS} blur-none opacity-100`;
+      content.className = locked ? CONTENT_LOCKED_CLASS : CONTENT_BASE_CLASS;
     }
   }, []);
 
@@ -291,46 +354,25 @@ export function DrmShield({
       );
     };
 
+    const clientOs = detectClientOs();
+
     const handleKeyDown = (e: KeyboardEvent) => {
       const hasPrimaryMod = e.ctrlKey || e.metaKey;
-
-      if (e.key === "PrintScreen" || e.code === "PrintScreen") {
+      const ssDetail = getScreenshotShortcutDetail(e, clientOs, "keydown");
+      if (ssDetail) {
         e.preventDefault();
+        e.stopPropagation();
         activateShield(
           "screenshot_shortcut",
-          "Tombol PrintScreen terdeteksi.",
-          "PrintScreen (keydown)",
+          "Pintasan tangkapan layar atau rekam layar terdeteksi.",
+          ssDetail,
         );
         return;
       }
 
-      if (
-        e.metaKey &&
-        e.shiftKey &&
-        (["Digit3", "Digit4", "Digit5", "KeyS"].includes(e.code) ||
-          ["3", "4", "5", "s", "S"].includes(e.key))
-      ) {
-        activateShield(
-          "screenshot_shortcut",
-          "Pintasan tangkapan layar sistem terdeteksi.",
-          `Pintasan screenshot (${e.code || e.key})`,
-        );
-        return;
-      }
-
-      const isDevToolsShortcut =
-        e.key === "F12" ||
-        e.code === "F12" ||
-        (hasPrimaryMod &&
-          e.shiftKey &&
-          ["KeyI", "KeyJ", "KeyC"].includes(e.code)) ||
-        (e.metaKey &&
-          e.altKey &&
-          ["KeyI", "KeyJ", "KeyC", "KeyU"].includes(e.code)) ||
-        (hasPrimaryMod && !e.shiftKey && e.code === "KeyU");
-
-      if (isDevToolsShortcut) {
+      if (isDevToolsShortcutEvent(e)) {
         e.preventDefault();
+        e.stopPropagation();
         activateShield(
           "devtools_attempt",
           "Akses DevTools dan inspeksi sumber halaman dinonaktifkan.",
@@ -341,6 +383,7 @@ export function DrmShield({
 
       if (hasPrimaryMod && !e.shiftKey && e.code === "KeyP") {
         e.preventDefault();
+        e.stopPropagation();
         activateShield(
           "print_save_attempt",
           "Fungsi pencetakan dokumen (Print / PDF) dinonaktifkan.",
@@ -351,6 +394,7 @@ export function DrmShield({
 
       if (hasPrimaryMod && !e.shiftKey && e.code === "KeyS") {
         e.preventDefault();
+        e.stopPropagation();
         activateShield(
           "print_save_attempt",
           "Fungsi pengunduhan halaman dinonaktifkan.",
@@ -360,12 +404,14 @@ export function DrmShield({
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.key === "PrintScreen" || e.code === "PrintScreen") {
+      const ssDetail = getScreenshotShortcutDetail(e, clientOs, "keyup");
+      if (ssDetail) {
         e.preventDefault();
+        e.stopPropagation();
         activateShield(
           "screenshot_shortcut",
           "Tombol PrintScreen terdeteksi.",
-          "PrintScreen (keyup)",
+          ssDetail,
         );
       }
     };
@@ -556,7 +602,7 @@ export function DrmShield({
         ) {
           isRecovering = true;
           content.removeAttribute("style");
-          content.className = `${CONTENT_BASE_CLASS} ${CONTENT_LOCKED_CLASS}`;
+          content.className = CONTENT_LOCKED_CLASS;
           tampered = true;
         }
       }
@@ -658,9 +704,7 @@ export function DrmShield({
         ref={contentRef}
         data-drm-content="true"
         className={
-          isEffectiveShieldActive
-            ? `${CONTENT_BASE_CLASS} ${CONTENT_LOCKED_CLASS}`
-            : `${CONTENT_BASE_CLASS} blur-none opacity-100`
+          isEffectiveShieldActive ? CONTENT_LOCKED_CLASS : CONTENT_BASE_CLASS
         }
       >
         {children}
