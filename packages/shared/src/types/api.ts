@@ -776,6 +776,55 @@ export type DrmWatermarkTraceDto = {
   recentEvents: DrmSecurityEventDto[];
 };
 
+export type DrmSuspensionStatus =
+  "suspended" | "appeal_pending" | "reinstated" | "rejected";
+
+export type DrmReaderSuspensionDto = {
+  id: string;
+  userId: string;
+  userName: string;
+  username: string | null;
+  userEmail: string;
+  status: DrmSuspensionStatus;
+  cycleNumber: number;
+  triggerCount: number;
+  lastEventType: DrmSecurityEventType;
+  lastBookSlug: string | null;
+  suspendedAt: string;
+  appealMessage: string | null;
+  appealedAt: string | null;
+  reviewNote: string | null;
+  reviewedAt: string | null;
+  reinstatedAt: string | null;
+};
+
+export type ReaderDrmStatusDto = {
+  status: "active" | DrmSuspensionStatus;
+  highRiskCount: number;
+  strikeLimit: number;
+  latestSuspension: DrmReaderSuspensionDto | null;
+};
+
+export type RecordDrmEventResultDto = {
+  id: string;
+  riskLevel: DrmSecurityRiskLevel;
+  createdAt: string;
+  highRiskCount: number;
+  strikeLimit: number;
+  suspensionTriggered: boolean;
+  readerStatus: "active" | DrmSuspensionStatus;
+};
+
+export type AdminDrmSuspensionsListResponse =
+  Paginated<DrmReaderSuspensionDto> & {
+    summary: {
+      activeSuspendedCount: number;
+      appealPendingCount: number;
+      reinstatedCount: number;
+      rejectedCount: number;
+    };
+  };
+
 export type AdminCalendarDto = {
   id: string;
   slug: string;

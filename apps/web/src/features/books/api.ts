@@ -8,11 +8,14 @@ import type {
   BookSummaryDto,
   CollectionSummaryDto,
   DataResponse,
+  DrmReaderSuspensionDto,
   PageMeta,
   ParagraphCommentDto,
+  ReaderDrmStatusDto,
   ReadingProgressDto,
   ReadingProgressScope,
   ReadingSessionDto,
+  RecordDrmEventResultDto,
   StoreStockItemDto,
 } from "@starter/shared/types";
 import type {
@@ -29,7 +32,10 @@ import type {
   SaveReadingProgressInput,
 } from "@starter/shared/validators/reading";
 import type { PurchaseBookAlacarteInput } from "@starter/shared/validators/publisher";
-import type { RecordDrmEventInput } from "@starter/shared/validators/drm";
+import type {
+  RecordDrmEventInput,
+  SubmitDrmAppealInput,
+} from "@starter/shared/validators/drm";
 import { apiFetch } from "@/lib/api/client";
 
 export type BooksListResponse = {
@@ -248,13 +254,33 @@ export async function purchaseBookAlacarte(
   return data;
 }
 
+export async function getReaderDrmStatus(signal?: AbortSignal) {
+  const { data } = await apiFetch<DataResponse<ReaderDrmStatusDto>>(
+    "/api/reading/drm-status",
+    { signal },
+  );
+  return data;
+}
+
+export async function submitReaderDrmAppeal(input: SubmitDrmAppealInput) {
+  const { data } = await apiFetch<DataResponse<DrmReaderSuspensionDto>>(
+    "/api/reading/drm-appeal",
+    {
+      method: "POST",
+      body: input,
+    },
+  );
+  return data;
+}
+
 export async function recordDrmEvent(input: RecordDrmEventInput) {
-  const { data } = await apiFetch<
-    DataResponse<{ id: string; riskLevel: string; createdAt: string }>
-  >("/api/reading/drm-events", {
-    method: "POST",
-    body: input,
-    keepalive: true,
-  });
+  const { data } = await apiFetch<DataResponse<RecordDrmEventResultDto>>(
+    "/api/reading/drm-events",
+    {
+      method: "POST",
+      body: input,
+      keepalive: true,
+    },
+  );
   return data;
 }

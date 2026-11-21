@@ -9,6 +9,9 @@ import {
 } from "@starter/shared/validators/admin";
 import {
   adminDrmEventsQuerySchema,
+  adminDrmSuspensionsQuerySchema,
+  adminReviewDrmAppealSchema,
+  drmSuspensionIdParamSchema,
   watermarkCodeParamSchema,
 } from "@starter/shared/validators/drm";
 import {
@@ -38,6 +41,8 @@ import {
 import { deleteAnyNote, listAnyNotes } from "../services/notes.service";
 import {
   listAdminDrmEvents,
+  listAdminDrmSuspensions,
+  reviewDrmSuspension,
   traceDrmWatermarkSession,
 } from "../services/drm.service";
 
@@ -171,6 +176,19 @@ adminRouter.get("/drm-events/trace/:watermarkCode", async (req, res) => {
     watermarkCode: req.params.watermarkCode,
   });
   const result = await traceDrmWatermarkSession(watermarkCode);
+  res.json({ data: result });
+});
+
+adminRouter.get("/drm-suspensions", async (req, res) => {
+  const query = adminDrmSuspensionsQuerySchema.parse(req.query);
+  const result = await listAdminDrmSuspensions(query);
+  res.json(result);
+});
+
+adminRouter.patch("/drm-suspensions/:id/review", jsonBody, async (req, res) => {
+  const { id } = drmSuspensionIdParamSchema.parse({ id: req.params.id });
+  const input = adminReviewDrmAppealSchema.parse(req.body);
+  const result = await reviewDrmSuspension(id, getAuth(req).user.id, input);
   res.json({ data: result });
 });
 

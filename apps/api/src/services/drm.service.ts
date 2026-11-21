@@ -1,19 +1,27 @@
 import { randomBytes } from "node:crypto";
-import { and, desc, eq, gte, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, ilike, or, sql } from "drizzle-orm";
 import type {
   AdminDrmEventsListResponse,
+  AdminDrmSuspensionsListResponse,
+  DrmReaderSuspensionDto,
   DrmSecurityEventDto,
   DrmWatermarkTraceDto,
+  ReaderDrmStatusDto,
+  RecordDrmEventResultDto,
 } from "@starter/shared/types";
 import {
+  DRM_HIGH_RISK_SUSPEND_THRESHOLD,
   getDrmEventRiskLevel,
   type AdminDrmEventsQueryOutput,
+  type AdminDrmSuspensionsQueryOutput,
+  type AdminReviewDrmAppealOutput,
   type DrmClientOs,
   type RecordDrmEventOutput,
 } from "@starter/shared/validators/drm";
 import { db } from "../db";
 import {
   books,
+  drmReaderSuspensions,
   drmSecurityEvents,
   drmWatermarkSessions,
   manuscriptSubmissions,
@@ -63,6 +71,7 @@ function pruneChapterDeliveryHistory(now: number) {
  */
 export async function enforceChapterWindowRateLimit(params: {
   userId: string;
+  userRole?: string | null;
   bookId: string;
   bookSlug: string;
   requestedChapterNum: number;
@@ -73,6 +82,7 @@ export async function enforceChapterWindowRateLimit(params: {
 }): Promise<void> {
   const {
     userId,
+    userRole,
     bookId,
     bookSlug,
     requestedChapterNum,
@@ -121,6 +131,7 @@ export async function enforceChapterWindowRateLimit(params: {
       : `${projectedLongCount} bab unik / 60 detik`;
     await recordDrmSecurityEvent({
       userId,
+      userRole,
       input: {
         bookSlug,
         chapterNumber: requestedChapterNum,
@@ -213,13 +224,138 @@ export async function issueOrGetDrmWatermarkSession(input: {
   return watermarkCode;
 }
 
+const drmSuspensionSelection = {
+  id: drmReaderSuspensions.id,
+  userId: drmReaderSuspensions.userId,
+  userName: user.name,
+  username: user.username,
+  userEmail: user.email,
+  status: drmReaderSuspensions.status,
+  cycleNumber: drmReaderSuspensions.cycleNumber,
+  triggerCount: drmReaderSuspensions.triggerCount,
+  lastEventType: drmReaderSuspensions.lastEventType,
+  lastBookSlug: drmReaderSuspensions.lastBookSlug,
+  suspendedAt: drmReaderSuspensions.suspendedAt,
+  appealMessage: drmReaderSuspensions.appealMessage,
+  appealedAt: drmReaderSuspensions.appealedAt,
+  reviewNote: drmReaderSuspensions.reviewNote,
+  reviewedAt: drmReaderSuspensions.reviewedAt,
+  reinstatedAt: drmReaderSuspensions.reinstatedAt,
+};
+
+function mapSuspensionRow(row: {
+  id: string;
+  userId: string;
+  userName: string;
+  username: string | null;
+  userEmail: string;
+  status: DrmReaderSuspensionDto["status"];
+  cycleNumber: number;
+  triggerCount: number;
+  lastEventType: DrmReaderSuspensionDto["lastEventType"];
+  lastBookSlug: string | null;
+  suspendedAt: Date;
+  appealMessage: string | null;
+  appealedAt: Date | null;
+  reviewNote: string | null;
+  reviewedAt: Date | null;
+  reinstatedAt: Date | null;
+}): DrmReaderSuspensionDto {
+  return {
+    id: row.id,
+    userId: row.userId,
+    userName: row.userName,
+    username: row.username,
+    userEmail: row.userEmail,
+    status: row.status,
+    cycleNumber: row.cycleNumber,
+    triggerCount: row.triggerCount,
+    lastEventType: row.lastEventType,
+    lastBookSlug: row.lastBookSlug,
+    suspendedAt: row.suspendedAt.toISOString(),
+    appealMessage: row.appealMessage,
+    appealedAt: row.appealedAt ? row.appealedAt.toISOString() : null,
+    reviewNote: row.reviewNote,
+    reviewedAt: row.reviewedAt ? row.reviewedAt.toISOString() : null,
+    reinstatedAt: row.reinstatedAt ? row.reinstatedAt.toISOString() : null,
+  };
+}
+
+async function getLatestUserSuspension(userId: string) {
+  const [latest] = await db
+    .select(drmSuspensionSelection)
+    .from(drmReaderSuspensions)
+    .innerJoin(user, eq(drmReaderSuspensions.userId, user.id))
+    .where(eq(drmReaderSuspensions.userId, userId))
+    .orderBy(
+      desc(drmReaderSuspensions.suspendedAt),
+      desc(drmReaderSuspensions.cycleNumber),
+    )
+    .limit(1);
+  return latest ?? null;
+}
+
+async function countHighRiskInCycle(
+  userId: string,
+  cycleStart: Date | null,
+): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(drmSecurityEvents)
+    .where(
+      and(
+        eq(drmSecurityEvents.userId, userId),
+        eq(drmSecurityEvents.riskLevel, "high"),
+        cycleStart ? gt(drmSecurityEvents.createdAt, cycleStart) : undefined,
+      ),
+    );
+  return Number(row?.count ?? 0);
+}
+
+export async function assertReaderNotSuspended(
+  userId: string,
+  userRole?: string | null,
+): Promise<void> {
+  if (userRole === "admin") return;
+  const latest = await getLatestUserSuspension(userId);
+  if (!latest || latest.status === "reinstated") return;
+
+  throw new HttpError(
+    403,
+    "READER_SUSPENDED",
+    "Akses E-Reader akun Anda dibekukan sementara karena mencapai batas 7 pelanggaran DRM prioritas tinggi. Ajukan peninjauan kepada Admin untuk memulihkan akses baca.",
+  );
+}
+
+export async function getReaderDrmStatus(
+  userId: string,
+): Promise<ReaderDrmStatusDto> {
+  const latest = await getLatestUserSuspension(userId);
+  const isSuspended = latest !== null && latest.status !== "reinstated";
+  const cycleStart =
+    latest?.status === "reinstated" && latest.reinstatedAt
+      ? latest.reinstatedAt
+      : null;
+  const highRiskCount = isSuspended
+    ? latest.triggerCount
+    : await countHighRiskInCycle(userId, cycleStart);
+
+  return {
+    status: isSuspended ? latest.status : "active",
+    highRiskCount,
+    strikeLimit: DRM_HIGH_RISK_SUSPEND_THRESHOLD,
+    latestSuspension: latest ? mapSuspensionRow(latest) : null,
+  };
+}
+
 export async function recordDrmSecurityEvent(params: {
   userId: string;
+  userRole?: string | null;
   input: RecordDrmEventOutput;
   userAgent?: string | null;
   ipAddress?: string | null;
-}): Promise<{ id: string; riskLevel: string; createdAt: string }> {
-  const { userId, input, userAgent, ipAddress } = params;
+}): Promise<RecordDrmEventResultDto> {
+  const { userId, userRole, input, userAgent, ipAddress } = params;
   const isManuscriptSlug =
     input.bookSlug.startsWith("manuscript-") ||
     input.bookSlug.startsWith("manu-");
@@ -265,8 +401,17 @@ export async function recordDrmSecurityEvent(params: {
     )
     .limit(1);
 
+  const latest = await getLatestUserSuspension(userId);
+  const alreadySuspended = latest !== null && latest.status !== "reinstated";
+  const cycleStart =
+    latest?.status === "reinstated" && latest.reinstatedAt
+      ? latest.reinstatedAt
+      : null;
+
   const riskLevel = getDrmEventRiskLevel(input.eventType);
   const cutoff = new Date(Date.now() - DEDUP_WINDOW_MS);
+  // Ensure post-reinstatement events always belong to the new cycle cleanly without cross-cycle dedup.
+  const dedupSince = cycleStart && cycleStart > cutoff ? cycleStart : cutoff;
 
   const [recentDuplicate] = await db
     .select({
@@ -281,17 +426,24 @@ export async function recordDrmSecurityEvent(params: {
         eq(drmSecurityEvents.bookSlug, input.bookSlug),
         eq(drmSecurityEvents.eventType, input.eventType),
         eq(drmSecurityEvents.triggerDetail, input.triggerDetail),
-        gte(drmSecurityEvents.createdAt, cutoff),
+        gte(drmSecurityEvents.createdAt, dedupSince),
       ),
     )
     .orderBy(desc(drmSecurityEvents.createdAt))
     .limit(1);
 
   if (recentDuplicate) {
+    const highRiskCount = alreadySuspended
+      ? latest.triggerCount
+      : await countHighRiskInCycle(userId, cycleStart);
     return {
       id: recentDuplicate.id,
       riskLevel: recentDuplicate.riskLevel,
       createdAt: recentDuplicate.createdAt.toISOString(),
+      highRiskCount,
+      strikeLimit: DRM_HIGH_RISK_SUSPEND_THRESHOLD,
+      suspensionTriggered: false,
+      readerStatus: alreadySuspended ? latest.status : "active",
     };
   }
 
@@ -317,10 +469,68 @@ export async function recordDrmSecurityEvent(params: {
       createdAt: drmSecurityEvents.createdAt,
     });
 
+  const highRiskCount = alreadySuspended
+    ? latest.triggerCount
+    : await countHighRiskInCycle(userId, cycleStart);
+
+  let suspensionTriggered = false;
+  let readerStatus: RecordDrmEventResultDto["readerStatus"] = alreadySuspended
+    ? latest.status
+    : "active";
+
+  if (
+    userRole !== "admin" &&
+    !alreadySuspended &&
+    riskLevel === "high" &&
+    highRiskCount >= DRM_HIGH_RISK_SUSPEND_THRESHOLD
+  ) {
+    const insertedSuspension = await db.transaction(async (tx) => {
+      const [active] = await tx
+        .select({
+          id: drmReaderSuspensions.id,
+          status: drmReaderSuspensions.status,
+        })
+        .from(drmReaderSuspensions)
+        .where(eq(drmReaderSuspensions.userId, userId))
+        .orderBy(
+          desc(drmReaderSuspensions.suspendedAt),
+          desc(drmReaderSuspensions.cycleNumber),
+        )
+        .limit(1);
+
+      if (active && active.status !== "reinstated") {
+        return null;
+      }
+
+      const nextCycle = (latest?.cycleNumber ?? 0) + 1;
+      const [createdSuspension] = await tx
+        .insert(drmReaderSuspensions)
+        .values({
+          userId,
+          status: "suspended",
+          cycleNumber: nextCycle,
+          triggerCount: highRiskCount,
+          lastEventType: input.eventType,
+          lastBookSlug: input.bookSlug,
+        })
+        .returning({ status: drmReaderSuspensions.status });
+      return createdSuspension ?? null;
+    });
+
+    if (insertedSuspension) {
+      suspensionTriggered = true;
+      readerStatus = insertedSuspension.status;
+    }
+  }
+
   return {
     id: created.id,
     riskLevel: created.riskLevel,
     createdAt: created.createdAt.toISOString(),
+    highRiskCount,
+    strikeLimit: DRM_HIGH_RISK_SUSPEND_THRESHOLD,
+    suspensionTriggered,
+    readerStatus,
   };
 }
 
@@ -503,4 +713,158 @@ export async function traceDrmWatermarkSession(
     lastSeenAt: sessionRow.lastSeenAt.toISOString(),
     recentEvents: eventRows.map(mapEventRow),
   };
+}
+
+export async function submitReaderDrmAppeal(
+  userId: string,
+  appealMessage: string,
+): Promise<DrmReaderSuspensionDto> {
+  const latest = await getLatestUserSuspension(userId);
+  if (!latest || latest.status === "reinstated") {
+    throw new HttpError(
+      409,
+      "NO_ACTIVE_SUSPENSION",
+      "Akses membaca akun Anda saat ini sedang aktif.",
+    );
+  }
+  if (latest.status === "appeal_pending") {
+    throw new HttpError(
+      409,
+      "APPEAL_ALREADY_PENDING",
+      "Permintaan peninjauan Anda sudah diterima dan sedang menunggu keputusan Admin.",
+    );
+  }
+
+  await db
+    .update(drmReaderSuspensions)
+    .set({
+      status: "appeal_pending",
+      appealMessage,
+      appealedAt: new Date(),
+    })
+    .where(eq(drmReaderSuspensions.id, latest.id));
+
+  const updated = await getLatestUserSuspension(userId);
+  if (!updated) {
+    throw new HttpError(
+      404,
+      "SUSPENSION_NOT_FOUND",
+      "Data suspensi pembaca tidak ditemukan.",
+    );
+  }
+  return mapSuspensionRow(updated);
+}
+
+export async function listAdminDrmSuspensions(
+  query: AdminDrmSuspensionsQueryOutput,
+): Promise<AdminDrmSuspensionsListResponse> {
+  const filters = [];
+  if (query.status !== "all") {
+    filters.push(eq(drmReaderSuspensions.status, query.status));
+  }
+  if (query.search) {
+    const pattern = `%${query.search}%`;
+    filters.push(
+      or(
+        ilike(user.username, pattern),
+        ilike(user.name, pattern),
+        ilike(user.email, pattern),
+        ilike(drmReaderSuspensions.lastBookSlug, pattern),
+      ),
+    );
+  }
+
+  const whereClause = filters.length > 0 ? and(...filters) : undefined;
+
+  const [rows, [summaryRow]] = await Promise.all([
+    db
+      .select(drmSuspensionSelection)
+      .from(drmReaderSuspensions)
+      .innerJoin(user, eq(drmReaderSuspensions.userId, user.id))
+      .where(whereClause)
+      .orderBy(desc(drmReaderSuspensions.suspendedAt))
+      .limit(query.limit + 1)
+      .offset(query.offset),
+    db
+      .select({
+        activeSuspendedCount: sql<number>`count(*) filter (where ${drmReaderSuspensions.status} = 'suspended')`,
+        appealPendingCount: sql<number>`count(*) filter (where ${drmReaderSuspensions.status} = 'appeal_pending')`,
+        reinstatedCount: sql<number>`count(*) filter (where ${drmReaderSuspensions.status} = 'reinstated')`,
+        rejectedCount: sql<number>`count(*) filter (where ${drmReaderSuspensions.status} = 'rejected')`,
+      })
+      .from(drmReaderSuspensions),
+  ]);
+
+  const hasMore = rows.length > query.limit;
+  const items = rows.slice(0, query.limit).map(mapSuspensionRow);
+
+  return {
+    data: items,
+    meta: {
+      limit: query.limit,
+      offset: query.offset,
+      hasMore,
+    },
+    summary: {
+      activeSuspendedCount: Number(summaryRow?.activeSuspendedCount ?? 0),
+      appealPendingCount: Number(summaryRow?.appealPendingCount ?? 0),
+      reinstatedCount: Number(summaryRow?.reinstatedCount ?? 0),
+      rejectedCount: Number(summaryRow?.rejectedCount ?? 0),
+    },
+  };
+}
+
+export async function reviewDrmSuspension(
+  suspensionId: string,
+  adminUserId: string,
+  input: AdminReviewDrmAppealOutput,
+): Promise<DrmReaderSuspensionDto> {
+  const [existing] = await db
+    .select(drmSuspensionSelection)
+    .from(drmReaderSuspensions)
+    .innerJoin(user, eq(drmReaderSuspensions.userId, user.id))
+    .where(eq(drmReaderSuspensions.id, suspensionId))
+    .limit(1);
+
+  if (!existing) {
+    throw new HttpError(
+      404,
+      "SUSPENSION_NOT_FOUND",
+      "Data suspensi DRM tidak ditemukan.",
+    );
+  }
+  if (existing.status === "reinstated") {
+    throw new HttpError(
+      409,
+      "ALREADY_REINSTATED",
+      "Akses E-Reader akun ini sudah dipulihkan sebelumnya.",
+    );
+  }
+
+  const now = new Date();
+  const nextStatus = input.action === "approve" ? "reinstated" : "rejected";
+  const defaultNote =
+    input.action === "approve"
+      ? "Akses membaca E-Reader dipulihkan setelah peninjauan Admin."
+      : "Permintaan peninjauan ditolak karena indikasi pelanggaran hak cipta.";
+
+  await db
+    .update(drmReaderSuspensions)
+    .set({
+      status: nextStatus,
+      reviewedByUserId: adminUserId,
+      reviewNote: input.reviewNote ?? defaultNote,
+      reviewedAt: now,
+      reinstatedAt: input.action === "approve" ? now : null,
+    })
+    .where(eq(drmReaderSuspensions.id, existing.id));
+
+  const [updated] = await db
+    .select(drmSuspensionSelection)
+    .from(drmReaderSuspensions)
+    .innerJoin(user, eq(drmReaderSuspensions.userId, user.id))
+    .where(eq(drmReaderSuspensions.id, existing.id))
+    .limit(1);
+
+  return mapSuspensionRow(updated);
 }

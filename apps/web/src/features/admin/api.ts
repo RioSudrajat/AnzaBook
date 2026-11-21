@@ -4,16 +4,22 @@ import type {
   AdminClaimBatchCodesDto,
   AdminCreateClaimBatchResultDto,
   AdminDrmEventsListResponse,
+  AdminDrmSuspensionsListResponse,
   AdminNoteDto,
   AdminOverviewDto,
   AdminPublishManuscriptResultDto,
   DataResponse,
+  DrmReaderSuspensionDto,
   DrmWatermarkTraceDto,
   ManuscriptSubmissionDto,
   Paginated,
   PublisherDto,
 } from "@starter/shared/types";
-import type { AdminDrmEventsQueryInput } from "@starter/shared/validators/drm";
+import type {
+  AdminDrmEventsQueryInput,
+  AdminDrmSuspensionsQueryInput,
+  AdminReviewDrmAppealInput,
+} from "@starter/shared/validators/drm";
 import type {
   AdminEditManuscriptInput,
   AdminListQueryInput,
@@ -243,6 +249,33 @@ export async function traceAdminDrmWatermark(
   const { data } = await apiFetch<DataResponse<DrmWatermarkTraceDto>>(
     `/api/admin/drm-events/trace/${encodeURIComponent(watermarkCode)}`,
     { signal },
+  );
+  return data;
+}
+
+export function getAdminDrmSuspensions(
+  params?: AdminDrmSuspensionsQueryInput,
+  signal?: AbortSignal,
+): Promise<AdminDrmSuspensionsListResponse> {
+  return apiFetch<AdminDrmSuspensionsListResponse>(
+    "/api/admin/drm-suspensions",
+    {
+      query: params,
+      signal,
+    },
+  );
+}
+
+export async function reviewAdminDrmSuspension(
+  id: string,
+  input: AdminReviewDrmAppealInput,
+): Promise<DrmReaderSuspensionDto> {
+  const { data } = await apiFetch<DataResponse<DrmReaderSuspensionDto>>(
+    `/api/admin/drm-suspensions/${encodeURIComponent(id)}/review`,
+    {
+      method: "PATCH",
+      body: input,
+    },
   );
   return data;
 }

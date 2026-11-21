@@ -7,11 +7,18 @@ import {
   readingProgressQuerySchema,
   saveReadingProgressSchema,
 } from "@starter/shared/validators/reading";
-import { recordDrmEventSchema } from "@starter/shared/validators/drm";
+import {
+  recordDrmEventSchema,
+  submitDrmAppealSchema,
+} from "@starter/shared/validators/drm";
 import { getAuth, requireAuth } from "../middleware/auth";
 import { jsonBody } from "../middleware/body";
 import { requireTrustedOrigin } from "../middleware/origin";
-import { recordDrmSecurityEvent } from "../services/drm.service";
+import {
+  getReaderDrmStatus,
+  recordDrmSecurityEvent,
+  submitReaderDrmAppeal,
+} from "../services/drm.service";
 import {
   createHighlight,
   createReadingSession,
@@ -122,15 +129,36 @@ readingRouter.post(
   },
 );
 
-// DRM security trigger logging
+// DRM security trigger logging, suspension status & appeal submission
+readingRouter.get("/drm-status", async (req, res) => {
+  const status = await getReaderDrmStatus(getAuth(req).user.id);
+  res.json({ data: status });
+});
+
+readingRouter.post(
+  "/drm-appeal",
+  requireTrustedOrigin,
+  jsonBody,
+  async (req, res) => {
+    const { appealMessage } = submitDrmAppealSchema.parse(req.body);
+    const updated = await submitReaderDrmAppeal(
+      getAuth(req).user.id,
+      appealMessage,
+    );
+    res.json({ data: updated });
+  },
+);
+
 readingRouter.post(
   "/drm-events",
   requireTrustedOrigin,
   jsonBody,
   async (req, res) => {
+    const auth = getAuth(req);
     const input = recordDrmEventSchema.parse(req.body);
     const result = await recordDrmSecurityEvent({
-      userId: getAuth(req).user.id,
+      userId: auth.user.id,
+      userRole: auth.user.role,
       input,
       userAgent: req.get("user-agent") ?? null,
       ipAddress: req.ip ?? req.socket.remoteAddress ?? null,

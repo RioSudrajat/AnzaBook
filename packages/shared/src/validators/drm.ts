@@ -103,6 +103,16 @@ export const adminDrmEventsQuerySchema = z
   })
   .strict();
 
+export const DRM_HIGH_RISK_SUSPEND_THRESHOLD = 7;
+
+export const drmSuspensionStatuses = [
+  "suspended",
+  "appeal_pending",
+  "reinstated",
+  "rejected",
+] as const;
+export type DrmSuspensionStatus = (typeof drmSuspensionStatuses)[number];
+
 export const watermarkCodeParamSchema = z
   .object({
     watermarkCode: z
@@ -114,8 +124,51 @@ export const watermarkCodeParamSchema = z
   })
   .strict();
 
+export const submitDrmAppealSchema = z
+  .object({
+    appealMessage: z
+      .string()
+      .trim()
+      .min(10, "Alasan peninjauan minimal 10 karakter.")
+      .max(1000, "Alasan peninjauan maksimal 1000 karakter."),
+  })
+  .strict();
+
+export const adminReviewDrmAppealSchema = z
+  .object({
+    action: z.enum(["approve", "reject"]),
+    reviewNote: z.string().trim().min(3).max(500).optional(),
+  })
+  .strict();
+
+export const adminDrmSuspensionsQuerySchema = z
+  .object({
+    status: z
+      .enum(["all", ...drmSuspensionStatuses])
+      .optional()
+      .default("all"),
+    search: z.string().trim().max(120).optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+    offset: z.coerce.number().int().min(0).default(0),
+  })
+  .strict();
+
+export const drmSuspensionIdParamSchema = z
+  .object({
+    id: z.string().uuid("ID suspensi DRM tidak valid."),
+  })
+  .strict();
+
 export type RecordDrmEventInput = z.input<typeof recordDrmEventSchema>;
 export type RecordDrmEventOutput = z.infer<typeof recordDrmEventSchema>;
+export type SubmitDrmAppealInput = z.input<typeof submitDrmAppealSchema>;
+export type SubmitDrmAppealOutput = z.infer<typeof submitDrmAppealSchema>;
+export type AdminReviewDrmAppealInput = z.input<
+  typeof adminReviewDrmAppealSchema
+>;
+export type AdminReviewDrmAppealOutput = z.infer<
+  typeof adminReviewDrmAppealSchema
+>;
 export type AdminDrmEventsQueryInput = {
   riskLevel?: "all" | DrmRiskLevel;
   eventType?: "all" | DrmEventType;
@@ -125,4 +178,13 @@ export type AdminDrmEventsQueryInput = {
 };
 export type AdminDrmEventsQueryOutput = z.infer<
   typeof adminDrmEventsQuerySchema
+>;
+export type AdminDrmSuspensionsQueryInput = {
+  status?: "all" | DrmSuspensionStatus;
+  search?: string;
+  limit?: number;
+  offset?: number;
+};
+export type AdminDrmSuspensionsQueryOutput = z.infer<
+  typeof adminDrmSuspensionsQuerySchema
 >;

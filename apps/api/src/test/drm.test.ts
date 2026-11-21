@@ -1,9 +1,15 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
+  DRM_HIGH_RISK_SUSPEND_THRESHOLD,
   getDrmEventRiskLevel,
   resolveReaderDrmPolicy,
 } from "@starter/shared/validators/drm";
+import {
+  decodeZeroWidthFingerprint,
+  encodeZeroWidthFingerprint,
+  stripZeroWidthCharacters,
+} from "@starter/shared/drm-steganography";
 import { agent, originHeader, setRole, signUp } from "./helpers";
 
 describe("DRM Policy, Opaque Session Watermarks, & Admin Audit Logging", () => {
@@ -282,5 +288,207 @@ describe("DRM Policy, Opaque Session Watermarks, & Admin Audit Logging", () => {
     expect(eventsRes.body.data[0].eventType).toBe("api_scrape_anomaly");
     expect(eventsRes.body.data[0].riskLevel).toBe("high");
     expect(eventsRes.body.data[0].userEmail).toBe(scraperEmail);
+  });
+
+  it("encodes and extracts zero-width steganography fingerprints cleanly without corrupting plain prose", () => {
+    const code = "ANZ-7F3A9C21B401";
+    const zw = encodeZeroWidthFingerprint(code);
+    expect(zw.length).toBeGreaterThan(10);
+
+    const prose = "Membaca adalah tindakan merdeka yang berdaulat.";
+    const watermarked = `${prose}${zw}`;
+
+    expect(decodeZeroWidthFingerprint(watermarked)).toBe(code);
+    expect(decodeZeroWidthFingerprint(prose)).toBeNull();
+    expect(stripZeroWidthCharacters(watermarked)).toBe(prose);
+  });
+
+  it("auto-suspends E-Reader on 7th high-risk strike, allows user appeal and admin review/reinstatement, and re-bans on 7 subsequent high-risk strikes", async () => {
+    expect(DRM_HIGH_RISK_SUSPEND_THRESHOLD).toBe(7);
+
+    const reader = agent();
+    const readerEmail = await signUp(reader, "Raka Striker 7");
+    const slug = "revolusi-cetak-kedaulatan-membaca";
+
+    const read1 = await reader.get(`/api/books/${slug}/read?chapter=1`);
+    expect(read1.status).toBe(200);
+    const wmCode: string = read1.body.data.watermark;
+
+    // 1. Low & medium events NEVER count toward the 7 high-risk auto-suspend limit
+    for (let i = 1; i <= 8; i += 1) {
+      const lowRes = await reader
+        .post("/api/reading/drm-events")
+        .set(originHeader)
+        .send({
+          bookSlug: slug,
+          chapterNumber: 1,
+          eventType: i % 2 === 0 ? "visibility_hidden" : "context_menu",
+          triggerDetail: `Non-high distraction #${i}`,
+          watermarkCode: wmCode,
+          clientOs: "linux",
+        });
+      expect(lowRes.status).toBe(201);
+      expect(lowRes.body.data.suspensionTriggered).toBe(false);
+    }
+
+    // 2. Trigger high-risk strikes 1..6 (still allowed to read)
+    for (let strike = 1; strike <= 6; strike += 1) {
+      const res = await reader
+        .post("/api/reading/drm-events")
+        .set(originHeader)
+        .send({
+          bookSlug: slug,
+          chapterNumber: 1,
+          eventType: "screenshot_shortcut",
+          triggerDetail: `High strike C1 #${strike}`,
+          watermarkCode: wmCode,
+          clientOs: "linux",
+        });
+      expect(res.status).toBe(201);
+      expect(res.body.data.highRiskCount).toBe(strike);
+      expect(res.body.data.strikeLimit).toBe(7);
+      expect(res.body.data.suspensionTriggered).toBe(false);
+      expect(res.body.data.readerStatus).toBe("active");
+    }
+
+    const stillAllowed = await reader.get(`/api/books/${slug}/read?chapter=1`);
+    expect(stillAllowed.status).toBe(200);
+
+    // 3. 7th high-risk strike triggers auto-suspend on E-Reader access
+    const strike7 = await reader
+      .post("/api/reading/drm-events")
+      .set(originHeader)
+      .send({
+        bookSlug: slug,
+        chapterNumber: 1,
+        eventType: "devtools_attempt",
+        triggerDetail: "High strike C1 #7 (F12)",
+        watermarkCode: wmCode,
+        clientOs: "linux",
+      });
+    expect(strike7.status).toBe(201);
+    expect(strike7.body.data.highRiskCount).toBe(7);
+    expect(strike7.body.data.suspensionTriggered).toBe(true);
+    expect(strike7.body.data.readerStatus).toBe("suspended");
+
+    const blockedRead = await reader.get(`/api/books/${slug}/read?chapter=1`);
+    expect(blockedRead.status).toBe(403);
+    expect(blockedRead.body.error.code).toBe("READER_SUSPENDED");
+
+    const statusSuspended = await reader.get("/api/reading/drm-status");
+    expect(statusSuspended.status).toBe(200);
+    expect(statusSuspended.body.data.status).toBe("suspended");
+    expect(statusSuspended.body.data.latestSuspension.cycleNumber).toBe(1);
+
+    // 4. Reader submits appeal -> transitions to appeal_pending (still blocked until admin reviews)
+    const appealRes = await reader
+      .post("/api/reading/drm-appeal")
+      .set(originHeader)
+      .send({
+        appealMessage:
+          "Saya tidak bermaksud membajak, tombol shortcut kepencet saat berpindah workspace.",
+      });
+    expect(appealRes.status).toBe(200);
+    expect(appealRes.body.data.status).toBe("appeal_pending");
+
+    const stillBlockedDuringAppeal = await reader.get(
+      `/api/books/${slug}/read?chapter=1`,
+    );
+    expect(stillBlockedDuringAppeal.status).toBe(403);
+    expect(stillBlockedDuringAppeal.body.error.code).toBe("READER_SUSPENDED");
+
+    // Non-admin forbidden from reviewing appeals
+    const forbiddenReview = await reader.get("/api/admin/drm-suspensions");
+    expect(forbiddenReview.status).toBe(403);
+
+    // 5. Admin inspects suspension queue, rejects once, then reinstates after review
+    const admin = agent();
+    const adminEmail = await signUp(admin, "Admin DRM Reviewer");
+    await setRole(adminEmail, "admin");
+
+    const listRes = await admin.get(
+      `/api/admin/drm-suspensions?status=appeal_pending&search=${encodeURIComponent(readerEmail)}`,
+    );
+    expect(listRes.status).toBe(200);
+    expect(listRes.body.data).toHaveLength(1);
+    const suspensionId: string = listRes.body.data[0].id;
+    expect(listRes.body.data[0].cycleNumber).toBe(1);
+
+    const rejectRes = await admin
+      .patch(`/api/admin/drm-suspensions/${suspensionId}/review`)
+      .set(originHeader)
+      .send({
+        action: "reject",
+        reviewNote: "Mohon jelaskan lebih rinci komitmen Anda.",
+      });
+    expect(rejectRes.status).toBe(200);
+    expect(rejectRes.body.data.status).toBe("rejected");
+
+    const stillRejectedRead = await reader.get(
+      `/api/books/${slug}/read?chapter=1`,
+    );
+    expect(stillRejectedRead.status).toBe(403);
+
+    const approveRes = await admin
+      .patch(`/api/admin/drm-suspensions/${suspensionId}/review`)
+      .set(originHeader)
+      .send({
+        action: "approve",
+        reviewNote: "Akses baca dipulihkan setelah peninjauan.",
+      });
+    expect(approveRes.status).toBe(200);
+    expect(approveRes.body.data.status).toBe("reinstated");
+
+    // 6. Reinstated reader can read again and cycle highRiskCount resets to 0
+    const statusAfterReinstate = await reader.get("/api/reading/drm-status");
+    expect(statusAfterReinstate.status).toBe(200);
+    expect(statusAfterReinstate.body.data.status).toBe("active");
+    expect(statusAfterReinstate.body.data.highRiskCount).toBe(0);
+
+    const restoredRead = await reader.get(`/api/books/${slug}/read?chapter=1`);
+    expect(restoredRead.status).toBe(200);
+
+    // 7. Reinstated user commits 7 MORE high-risk violations -> auto-suspended AGAIN (Cycle 2)!
+    for (let strike = 1; strike <= 6; strike += 1) {
+      const c2Res = await reader
+        .post("/api/reading/drm-events")
+        .set(originHeader)
+        .send({
+          bookSlug: slug,
+          chapterNumber: 1,
+          eventType: "clipboard_copy",
+          triggerDetail: `High strike C2 #${strike}`,
+          watermarkCode: wmCode,
+          clientOs: "linux",
+        });
+      expect(c2Res.status).toBe(201);
+      expect(c2Res.body.data.highRiskCount).toBe(strike);
+      expect(c2Res.body.data.suspensionTriggered).toBe(false);
+    }
+
+    const c2Strike7 = await reader
+      .post("/api/reading/drm-events")
+      .set(originHeader)
+      .send({
+        bookSlug: slug,
+        chapterNumber: 1,
+        eventType: "screenshot_shortcut",
+        triggerDetail: "High strike C2 #7 (PrintScreen)",
+        watermarkCode: wmCode,
+        clientOs: "linux",
+      });
+    expect(c2Strike7.status).toBe(201);
+    expect(c2Strike7.body.data.highRiskCount).toBe(7);
+    expect(c2Strike7.body.data.suspensionTriggered).toBe(true);
+    expect(c2Strike7.body.data.readerStatus).toBe("suspended");
+
+    const reBannedRead = await reader.get(`/api/books/${slug}/read?chapter=1`);
+    expect(reBannedRead.status).toBe(403);
+    expect(reBannedRead.body.error.code).toBe("READER_SUSPENDED");
+
+    const statusCycle2 = await reader.get("/api/reading/drm-status");
+    expect(statusCycle2.status).toBe(200);
+    expect(statusCycle2.body.data.status).toBe("suspended");
+    expect(statusCycle2.body.data.latestSuspension.cycleNumber).toBe(2);
   });
 });

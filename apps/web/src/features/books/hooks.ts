@@ -17,7 +17,10 @@ import type {
   CreateHighlightInput,
   SaveReadingProgressInput,
 } from "@starter/shared/validators/reading";
-import type { RecordDrmEventInput } from "@starter/shared/validators/drm";
+import type {
+  RecordDrmEventInput,
+  SubmitDrmAppealInput,
+} from "@starter/shared/validators/drm";
 import type {
   BookHighlightDto,
   ReadingProgressDto,
@@ -34,6 +37,7 @@ import {
   recordDrmEvent,
   restartBookReading,
   saveReadingProgress,
+  submitReaderDrmAppeal,
 } from "./api";
 import type { PurchaseBookAlacarteInput } from "@starter/shared/validators/publisher";
 import {
@@ -50,6 +54,7 @@ import {
   categoriesQuery,
   chapterCommentsQuery,
   collectionsQuery,
+  readerDrmStatusQuery,
   readingProgressQuery,
 } from "./queries";
 
@@ -256,8 +261,30 @@ export function usePurchaseBookAlacarte(slug: string) {
   });
 }
 
+export function useReaderDrmStatus() {
+  return useQuery(readerDrmStatusQuery());
+}
+
+export function useSubmitReaderDrmAppeal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SubmitDrmAppealInput) => submitReaderDrmAppeal(input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: booksKeys.drmStatus() });
+      void queryClient.invalidateQueries({ queryKey: booksKeys.readers() });
+    },
+  });
+}
+
 export function useRecordDrmEvent() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: RecordDrmEventInput) => recordDrmEvent(input),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: booksKeys.drmStatus() });
+      if (data.suspensionTriggered) {
+        void queryClient.invalidateQueries({ queryKey: booksKeys.readers() });
+      }
+    },
   });
 }

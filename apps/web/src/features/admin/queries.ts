@@ -1,11 +1,15 @@
 import { queryOptions } from "@tanstack/react-query";
 import type { AdminListQueryInput } from "@starter/shared/validators/admin";
-import type { AdminDrmEventsQueryInput } from "@starter/shared/validators/drm";
+import type {
+  AdminDrmEventsQueryInput,
+  AdminDrmSuspensionsQueryInput,
+} from "@starter/shared/validators/drm";
 import type { ListNotesInput } from "@starter/shared/validators/notes";
 import {
   getAdminAuthorApplications,
   getAdminCalendars,
   getAdminDrmEvents,
+  getAdminDrmSuspensions,
   getAdminManuscriptDetail,
   getAdminManuscripts,
   getAdminOverview,
@@ -34,6 +38,8 @@ export const adminKeys = {
     [...adminKeys.all, "drm-events", params ?? {}] as const,
   drmTrace: (watermarkCode: string) =>
     [...adminKeys.all, "drm-trace", watermarkCode] as const,
+  drmSuspensions: (params?: AdminDrmSuspensionsQueryInput) =>
+    [...adminKeys.all, "drm-suspensions", params ?? {}] as const,
   notes: (params: ListNotesInput) =>
     [...adminKeys.all, "notes", params] as const,
 };
@@ -111,5 +117,14 @@ export function adminDrmTraceQuery(watermarkCode: string) {
     queryFn: ({ signal }) => traceAdminDrmWatermark(watermarkCode, signal),
     enabled: Boolean(watermarkCode.trim()),
     retry: false,
+  });
+}
+
+export function adminDrmSuspensionsQuery(
+  params?: AdminDrmSuspensionsQueryInput,
+) {
+  return queryOptions({
+    queryKey: adminKeys.drmSuspensions(params),
+    queryFn: ({ signal }) => getAdminDrmSuspensions(params, signal),
   });
 }

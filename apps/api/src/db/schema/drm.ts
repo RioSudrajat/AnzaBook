@@ -12,6 +12,7 @@ import type {
   DrmClientOs,
   DrmEventType,
   DrmRiskLevel,
+  DrmSuspensionStatus,
 } from "@starter/shared/validators/drm";
 import { books } from "./anzabook";
 import { session } from "./session";
@@ -93,5 +94,46 @@ export const drmSecurityEvents = pgTable(
       table.createdAt.desc(),
     ),
     index("drm_security_events_watermark_idx").on(table.watermarkCode),
+  ],
+);
+
+export const drmReaderSuspensions = pgTable(
+  "drm_reader_suspensions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    status: varchar("status", { length: 24 })
+      .$type<DrmSuspensionStatus>()
+      .notNull()
+      .default("suspended"),
+    cycleNumber: integer("cycle_number").notNull().default(1),
+    triggerCount: integer("trigger_count").notNull().default(7),
+    lastEventType: varchar("last_event_type", { length: 48 })
+      .$type<DrmEventType>()
+      .notNull(),
+    lastBookSlug: varchar("last_book_slug", { length: 120 }),
+    suspendedAt: timestamp("suspended_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    appealMessage: text("appeal_message"),
+    appealedAt: timestamp("appealed_at", { withTimezone: true }),
+    reviewedByUserId: text("reviewed_by_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    reviewNote: text("review_note"),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reinstatedAt: timestamp("reinstated_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("drm_reader_suspensions_user_suspended_idx").on(
+      table.userId,
+      table.suspendedAt.desc(),
+    ),
+    index("drm_reader_suspensions_status_suspended_idx").on(
+      table.status,
+      table.suspendedAt.desc(),
+    ),
   ],
 );

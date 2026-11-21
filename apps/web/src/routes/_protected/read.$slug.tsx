@@ -19,6 +19,10 @@ import {
 } from "lucide-react";
 import { z } from "zod";
 import {
+  encodeZeroWidthFingerprint,
+  stripZeroWidthCharacters,
+} from "@starter/shared/drm-steganography";
+import {
   splitChapterIntoPages,
   computeBookPagination,
   getChapterAndPageFromGlobal,
@@ -43,13 +47,16 @@ import {
   useBookReader,
   useCreateHighlight,
   useDeleteHighlight,
+  useReaderDrmStatus,
   useReadingProgress,
   useRecordDrmEvent,
   useSaveReadingProgress,
+  useSubmitReaderDrmAppeal,
 } from "@/features/books/hooks";
 import { IS_DRM_TOGGLE_ENABLED } from "@/lib/env";
 import { booksKeys } from "@/features/books/queries";
 import { bookPagePath } from "@/features/books/book-share";
+import { Brand } from "@/components/brand";
 import { BookShareDialog } from "@/features/books/components/book-share-dialog";
 import {
   findSlide,
@@ -173,6 +180,16 @@ function splitParagraphs(text?: string | null): string[] {
     .split(/\n\n+/)
     .map((p) => p.trim())
     .filter(Boolean);
+}
+
+// Helper to embed an invisible zero-width forensic session fingerprint inside prose
+function DrmStegoFingerprint({ fingerprint }: { fingerprint: string }) {
+  if (!fingerprint) return null;
+  return (
+    <span aria-hidden="true" data-drm-fp="true" className="select-text">
+      {fingerprint}
+    </span>
+  );
 }
 
 // Helper to render text with interactive fluorescent stabilo marks
@@ -667,6 +684,12 @@ function ReaderBook() {
     isAuthorEditing: isAuthorOrPublisher && editMode === "edit",
   });
   const { mutate: recordDrmEvent } = useRecordDrmEvent();
+  const { data: readerDrmStatus, refetch: refetchDrmStatus } =
+    useReaderDrmStatus();
+  const submitAppealMutation = useSubmitReaderDrmAppeal();
+  const [appealMessageInput, setAppealMessageInput] = useState("");
+  const [appealFeedback, setAppealFeedback] = useState<string | null>(null);
+  const [suspendedNow, setSuspendedNow] = useState(false);
   const lastDrmLogRef = useRef<Map<string, number>>(new Map());
   const [isHighlightsOpen, setIsHighlightsOpen] = useState(false);
   const [isRatingOpen, setIsRatingOpen] = useState(false);
@@ -824,25 +847,41 @@ function ReaderBook() {
     (event: DrmShieldTriggerEvent) => {
       if (!drmPolicy.isEnabled || !payload?.watermark) return;
       const now = Date.now();
-      const key = event.eventType;
-      const last = lastDrmLogRef.current.get(key) ?? 0;
-      if (now - last < 2000) return;
-      lastDrmLogRef.current.set(key, now);
+      // Group PrintScreen keydown+keyup as one physical trigger while allowing distinct actions.
+      const dedupKey =
+        event.eventType === "screenshot_shortcut" &&
+        event.triggerDetail.startsWith("PrintScreen")
+          ? "screenshot_shortcut:PrintScreen"
+          : `${event.eventType}:${event.triggerDetail}`;
+      const last = lastDrmLogRef.current.get(dedupKey) ?? 0;
+      if (now - last < 1500) return;
+      lastDrmLogRef.current.set(dedupKey, now);
 
-      recordDrmEvent({
-        bookSlug: slug,
-        chapterNumber: activeChapterNum,
-        eventType: event.eventType,
-        triggerDetail: event.triggerDetail,
-        watermarkCode: payload.watermark,
-        clientOs: event.clientOs,
-      });
+      recordDrmEvent(
+        {
+          bookSlug: slug,
+          chapterNumber: activeChapterNum,
+          eventType: event.eventType,
+          triggerDetail: event.triggerDetail,
+          watermarkCode: payload.watermark,
+          clientOs: event.clientOs,
+        },
+        {
+          onSuccess: (result) => {
+            if (result.suspensionTriggered) {
+              setSuspendedNow(true);
+              void refetchDrmStatus();
+            }
+          },
+        },
+      );
     },
     [
       activeChapterNum,
       drmPolicy.isEnabled,
       payload?.watermark,
       recordDrmEvent,
+      refetchDrmStatus,
       slug,
     ],
   );
@@ -1441,6 +1480,10 @@ function ReaderBook() {
     note?: string;
     chapterNumber?: number;
   }) => {
+    const cleanSelectedText = stripZeroWidthCharacters(
+      data.selectedText,
+    ).trim();
+    if (!cleanSelectedText) return;
     const targetChapter = data.chapterNumber ?? activeChapterNum;
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const optHighlight: BookHighlightDto = {
@@ -1450,7 +1493,7 @@ function ReaderBook() {
       chapterId: null,
       chapterNumber: targetChapter,
       pageNumber: activeSpread?.chapterPage ?? 1,
-      selectedText: data.selectedText.trim(),
+      selectedText: cleanSelectedText,
       color: data.color,
       note: data.note || null,
       createdAt: new Date().toISOString(),
@@ -1467,7 +1510,7 @@ function ReaderBook() {
         bookId,
         chapterNumber: targetChapter,
         pageNumber: activeSpread?.chapterPage ?? 1,
-        selectedText: data.selectedText.trim(),
+        selectedText: cleanSelectedText,
         color: data.color,
         note: data.note,
       });
@@ -1611,9 +1654,26 @@ function ReaderBook() {
 
   const isLocked =
     error instanceof ApiError && error.code === "FORBIDDEN_DIGITAL_ACCESS";
+  const isDrmSuspendedError =
+    error instanceof ApiError && error.code === "READER_SUSPENDED";
+  const isReaderSuspended =
+    !isAuthorOrPublisher &&
+    !isManuscript &&
+    (suspendedNow ||
+      isDrmSuspendedError ||
+      (readerDrmStatus?.status !== undefined &&
+        readerDrmStatus.status !== "active"));
   const isExpired =
     expiredAccess !== null && expiredAccess === payload?.accessExpiresAt;
   const isMissing = error instanceof ApiError && error.status === 404;
+
+  const hiddenFingerprint = useMemo(
+    () =>
+      drmPolicy.isEnabled && payload?.watermark
+        ? encodeZeroWidthFingerprint(payload.watermark)
+        : "",
+    [drmPolicy.isEnabled, payload?.watermark],
+  );
 
   const lastLoadedChapterNum = loadedChapters.at(-1)?.chapterNumber ?? 0;
   const bookLastChapterNum = payload?.allChapters.at(-1)?.chapterNumber;
@@ -1642,6 +1702,180 @@ function ReaderBook() {
           </p>
         </div>
       </div>
+    );
+  }
+
+  if (isReaderSuspended) {
+    const suspension = readerDrmStatus?.latestSuspension ?? null;
+    const status = readerDrmStatus?.status ?? "suspended";
+    const canAppeal = status === "suspended" || status === "rejected";
+    const statusText =
+      status === "appeal_pending"
+        ? "Peninjauan Diajukan"
+        : status === "rejected"
+          ? "Peninjauan Ditolak"
+          : "Pembekuan Aktif";
+
+    return (
+      <main
+        id="main-content"
+        className="mx-auto flex min-h-svh max-w-lg flex-col items-center justify-center px-4 py-12"
+      >
+        <section
+          aria-labelledby="drm-suspended-title"
+          className="w-full rounded-[10px] border border-border bg-card overflow-hidden"
+        >
+          {/* Editorial Masthead Bar: Authentic AnzaBook Logo + Plain Monospace Status Indicator */}
+          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-4">
+            <Brand asLink={false} size="sm" />
+            <span className="inline-flex items-center gap-2 font-mono text-[11px] font-medium uppercase tracking-wider text-destructive tabular-nums">
+              <span
+                className="size-1.5 shrink-0 rounded-full bg-destructive"
+                aria-hidden="true"
+              />
+              {statusText}
+            </span>
+          </header>
+
+          {/* Main Content Sheet */}
+          <div className="p-6 sm:p-7 space-y-6 text-left">
+            <div className="space-y-2.5 border-b border-border/70 pb-5">
+              <h1
+                id="drm-suspended-title"
+                className="font-serif text-2xl font-semibold tracking-tight text-foreground"
+              >
+                Akses E-Reader Dibekukan Sementara
+              </h1>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Sistem keamanan DRM mendeteksi{" "}
+                <strong className="font-semibold text-foreground tabular-nums">
+                  {suspension?.triggerCount ?? 7} /{" "}
+                  {readerDrmStatus?.strikeLimit ?? 7} pelanggaran prioritas
+                  tinggi
+                </strong>{" "}
+                <span className="font-mono text-xs text-muted-foreground tabular-nums">
+                  (siklus ke-{suspension?.cycleNumber ?? 1})
+                </span>
+                . Akses baca ditahan sementara untuk melindungi hak cipta
+                penulis dan penerbit.
+              </p>
+            </div>
+
+            {suspension?.reviewNote && (
+              <div className="border-l-2 border-destructive pl-3.5 py-0.5 text-xs space-y-1">
+                <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground block">
+                  Catatan Admin
+                </span>
+                <p className="text-foreground leading-relaxed">
+                  {suspension.reviewNote}
+                </p>
+              </div>
+            )}
+
+            {status === "appeal_pending" ? (
+              <div className="border-l-2 border-[var(--color-accent)] pl-3.5 py-0.5 text-xs space-y-1.5">
+                <p className="font-semibold text-foreground">
+                  Permintaan Peninjauan Terkirim
+                </p>
+                <p className="text-muted-foreground leading-relaxed">
+                  Tim Admin AnzaBook sedang meninjau laporan Anda. Klik periksa
+                  status setelah Admin menyetujui pemulihan akses baca.
+                </p>
+                {suspension?.appealMessage && (
+                  <p className="pt-1 italic text-muted-foreground">
+                    &ldquo;{suspension.appealMessage}&rdquo;
+                  </p>
+                )}
+              </div>
+            ) : canAppeal ? (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setAppealFeedback(null);
+                  try {
+                    await submitAppealMutation.mutateAsync({
+                      appealMessage: appealMessageInput.trim(),
+                    });
+                    setAppealMessageInput("");
+                    setAppealFeedback(
+                      "Permintaan peninjauan berhasil dikirim ke Admin.",
+                    );
+                  } catch (err) {
+                    setAppealFeedback(
+                      err instanceof Error
+                        ? err.message
+                        : "Gagal mengirim permintaan peninjauan.",
+                    );
+                  }
+                }}
+                className="space-y-3"
+              >
+                <label
+                  htmlFor="drm-appeal-message"
+                  className="block font-mono text-[11px] uppercase tracking-wider text-muted-foreground"
+                >
+                  Ajukan Peninjauan Akses ke Admin
+                </label>
+                <textarea
+                  id="drm-appeal-message"
+                  aria-label="Alasan Peninjauan Akses"
+                  value={appealMessageInput}
+                  onChange={(e) => setAppealMessageInput(e.target.value)}
+                  minLength={10}
+                  maxLength={1000}
+                  required
+                  rows={3}
+                  placeholder="Jelaskan kronologi aktivitas Anda agar Admin dapat meninjau pemulihan akses E-Reader..."
+                  className="w-full rounded-[6px] border border-border bg-background px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                />
+                {appealFeedback && (
+                  <p className="text-xs text-muted-foreground">
+                    {appealFeedback}
+                  </p>
+                )}
+                <Button
+                  type="submit"
+                  disabled={
+                    submitAppealMutation.isPending ||
+                    appealMessageInput.trim().length < 10
+                  }
+                  className="w-full min-h-11 font-mono text-xs bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
+                >
+                  {submitAppealMutation.isPending
+                    ? "Mengirim..."
+                    : "Ajukan Peninjauan Akses"}
+                </Button>
+              </form>
+            ) : null}
+          </div>
+
+          {/* Ruled Footer Utility Actions */}
+          <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/20 px-6 py-3.5">
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11 font-mono text-xs"
+              onClick={async () => {
+                lastDrmLogRef.current.clear();
+                setSuspendedNow(false);
+                await queryClient.invalidateQueries({
+                  queryKey: booksKeys.readers(),
+                });
+                await Promise.all([refetchDrmStatus(), refetchBook()]);
+              }}
+            >
+              Periksa Status Akses
+            </Button>
+            <Link
+              to="/app"
+              search={{ tab: "home" }}
+              className="inline-flex min-h-11 items-center rounded-sm px-2 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              Kembali ke Home
+            </Link>
+          </footer>
+        </section>
+      </main>
     );
   }
 
@@ -1976,6 +2210,9 @@ function ReaderBook() {
                                         highlights,
                                         handleFlexHighlight,
                                       )}
+                                      <DrmStegoFingerprint
+                                        fingerprint={hiddenFingerprint}
+                                      />
                                     </p>
                                     <p
                                       className={`border-t md:border-t-0 md:border-l border-current/15 pt-2 md:pt-0 md:pl-6 opacity-75 italic leading-relaxed text-justify ${fontClass}`}
@@ -2052,6 +2289,9 @@ function ReaderBook() {
                                             highlights,
                                             handleFlexHighlight,
                                           )}
+                                          <DrmStegoFingerprint
+                                            fingerprint={hiddenFingerprint}
+                                          />
                                         </p>
                                       )}
                                     </div>
@@ -2130,16 +2370,19 @@ function ReaderBook() {
               fontSize={fontSize}
               coverColor={book.coverColor}
               isPremiumPreview={isPremiumPreview}
-              renderFragment={(fragment, chapterNumber) =>
-                renderHighlightedText(
-                  fragment.source,
-                  allHighlights.filter(
-                    (item) => item.chapterNumber === chapterNumber,
-                  ),
-                  handleFlexHighlight,
-                  fragment,
-                )
-              }
+              renderFragment={(fragment, chapterNumber) => (
+                <>
+                  {renderHighlightedText(
+                    fragment.source,
+                    allHighlights.filter(
+                      (item) => item.chapterNumber === chapterNumber,
+                    ),
+                    handleFlexHighlight,
+                    fragment,
+                  )}
+                  <DrmStegoFingerprint fingerprint={hiddenFingerprint} />
+                </>
+              )}
             />
           )}
           {!payload.hasFullAccess && readingLayout === "scroll" && (

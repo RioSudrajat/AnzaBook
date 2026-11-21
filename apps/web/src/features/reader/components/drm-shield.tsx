@@ -27,9 +27,9 @@ type DrmShieldProps = {
 };
 
 const WATERMARK_INK: Record<ReaderTheme, string> = {
-  manila: "rgba(26, 22, 18, 0.072)",
-  sepia: "rgba(38, 28, 16, 0.078)",
-  night: "rgba(242, 234, 222, 0.085)",
+  manila: "rgba(26, 22, 18, 0.115)",
+  sepia: "rgba(38, 28, 16, 0.125)",
+  night: "rgba(242, 234, 222, 0.135)",
 };
 
 const WATERMARK_HOST_CLASS =
@@ -104,12 +104,12 @@ function paintWatermarkCanvas(
 
   ctx.save();
   ctx.fillStyle = ink;
-  ctx.font = '500 11px "Red Hat Mono", ui-monospace, SFMono-Regular, monospace';
+  ctx.font = '600 11px "Red Hat Mono", ui-monospace, SFMono-Regular, monospace';
   ctx.textBaseline = "middle";
   ctx.textAlign = "center";
 
-  const stepX = 270;
-  const stepY = 124;
+  const stepX = 240;
+  const stepY = 104;
   const diagSpan = Math.hypot(width, height) + 280;
 
   ctx.translate(width / 2, height / 2);

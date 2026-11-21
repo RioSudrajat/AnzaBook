@@ -18,6 +18,7 @@ import {
 } from "../db/schema";
 import { HttpError } from "../lib/http-error";
 import {
+  assertReaderNotSuspended,
   enforceChapterWindowRateLimit,
   issueOrGetDrmWatermarkSession,
 } from "./drm.service";
@@ -841,7 +842,11 @@ export async function getBookReaderPayload(
   userId: string,
   query: ReadBookQuery,
   authSessionId?: string | null,
-  requestContext?: { userAgent?: string | null; ipAddress?: string | null },
+  requestContext?: {
+    userRole?: string | null;
+    userAgent?: string | null;
+    ipAddress?: string | null;
+  },
 ): Promise<BookReaderPayloadDto & { watermark: string }> {
   const [book] = await db
     .select()
@@ -851,6 +856,8 @@ export async function getBookReaderPayload(
 
   if (!book)
     throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+
+  await assertReaderNotSuspended(userId, requestContext?.userRole);
 
   const access = await getBookReadAccess(book, userId);
   const requestedChapterNum = query.chapter;
@@ -935,6 +942,7 @@ export async function getBookReaderPayload(
 
   await enforceChapterWindowRateLimit({
     userId,
+    userRole: requestContext?.userRole ?? null,
     bookId: book.id,
     bookSlug: book.slug,
     requestedChapterNum,
