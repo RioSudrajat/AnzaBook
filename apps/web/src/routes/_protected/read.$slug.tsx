@@ -1739,14 +1739,14 @@ function ReaderBook() {
 
           {/* Main Content Sheet */}
           <div className="p-6 sm:p-7 space-y-6 text-left">
-            <div className="space-y-2.5 border-b border-border/70 pb-5">
+            <div className="space-y-2.5 border-b border-border/70 pb-5 text-center">
               <h1
                 id="drm-suspended-title"
                 className="font-serif text-2xl font-semibold tracking-tight text-foreground"
               >
                 Akses E-Reader Dibekukan Sementara
               </h1>
-              <p className="text-sm text-muted-foreground leading-relaxed">
+              <p className="mx-auto max-w-md text-sm text-muted-foreground leading-relaxed">
                 Sistem keamanan DRM mendeteksi{" "}
                 <strong className="font-semibold text-foreground tabular-nums">
                   {suspension?.triggerCount ?? 7} /{" "}
