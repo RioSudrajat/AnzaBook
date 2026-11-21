@@ -437,7 +437,7 @@ export type ManagedPublisherSummaryDto = {
   topics?: string[];
   verificationStatus: PublisherVerificationStatus;
   rejectionReason?: string | null;
-  role: PublisherMemberRole | null;
+  role?: PublisherMemberRole | null;
 };
 
 export type PublicProfileReviewDto = {

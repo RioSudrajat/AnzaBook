@@ -299,8 +299,18 @@ describe("Publisher & Manuscript Shared Contracts", () => {
       topicMatchScore: 2,
       matchedTopics: ["Fiksi"],
     };
-    const managedSummaryCheck: Partial<ManagedPublisherSummaryDto> = {
+    const managedSummaryWithoutRole: ManagedPublisherSummaryDto = {
+      id: "p1",
+      name: "Anza Press",
+      slug: "anza-press",
+      logoUrl: null,
+      headerImageUrl: null,
+      city: "Jakarta",
       topics: ["Fiksi"],
+      verificationStatus: "verified",
+    };
+    const managedSummaryWithNullRole: ManagedPublisherSummaryDto = {
+      ...managedSummaryWithoutRole,
       role: null,
     };
     const bookSummaryCheck: Partial<BookSummaryDto> = {
@@ -328,7 +338,8 @@ describe("Publisher & Manuscript Shared Contracts", () => {
     const overviewCheck: Pick<AdminOverviewDto, "pendingManuscriptsCount"> = {};
 
     expect(publisherDtoCheck.topics).toEqual(["Fiksi"]);
-    expect(managedSummaryCheck.role).toBeNull();
+    expect(managedSummaryWithoutRole.role).toBeUndefined();
+    expect(managedSummaryWithNullRole.role).toBeNull();
     expect(bookSummaryCheck.publisherName).toBe("Anza Press");
     expect(memberCheck.role).toBe("editor");
     expect(publishResultCheck.publishedBookId).toBe("b1");
