@@ -185,7 +185,7 @@ export async function issueOrGetDrmWatermarkSession(input: {
     if (existing) {
       await db
         .update(drmWatermarkSessions)
-        .set({ lastSeenAt: new Date() })
+        .set({ lastSeenAt: sql`now()` })
         .where(eq(drmWatermarkSessions.id, existing.id));
       return existing.watermarkCode;
     }
@@ -740,7 +740,7 @@ export async function submitReaderDrmAppeal(
     .set({
       status: "appeal_pending",
       appealMessage,
-      appealedAt: new Date(),
+      appealedAt: sql`now()`,
     })
     .where(eq(drmReaderSuspensions.id, latest.id));
 
@@ -841,7 +841,6 @@ export async function reviewDrmSuspension(
     );
   }
 
-  const now = new Date();
   const nextStatus = input.action === "approve" ? "reinstated" : "rejected";
   const defaultNote =
     input.action === "approve"
@@ -854,8 +853,8 @@ export async function reviewDrmSuspension(
       status: nextStatus,
       reviewedByUserId: adminUserId,
       reviewNote: input.reviewNote ?? defaultNote,
-      reviewedAt: now,
-      reinstatedAt: input.action === "approve" ? now : null,
+      reviewedAt: sql`now()`,
+      reinstatedAt: input.action === "approve" ? sql`now()` : null,
     })
     .where(eq(drmReaderSuspensions.id, existing.id));
 

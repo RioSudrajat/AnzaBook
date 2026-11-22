@@ -237,6 +237,43 @@ docker compose -f compose.local.yaml down
 3. Create API Token with _Object Read & Write_ permissions.
 4. Supply `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, and `R2_BUCKET_NAME` to the Render API environment.
 
+## Map Tile CSP, Geolocation & Location Privacy (Peta Sudut Baca Indonesia)
+
+For the location-aware **Peta Sudut Baca Indonesia** interactive map and home banner:
+
+### 1. Zero New Secret Keys (GitHub Custodian Compliance)
+
+- Uses client-side **MapLibre GL JS** rendering open vector tiles + Google Maps Universal Deep Links (`https://www.google.com/maps/dir/?api=1&destination={lat},{lng}`) for navigation.
+- **Zero Google Maps API keys or cloud billing cards are required.** Respects the GitHub Custodian Protocol by requiring zero new environment secrets.
+
+### 2. Scoped Geolocation Permissions-Policy
+
+- Web responses send:
+  ```http
+  Permissions-Policy: display-capture=(), camera=(), microphone=(), geolocation=(self)
+  ```
+- Browser GPS access is strictly restricted to `(self)`. Third-party iframes cannot access visitor location.
+- Sensitive peripherals (`camera`, `microphone`, `display-capture`) remain permanently disabled `()`.
+
+### 3. Edge CSP & Map Tile Allowlist
+
+Reverse proxies, Cloudflare edge rules, and CDN security headers must allow the following directives for MapLibre WebGL tile rendering:
+
+- **Map Tile Origins:**
+  - `https://tiles.openfreemap.org`
+  - `https://*.basemaps.cartocdn.com`
+  - `https://*.tile.openstreetmap.org`
+- **Worker Decompression:** `worker-src 'self' blob:` (required by MapLibre web worker vector decoding).
+- **Tile Textures:** `img-src 'self' data: blob: https:`.
+- **Tile Connect:** `connect-src 'self' https://tiles.openfreemap.org https://*.basemaps.cartocdn.com https://*.tile.openstreetmap.org`.
+
+### 4. Location Privacy Compliance (UU PDP)
+
+- Visitor GPS coordinates are used ephemerally for distance calculation (`GET /api/spots?lat=...&lng=...`).
+- Coordinates **must never be persisted** to user records or session cookies.
+- Access logs in `apps/api/src/app.ts` (`safeUrl`) and `apps/web/src/start.ts` automatically redact `lat`, `lng`, `minLat`, `maxLat`, `minLng`, and `maxLng` query parameters to prevent tracking in server log streams.
+- Community-submitted map links are validated strictly against `googleMapsUrlSchema` (HTTPS Google hosts only) with zero outbound server-side fetching (anti-SSRF).
+
 ## Logs in production
 
 Both servers write one JSON object per line to stdout with `level`, `time`, `service` (`api`/`web`), `env`, `msg`, and `reqId` (plus `userId` on authenticated API requests). Ship stdout to your log platform; correlate a page render across services by `reqId`. Forward an `X-Request-Id` from your load balancer and both servers reuse it. `LOG_LEVEL` adjusts verbosity; `LOG_SQL=true` is for debugging only.

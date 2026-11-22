@@ -10,6 +10,7 @@ import { publisherRouter } from "./publisher.routes";
 import { readingRouter } from "./reading.routes";
 import { shelvesRouter } from "./shelves.routes";
 import { socialRouter } from "./social.routes";
+import { spotsRouter } from "./spots.routes";
 
 // Mounted at /api. Add a router per resource and register it here.
 export const apiRouter = Router();
@@ -26,3 +27,4 @@ apiRouter.use("/reading-sessions", readingRouter);
 apiRouter.use("/shelves", shelvesRouter);
 apiRouter.use("/publisher", publisherRouter);
 apiRouter.use("/social", socialRouter);
+apiRouter.use("/spots", spotsRouter);
