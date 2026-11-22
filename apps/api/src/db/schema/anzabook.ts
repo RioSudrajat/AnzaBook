@@ -11,7 +11,11 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
-import type { DigitalPolicy } from "@starter/shared/types";
+import type {
+  DigitalPolicy,
+  QuotePostConfig,
+  SessionPostConfig,
+} from "@starter/shared/types";
 import { user } from "./user";
 import { publishers, bookClaimBatches } from "./publishers";
 
@@ -247,13 +251,21 @@ export const readingSessions = pgTable(
     bookId: uuid("book_id")
       .notNull()
       .references(() => books.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 140 }),
     pagesRead: integer("pages_read").notNull(),
+    wordsRead: integer("words_read"),
     durationSeconds: integer("duration_seconds").notNull(),
     avgWpm: integer("avg_wpm").notNull(),
     mode: varchar("mode", { length: 32 }).notNull().default("full"),
+    startProgressPercent: integer("start_progress_percent"),
+    endProgressPercent: integer("end_progress_percent"),
+    startChapterNumber: integer("start_chapter_number"),
+    endChapterNumber: integer("end_chapter_number"),
+    highlightsCount: integer("highlights_count").notNull().default(0),
     isValidForRoyalty: boolean("is_valid_for_royalty").notNull().default(false),
     isPosted: boolean("is_posted").notNull().default(false),
     note: text("note"),
+    postConfig: jsonb("post_config").$type<SessionPostConfig>(),
     postedAt: timestamp("posted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -370,6 +382,8 @@ export const bookHighlights = pgTable(
       .notNull()
       .default("yellow"),
     note: text("note"),
+    postCaption: text("post_caption"),
+    postConfig: jsonb("post_config").$type<QuotePostConfig>(),
     isPosted: boolean("is_posted").notNull().default(false),
     postedAt: timestamp("posted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })

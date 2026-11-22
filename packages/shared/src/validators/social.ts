@@ -112,3 +112,76 @@ export type SocialLinksInput = z.infer<typeof socialLinksSchema>;
 export type UpdateProfileBioInput = z.infer<typeof updateProfileBioSchema>;
 export type ApplyAuthorInput = z.infer<typeof applyAuthorSchema>;
 export type FollowUserInput = z.infer<typeof followUserSchema>;
+
+export const quoteTemplateSchema = z.enum([
+  "book_cover",
+  "furrow_paper",
+  "night_stabilo",
+  "cover_tint",
+]);
+
+export const sessionTemplateSchema = z.enum([
+  "cover_trail",
+  "photo_overlay",
+  "transparent_sticker",
+  "literary_index",
+]);
+
+export const cardAspectSchema = z.enum(["square", "story"]);
+
+export const quotePostConfigSchema = z
+  .object({
+    template: quoteTemplateSchema,
+    aspect: cardAspectSchema,
+    alignment: z.enum(["left", "center"]),
+    includeNote: z.boolean(),
+  })
+  .strict();
+
+export const sessionPostConfigSchema = z
+  .object({
+    template: sessionTemplateSchema,
+    aspect: cardAspectSchema,
+    showWpm: z.boolean(),
+    showDuration: z.boolean(),
+    showPages: z.boolean(),
+    stickerInk: z.enum(["light", "dark"]).optional(),
+  })
+  .strict();
+
+export const publishHighlightPostSchema = z
+  .object({
+    isPosted: z.boolean().optional(),
+    postCaption: z
+      .string()
+      .trim()
+      .max(500, "Caption maksimal 500 karakter")
+      .optional()
+      .nullable(),
+    postConfig: quotePostConfigSchema.optional().nullable(),
+  })
+  .strict();
+
+export const publishSessionPostSchema = z
+  .object({
+    isPosted: z.boolean().optional(),
+    title: z
+      .string()
+      .trim()
+      .max(140, "Judul sesi maksimal 140 karakter")
+      .optional()
+      .nullable(),
+    note: z
+      .string()
+      .trim()
+      .max(500, "Catatan sesi maksimal 500 karakter")
+      .optional()
+      .nullable(),
+    postConfig: sessionPostConfigSchema.optional().nullable(),
+  })
+  .strict();
+
+export type PublishHighlightPostInput = z.infer<
+  typeof publishHighlightPostSchema
+>;
+export type PublishSessionPostInput = z.infer<typeof publishSessionPostSchema>;
