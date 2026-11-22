@@ -25,9 +25,9 @@ export default defineConfig(({ command, mode }) => {
     resolve: { tsconfigPaths: true },
     server: { port, strictPort: true, host: true },
     // node-server emits .output/server/index.mjs, a portable Node server that
-    // honors PORT and HOST. The Dockerfile ships only that folder.
+    // honors PORT and HOST. For Cloudflare Pages, pass NITRO_PRESET=cloudflare-pages.
     nitro: {
-      preset: "node-server",
+      preset: process.env.NITRO_PRESET || "node-server",
       rolldownConfig: {
         // Libraries ship RSC "use client" directives; this app has no server
         // components, so the bundler's notice about dropping them is noise.
