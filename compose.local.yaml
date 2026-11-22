@@ -1,0 +1,80 @@
+# Full-stack production-like local deployment with Docker Compose.
+# Run with: docker compose -f compose.local.yaml up --build
+# Stop with: docker compose -f compose.local.yaml down
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: anzabook-local-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-anzabook}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-anzabook_local_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-anzabook}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - anzabook-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 2s
+      timeout: 5s
+      retries: 20
+    stop_grace_period: 10s
+
+  api-migrator:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: migrator
+    container_name: anzabook-local-migrator
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-anzabook}:${POSTGRES_PASSWORD:-anzabook_local_secret}@postgres:5432/${POSTGRES_DB:-anzabook}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: runner
+    container_name: anzabook-local-api
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://${POSTGRES_USER:-anzabook}:${POSTGRES_PASSWORD:-anzabook_local_secret}@postgres:5432/${POSTGRES_DB:-anzabook}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-replace_with_a_secure_random_string_min_32_characters_long}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:4000}
+      WEB_URL: ${WEB_URL:-http://localhost:3000}
+      TRUST_PROXY: "1"
+    ports:
+      - "4000:4000"
+    depends_on:
+      api-migrator:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: runner
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:4000}
+    container_name: anzabook-local-web
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      API_INTERNAL_URL: http://api:4000
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  anzabook-pgdata:
