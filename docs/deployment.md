@@ -15,6 +15,54 @@ Unrelated domains (e.g. `app.example.com` and `example-api.net`) are not support
 
 `COOKIE_DOMAIN` sends the session cookie to **every** host under that domain, not just these two. Anything else served there — a marketing site on a third-party platform, user uploads, preview deployments — receives your users' sessions. Host such content on a different domain, or give the app its own parent (e.g. `api.app.example.com` and `web.app.example.com` with `COOKIE_DOMAIN=.app.example.com`).
 
+## Environments and Release Strategy (Trunk-Based)
+
+Deploy AnzaBook across two isolated cloud environments tied to our Trunk-Based workflow:
+
+- **Staging (`main` branch)**: Automatically deployed whenever verified PRs merge into `main`. Uses staging-specific database, Midtrans Sandbox, and test credentials.
+- **Production (`production` branch)**: Updated exclusively by promoting commits from `main` via Merge Commit (`Protect production (Release)` ruleset). Uses production PostgreSQL with connection pooler and live Midtrans credentials.
+
+| Environment    | Web Origin (`WEB_URL`)         | API Origin (`BETTER_AUTH_URL`)     | Shared Cookie Domain (`COOKIE_DOMAIN`) |
+| :------------- | :----------------------------- | :--------------------------------- | :------------------------------------- |
+| **Staging**    | `https://staging.anzabook.com` | `https://api-staging.anzabook.com` | `.anzabook.com`                        |
+| **Production** | `https://app.anzabook.com`     | `https://api.anzabook.com`         | `.anzabook.com`                        |
+
+## GitHub Custodian Protocol: Environments & Secrets Manifest
+
+In accordance with `CONTRIBUTING.md`, `@luminariadev` (DevOps & Security) maintains this manifest of required secret **names**. Actual sensitive values are handed off out-of-band to `@RioSudrajat` (GitHub Custodian) to input into GitHub Repository Settings > Environments (`staging` and `production`):
+
+### Staging Environment (`staging`)
+
+| Secret Variable Name     | Required Service | Purpose / Description                                                |
+| :----------------------- | :--------------- | :------------------------------------------------------------------- |
+| `NODE_ENV`               | API & Web        | Set to `production` (enables structured JSON logging and HSTS)       |
+| `DATABASE_URL`           | API & Migrator   | Staging managed PostgreSQL connection string                         |
+| `MIGRATION_DATABASE_URL` | Migrator         | Direct PostgreSQL port connection (if `DATABASE_URL` uses PgBouncer) |
+| `BETTER_AUTH_SECRET`     | API              | Minimum 32-character random string for signing auth tokens           |
+| `BETTER_AUTH_URL`        | API              | Public API origin: `https://api-staging.anzabook.com`                |
+| `WEB_URL`                | API              | Public Web origin: `https://staging.anzabook.com`                    |
+| `COOKIE_DOMAIN`          | API              | `.anzabook.com` (enables cross-subdomain SSR session lookup)         |
+| `TRUST_PROXY`            | API              | `1` (resolves real visitor IP behind proxy for rate limiting)        |
+| `VITE_API_URL`           | Web Build        | Inlined public API origin: `https://api-staging.anzabook.com`        |
+| `MIDTRANS_SERVER_KEY`    | API              | Midtrans Sandbox server key (`SB-Mid-server-...`)                    |
+| `MIDTRANS_CLIENT_KEY`    | API              | Midtrans Sandbox client key (`SB-Mid-client-...`)                    |
+
+### Production Environment (`production`)
+
+| Secret Variable Name     | Required Service | Purpose / Description                                          |
+| :----------------------- | :--------------- | :------------------------------------------------------------- |
+| `NODE_ENV`               | API & Web        | Set to `production`                                            |
+| `DATABASE_URL`           | API & Migrator   | Production managed PostgreSQL connection string                |
+| `MIGRATION_DATABASE_URL` | Migrator         | Direct PostgreSQL port connection for Drizzle migrator         |
+| `BETTER_AUTH_SECRET`     | API              | Cryptographically secure random secret (isolated from staging) |
+| `BETTER_AUTH_URL`        | API              | Production API origin: `https://api.anzabook.com`              |
+| `WEB_URL`                | API              | Production Web origin: `https://app.anzabook.com`              |
+| `COOKIE_DOMAIN`          | API              | `.anzabook.com`                                                |
+| `TRUST_PROXY`            | API              | `1`                                                            |
+| `VITE_API_URL`           | Web Build        | Inlined public API origin: `https://api.anzabook.com`          |
+| `MIDTRANS_SERVER_KEY`    | API              | Midtrans Live production server key                            |
+| `MIDTRANS_CLIENT_KEY`    | API              | Midtrans Live production client key                            |
+
 ## Production environment
 
 **API** (private values through your host):
