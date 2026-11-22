@@ -12,11 +12,13 @@ import { limitAuthBody } from "./middleware/body";
 import { errorHandler, notFound } from "./middleware/error-handler";
 import { apiRouter } from "./routes";
 
-const SENSITIVE_QUERY = /token|code|secret|password|signature|key/i;
+export const SENSITIVE_QUERY =
+  /token|code|secret|password|signature|key|lat|lng|latitude|longitude|minLat|maxLat|minLng|maxLng/i;
 
 // Path plus query, with values of credential-like parameters (Better Auth's
-// verification tokens, OAuth codes) blanked out before they reach a log.
-function safeUrl(url: string) {
+// verification tokens, OAuth codes) and ephemeral GPS coordinates (UU PDP)
+// blanked out before they reach a log.
+export function safeUrl(url: string) {
   const [path, query] = url.split("?", 2);
   if (!query) return path;
   const params = new URLSearchParams(query);
