@@ -43,6 +43,30 @@ export type ShelfStatus = "want_to_read" | "reading" | "finished" | "abandoned";
 export type ReadingMode = "full" | "blueprint" | "audio";
 export type HighlightColor = "yellow" | "green" | "coral" | "blue";
 
+export type QuoteTemplate =
+  "book_cover" | "furrow_paper" | "night_stabilo" | "cover_tint";
+
+export type SessionTemplate =
+  "cover_trail" | "photo_overlay" | "transparent_sticker" | "literary_index";
+
+export type CardAspect = "square" | "story";
+
+export type QuotePostConfig = {
+  template: QuoteTemplate;
+  aspect: CardAspect;
+  alignment: "left" | "center";
+  includeNote: boolean;
+};
+
+export type SessionPostConfig = {
+  template: SessionTemplate;
+  aspect: CardAspect;
+  showWpm: boolean;
+  showDuration: boolean;
+  showPages: boolean;
+  stickerInk?: "light" | "dark";
+};
+
 export type BookPrintEditionDto = {
   id: string;
   bookId: string;
@@ -153,13 +177,22 @@ export type ReadingSessionDto = {
   id: string;
   bookId: string;
   bookTitle: string;
+  bookCoverUrl?: string | null;
+  title?: string | null;
   pagesRead: number;
+  wordsRead?: number | null;
   durationSeconds: number;
   avgWpm: number;
   mode: ReadingMode;
+  startProgressPercent?: number | null;
+  endProgressPercent?: number | null;
+  startChapterNumber?: number | null;
+  endChapterNumber?: number | null;
+  highlightsCount?: number;
   isValidForRoyalty?: boolean;
   isPosted?: boolean;
   note?: string | null;
+  postConfig?: SessionPostConfig | null;
   postedAt?: string | null;
   createdAt: string;
 };
@@ -207,12 +240,16 @@ export type BookHighlightDto = {
   id: string;
   userId: string;
   bookId: string;
+  bookTitle?: string;
+  bookCoverUrl?: string | null;
   chapterId: string | null;
   chapterNumber: number;
   pageNumber: number;
   selectedText: string;
   color: HighlightColor;
   note: string | null;
+  postCaption?: string | null;
+  postConfig?: QuotePostConfig | null;
   isPosted?: boolean;
   postedAt?: string | null;
   createdAt: string;
@@ -555,11 +592,22 @@ export type ExplorePostItemDto = {
     title: string;
     author: string;
     coverColor?: string | null;
+    coverUrl?: string | null;
   };
   rating?: number;
   color?: HighlightColor;
   pagesRead?: number;
   durationSeconds?: number;
+  avgWpm?: number | null;
+  wordsRead?: number | null;
+  title?: string | null;
+  startProgressPercent?: number | null;
+  endProgressPercent?: number | null;
+  startChapterNumber?: number | null;
+  endChapterNumber?: number | null;
+  highlightsCount?: number;
+  postCaption?: string | null;
+  postConfig?: QuotePostConfig | SessionPostConfig | null;
 };
 
 export type UnifiedExploreResultDto = {

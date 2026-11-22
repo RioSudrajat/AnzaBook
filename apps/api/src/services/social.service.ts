@@ -20,6 +20,8 @@ import { toBookSummary } from "./books.service";
 import type {
   ApplyAuthorInput,
   UpdateProfileBioInput,
+  PublishHighlightPostInput,
+  PublishSessionPostInput,
 } from "@starter/shared/validators/social";
 import type {
   AuthorDirectoryItemDto,
@@ -35,6 +37,8 @@ import type {
   SocialProfileDto,
   SocialRelationItemDto,
   UnifiedExploreResultDto,
+  QuotePostConfig,
+  SessionPostConfig,
 } from "@starter/shared/types";
 
 const readingDay = new Intl.DateTimeFormat("en-CA", {
@@ -380,7 +384,9 @@ export async function getSocialProfile(
       id: quote.id,
       type: "quote" as const,
       content: quote.selectedText,
-      note: quote.note,
+      note: quote.postConfig?.includeNote === true ? quote.note : null,
+      postCaption: quote.postCaption,
+      postConfig: quote.postConfig ?? null,
       createdAt: (quote.postedAt || quote.createdAt).toISOString(),
       author: authorPreview,
       book: {
@@ -1265,6 +1271,8 @@ export async function unifiedExplore(
       id: bookHighlights.id,
       selectedText: bookHighlights.selectedText,
       note: bookHighlights.note,
+      postCaption: bookHighlights.postCaption,
+      postConfig: bookHighlights.postConfig,
       color: bookHighlights.color,
       createdAt: bookHighlights.createdAt,
       postedAt: bookHighlights.postedAt,
@@ -1280,6 +1288,7 @@ export async function unifiedExplore(
         title: books.title,
         author: books.author,
         coverColor: books.coverColor,
+        coverUrl: books.coverUrl,
       },
     })
     .from(bookHighlights)
@@ -1343,7 +1352,9 @@ export async function unifiedExplore(
       id: q.id,
       type: "quote" as const,
       content: q.selectedText,
-      note: q.note,
+      note: q.postConfig?.includeNote === true ? q.note : null,
+      postCaption: q.postCaption,
+      postConfig: q.postConfig ?? null,
       createdAt: (q.postedAt || q.createdAt).toISOString(),
       author: q.user,
       book: q.book,
@@ -1377,13 +1388,28 @@ export async function unifiedExplore(
   };
 }
 
+const MAX_PUBLIC_QUOTE_CHARS = 400;
+
 export async function togglePostHighlight(
   userId: string,
   highlightId: string,
-  isPosted?: boolean,
-): Promise<{ id: string; isPosted: boolean; postedAt: string | null }> {
+  input: PublishHighlightPostInput = {},
+): Promise<{
+  id: string;
+  isPosted: boolean;
+  postCaption: string | null;
+  postConfig: QuotePostConfig | null;
+  postedAt: string | null;
+}> {
   const [existing] = await db
-    .select({ id: bookHighlights.id, isPosted: bookHighlights.isPosted })
+    .select({
+      id: bookHighlights.id,
+      selectedText: bookHighlights.selectedText,
+      isPosted: bookHighlights.isPosted,
+      postCaption: bookHighlights.postCaption,
+      postConfig: bookHighlights.postConfig,
+      postedAt: bookHighlights.postedAt,
+    })
     .from(bookHighlights)
     .where(
       and(
@@ -1397,17 +1423,44 @@ export async function togglePostHighlight(
     throw new HttpError(404, "HIGHLIGHT_NOT_FOUND", "Kutipan tidak ditemukan.");
   }
 
-  const nextStatus = isPosted !== undefined ? isPosted : !existing.isPosted;
-  const postedAt = nextStatus ? new Date() : null;
+  const nextStatus =
+    input.isPosted !== undefined ? input.isPosted : !existing.isPosted;
+
+  // DRM-05 public excerpt cap
+  if (
+    nextStatus &&
+    existing.selectedText.trim().length > MAX_PUBLIC_QUOTE_CHARS
+  ) {
+    throw new HttpError(
+      422,
+      "EXCERPT_TOO_LONG",
+      `Kutipan yang dibagikan ke publik maksimal ${MAX_PUBLIC_QUOTE_CHARS} karakter sesuai ketentuan DRM-05.`,
+    );
+  }
+
+  const nextCaption =
+    input.postCaption !== undefined
+      ? input.postCaption || null
+      : existing.postCaption;
+  const nextConfig =
+    input.postConfig !== undefined ? input.postConfig : existing.postConfig;
+  const postedAt = nextStatus ? (existing.postedAt ?? new Date()) : null;
 
   await db
     .update(bookHighlights)
-    .set({ isPosted: nextStatus, postedAt })
+    .set({
+      isPosted: nextStatus,
+      postCaption: nextCaption,
+      postConfig: nextConfig,
+      postedAt,
+    })
     .where(eq(bookHighlights.id, highlightId));
 
   return {
     id: highlightId,
     isPosted: nextStatus,
+    postCaption: nextCaption,
+    postConfig: nextConfig ?? null,
     postedAt: postedAt ? postedAt.toISOString() : null,
   };
 }
@@ -1415,18 +1468,23 @@ export async function togglePostHighlight(
 export async function togglePostSession(
   userId: string,
   sessionId: string,
-  input: { note?: string; isPosted?: boolean },
+  input: PublishSessionPostInput = {},
 ): Promise<{
   id: string;
   isPosted: boolean;
+  title: string | null;
   note: string | null;
+  postConfig: SessionPostConfig | null;
   postedAt: string | null;
 }> {
   const [existing] = await db
     .select({
       id: readingSessions.id,
       isPosted: readingSessions.isPosted,
+      title: readingSessions.title,
       note: readingSessions.note,
+      postConfig: readingSessions.postConfig,
+      postedAt: readingSessions.postedAt,
     })
     .from(readingSessions)
     .where(
@@ -1447,13 +1505,21 @@ export async function togglePostSession(
 
   const nextStatus =
     input.isPosted !== undefined ? input.isPosted : !existing.isPosted;
-  const postedAt = nextStatus ? new Date() : null;
+  const nextTitle =
+    input.title !== undefined ? input.title || null : existing.title;
+  const nextNote =
+    input.note !== undefined ? input.note || null : existing.note;
+  const nextConfig =
+    input.postConfig !== undefined ? input.postConfig : existing.postConfig;
+  const postedAt = nextStatus ? (existing.postedAt ?? new Date()) : null;
 
   await db
     .update(readingSessions)
     .set({
       isPosted: nextStatus,
-      note: input.note !== undefined ? input.note : existing.note,
+      title: nextTitle,
+      note: nextNote,
+      postConfig: nextConfig,
       postedAt,
     })
     .where(eq(readingSessions.id, sessionId));
@@ -1461,7 +1527,9 @@ export async function togglePostSession(
   return {
     id: sessionId,
     isPosted: nextStatus,
-    note: input.note !== undefined ? input.note : existing.note,
+    title: nextTitle,
+    note: nextNote,
+    postConfig: nextConfig ?? null,
     postedAt: postedAt ? postedAt.toISOString() : null,
   };
 }

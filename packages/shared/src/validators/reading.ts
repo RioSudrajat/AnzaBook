@@ -4,11 +4,25 @@ export const createReadingSessionSchema = z
   .object({
     bookId: z.string().uuid("ID buku harus berupa UUID valid"),
     sessionId: z.string().uuid().optional(),
+    title: z
+      .string()
+      .trim()
+      .max(140, "Judul sesi maksimal 140 karakter")
+      .optional()
+      .nullable(),
     pagesRead: z
       .number()
       .int("Jumlah halaman harus berupa bilangan bulat")
-      .min(1, "Minimal 1 halaman dibaca")
-      .max(1000, "Maksimal 1000 halaman per sesi"),
+      .min(0, "Jumlah halaman minimal 0")
+      .max(1000, "Maksimal 1000 halaman per sesi")
+      .optional(),
+    wordsRead: z
+      .number()
+      .int("Jumlah kata harus berupa bilangan bulat")
+      .min(0, "Jumlah kata minimal 0")
+      .max(500000, "Maksimal 500.000 kata per sesi")
+      .optional()
+      .nullable(),
     durationSeconds: z
       .number()
       .int("Durasi membaca harus berupa bilangan bulat")
@@ -20,8 +34,28 @@ export const createReadingSessionSchema = z
       .min(30, "Kecepatan membaca minimal 30 kata per menit")
       .max(1200, "Kecepatan membaca maksimal 1200 kata per menit"),
     mode: z.enum(["full", "blueprint", "audio"]).default("full"),
+    startProgressPercent: z
+      .number()
+      .int()
+      .min(0)
+      .max(100)
+      .optional()
+      .nullable(),
+    endProgressPercent: z.number().int().min(0).max(100).optional().nullable(),
+    startChapterNumber: z.number().int().min(1).optional().nullable(),
+    endChapterNumber: z.number().int().min(1).optional().nullable(),
+    highlightsCount: z.number().int().min(0).max(1000).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((data, ctx) => {
+    if (data.pagesRead === undefined && data.wordsRead == null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["pagesRead"],
+        message: "Minimal isi pagesRead atau wordsRead",
+      });
+    }
+  });
 
 export const listReadingSessionsQuerySchema = z
   .object({

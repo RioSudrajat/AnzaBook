@@ -1,5 +1,8 @@
-import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
-import { bookProgressPercent } from "@starter/shared/reading-progress";
+import { and, desc, eq, lt, sql } from "drizzle-orm";
+import {
+  bookProgressPercent,
+  wordsToStandardPages,
+} from "@starter/shared/reading-progress";
 import { db } from "../db";
 import {
   books,
@@ -41,13 +44,21 @@ export async function createReadingSession(
   input: CreateReadingSessionInput,
 ): Promise<ReadingSessionDto> {
   const [book] = await db
-    .select({ title: books.title, digitalPolicy: books.digitalPolicy })
+    .select({
+      title: books.title,
+      coverUrl: books.coverUrl,
+      digitalPolicy: books.digitalPolicy,
+    })
     .from(books)
     .where(eq(books.id, input.bookId))
     .limit(1);
 
   if (!book)
     throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+
+  const resolvedPagesRead =
+    input.pagesRead ??
+    (input.wordsRead != null ? wordsToStandardPages(input.wordsRead) : 0);
 
   const hasMembership = !!(await getActiveMembership(userId));
   const isNakamaEligible =
@@ -67,10 +78,17 @@ export async function createReadingSession(
         id: input.sessionId,
         userId,
         bookId: input.bookId,
-        pagesRead: input.pagesRead,
+        title: input.title ?? null,
+        pagesRead: resolvedPagesRead,
+        wordsRead: input.wordsRead ?? null,
         durationSeconds: input.durationSeconds,
         avgWpm: input.avgWpm,
         mode: input.mode,
+        startProgressPercent: input.startProgressPercent ?? null,
+        endProgressPercent: input.endProgressPercent ?? null,
+        startChapterNumber: input.startChapterNumber ?? null,
+        endChapterNumber: input.endChapterNumber ?? null,
+        highlightsCount: input.highlightsCount ?? 0,
         isValidForRoyalty,
       })
       .onConflictDoNothing({ target: readingSessions.id })
@@ -85,28 +103,6 @@ export async function createReadingSession(
           set: { shelfStatus: "reading" },
           setWhere: eq(userShelves.shelfStatus, "want_to_read"),
         });
-
-      // Prune old sessions: retain only the latest 10 sessions per book per user
-      const excess = await tx
-        .select({ id: readingSessions.id })
-        .from(readingSessions)
-        .where(
-          and(
-            eq(readingSessions.userId, userId),
-            eq(readingSessions.bookId, input.bookId),
-          ),
-        )
-        .orderBy(desc(readingSessions.createdAt))
-        .offset(10);
-
-      if (excess.length > 0) {
-        await tx.delete(readingSessions).where(
-          inArray(
-            readingSessions.id,
-            excess.map((r) => r.id),
-          ),
-        );
-      }
 
       return inserted;
     }
@@ -134,11 +130,23 @@ export async function createReadingSession(
     id: session.id,
     bookId: session.bookId,
     bookTitle: book.title,
+    bookCoverUrl: book.coverUrl,
+    title: session.title,
     pagesRead: session.pagesRead,
+    wordsRead: session.wordsRead,
     durationSeconds: session.durationSeconds,
     avgWpm: session.avgWpm,
     mode: session.mode as ReadingMode,
+    startProgressPercent: session.startProgressPercent,
+    endProgressPercent: session.endProgressPercent,
+    startChapterNumber: session.startChapterNumber,
+    endChapterNumber: session.endChapterNumber,
+    highlightsCount: session.highlightsCount,
     isValidForRoyalty: session.isValidForRoyalty,
+    isPosted: session.isPosted,
+    note: session.note,
+    postConfig: session.postConfig ?? null,
+    postedAt: session.postedAt ? session.postedAt.toISOString() : null,
     createdAt: session.createdAt.toISOString(),
   };
 }
@@ -154,12 +162,22 @@ export async function listReadingSessions(
       id: readingSessions.id,
       bookId: readingSessions.bookId,
       bookTitle: books.title,
+      bookCoverUrl: books.coverUrl,
+      title: readingSessions.title,
       pagesRead: readingSessions.pagesRead,
+      wordsRead: readingSessions.wordsRead,
       durationSeconds: readingSessions.durationSeconds,
       avgWpm: readingSessions.avgWpm,
       mode: readingSessions.mode,
+      startProgressPercent: readingSessions.startProgressPercent,
+      endProgressPercent: readingSessions.endProgressPercent,
+      startChapterNumber: readingSessions.startChapterNumber,
+      endChapterNumber: readingSessions.endChapterNumber,
+      highlightsCount: readingSessions.highlightsCount,
+      isValidForRoyalty: readingSessions.isValidForRoyalty,
       isPosted: readingSessions.isPosted,
       note: readingSessions.note,
+      postConfig: readingSessions.postConfig,
       postedAt: readingSessions.postedAt,
       createdAt: readingSessions.createdAt,
     })
@@ -174,12 +192,22 @@ export async function listReadingSessions(
     id: r.id,
     bookId: r.bookId,
     bookTitle: r.bookTitle,
+    bookCoverUrl: r.bookCoverUrl,
+    title: r.title,
     pagesRead: r.pagesRead,
+    wordsRead: r.wordsRead,
     durationSeconds: r.durationSeconds,
     avgWpm: r.avgWpm,
     mode: r.mode as ReadingMode,
+    startProgressPercent: r.startProgressPercent,
+    endProgressPercent: r.endProgressPercent,
+    startChapterNumber: r.startChapterNumber,
+    endChapterNumber: r.endChapterNumber,
+    highlightsCount: r.highlightsCount,
+    isValidForRoyalty: r.isValidForRoyalty,
     isPosted: r.isPosted,
     note: r.note,
+    postConfig: r.postConfig ?? null,
     postedAt: r.postedAt ? r.postedAt.toISOString() : null,
     createdAt: r.createdAt.toISOString(),
   }));
@@ -438,23 +466,32 @@ export async function listHighlights(
   bookId: string,
 ): Promise<BookHighlightDto[]> {
   const rows = await db
-    .select()
+    .select({
+      highlight: bookHighlights,
+      bookTitle: books.title,
+      bookCoverUrl: books.coverUrl,
+    })
     .from(bookHighlights)
+    .innerJoin(books, eq(bookHighlights.bookId, books.id))
     .where(
       and(eq(bookHighlights.userId, userId), eq(bookHighlights.bookId, bookId)),
     )
     .orderBy(desc(bookHighlights.createdAt));
 
-  return rows.map((r) => ({
+  return rows.map(({ highlight: r, bookTitle, bookCoverUrl }) => ({
     id: r.id,
     userId: r.userId,
     bookId: r.bookId,
+    bookTitle,
+    bookCoverUrl,
     chapterId: r.chapterId,
     chapterNumber: r.chapterNumber,
     pageNumber: r.pageNumber,
     selectedText: r.selectedText,
     color: r.color as HighlightColor,
     note: r.note,
+    postCaption: r.postCaption,
+    postConfig: r.postConfig ?? null,
     isPosted: r.isPosted,
     postedAt: r.postedAt ? r.postedAt.toISOString() : null,
     createdAt: r.createdAt.toISOString(),
@@ -465,21 +502,30 @@ export async function listAllUserHighlights(
   userId: string,
 ): Promise<BookHighlightDto[]> {
   const rows = await db
-    .select()
+    .select({
+      highlight: bookHighlights,
+      bookTitle: books.title,
+      bookCoverUrl: books.coverUrl,
+    })
     .from(bookHighlights)
+    .innerJoin(books, eq(bookHighlights.bookId, books.id))
     .where(eq(bookHighlights.userId, userId))
     .orderBy(desc(bookHighlights.createdAt));
 
-  return rows.map((r) => ({
+  return rows.map(({ highlight: r, bookTitle, bookCoverUrl }) => ({
     id: r.id,
     userId: r.userId,
     bookId: r.bookId,
+    bookTitle,
+    bookCoverUrl,
     chapterId: r.chapterId,
     chapterNumber: r.chapterNumber,
     pageNumber: r.pageNumber,
     selectedText: r.selectedText,
     color: r.color as HighlightColor,
     note: r.note,
+    postCaption: r.postCaption,
+    postConfig: r.postConfig ?? null,
     isPosted: r.isPosted,
     postedAt: r.postedAt ? r.postedAt.toISOString() : null,
     createdAt: r.createdAt.toISOString(),
@@ -514,6 +560,8 @@ export async function createHighlight(
     selectedText: created.selectedText,
     color: created.color as HighlightColor,
     note: created.note,
+    postCaption: created.postCaption,
+    postConfig: created.postConfig ?? null,
     isPosted: created.isPosted,
     postedAt: created.postedAt ? created.postedAt.toISOString() : null,
     createdAt: created.createdAt.toISOString(),
@@ -552,10 +600,23 @@ export async function listSessionsForBook(
       id: readingSessions.id,
       bookId: readingSessions.bookId,
       bookTitle: books.title,
+      bookCoverUrl: books.coverUrl,
+      title: readingSessions.title,
       pagesRead: readingSessions.pagesRead,
+      wordsRead: readingSessions.wordsRead,
       durationSeconds: readingSessions.durationSeconds,
       avgWpm: readingSessions.avgWpm,
       mode: readingSessions.mode,
+      startProgressPercent: readingSessions.startProgressPercent,
+      endProgressPercent: readingSessions.endProgressPercent,
+      startChapterNumber: readingSessions.startChapterNumber,
+      endChapterNumber: readingSessions.endChapterNumber,
+      highlightsCount: readingSessions.highlightsCount,
+      isValidForRoyalty: readingSessions.isValidForRoyalty,
+      isPosted: readingSessions.isPosted,
+      note: readingSessions.note,
+      postConfig: readingSessions.postConfig,
+      postedAt: readingSessions.postedAt,
       createdAt: readingSessions.createdAt,
     })
     .from(readingSessions)
@@ -573,10 +634,23 @@ export async function listSessionsForBook(
     id: r.id,
     bookId: r.bookId,
     bookTitle: r.bookTitle,
+    bookCoverUrl: r.bookCoverUrl,
+    title: r.title,
     pagesRead: r.pagesRead,
+    wordsRead: r.wordsRead,
     durationSeconds: r.durationSeconds,
     avgWpm: r.avgWpm,
     mode: r.mode as ReadingMode,
+    startProgressPercent: r.startProgressPercent,
+    endProgressPercent: r.endProgressPercent,
+    startChapterNumber: r.startChapterNumber,
+    endChapterNumber: r.endChapterNumber,
+    highlightsCount: r.highlightsCount,
+    isValidForRoyalty: r.isValidForRoyalty,
+    isPosted: r.isPosted,
+    note: r.note,
+    postConfig: r.postConfig ?? null,
+    postedAt: r.postedAt ? r.postedAt.toISOString() : null,
     createdAt: r.createdAt.toISOString(),
   }));
 }

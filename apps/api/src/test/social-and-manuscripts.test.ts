@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 import { agent, originHeader, signUp } from "./helpers";
 import { db } from "../db";
 import {
+  bookHighlights,
+  books,
   communityCalendars,
   communityWalletLedgers,
   publishers,
@@ -462,5 +464,155 @@ describe("Social Profile, 4D Explore, Community Membership & Manuscript Studio A
       "Penerbit Nusantara Kreatif",
     );
     expect(myManuscriptsRes.body.data[0].chapters).toHaveLength(2);
+  });
+
+  it("validates highlight & session post publishing, enforces DRM-05 400-char cap, and guards private notes", async () => {
+    const reader = agent();
+    const email = await signUp(reader, "Pembaca Kutipan");
+    const [dbReader] = await db
+      .select()
+      .from(user)
+      .where(eq(user.email, email));
+    const [seededBook] = await db.select().from(books).limit(1);
+    expect(seededBook).toBeDefined();
+
+    // 1. Insert normal highlight (<= 400 chars) and overly long highlight (> 400 chars)
+    const [shortHighlight] = await db
+      .insert(bookHighlights)
+      .values({
+        userId: dbReader.id,
+        bookId: seededBook.id,
+        chapterNumber: 1,
+        pageNumber: 1,
+        selectedText: "Membaca adalah cara paling sunyi untuk menembus waktu.",
+        color: "yellow",
+        note: "Catatan pribadi rahasia pembaca",
+      })
+      .returning();
+
+    const [longHighlight] = await db
+      .insert(bookHighlights)
+      .values({
+        userId: dbReader.id,
+        bookId: seededBook.id,
+        chapterNumber: 1,
+        pageNumber: 2,
+        selectedText: "A".repeat(401),
+        color: "green",
+      })
+      .returning();
+
+    // DRM-05 guard: publishing highlight > 400 chars must fail with 422
+    const drmFailRes = await reader
+      .post(`/api/social/highlights/${longHighlight.id}/toggle-post`)
+      .set(originHeader)
+      .send({ isPosted: true });
+    expect(drmFailRes.status).toBe(422);
+    expect(drmFailRes.body.error.code).toBe("EXCERPT_TOO_LONG");
+
+    // Publish valid highlight with postCaption & postConfig (includeNote: false)
+    const postQuoteRes = await reader
+      .post(`/api/social/highlights/${shortHighlight.id}/toggle-post`)
+      .set(originHeader)
+      .send({
+        isPosted: true,
+        postCaption: "Kutipan favorit malam ini",
+        postConfig: {
+          template: "furrow_paper",
+          aspect: "square",
+          alignment: "left",
+          includeNote: false,
+        },
+      });
+    expect(postQuoteRes.status).toBe(200);
+    expect(postQuoteRes.body.data).toMatchObject({
+      id: shortHighlight.id,
+      isPosted: true,
+      postCaption: "Kutipan favorit malam ini",
+      postConfig: {
+        template: "furrow_paper",
+        aspect: "square",
+        alignment: "left",
+        includeNote: false,
+      },
+    });
+
+    // Public explore must NOT leak private note when includeNote === false
+    const exploreRes1 = await reader.get(
+      "/api/social/explore?q=menembus+waktu",
+    );
+    expect(exploreRes1.status).toBe(200);
+    const quoteItem1 = exploreRes1.body.data.posts.find(
+      (p: { id: string }) => p.id === shortHighlight.id,
+    );
+    expect(quoteItem1).toBeDefined();
+    expect(quoteItem1.note).toBeNull();
+    expect(quoteItem1.postCaption).toBe("Kutipan favorit malam ini");
+
+    // Update includeNote: true -> note is now intentionally shared
+    const revealNoteRes = await reader
+      .post(`/api/social/highlights/${shortHighlight.id}/toggle-post`)
+      .set(originHeader)
+      .send({
+        isPosted: true,
+        postConfig: {
+          template: "night_stabilo",
+          aspect: "story",
+          alignment: "center",
+          includeNote: true,
+        },
+      });
+    expect(revealNoteRes.status).toBe(200);
+
+    const exploreRes2 = await reader.get(
+      "/api/social/explore?q=menembus+waktu",
+    );
+    const quoteItem2 = exploreRes2.body.data.posts.find(
+      (p: { id: string }) => p.id === shortHighlight.id,
+    );
+    expect(quoteItem2.note).toBe("Catatan pribadi rahasia pembaca");
+
+    // 2. Create and publish reading session with title & postConfig
+    const sessionRes = await reader
+      .post("/api/reading")
+      .set(originHeader)
+      .send({
+        bookId: seededBook.id,
+        wordsRead: 750,
+        durationSeconds: 240,
+        avgWpm: 188,
+      });
+    expect(sessionRes.status).toBe(201);
+    const sessionId = sessionRes.body.data.id as string;
+
+    const postSessionRes = await reader
+      .post(`/api/social/sessions/${sessionId}/toggle-post`)
+      .set(originHeader)
+      .send({
+        isPosted: true,
+        title: "Baca Malam Sebelum Tidur",
+        note: "Bab pembukanya sangat memikat.",
+        postConfig: {
+          template: "cover_trail",
+          aspect: "story",
+          showWpm: true,
+          showDuration: true,
+          showPages: true,
+        },
+      });
+    expect(postSessionRes.status).toBe(200);
+    expect(postSessionRes.body.data).toMatchObject({
+      id: sessionId,
+      isPosted: true,
+      title: "Baca Malam Sebelum Tidur",
+      note: "Bab pembukanya sangat memikat.",
+      postConfig: {
+        template: "cover_trail",
+        aspect: "story",
+        showWpm: true,
+        showDuration: true,
+        showPages: true,
+      },
+    });
   });
 });

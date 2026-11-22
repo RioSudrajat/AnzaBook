@@ -1,3 +1,11 @@
+import {
+  STANDARD_WORDS_PER_PAGE,
+  bookProgressPercent,
+  classifyReadingTempo,
+  computeReadingWpm,
+  computeWordWeightedProgress,
+  wordsToStandardPages,
+} from "@starter/shared/reading-progress";
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
@@ -177,7 +185,7 @@ describe("reading checkpoints and history", () => {
     expect(history.body.summary.currentStreakDays).toBe(2);
   });
 
-  it("limits reading sessions to the 10 most recent sessions per book per user", async () => {
+  it("retains all reading sessions in DB while limiting per-book list endpoint to 10 most recent", async () => {
     const reader = agent();
     await signUp(reader, "Pembaca Batas Sesi");
     const id = await bookId(reader, freeSlug);
@@ -204,21 +212,59 @@ describe("reading checkpoints and history", () => {
     expect(sessionsResponse.status).toBe(200);
     expect(sessionsResponse.body.data).toHaveLength(10);
 
-    // Get current user ID to query DB for this user's sessions on this book
     const authSession = await reader.get("/api/auth/get-session");
     const userId = authSession.body.user.id;
 
-    // The two oldest sessions (first two) should have been pruned from DB for this user
+    // All 12 sessions must be retained (no destructive pruning)
     const dbRows = await db
       .select({ id: readingSessions.id })
       .from(readingSessions)
       .where(
         and(eq(readingSessions.bookId, id), eq(readingSessions.userId, userId)),
       );
-    expect(dbRows).toHaveLength(10);
-    expect(dbRows.some((r) => r.id === sessionIds[0])).toBe(false);
-    expect(dbRows.some((r) => r.id === sessionIds[1])).toBe(false);
+    expect(dbRows).toHaveLength(12);
+    expect(dbRows.some((r) => r.id === sessionIds[0])).toBe(true);
     expect(dbRows.some((r) => r.id === sessionIds[11])).toBe(true);
+  });
+
+  it("persists extended reading telemetry and derives standard pages from wordsRead", async () => {
+    const reader = agent();
+    await signUp(reader, "Pembaca Telemetri");
+    const id = await bookId(reader, freeSlug);
+
+    const res = await reader.post("/api/reading").set(originHeader).send({
+      bookId: id,
+      title: "Sesi Pagi Bab 1-2",
+      wordsRead: 1000,
+      durationSeconds: 300,
+      avgWpm: 200,
+      startProgressPercent: 10,
+      endProgressPercent: 25,
+      startChapterNumber: 1,
+      endChapterNumber: 2,
+      highlightsCount: 3,
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data).toMatchObject({
+      title: "Sesi Pagi Bab 1-2",
+      wordsRead: 1000,
+      pagesRead: 4, // 1000 / 250 standard words per page
+      startProgressPercent: 10,
+      endProgressPercent: 25,
+      startChapterNumber: 1,
+      endChapterNumber: 2,
+      highlightsCount: 3,
+    });
+
+    const listRes = await reader.get(`/api/reading/sessions/${id}`);
+    expect(listRes.status).toBe(200);
+    expect(listRes.body.data[0]).toMatchObject({
+      title: "Sesi Pagi Bab 1-2",
+      wordsRead: 1000,
+      pagesRead: 4,
+      highlightsCount: 3,
+    });
   });
 
   it("resets reading progress and shelf status when restarting a book without deleting session history", async () => {
@@ -266,5 +312,35 @@ describe("reading checkpoints and history", () => {
     // Check sessions history is preserved
     const sessions = await reader.get(`/api/reading/sessions/${id}`);
     expect(sessions.body.data).toHaveLength(1);
+  });
+});
+
+describe("reading telemetry helpers", () => {
+  it("converts words to standard pages using 250 words/page", () => {
+    expect(STANDARD_WORDS_PER_PAGE).toBe(250);
+    expect(wordsToStandardPages(0)).toBe(0);
+    expect(wordsToStandardPages(-10)).toBe(0);
+    expect(wordsToStandardPages(250)).toBe(1);
+    expect(wordsToStandardPages(625)).toBe(3);
+  });
+
+  it("computes word-weighted book progress across unequal chapters", () => {
+    // Chapter 1: 1000 words, Chapter 2: 3000 words (total 4000)
+    expect(computeWordWeightedProgress([1000, 3000], 0, 0.5)).toBe(13); // 500/4000 = 12.5% -> 13%
+    expect(computeWordWeightedProgress([1000, 3000], 1, 0)).toBe(25); // 1000/4000 = 25%
+    expect(computeWordWeightedProgress([1000, 3000], 1, 1)).toBe(100);
+    expect(computeWordWeightedProgress([], 0, 0.5)).toBe(0);
+    expect(bookProgressPercent(1, 4, 50)).toBe(37);
+  });
+
+  it("computes reading WPM and classifies tempo", () => {
+    expect(computeReadingWpm(500, 120)).toBe(250);
+    expect(computeReadingWpm(0, 120)).toBeNull();
+    expect(computeReadingWpm(500, 0)).toBeNull();
+
+    expect(classifyReadingTempo(150)).toBe("reflective");
+    expect(classifyReadingTempo(180)).toBe("steady");
+    expect(classifyReadingTempo(280)).toBe("steady");
+    expect(classifyReadingTempo(320)).toBe("brisk");
   });
 });

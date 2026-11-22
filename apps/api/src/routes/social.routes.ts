@@ -2,6 +2,8 @@ import { Router } from "express";
 import {
   applyAuthorSchema,
   followUserSchema,
+  publishHighlightPostSchema,
+  publishSessionPostSchema,
   updateProfileBioSchema,
 } from "@starter/shared/validators/social";
 import { getAuth, optionalAuth, requireAuth } from "../middleware/auth";
@@ -175,9 +177,8 @@ socialRouter.post(
   async (req, res) => {
     const userId = getAuth(req).user.id;
     const highlightId = String(req.params.id);
-    const isPosted =
-      typeof req.body?.isPosted === "boolean" ? req.body.isPosted : undefined;
-    const result = await togglePostHighlight(userId, highlightId, isPosted);
+    const input = publishHighlightPostSchema.parse(req.body ?? {});
+    const result = await togglePostHighlight(userId, highlightId, input);
     res.json({ data: result });
   },
 );
@@ -191,13 +192,8 @@ socialRouter.post(
   async (req, res) => {
     const userId = getAuth(req).user.id;
     const sessionId = String(req.params.id);
-    const isPosted =
-      typeof req.body?.isPosted === "boolean" ? req.body.isPosted : undefined;
-    const note = typeof req.body?.note === "string" ? req.body.note : undefined;
-    const result = await togglePostSession(userId, sessionId, {
-      note,
-      isPosted,
-    });
+    const input = publishSessionPostSchema.parse(req.body ?? {});
+    const result = await togglePostSession(userId, sessionId, input);
     res.json({ data: result });
   },
 );
