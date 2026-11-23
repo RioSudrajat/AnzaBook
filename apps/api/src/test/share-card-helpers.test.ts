@@ -10,7 +10,9 @@ import {
   extractSurroundingContext,
   formatShareDuration,
   getQuoteExcerptValidation,
+  resolveQuoteCardViewModel,
   resolveSafeInAppSessionTemplate,
+  resolveSessionCardViewModel,
   shareTempoLabel,
   suggestSessionTitle,
 } from "../../../web/src/features/share/card-helpers";
@@ -225,5 +227,120 @@ describe("Share Card Helpers (Issue #13)", () => {
 
     expect(extractSurroundingContext(null, "Minke")).toBeNull();
     expect(extractSurroundingContext("", "Minke")).toBeNull();
+  });
+
+  it("resolves QuoteCardViewModel with canonical templates, privacy-safe note, and location badge", () => {
+    const basePost = {
+      id: "quote-1",
+      type: "quote" as const,
+      content: "Tahu lebih baik daripada menebak.",
+      note: "Catatan pribadi",
+      postCaption: "  Refleksi sore ini  ",
+      chapterNumber: 4,
+      pageNumber: 78,
+      createdAt: "2026-11-23T10:00:00.000Z",
+      author: { id: "u1", name: "Nadia", username: "nadia", image: null },
+      book: {
+        id: "b1",
+        slug: "madilog-tan-malaka",
+        title: "Madilog",
+        author: "Tan Malaka",
+        coverColor: "#283618",
+        coverUrl: null,
+      },
+      postConfig: {
+        template: "night_stabilo" as const,
+        aspect: "story" as const,
+        alignment: "center" as const,
+        includeNote: false,
+      },
+    };
+
+    const hiddenNoteVm = resolveQuoteCardViewModel(basePost);
+    expect(hiddenNoteVm.template).toBe("night_stabilo");
+    expect(hiddenNoteVm.alignment).toBe("center");
+    expect(hiddenNoteVm.caption).toBe("Refleksi sore ini");
+    expect(hiddenNoteVm.note).toBeNull();
+    expect(hiddenNoteVm.locationLabel).toBe("Bab 4 · Hal. 78");
+
+    const revealedNoteVm = resolveQuoteCardViewModel({
+      ...basePost,
+      postConfig: { ...basePost.postConfig, includeNote: true },
+    });
+    expect(revealedNoteVm.note).toBe("Catatan pribadi");
+
+    const fallbackVm = resolveQuoteCardViewModel({
+      ...basePost,
+      postConfig: null,
+      chapterNumber: null,
+      pageNumber: null,
+    });
+    expect(fallbackVm.template).toBe("book_cover");
+    expect(fallbackVm.alignment).toBe("left");
+    expect(fallbackVm.locationLabel).toBeNull();
+  });
+
+  it("resolves SessionCardViewModel with safe photo_overlay fallback, Reading Trail, and FLEX-03 hidden metrics", () => {
+    const sessionPost = {
+      id: "session-1",
+      type: "session" as const,
+      title: "Sesi Subuh Tenang",
+      content: "Menyelesaikan sesi membaca.",
+      note: "Bab 2 padat gagasan.",
+      pagesRead: 8,
+      wordsRead: 2000,
+      durationSeconds: 900,
+      avgWpm: 190,
+      startProgressPercent: 15,
+      endProgressPercent: 32,
+      startChapterNumber: 1,
+      endChapterNumber: 2,
+      highlightsCount: 2,
+      createdAt: "2026-11-23T10:00:00.000Z",
+      author: { id: "u1", name: "Nadia", username: "nadia", image: null },
+      book: {
+        id: "b1",
+        slug: "madilog-tan-malaka",
+        title: "Madilog",
+        author: "Tan Malaka",
+        coverColor: "#3D3229",
+        coverUrl: null,
+      },
+      postConfig: {
+        template: "photo_overlay" as const,
+        aspect: "story" as const,
+        showWpm: false,
+        showDuration: false,
+        showPages: true,
+      },
+    };
+
+    const vm = resolveSessionCardViewModel(sessionPost);
+    expect(vm.template).toBe("cover_trail");
+    expect(vm.title).toBe("Sesi Subuh Tenang");
+    expect(vm.trail).toEqual({
+      hasTrail: true,
+      startPercent: 15,
+      endPercent: 32,
+      deltaPercent: 17,
+      chapterLabel: "Bab 1 → Bab 2",
+    });
+    expect(vm.metrics.map((m) => m.key)).toEqual(["pages", "highlights"]);
+    expect(vm.metrics.find((m) => m.key === "tempo")).toBeUndefined();
+    expect(vm.metrics.find((m) => m.key === "duration")).toBeUndefined();
+
+    const allHiddenVm = resolveSessionCardViewModel({
+      ...sessionPost,
+      highlightsCount: 0,
+      postConfig: {
+        template: "literary_index",
+        aspect: "square",
+        showWpm: false,
+        showDuration: false,
+        showPages: false,
+      },
+    });
+    expect(allHiddenVm.template).toBe("literary_index");
+    expect(allHiddenVm.metrics).toEqual([]);
   });
 });

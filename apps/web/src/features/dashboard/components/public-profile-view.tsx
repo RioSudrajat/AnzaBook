@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
-  Bookmark,
   BookOpen,
   CheckCircle,
   Clock,
+  ExternalLink,
   Heart,
   MapPin,
   MessageSquare,
@@ -22,6 +22,9 @@ import type {
 } from "@starter/shared/types";
 import { Button } from "@/components/ui/button";
 import { BookCover } from "@/features/books/components/book-cover";
+import { PostShareDialog } from "@/features/share/components/post-share-dialog";
+import { QuotePostCard } from "@/features/share/components/quote-post-card";
+import { SessionPostCard } from "@/features/share/components/session-post-card";
 import { SocialRelationsDialog } from "@/features/social/components/social-relations-dialog";
 import { useFollowUser, useUnfollowUser } from "@/features/social/hooks";
 
@@ -451,10 +454,9 @@ export function PublicProfileView({
   );
 }
 
-// Sub-component: ActivityFeedCard for Tab Aktivitas
 function ActivityFeedCard({ activity }: { activity: ExplorePostItemDto }) {
   const [isLiked, setIsLiked] = useState(false);
-  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
 
   const formattedDate = new Date(activity.createdAt).toLocaleDateString(
     "id-ID",
@@ -464,6 +466,9 @@ function ActivityFeedCard({ activity }: { activity: ExplorePostItemDto }) {
       year: "numeric",
     },
   );
+
+  const isShareablePost =
+    activity.type === "quote" || activity.type === "session";
 
   return (
     <article className="rounded-xl border border-border/80 bg-card p-5 space-y-3.5 shadow-xs hover:border-foreground/30 transition-colors">
@@ -481,7 +486,7 @@ function ActivityFeedCard({ activity }: { activity: ExplorePostItemDto }) {
             </span>
           )}
           {activity.type === "session" && (
-            <span className="inline-flex items-center gap-1 font-mono font-medium text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full text-[11px]">
+            <span className="inline-flex items-center gap-1 font-mono font-medium text-[var(--color-accent)] bg-[var(--color-accent)]/10 px-2 py-0.5 rounded-full text-[11px]">
               <Clock className="size-3" /> Sesi Membaca
             </span>
           )}
@@ -495,61 +500,9 @@ function ActivityFeedCard({ activity }: { activity: ExplorePostItemDto }) {
 
       {/* Content based on type */}
       {activity.type === "quote" ? (
-        <div className="rounded-xl bg-[#283618] text-[#fefae0] dark:bg-[#1f2b13] dark:text-[#f3ecc8] p-5 space-y-3 relative overflow-hidden shadow-xs border border-[#3a4d23]">
-          <Quote className="size-7 text-[#dda15e] opacity-80" />
-          <p className="font-serif text-sm sm:text-base leading-relaxed tracking-wide">
-            &ldquo;{activity.content}&rdquo;
-          </p>
-
-          {activity.note && (
-            <p className="text-xs text-[#fefae0]/80 italic border-t border-[#fefae0]/15 pt-2">
-              Catatan: {activity.note}
-            </p>
-          )}
-
-          <div className="flex items-center justify-between pt-2 text-xs text-[#dda15e] font-medium">
-            <Link
-              to="/books/$slug"
-              params={{ slug: activity.book.slug }}
-              className="hover:underline flex items-center gap-1.5 truncate"
-            >
-              <BookOpen className="size-3.5 shrink-0" />
-              <span>
-                {activity.book.title} — {activity.book.author}
-              </span>
-            </Link>
-
-            <button
-              type="button"
-              onClick={() => setIsBookmarked(!isBookmarked)}
-              className="text-[#fefae0] hover:text-[#dda15e] transition-colors p-1"
-              aria-label="Simpan kutipan"
-            >
-              <Bookmark
-                className={`size-4 ${isBookmarked ? "fill-current" : ""}`}
-              />
-            </button>
-          </div>
-        </div>
+        <QuotePostCard post={activity} as="div" />
       ) : activity.type === "session" ? (
-        <div className="space-y-3">
-          <div className="p-4 rounded-xl border border-border/80 bg-muted/40 space-y-2">
-            <div className="flex items-center gap-2 font-mono text-xs font-semibold text-foreground">
-              <Clock className="size-4 text-orange-600" />
-              <span>
-                {Math.round((activity.durationSeconds || 0) / 60)} menit baca •{" "}
-                {activity.pagesRead || 0} halaman
-              </span>
-            </div>
-            {activity.note && (
-              <p className="font-serif text-sm leading-relaxed text-foreground/90 italic">
-                &ldquo;{activity.note}&rdquo;
-              </p>
-            )}
-          </div>
-
-          <BookLine book={activity.book} />
-        </div>
+        <SessionPostCard post={activity} as="div" />
       ) : (
         <div className="space-y-3">
           <BookLine book={activity.book} />
@@ -560,11 +513,11 @@ function ActivityFeedCard({ activity }: { activity: ExplorePostItemDto }) {
       )}
 
       {/* Social interaction footer */}
-      <div className="flex items-center gap-6 pt-2 border-t border-border/60 text-muted-foreground text-xs">
+      <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-border/60 text-muted-foreground text-xs">
         <button
           type="button"
           onClick={() => setIsLiked(!isLiked)}
-          className={`flex items-center gap-1.5 hover:text-red-500 transition-colors ${
+          className={`inline-flex min-h-10 items-center gap-1.5 px-2 rounded-md hover:text-red-500 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] cursor-pointer ${
             isLiked ? "text-red-500 font-semibold" : ""
           }`}
         >
@@ -574,27 +527,40 @@ function ActivityFeedCard({ activity }: { activity: ExplorePostItemDto }) {
 
         <button
           type="button"
-          className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+          className="inline-flex min-h-10 items-center gap-1.5 px-2 rounded-md hover:text-foreground transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] cursor-pointer"
         >
           <MessageSquare className="size-4" />
           <span>Balas</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => {
-            if (navigator.clipboard) {
-              void navigator.clipboard.writeText(
-                `${activity.content} — ${activity.book.title} di AnzaBook`,
-              );
-            }
-          }}
-          className="flex items-center gap-1.5 hover:text-foreground transition-colors ml-auto"
-          aria-label="Bagikan aktivitas"
-        >
-          <Share2 className="size-4" />
-        </button>
+        <div className="ml-auto flex items-center gap-1.5">
+          {isShareablePost && (
+            <Link
+              to="/post/$type/$id"
+              params={{ type: activity.type, id: activity.id }}
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+            >
+              <ExternalLink className="size-3.5" aria-hidden="true" />
+              <span>Detail</span>
+            </Link>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setIsShareOpen(true)}
+            className="inline-flex min-h-10 min-w-10 items-center justify-center gap-1.5 rounded-md px-2.5 hover:bg-muted hover:text-foreground transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] cursor-pointer"
+            aria-label="Bagikan aktivitas"
+          >
+            <Share2 className="size-4" aria-hidden="true" />
+            <span className="hidden sm:inline">Bagikan</span>
+          </button>
+        </div>
       </div>
+
+      <PostShareDialog
+        post={isShareOpen ? activity : null}
+        onClose={() => setIsShareOpen(false)}
+      />
     </article>
   );
 }
