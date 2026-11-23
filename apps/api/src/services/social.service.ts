@@ -17,11 +17,14 @@ import {
 } from "../db/schema";
 import { HttpError } from "../lib/http-error";
 import { toBookSummary } from "./books.service";
-import type {
-  ApplyAuthorInput,
-  UpdateProfileBioInput,
-  PublishHighlightPostInput,
-  PublishSessionPostInput,
+import {
+  quotePostConfigSchema,
+  sessionPostConfigSchema,
+  type ApplyAuthorInput,
+  type PublicSocialPostType,
+  type PublishHighlightPostInput,
+  type PublishSessionPostInput,
+  type UpdateProfileBioInput,
 } from "@starter/shared/validators/social";
 import type {
   AuthorDirectoryItemDto,
@@ -48,6 +51,149 @@ const readingDay = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
 });
 const dayMs = 86_400_000;
+
+type PublicAuthorPreview = {
+  id: string;
+  name: string;
+  username: string | null;
+  image: string | null;
+};
+
+type PublicBookPreview = {
+  id: string;
+  slug: string;
+  title: string;
+  author: string;
+  coverColor: string | null;
+  coverUrl: string | null;
+};
+
+function parseQuotePostConfig(raw: unknown): QuotePostConfig | null {
+  if (!raw) return null;
+  const parsed = quotePostConfigSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
+
+function parseSessionPostConfig(raw: unknown): SessionPostConfig | null {
+  if (!raw) return null;
+  const parsed = sessionPostConfigSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
+
+function buildSanitizedSessionContent(params: {
+  note: string | null;
+  durationSeconds: number;
+  pagesRead: number;
+  showDuration: boolean;
+  showPages: boolean;
+}): string {
+  if (params.note && params.note.trim().length > 0) {
+    return params.note;
+  }
+  const parts: string[] = [];
+  if (params.showDuration && params.durationSeconds > 0) {
+    const minutes = Math.round(params.durationSeconds / 60);
+    parts.push(
+      minutes >= 1 ? `${minutes} menit` : `${params.durationSeconds} detik`,
+    );
+  }
+  if (params.showPages && params.pagesRead > 0) {
+    parts.push(`${params.pagesRead} halaman`);
+  }
+  if (parts.length > 0) {
+    return `Menyelesaikan sesi membaca (${parts.join(" · ")}).`;
+  }
+  return "Menyelesaikan sesi membaca.";
+}
+
+function mapPublicQuoteRow(row: {
+  id: string;
+  selectedText: string;
+  note: string | null;
+  postCaption: string | null;
+  postConfig: unknown;
+  color: string;
+  chapterNumber: number;
+  pageNumber: number;
+  createdAt: Date;
+  postedAt: Date | null;
+  author: PublicAuthorPreview;
+  book: PublicBookPreview;
+}): ExplorePostItemDto {
+  const postConfig = parseQuotePostConfig(row.postConfig);
+  return {
+    id: row.id,
+    type: "quote",
+    content: row.selectedText,
+    note: postConfig?.includeNote === true ? row.note : null,
+    postCaption: row.postCaption,
+    postConfig,
+    chapterNumber: row.chapterNumber,
+    pageNumber: row.pageNumber,
+    createdAt: (row.postedAt || row.createdAt).toISOString(),
+    author: row.author,
+    book: row.book,
+    color: row.color as HighlightColor,
+  };
+}
+
+function mapPublicSessionRow(row: {
+  id: string;
+  title: string | null;
+  note: string | null;
+  pagesRead: number;
+  wordsRead: number | null;
+  durationSeconds: number;
+  avgWpm: number;
+  startProgressPercent: number | null;
+  endProgressPercent: number | null;
+  startChapterNumber: number | null;
+  endChapterNumber: number | null;
+  highlightsCount: number;
+  postConfig: unknown;
+  createdAt: Date;
+  postedAt: Date | null;
+  author: PublicAuthorPreview;
+  book: PublicBookPreview;
+}): ExplorePostItemDto {
+  const postConfig = parseSessionPostConfig(row.postConfig);
+  const showWpm = postConfig?.showWpm !== false;
+  const showDuration = postConfig?.showDuration !== false;
+  const showPages = postConfig?.showPages !== false;
+
+  const base: ExplorePostItemDto = {
+    id: row.id,
+    type: "session",
+    title: row.title,
+    content: buildSanitizedSessionContent({
+      note: row.note,
+      durationSeconds: row.durationSeconds,
+      pagesRead: row.pagesRead,
+      showDuration,
+      showPages,
+    }),
+    note: row.note,
+    createdAt: (row.postedAt || row.createdAt).toISOString(),
+    author: row.author,
+    book: row.book,
+    avgWpm: showWpm ? row.avgWpm : null,
+    wordsRead: showPages ? row.wordsRead : null,
+    startProgressPercent: row.startProgressPercent,
+    endProgressPercent: row.endProgressPercent,
+    startChapterNumber: row.startChapterNumber,
+    endChapterNumber: row.endChapterNumber,
+    highlightsCount: row.highlightsCount,
+    postConfig,
+  };
+
+  if (showDuration) {
+    base.durationSeconds = row.durationSeconds;
+  }
+  if (showPages) {
+    base.pagesRead = row.pagesRead;
+  }
+  return base;
+}
 
 function calculateStreak(sessions: { createdAt: Date }[]): number {
   if (!sessions.length) return 0;
@@ -377,46 +523,61 @@ export async function getSocialProfile(
         title: book.title,
         author: book.author,
         coverColor: book.coverColor,
+        coverUrl: book.coverUrl,
       },
       rating: review.ratingHalfSteps / 2,
     })),
-    ...quoteRows.map(({ quote, book }) => ({
-      id: quote.id,
-      type: "quote" as const,
-      content: quote.selectedText,
-      note: quote.postConfig?.includeNote === true ? quote.note : null,
-      postCaption: quote.postCaption,
-      postConfig: quote.postConfig ?? null,
-      createdAt: (quote.postedAt || quote.createdAt).toISOString(),
-      author: authorPreview,
-      book: {
-        id: book.id,
-        slug: book.slug,
-        title: book.title,
-        author: book.author,
-        coverColor: book.coverColor,
-      },
-      color: quote.color as HighlightColor,
-    })),
-    ...sessionRows.map(({ session, book }) => ({
-      id: session.id,
-      type: "session" as const,
-      content:
-        session.note ||
-        `Menyelesaikan sesi membaca ${Math.round(session.durationSeconds / 60)} menit (${session.pagesRead} halaman).`,
-      note: session.note,
-      createdAt: (session.postedAt || session.createdAt).toISOString(),
-      author: authorPreview,
-      book: {
-        id: book.id,
-        slug: book.slug,
-        title: book.title,
-        author: book.author,
-        coverColor: book.coverColor,
-      },
-      pagesRead: session.pagesRead,
-      durationSeconds: session.durationSeconds,
-    })),
+    ...quoteRows.map(({ quote, book }) =>
+      mapPublicQuoteRow({
+        id: quote.id,
+        selectedText: quote.selectedText,
+        note: quote.note,
+        postCaption: quote.postCaption,
+        postConfig: quote.postConfig,
+        color: quote.color,
+        chapterNumber: quote.chapterNumber,
+        pageNumber: quote.pageNumber,
+        createdAt: quote.createdAt,
+        postedAt: quote.postedAt,
+        author: authorPreview,
+        book: {
+          id: book.id,
+          slug: book.slug,
+          title: book.title,
+          author: book.author,
+          coverColor: book.coverColor,
+          coverUrl: book.coverUrl,
+        },
+      }),
+    ),
+    ...sessionRows.map(({ session, book }) =>
+      mapPublicSessionRow({
+        id: session.id,
+        title: session.title,
+        note: session.note,
+        pagesRead: session.pagesRead,
+        wordsRead: session.wordsRead,
+        durationSeconds: session.durationSeconds,
+        avgWpm: session.avgWpm,
+        startProgressPercent: session.startProgressPercent,
+        endProgressPercent: session.endProgressPercent,
+        startChapterNumber: session.startChapterNumber,
+        endChapterNumber: session.endChapterNumber,
+        highlightsCount: session.highlightsCount,
+        postConfig: session.postConfig,
+        createdAt: session.createdAt,
+        postedAt: session.postedAt,
+        author: authorPreview,
+        book: {
+          id: book.id,
+          slug: book.slug,
+          title: book.title,
+          author: book.author,
+          coverColor: book.coverColor,
+          coverUrl: book.coverUrl,
+        },
+      }),
+    ),
   ];
 
   publicActivities.sort(
@@ -1245,6 +1406,7 @@ export async function unifiedExplore(
         title: books.title,
         author: books.author,
         coverColor: books.coverColor,
+        coverUrl: books.coverUrl,
       },
     })
     .from(bookReviews)
@@ -1260,7 +1422,11 @@ export async function unifiedExplore(
     quoteConditions.push(
       or(
         ilike(bookHighlights.selectedText, searchPattern),
-        ilike(bookHighlights.note, searchPattern),
+        ilike(bookHighlights.postCaption, searchPattern),
+        and(
+          sql`coalesce((${bookHighlights.postConfig} ->> 'includeNote')::boolean, false) = true`,
+          ilike(bookHighlights.note, searchPattern),
+        ),
         ilike(books.title, searchPattern),
         ilike(books.author, searchPattern),
       )!,
@@ -1274,6 +1440,8 @@ export async function unifiedExplore(
       postCaption: bookHighlights.postCaption,
       postConfig: bookHighlights.postConfig,
       color: bookHighlights.color,
+      chapterNumber: bookHighlights.chapterNumber,
+      pageNumber: bookHighlights.pageNumber,
       createdAt: bookHighlights.createdAt,
       postedAt: bookHighlights.postedAt,
       user: {
@@ -1303,6 +1471,7 @@ export async function unifiedExplore(
   if (searchPattern) {
     sessionConditions.push(
       or(
+        ilike(readingSessions.title, searchPattern),
         ilike(readingSessions.note, searchPattern),
         ilike(books.title, searchPattern),
         ilike(books.author, searchPattern),
@@ -1312,9 +1481,18 @@ export async function unifiedExplore(
   const sessionRows = await db
     .select({
       id: readingSessions.id,
+      title: readingSessions.title,
       note: readingSessions.note,
       pagesRead: readingSessions.pagesRead,
+      wordsRead: readingSessions.wordsRead,
       durationSeconds: readingSessions.durationSeconds,
+      avgWpm: readingSessions.avgWpm,
+      startProgressPercent: readingSessions.startProgressPercent,
+      endProgressPercent: readingSessions.endProgressPercent,
+      startChapterNumber: readingSessions.startChapterNumber,
+      endChapterNumber: readingSessions.endChapterNumber,
+      highlightsCount: readingSessions.highlightsCount,
+      postConfig: readingSessions.postConfig,
       createdAt: readingSessions.createdAt,
       postedAt: readingSessions.postedAt,
       user: {
@@ -1329,6 +1507,7 @@ export async function unifiedExplore(
         title: books.title,
         author: books.author,
         coverColor: books.coverColor,
+        coverUrl: books.coverUrl,
       },
     })
     .from(readingSessions)
@@ -1348,31 +1527,43 @@ export async function unifiedExplore(
       book: r.book,
       rating: r.ratingHalfSteps / 2,
     })),
-    ...quoteRows.map((q) => ({
-      id: q.id,
-      type: "quote" as const,
-      content: q.selectedText,
-      note: q.postConfig?.includeNote === true ? q.note : null,
-      postCaption: q.postCaption,
-      postConfig: q.postConfig ?? null,
-      createdAt: (q.postedAt || q.createdAt).toISOString(),
-      author: q.user,
-      book: q.book,
-      color: q.color as HighlightColor,
-    })),
-    ...sessionRows.map((s) => ({
-      id: s.id,
-      type: "session" as const,
-      content:
-        s.note ||
-        `Menyelesaikan sesi membaca ${Math.round(s.durationSeconds / 60)} menit (${s.pagesRead} halaman).`,
-      note: s.note,
-      createdAt: (s.postedAt || s.createdAt).toISOString(),
-      author: s.user,
-      book: s.book,
-      pagesRead: s.pagesRead,
-      durationSeconds: s.durationSeconds,
-    })),
+    ...quoteRows.map((q) =>
+      mapPublicQuoteRow({
+        id: q.id,
+        selectedText: q.selectedText,
+        note: q.note,
+        postCaption: q.postCaption,
+        postConfig: q.postConfig,
+        color: q.color,
+        chapterNumber: q.chapterNumber,
+        pageNumber: q.pageNumber,
+        createdAt: q.createdAt,
+        postedAt: q.postedAt,
+        author: q.user,
+        book: q.book,
+      }),
+    ),
+    ...sessionRows.map((s) =>
+      mapPublicSessionRow({
+        id: s.id,
+        title: s.title,
+        note: s.note,
+        pagesRead: s.pagesRead,
+        wordsRead: s.wordsRead,
+        durationSeconds: s.durationSeconds,
+        avgWpm: s.avgWpm,
+        startProgressPercent: s.startProgressPercent,
+        endProgressPercent: s.endProgressPercent,
+        startChapterNumber: s.startChapterNumber,
+        endChapterNumber: s.endChapterNumber,
+        highlightsCount: s.highlightsCount,
+        postConfig: s.postConfig,
+        createdAt: s.createdAt,
+        postedAt: s.postedAt,
+        author: s.user,
+        book: s.book,
+      }),
+    ),
   ];
 
   posts.sort(
@@ -1532,4 +1723,133 @@ export async function togglePostSession(
     postConfig: nextConfig ?? null,
     postedAt: postedAt ? postedAt.toISOString() : null,
   };
+}
+
+export async function getPublicSocialPost(
+  type: PublicSocialPostType,
+  id: string,
+): Promise<ExplorePostItemDto> {
+  if (type === "quote") {
+    const [row] = await db
+      .select({
+        id: bookHighlights.id,
+        selectedText: bookHighlights.selectedText,
+        note: bookHighlights.note,
+        postCaption: bookHighlights.postCaption,
+        postConfig: bookHighlights.postConfig,
+        color: bookHighlights.color,
+        chapterNumber: bookHighlights.chapterNumber,
+        pageNumber: bookHighlights.pageNumber,
+        createdAt: bookHighlights.createdAt,
+        postedAt: bookHighlights.postedAt,
+        user: {
+          id: user.id,
+          name: user.name,
+          username: user.username,
+          image: user.image,
+        },
+        book: {
+          id: books.id,
+          slug: books.slug,
+          title: books.title,
+          author: books.author,
+          coverColor: books.coverColor,
+          coverUrl: books.coverUrl,
+        },
+      })
+      .from(bookHighlights)
+      .innerJoin(user, eq(bookHighlights.userId, user.id))
+      .innerJoin(books, eq(bookHighlights.bookId, books.id))
+      .where(and(eq(bookHighlights.id, id), eq(bookHighlights.isPosted, true)))
+      .limit(1);
+
+    if (!row) {
+      throw new HttpError(
+        404,
+        "POST_NOT_FOUND",
+        "Postingan tidak ditemukan atau bersifat privat.",
+      );
+    }
+
+    return mapPublicQuoteRow({
+      id: row.id,
+      selectedText: row.selectedText,
+      note: row.note,
+      postCaption: row.postCaption,
+      postConfig: row.postConfig,
+      color: row.color,
+      chapterNumber: row.chapterNumber,
+      pageNumber: row.pageNumber,
+      createdAt: row.createdAt,
+      postedAt: row.postedAt,
+      author: row.user,
+      book: row.book,
+    });
+  }
+
+  const [row] = await db
+    .select({
+      id: readingSessions.id,
+      title: readingSessions.title,
+      note: readingSessions.note,
+      pagesRead: readingSessions.pagesRead,
+      wordsRead: readingSessions.wordsRead,
+      durationSeconds: readingSessions.durationSeconds,
+      avgWpm: readingSessions.avgWpm,
+      startProgressPercent: readingSessions.startProgressPercent,
+      endProgressPercent: readingSessions.endProgressPercent,
+      startChapterNumber: readingSessions.startChapterNumber,
+      endChapterNumber: readingSessions.endChapterNumber,
+      highlightsCount: readingSessions.highlightsCount,
+      postConfig: readingSessions.postConfig,
+      createdAt: readingSessions.createdAt,
+      postedAt: readingSessions.postedAt,
+      user: {
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        image: user.image,
+      },
+      book: {
+        id: books.id,
+        slug: books.slug,
+        title: books.title,
+        author: books.author,
+        coverColor: books.coverColor,
+        coverUrl: books.coverUrl,
+      },
+    })
+    .from(readingSessions)
+    .innerJoin(user, eq(readingSessions.userId, user.id))
+    .innerJoin(books, eq(readingSessions.bookId, books.id))
+    .where(and(eq(readingSessions.id, id), eq(readingSessions.isPosted, true)))
+    .limit(1);
+
+  if (!row) {
+    throw new HttpError(
+      404,
+      "POST_NOT_FOUND",
+      "Postingan tidak ditemukan atau bersifat privat.",
+    );
+  }
+
+  return mapPublicSessionRow({
+    id: row.id,
+    title: row.title,
+    note: row.note,
+    pagesRead: row.pagesRead,
+    wordsRead: row.wordsRead,
+    durationSeconds: row.durationSeconds,
+    avgWpm: row.avgWpm,
+    startProgressPercent: row.startProgressPercent,
+    endProgressPercent: row.endProgressPercent,
+    startChapterNumber: row.startChapterNumber,
+    endChapterNumber: row.endChapterNumber,
+    highlightsCount: row.highlightsCount,
+    postConfig: row.postConfig,
+    createdAt: row.createdAt,
+    postedAt: row.postedAt,
+    author: row.user,
+    book: row.book,
+  });
 }

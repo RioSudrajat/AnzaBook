@@ -596,6 +596,8 @@ export type ExplorePostItemDto = {
   };
   rating?: number;
   color?: HighlightColor;
+  chapterNumber?: number | null;
+  pageNumber?: number | null;
   pagesRead?: number;
   durationSeconds?: number;
   avgWpm?: number | null;

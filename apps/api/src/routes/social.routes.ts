@@ -2,8 +2,10 @@ import { Router } from "express";
 import {
   applyAuthorSchema,
   followUserSchema,
+  publicSocialPostParamsSchema,
   publishHighlightPostSchema,
   publishSessionPostSchema,
+  socialResourceIdParamSchema,
   updateProfileBioSchema,
 } from "@starter/shared/validators/social";
 import { getAuth, optionalAuth, requireAuth } from "../middleware/auth";
@@ -14,6 +16,7 @@ import {
   exploreAuthors,
   exploreReaders,
   followUser,
+  getPublicSocialPost,
   getSocialProfile,
   getUserFollowers,
   getUserFollowing,
@@ -168,6 +171,13 @@ socialRouter.delete(
   },
 );
 
+// Public shareable post detail (quote or session, only if isPosted === true)
+socialRouter.get("/posts/:type/:id", optionalAuth, async (req, res) => {
+  const { type, id } = publicSocialPostParamsSchema.parse(req.params);
+  const post = await getPublicSocialPost(type, id);
+  res.json({ data: post });
+});
+
 // Toggle post highlight/quote to public feed
 socialRouter.post(
   "/highlights/:id/toggle-post",
@@ -176,7 +186,7 @@ socialRouter.post(
   jsonBody,
   async (req, res) => {
     const userId = getAuth(req).user.id;
-    const highlightId = String(req.params.id);
+    const { id: highlightId } = socialResourceIdParamSchema.parse(req.params);
     const input = publishHighlightPostSchema.parse(req.body ?? {});
     const result = await togglePostHighlight(userId, highlightId, input);
     res.json({ data: result });
@@ -191,7 +201,7 @@ socialRouter.post(
   jsonBody,
   async (req, res) => {
     const userId = getAuth(req).user.id;
-    const sessionId = String(req.params.id);
+    const { id: sessionId } = socialResourceIdParamSchema.parse(req.params);
     const input = publishSessionPostSchema.parse(req.body ?? {});
     const result = await togglePostSession(userId, sessionId, input);
     res.json({ data: result });
