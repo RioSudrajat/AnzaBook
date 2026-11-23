@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, Share2 } from "lucide-react";
 import type { HighlightColor } from "@starter/shared/types";
 
 type HighlightPopoverProps = {
@@ -10,6 +10,7 @@ type HighlightPopoverProps = {
     note?: string;
     chapterNumber?: number;
     paragraphIndex?: number;
+    openComposer?: boolean;
   }) => Promise<void>;
 };
 
@@ -124,7 +125,10 @@ export function HighlightPopover({
 
   if (!position || !selectedText) return null;
 
-  const handlePickColor = async (color: HighlightColor) => {
+  const handlePickColor = async (
+    color: HighlightColor,
+    openComposer = false,
+  ) => {
     if (isSaving) return;
     setIsSaving(true);
     try {
@@ -134,6 +138,7 @@ export function HighlightPopover({
         note: note.trim() || undefined,
         chapterNumber: selectedChapterNumber,
         paragraphIndex: selectedParagraphIndex,
+        openComposer,
       });
       setPosition(null);
       setShowNoteInput(false);
@@ -193,20 +198,34 @@ export function HighlightPopover({
           ))}
         </div>
 
-        {/* Note button */}
-        <button
-          type="button"
-          onClick={() => setShowNoteInput(!showNoteInput)}
-          className={`p-1.5 rounded-[6px] text-xs transition-colors cursor-pointer ${
-            showNoteInput
-              ? "bg-white/20 text-white"
-              : "text-white/60 hover:text-white hover:bg-white/10"
-          }`}
-          title="Tambah Catatan Pribadi"
-          aria-label="Tambah Catatan Pribadi"
-        >
-          <MessageSquare className="size-3.5" />
-        </button>
+        <div className="flex items-center gap-1">
+          {/* Note button */}
+          <button
+            type="button"
+            onClick={() => setShowNoteInput(!showNoteInput)}
+            className={`p-1.5 rounded-[6px] text-xs transition-colors cursor-pointer ${
+              showNoteInput
+                ? "bg-white/20 text-white"
+                : "text-white/60 hover:text-white hover:bg-white/10"
+            }`}
+            title="Tambah Catatan Pribadi"
+            aria-label="Tambah Catatan Pribadi"
+          >
+            <MessageSquare className="size-3.5" />
+          </button>
+
+          {/* Quick Share / Post Composer */}
+          <button
+            type="button"
+            disabled={isSaving}
+            onClick={() => void handlePickColor("yellow", true)}
+            className="inline-flex items-center gap-1 rounded-[6px] bg-[var(--color-accent)] px-2 py-1 text-[11px] font-semibold text-[var(--color-accent-ink)] transition-colors hover:brightness-95 disabled:opacity-50 cursor-pointer"
+            title="Simpan stabilo lalu buka composer kutipan"
+          >
+            <Share2 className="size-3" />
+            <span>Bagikan / Post</span>
+          </button>
+        </div>
       </div>
 
       {/* Note input field if toggled */}

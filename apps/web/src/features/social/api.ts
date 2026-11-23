@@ -337,55 +337,49 @@ export async function updateCalendarProfile(
   return data;
 }
 
-export async function togglePostHighlight(
-  highlightId: string,
-  input?: boolean | PublishHighlightPostInput,
-): Promise<{
+export type TogglePostHighlightResult = {
   id: string;
   isPosted: boolean;
   postCaption: string | null;
   postConfig: QuotePostConfig | null;
   postedAt: string | null;
-}> {
-  const body = typeof input === "boolean" ? { isPosted: input } : (input ?? {});
-  const { data } = await apiFetch<
-    DataResponse<{
-      id: string;
-      isPosted: boolean;
-      postCaption: string | null;
-      postConfig: QuotePostConfig | null;
-      postedAt: string | null;
-    }>
-  >(`/api/social/highlights/${encodeURIComponent(highlightId)}/toggle-post`, {
-    method: "POST",
-    body,
-  });
+};
+
+export async function togglePostHighlight(
+  highlightId: string,
+  input?: boolean | PublishHighlightPostInput,
+): Promise<TogglePostHighlightResult> {
+  const body: PublishHighlightPostInput =
+    typeof input === "boolean" ? { isPosted: input } : (input ?? {});
+  const { data } = await apiFetch<DataResponse<TogglePostHighlightResult>>(
+    `/api/social/highlights/${encodeURIComponent(highlightId)}/toggle-post`,
+    {
+      method: "POST",
+      body,
+    },
+  );
   return data;
 }
 
-export async function togglePostSession(
-  sessionId: string,
-  input: PublishSessionPostInput,
-): Promise<{
+export type TogglePostSessionResult = {
   id: string;
   isPosted: boolean;
   title: string | null;
   note: string | null;
   postConfig: SessionPostConfig | null;
   postedAt: string | null;
-}> {
-  const { data } = await apiFetch<
-    DataResponse<{
-      id: string;
-      isPosted: boolean;
-      title: string | null;
-      note: string | null;
-      postConfig: SessionPostConfig | null;
-      postedAt: string | null;
-    }>
-  >(`/api/social/sessions/${encodeURIComponent(sessionId)}/toggle-post`, {
-    method: "POST",
-    body: input,
-  });
+};
+
+export async function togglePostSession(
+  sessionId: string,
+  input: PublishSessionPostInput,
+): Promise<TogglePostSessionResult> {
+  const { data } = await apiFetch<DataResponse<TogglePostSessionResult>>(
+    `/api/social/sessions/${encodeURIComponent(sessionId)}/toggle-post`,
+    {
+      method: "POST",
+      body: input,
+    },
+  );
   return data;
 }

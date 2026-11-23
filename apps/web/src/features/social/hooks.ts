@@ -306,9 +306,8 @@ export function useTogglePostHighlight() {
     mutationFn: ({
       highlightId,
       ...input
-    }: {
-      highlightId: string;
-    } & PublishHighlightPostInput) => togglePostHighlight(highlightId, input),
+    }: { highlightId: string } & PublishHighlightPostInput) =>
+      togglePostHighlight(highlightId, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: socialKeys.all });
       queryClient.invalidateQueries({ queryKey: ["books", "highlights"] });
@@ -322,13 +321,12 @@ export function useTogglePostSession() {
     mutationFn: ({
       sessionId,
       ...input
-    }: {
-      sessionId: string;
-    } & PublishSessionPostInput) => togglePostSession(sessionId, input),
+    }: { sessionId: string } & PublishSessionPostInput) =>
+      togglePostSession(sessionId, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: socialKeys.all });
-      queryClient.invalidateQueries({ queryKey: communityKeys.sessions() });
       queryClient.invalidateQueries({ queryKey: ["reading", "sessions"] });
+      queryClient.invalidateQueries({ queryKey: communityKeys.sessions() });
     },
   });
 }
