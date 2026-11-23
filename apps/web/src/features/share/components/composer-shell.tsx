@@ -1,9 +1,18 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { Check, Copy, Download, Share2, MessageCircle, X } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Download,
+  ExternalLink,
+  MessageCircle,
+  X,
+} from "lucide-react";
+import { InstagramIcon } from "./instagram-icon";
 import type { CardAspect } from "@starter/shared/types";
 import type { ReaderTheme } from "@/features/reader/components/reader-toolbar";
 import { buildWhatsAppShareUrl } from "../card-helpers";
 import {
+  canShareFilesNatively,
   copyTextToClipboard,
   downloadCanvasPng,
   sanitizeShareFilename,
@@ -123,8 +132,8 @@ export function ComposerDialogShell({
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 p-4 sm:p-6 lg:grid-cols-[minmax(0,400px)_1fr]">
-        <div className="flex flex-col items-center justify-start rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-4">
+      <div className="grid grid-cols-1 gap-6 p-4 sm:p-6 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
+        <div className="flex min-w-0 flex-col items-center justify-start rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-4">
           {preview}
         </div>
         <div className="flex min-w-0 flex-col gap-5">{controls}</div>
@@ -147,7 +156,9 @@ export function CanvasPreviewFrame({
   const frameClass =
     aspect === "story"
       ? "w-full max-w-[270px] sm:max-w-[300px] aspect-[9/16]"
-      : "w-full max-w-[340px] sm:max-w-[360px] aspect-square";
+      : aspect === "4:3"
+        ? "w-full max-w-[360px] aspect-[4/3]"
+        : "w-full max-w-[340px] sm:max-w-[360px] aspect-square";
 
   return (
     <div className="flex w-full flex-col items-center gap-2">
@@ -170,7 +181,9 @@ export function CanvasPreviewFrame({
       <p className="font-mono text-[11px] uppercase tracking-wider text-[var(--color-muted)]">
         {aspect === "story"
           ? "Kanvas 1080 × 1920 px (9:16)"
-          : "Kanvas 1080 × 1080 px (1:1)"}
+          : aspect === "4:3"
+            ? "Kanvas 1440 × 1080 px (4:3)"
+            : "Kanvas 1080 × 1080 px (1:1)"}
       </p>
     </div>
   );
@@ -196,20 +209,24 @@ export function ComposerShareBar({
   shareUrl,
 }: ComposerShareBarProps) {
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [showInstagramGuide, setShowInstagramGuide] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const supportsNativeFiles =
+    typeof window !== "undefined" && canShareFilesNatively();
 
   const showTempFeedback = (message: string) => {
     setFeedback(message);
     window.setTimeout(() => {
       setFeedback((prev) => (prev === message ? null : prev));
-    }, 3500);
+    }, 4500);
   };
 
   const handleDownload = async () => {
     const canvas = canvasRef.current;
     if (!canvas || isExporting) return;
     setIsExporting(true);
+    setShowInstagramGuide(false);
     try {
       const filename = sanitizeShareFilename(
         filenamePrefix,
@@ -245,11 +262,13 @@ export function ComposerShareBar({
         url: shareUrl,
       });
       if (result === "shared") {
-        showTempFeedback("Kartu berhasil dikirim ke lembar bagikan.");
+        setShowInstagramGuide(false);
+        showTempFeedback("Kartu berhasil dikirim ke lembar bagikan sistem.");
       } else if (result === "unsupported") {
         await downloadCanvasPng(canvas, filename);
+        setShowInstagramGuide(true);
         showTempFeedback(
-          "Peramban ini belum mendukung bagikan file langsung; PNG diunduh agar siap diunggah.",
+          "PNG 1080p siap diunggah. Browser desktop tidak diizinkan Meta membuka editor IG Story secara langsung — klik Buka Instagram di bawah (atau buka di HP untuk kirim langsung ke IG Story).",
         );
       }
     } catch (err) {
@@ -287,8 +306,8 @@ export function ComposerShareBar({
           disabled={isExporting}
           className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 py-2 text-xs font-semibold text-[var(--color-ink)] transition-colors hover:bg-[var(--color-paper-3)] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
         >
-          <Share2 className="h-4 w-4 shrink-0 text-[var(--color-accent)]" />
-          <span>IG Story / Share</span>
+          <InstagramIcon className="h-4 w-4 shrink-0 text-[var(--color-accent)]" />
+          <span>{supportsNativeFiles ? "IG Story / Share" : "IG Story"}</span>
         </button>
 
         <button
@@ -324,6 +343,25 @@ export function ComposerShareBar({
           <span>{copied ? "Tersalin" : "Salin Tautan"}</span>
         </button>
       </div>
+
+      {showInstagramGuide ? (
+        <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-[var(--color-accent)]/35 bg-[var(--color-paper)] px-3.5 py-2.5 text-xs text-[var(--color-ink-2)]">
+          <p className="min-w-0 flex-1 leading-relaxed">
+            Kartu PNG sudah diunduh. Di desktop, browser belum bisa membuka
+            editor IG Story langsung — unggah lewat Instagram atau buka AnzaBook
+            di HP untuk kirim langsung ke IG Story.
+          </p>
+          <a
+            href="https://www.instagram.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3.5 text-xs font-semibold text-[var(--color-accent-ink)] hover:brightness-95 transition-[filter]"
+          >
+            <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>Buka Instagram</span>
+          </a>
+        </div>
+      ) : null}
 
       {feedback ? (
         <p

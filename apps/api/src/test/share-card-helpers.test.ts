@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { cardAspectSchema } from "@starter/shared/validators/social";
 import {
   MAX_PUBLIC_QUOTE_CHARS,
   buildQuoteShareCaption,
@@ -13,6 +14,7 @@ import {
   resolveQuoteCardViewModel,
   resolveSafeInAppSessionTemplate,
   resolveSessionCardViewModel,
+  sanitizeShareFilename,
   shareTempoLabel,
   suggestSessionTitle,
 } from "../../../web/src/features/share/card-helpers";
@@ -342,5 +344,12 @@ describe("Share Card Helpers (Issue #13)", () => {
     });
     expect(allHiddenVm.template).toBe("literary_index");
     expect(allHiddenVm.metrics).toEqual([]);
+  });
+
+  it("supports 4:3 landscape card aspect ratio in Zod validator and share filenames", () => {
+    expect(cardAspectSchema.safeParse("4:3").success).toBe(true);
+    expect(sanitizeShareFilename("session", "Kematian Kedua", "4:3")).toBe(
+      "anzabook-session-kematian-kedua-4x3.png",
+    );
   });
 });

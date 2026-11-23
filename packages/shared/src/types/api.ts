@@ -49,7 +49,7 @@ export type QuoteTemplate =
 export type SessionTemplate =
   "cover_trail" | "photo_overlay" | "transparent_sticker" | "literary_index";
 
-export type CardAspect = "square" | "story";
+export type CardAspect = "square" | "story" | "4:3";
 
 export type QuotePostConfig = {
   template: QuoteTemplate;

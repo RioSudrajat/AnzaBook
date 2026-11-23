@@ -17,6 +17,8 @@ test("larger type reflows the book and a corner drag turns the spread", async ({
   await expect(leaves).toHaveCount(2);
   const opening = leaves.first().locator("p").first();
   await expect(opening).toContainText("Selama berabad-abad");
+  await expect(opening).toHaveCSS("text-align", "justify");
+  expect(await leaves.locator("p").count()).toBeGreaterThan(1);
 
   const settings = page.getByRole("button", {
     name: "Pengaturan Tipografi dan Tampilan",
@@ -57,7 +59,7 @@ test("larger type reflows the book and a corner drag turns the spread", async ({
   await expect(page.locator("[data-reader-fold]")).toBeVisible();
   const arriving = await leaves.first().innerText();
   const reverse = page.locator("[data-reader-fold-back] .reader-leaf");
-  await expect(reverse).toHaveText(arriving);
+  await expect(reverse).toHaveText(arriving, { useInnerText: true });
   const heldTransform = await reverse.evaluate(
     (leaf) => getComputedStyle(leaf.parentElement!).transform,
   );
@@ -72,7 +74,7 @@ test("larger type reflows the book and a corner drag turns the spread", async ({
     .not.toBe(heldTransform);
   await page.mouse.up();
   await expect(counter).toHaveText(/^Page 2 of \d+$/);
-  await expect(leaves.first()).toHaveText(arriving);
+  await expect(leaves.first()).toHaveText(arriving, { useInnerText: true });
   await expect(leaves.first()).toHaveCSS(
     "background-color",
     "rgb(250, 246, 238)",
@@ -94,7 +96,9 @@ test("larger type reflows the book and a corner drag turns the spread", async ({
   await page.mouse.move(mobileX, mobileY);
   await page.mouse.down();
   await page.mouse.move(mobileX - 55, mobileY - 20, { steps: 4 });
-  await expect(reverse).toHaveText(await leaves.first().innerText());
+  await expect(reverse).toHaveText(await leaves.first().innerText(), {
+    useInnerText: true,
+  });
   await page.mouse.up();
   await expect(reverse).toHaveCount(0);
   await expect(counter).toHaveText(reflowed);
@@ -134,6 +138,8 @@ test("book sharing uses a public catalog link with a server-rendered PNG preview
     "href",
     /wa\.me/,
   );
+  await expect(dialog.getByRole("button", { name: "IG Story" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Unduh PNG" })).toBeVisible();
   await expect
     .poll(() =>
       dialog
@@ -143,4 +149,20 @@ test("book sharing uses a public catalog link with a server-rendered PNG preview
     .toBe(1200);
   await page.keyboard.press("Escape");
   await expect(share).toBeFocused();
+
+  await page.goto(`/books/${slug}`);
+  const detailShare = page
+    .getByRole("button", { name: "Bagikan Buku" })
+    .first();
+  await expect(detailShare).toBeVisible();
+  await detailShare.click();
+  const detailDialog = page.getByRole("dialog", { name: "Bagikan buku" });
+  await expect(detailDialog).toBeVisible();
+  await expect(
+    detailDialog.getByRole("button", { name: "IG Story" }),
+  ).toBeVisible();
+  await expect(
+    detailDialog.getByRole("textbox", { name: "Tautan buku" }),
+  ).toHaveValue(`${new URL(page.url()).origin}/books/${slug}`);
+  await page.keyboard.press("Escape");
 });

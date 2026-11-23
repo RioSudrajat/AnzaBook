@@ -1,5 +1,6 @@
 import { classifyReadingTempo } from "@starter/shared/reading-progress";
 import type {
+  CardAspect,
   ExplorePostItemDto,
   QuotePostConfig,
   QuoteTemplate,
@@ -601,4 +602,19 @@ export function resolveSessionCardViewModel(
     },
     palette: deriveAdaptiveCoverPalette(post.book.coverColor),
   };
+}
+
+export function sanitizeShareFilename(
+  prefix: string,
+  title: string,
+  aspect: CardAspect,
+): string {
+  const cleanTitle = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 42);
+  const ratioTag =
+    aspect === "story" ? "9x16" : aspect === "4:3" ? "4x3" : "1x1";
+  return `anzabook-${prefix}-${cleanTitle || "kartu"}-${ratioTag}.png`;
 }

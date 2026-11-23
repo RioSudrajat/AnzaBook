@@ -1,20 +1,6 @@
-import type { CardAspect } from "@starter/shared/types";
+export { sanitizeShareFilename } from "./card-helpers";
 
 export type NativeShareResult = "shared" | "cancelled" | "unsupported";
-
-export function sanitizeShareFilename(
-  prefix: string,
-  title: string,
-  aspect: CardAspect,
-): string {
-  const cleanTitle = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 42);
-  const ratioTag = aspect === "story" ? "9x16" : "1x1";
-  return `anzabook-${prefix}-${cleanTitle || "kartu"}-${ratioTag}.png`;
-}
 
 export async function canvasToPngBlob(
   canvas: HTMLCanvasElement,

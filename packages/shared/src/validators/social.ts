@@ -127,7 +127,7 @@ export const sessionTemplateSchema = z.enum([
   "literary_index",
 ]);
 
-export const cardAspectSchema = z.enum(["square", "story"]);
+export const cardAspectSchema = z.enum(["square", "story", "4:3"]);
 
 export const quotePostConfigSchema = z
   .object({

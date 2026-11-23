@@ -5,9 +5,9 @@ import {
   ExternalLink,
   Loader2,
   MessageCircle,
-  Share2,
   X,
 } from "lucide-react";
+import { InstagramIcon } from "./instagram-icon";
 import type {
   CardAspect,
   ExplorePostItemDto,
@@ -65,6 +65,7 @@ function PostShareDialogContent({
   );
   const [isExporting, setIsExporting] = useState(false);
   const [exportFeedback, setExportFeedback] = useState<string | null>(null);
+  const [showInstagramGuide, setShowInstagramGuide] = useState(false);
   const activeRunRef = useRef(0);
 
   const isQuote = post.type === "quote";
@@ -234,15 +235,18 @@ function PostShareDialogContent({
         if (activeRunRef.current !== runId) return;
         if (result === "unsupported") {
           await downloadCanvasPng(canvas, filename);
+          setShowInstagramGuide(true);
           setExportFeedback(
-            "Perangkat belum mendukung Share langsung — kartu diunduh sebagai PNG.",
+            "Kartu PNG 1080p diunduh. Klik Buka Instagram di bawah (atau buka di HP untuk kirim langsung ke IG Story).",
           );
         } else if (result === "shared") {
-          setExportFeedback("Kartu berhasil dibagikan.");
+          setShowInstagramGuide(false);
+          setExportFeedback("Kartu berhasil dikirim ke lembar bagikan.");
         }
       } else {
         await downloadCanvasPng(canvas, filename);
         if (activeRunRef.current !== runId) return;
+        setShowInstagramGuide(false);
         setExportFeedback("Kartu PNG 1080p berhasil diunduh.");
       }
     } catch {
@@ -315,29 +319,27 @@ function PostShareDialogContent({
             <p className="text-xs font-mono uppercase tracking-[0.08em] text-[var(--color-muted)]">
               Rasio Kartu Gambar (1080p PNG)
             </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setAspect("story")}
-                className={`min-h-11 rounded-lg border px-3 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] cursor-pointer ${
-                  aspect === "story"
-                    ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-ink)] font-semibold"
-                    : "border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-muted)] hover:text-[var(--color-ink)]"
-                }`}
-              >
-                9:16 IG / WA Story
-              </button>
-              <button
-                type="button"
-                onClick={() => setAspect("square")}
-                className={`min-h-11 rounded-lg border px-3 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] cursor-pointer ${
-                  aspect === "square"
-                    ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-ink)] font-semibold"
-                    : "border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-muted)] hover:text-[var(--color-ink)]"
-                }`}
-              >
-                1:1 Feed / X
-              </button>
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  { id: "story", label: "9:16 Story" },
+                  { id: "square", label: "1:1 Feed" },
+                  { id: "4:3", label: "4:3 Slide" },
+                ] as const
+              ).map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setAspect(item.id)}
+                  className={`min-h-11 rounded-lg border px-2 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] cursor-pointer ${
+                    aspect === item.id
+                      ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-ink)] font-semibold"
+                      : "border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-muted)] hover:text-[var(--color-ink)]"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
             </div>
           </div>
         )}
@@ -360,16 +362,41 @@ function PostShareDialogContent({
             </button>
           )}
 
-          {canShareNative && (isQuote || isSession) && (
+          {(isQuote || isSession) && (
             <button
               type="button"
               onClick={() => void handleExport("native")}
               disabled={isExporting}
               className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-4 text-sm font-medium text-[var(--color-ink)] hover:bg-[var(--color-paper)] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:opacity-60 cursor-pointer"
             >
-              <Share2 className="size-4" aria-hidden="true" />
-              <span>Bagikan ke IG Story / Aplikasi Lain</span>
+              <InstagramIcon
+                className="size-4 text-[var(--color-accent)]"
+                aria-hidden="true"
+              />
+              <span>
+                {canShareNative
+                  ? "Bagikan ke IG Story / Aplikasi Lain"
+                  : "Bagikan ke IG Story"}
+              </span>
             </button>
+          )}
+
+          {showInstagramGuide && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--color-accent)]/35 bg-[var(--color-paper-2)] px-3 py-2.5 text-xs text-[var(--color-ink-2)]">
+              <span className="min-w-0 flex-1">
+                PNG sudah diunduh. Unggah lewat Instagram atau buka di HP untuk
+                kirim langsung ke IG Story.
+              </span>
+              <a
+                href="https://www.instagram.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-md bg-[var(--color-accent)] px-3 text-xs font-semibold text-[var(--color-accent-ink)] hover:brightness-95"
+              >
+                <ExternalLink className="size-3.5" aria-hidden="true" />
+                <span>Buka Instagram</span>
+              </a>
+            </div>
           )}
 
           <a
