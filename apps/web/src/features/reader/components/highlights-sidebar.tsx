@@ -189,7 +189,7 @@ export function HighlightsSidebar({
                         className={`h-7 px-2.5 text-[11px] font-mono gap-1.5 border rounded-[6px] ${
                           h.isPosted
                             ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-300 font-semibold hover:bg-emerald-950/60"
-                            : "bg-white/10 hover:bg-[var(--color-accent)] hover:text-[#13110F] text-white/90 border-white/10"
+                            : "bg-white/10 hover:bg-[var(--color-accent)] hover:text-[var(--color-accent-ink)] text-white/90 border-white/10"
                         }`}
                         title="Buka composer untuk bagikan kartu atau post kutipan ke feed"
                       >

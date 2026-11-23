@@ -2,6 +2,7 @@ import type {
   ReadingSessionDto,
   SessionPostConfig,
 } from "@starter/shared/types";
+import type { ReaderTheme } from "@/features/reader/components/reader-toolbar";
 import {
   SessionPostComposerDialog,
   type SessionComposerTarget,
@@ -21,6 +22,7 @@ export type FlexReadingDialogProps = {
     endedAt?: string | null;
   }>;
   isOpen: boolean;
+  theme?: ReaderTheme;
   onClose: () => void;
   userName?: string;
   onPublishedChange?: (result: {
@@ -42,6 +44,7 @@ export function FlexReadingDialog({
   streakDays,
   recentSessions,
   isOpen,
+  theme,
   onClose,
   userName = "Pembaca AnzaBook",
   onPublishedChange,
@@ -76,6 +79,7 @@ export function FlexReadingDialog({
   return (
     <SessionPostComposerDialog
       isOpen={isOpen}
+      theme={theme}
       onClose={onClose}
       target={target}
       readerName={userName}

@@ -90,7 +90,7 @@ test("Post-Reading Exit Prompt skips immediate exit and shows real metrics after
   expect(detail.ok()).toBeTruthy();
   const { data: book } = await detail.json();
 
-  // 1. Immediate exit (< 15s and no forward progress) navigates straight home without modal.
+  // 1. Immediate exit (< 15s and no forward progress) navigates straight home without modal or session record.
   await page.goto(`/read/${slug}`);
   await expect(page.locator("#chapter-sec-1")).toBeVisible();
   await page.getByRole("button", { name: "Keluar ke Home" }).click();
@@ -98,6 +98,13 @@ test("Post-Reading Exit Prompt skips immediate exit and shows real metrics after
     page.getByRole("dialog", { name: "Ringkasan Sesi Baca" }),
   ).toHaveCount(0);
   await expect(page).toHaveURL(/\/app/);
+
+  const immediateSessionsRes = await page.request.get(
+    `${API_URL}/api/reading/sessions/${book.id}`,
+  );
+  expect(immediateSessionsRes.ok()).toBeTruthy();
+  const { data: immediateSessions } = await immediateSessionsRes.json();
+  expect(immediateSessions).toHaveLength(0);
 
   // 2. Forward progress into chapter 2 triggers the exit sheet with real telemetry.
   await page.goto(`/read/${slug}`);
@@ -139,7 +146,7 @@ test("Post-Reading Exit Prompt skips immediate exit and shows real metrics after
   );
   expect(sessionsRes.ok()).toBeTruthy();
   const { data: sessions } = await sessionsRes.json();
-  expect(sessions.length).toBeGreaterThanOrEqual(2);
+  expect(sessions).toHaveLength(2);
   expect(sessions[0]).toMatchObject({
     endChapterNumber: 2,
     isPosted: false,

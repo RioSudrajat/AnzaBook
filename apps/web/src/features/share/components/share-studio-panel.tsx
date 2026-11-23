@@ -69,25 +69,27 @@ export function ShareStudioPanel({
     if (!canvas) return;
     let cancelled = false;
 
-    void renderSessionCardToCanvas(canvas, {
-      title: effectiveTitle,
-      bookTitle: fallbackBookTitle,
-      bookCoverUrl: latestSession.bookCoverUrl,
-      durationSec: latestSession.durationSeconds,
-      pagesRead: latestSession.pagesRead,
-      avgWpm: latestSession.avgWpm,
-      startChapterNumber: latestSession.startChapterNumber,
-      endChapterNumber: latestSession.endChapterNumber,
-      startProgressPercent: latestSession.startProgressPercent,
-      endProgressPercent: latestSession.endProgressPercent,
-      note: latestSession.note,
-      photoUrl: localPhotoUrl,
-      recentSessions,
-      readerName: userName,
-      config,
-    }).then(() => {
-      if (cancelled) return;
-    });
+    void renderSessionCardToCanvas(
+      canvas,
+      {
+        title: effectiveTitle,
+        bookTitle: fallbackBookTitle,
+        bookCoverUrl: latestSession.bookCoverUrl,
+        durationSec: latestSession.durationSeconds,
+        pagesRead: latestSession.pagesRead,
+        avgWpm: latestSession.avgWpm,
+        startChapterNumber: latestSession.startChapterNumber,
+        endChapterNumber: latestSession.endChapterNumber,
+        startProgressPercent: latestSession.startProgressPercent,
+        endProgressPercent: latestSession.endProgressPercent,
+        note: latestSession.note,
+        photoUrl: localPhotoUrl,
+        recentSessions,
+        readerName: userName,
+        config,
+      },
+      { isCancelled: () => cancelled },
+    );
 
     return () => {
       cancelled = true;
@@ -108,7 +110,7 @@ export function ShareStudioPanel({
         <p className="font-serif text-base font-semibold text-[var(--color-ink)]">
           Belum ada sesi membaca yang siap dibuat kartu
         </p>
-        <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
+        <p className="mt-1 text-sm text-[var(--color-muted)]">
           Selesaikan minimal satu sesi membaca di reader AnzaBook agar statistik
           nyata muncul di studio ini.
         </p>
@@ -129,7 +131,7 @@ export function ShareStudioPanel({
   const shareText = buildSessionShareCaption({
     title: effectiveTitle,
     bookTitle: fallbackBookTitle,
-    durationSec: config.showDuration ? latestSession.durationSeconds : 0,
+    durationSec: config.showDuration ? latestSession.durationSeconds : null,
     pagesRead: config.showPages ? latestSession.pagesRead : undefined,
     tempoLabel: config.showWpm ? shareTempoLabel(latestSession.avgWpm) : null,
     note: latestSession.note,
@@ -163,7 +165,7 @@ export function ShareStudioPanel({
               className={`min-h-11 rounded-lg border px-3 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] ${
                 config.template === tpl.id
                   ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-ink)]"
-                  : "border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-soft)] hover:bg-[var(--color-paper-3)]"
+                  : "border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-2)] hover:bg-[var(--color-paper-3)]"
               }`}
             >
               {tpl.label}
@@ -187,7 +189,7 @@ export function ShareStudioPanel({
               className={`min-h-11 rounded-lg border px-3 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] ${
                 config.aspect === ratio.id
                   ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-ink)]"
-                  : "border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-soft)] hover:bg-[var(--color-paper-3)]"
+                  : "border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-2)] hover:bg-[var(--color-paper-3)]"
               }`}
             >
               {ratio.label}
@@ -223,7 +225,7 @@ export function ShareStudioPanel({
                 type="button"
                 aria-label="Hapus foto latar"
                 onClick={() => setLocalPhotoUrl(null)}
-                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-soft)] hover:bg-[var(--color-paper-3)]"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-2)] hover:bg-[var(--color-paper-3)]"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -234,7 +236,7 @@ export function ShareStudioPanel({
         <div className="flex flex-col gap-1.5">
           <label
             htmlFor={titleInputId}
-            className="text-xs font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]"
+            className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]"
           >
             Judul Kartu
           </label>
@@ -245,7 +247,7 @@ export function ShareStudioPanel({
             value={customTitle}
             onChange={(e) => setCustomTitle(e.target.value)}
             placeholder={effectiveTitle}
-            className="min-h-11 w-full rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-3.5 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:border-[var(--color-accent)] focus:outline-none"
+            className="min-h-11 w-full rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-3.5 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-muted)] focus:border-[var(--color-accent)] focus:outline-none"
           />
         </div>
 

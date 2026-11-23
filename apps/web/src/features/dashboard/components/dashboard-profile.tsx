@@ -44,6 +44,8 @@ import {
 } from "@/features/social/hooks";
 import { useAllHighlights } from "@/features/books/hooks";
 import { BookCover } from "@/features/books/components/book-cover";
+import { HighlightStoryDialog } from "@/features/reader/components/highlight-story-dialog";
+import { FlexReadingDialog } from "@/features/share/components/flex-reading-dialog";
 import { SocialRelationsDialog } from "@/features/social/components/social-relations-dialog";
 import { EditProfileView } from "./edit-profile-view";
 import {
@@ -171,6 +173,29 @@ function DashboardProfileContent({
     isOpen: false,
     initialTab: "followers",
   });
+
+  const [internalSessionTarget, setInternalSessionTarget] =
+    useState<ReadingSessionDto | null>(null);
+  const [internalQuoteTarget, setInternalQuoteTarget] =
+    useState<BookHighlightDto | null>(null);
+
+  const resolveBookMeta = (
+    bookId?: string | null,
+    fallbackTitle?: string | null,
+    fallbackCoverUrl?: string | null,
+  ) => {
+    const matched = bookId
+      ? (shelves.find((item) => item.bookId === bookId)?.book ?? null)
+      : null;
+
+    return {
+      title: matched?.title || fallbackTitle?.trim() || "AnzaBook",
+      author: matched?.author ?? null,
+      slug: matched?.slug ?? null,
+      coverUrl: matched?.coverUrl ?? fallbackCoverUrl ?? null,
+      coverColor: matched?.coverColor ?? null,
+    };
+  };
 
   // E-Reader Studio & Modal states
   const [fallbackTimestamp] = useState(() => Date.now());
@@ -929,18 +954,22 @@ function DashboardProfileContent({
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
-                        {isOwnProfile && onOpenFlexStory && (
+                        {isOwnProfile && (
                           <Button
                             type="button"
                             size="sm"
                             variant={session.isPosted ? "outline" : "default"}
-                            onClick={() =>
-                              onOpenFlexStory(session, session.bookTitle)
-                            }
+                            onClick={() => {
+                              if (onOpenFlexStory) {
+                                onOpenFlexStory(session, session.bookTitle);
+                                return;
+                              }
+                              setInternalSessionTarget(session);
+                            }}
                             className={`text-xs min-h-11 px-3.5 inline-flex items-center gap-1.5 cursor-pointer shrink-0 ${
                               session.isPosted
                                 ? "border-emerald-600/30 text-emerald-700 dark:text-emerald-400 bg-emerald-500/10"
-                                : "bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[#13110F] font-semibold"
+                                : "bg-[var(--color-accent)] hover:brightness-95 text-[var(--color-accent-ink)] font-semibold"
                             }`}
                           >
                             <Share2 className="size-3.5" />
@@ -998,16 +1027,22 @@ function DashboardProfileContent({
                         {hl.bookTitle ? `${hl.bookTitle} · ` : ""}Bab{" "}
                         {hl.chapterNumber} · Halaman {hl.pageNumber}
                       </span>
-                      {isOwnProfile && onOpenQuoteStory && (
+                      {isOwnProfile && (
                         <Button
                           type="button"
                           size="sm"
                           variant={hl.isPosted ? "outline" : "default"}
-                          onClick={() => onOpenQuoteStory(hl)}
+                          onClick={() => {
+                            if (onOpenQuoteStory) {
+                              onOpenQuoteStory(hl);
+                              return;
+                            }
+                            setInternalQuoteTarget(hl);
+                          }}
                           className={`text-xs min-h-11 px-3.5 inline-flex items-center gap-1.5 cursor-pointer ${
                             hl.isPosted
                               ? "border-emerald-600/30 text-emerald-700 dark:text-emerald-400 bg-emerald-500/10"
-                              : "bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[#13110F] font-semibold"
+                              : "bg-[var(--color-accent)] hover:brightness-95 text-[var(--color-accent-ink)] font-semibold"
                           }`}
                         >
                           <Share2 className="size-3.5" />
@@ -1621,6 +1656,64 @@ function DashboardProfileContent({
         initialTab={relationsDialogState.initialTab}
         currentUserId={myProfile?.id}
       />
+
+      {!onOpenFlexStory &&
+        internalSessionTarget &&
+        (() => {
+          const sessionMeta = resolveBookMeta(
+            internalSessionTarget.bookId,
+            internalSessionTarget.bookTitle,
+            internalSessionTarget.bookCoverUrl,
+          );
+          return (
+            <FlexReadingDialog
+              isOpen={Boolean(internalSessionTarget)}
+              onClose={() => setInternalSessionTarget(null)}
+              session={internalSessionTarget}
+              bookTitle={sessionMeta.title}
+              bookAuthor={sessionMeta.author}
+              bookSlug={sessionMeta.slug}
+              bookCoverUrl={sessionMeta.coverUrl}
+              bookCoverColor={sessionMeta.coverColor}
+              streakDays={telemetrySummary?.currentStreakDays ?? null}
+              recentSessions={sessions}
+              userName={profile?.name || "Pembaca AnzaBook"}
+            />
+          );
+        })()}
+
+      {!onOpenQuoteStory &&
+        internalQuoteTarget &&
+        (() => {
+          const quoteMeta = resolveBookMeta(
+            internalQuoteTarget.bookId,
+            internalQuoteTarget.bookTitle,
+            internalQuoteTarget.bookCoverUrl,
+          );
+          return (
+            <HighlightStoryDialog
+              isOpen={Boolean(internalQuoteTarget)}
+              onClose={() => setInternalQuoteTarget(null)}
+              highlightId={internalQuoteTarget.id}
+              bookTitle={quoteMeta.title}
+              bookAuthor={quoteMeta.author}
+              bookSlug={quoteMeta.slug}
+              bookCoverUrl={
+                internalQuoteTarget.bookCoverUrl ?? quoteMeta.coverUrl
+              }
+              bookCoverColor={quoteMeta.coverColor}
+              chapterNumber={internalQuoteTarget.chapterNumber}
+              pageNumber={internalQuoteTarget.pageNumber}
+              highlightText={internalQuoteTarget.selectedText}
+              color={internalQuoteTarget.color}
+              note={internalQuoteTarget.note || undefined}
+              isPosted={internalQuoteTarget.isPosted}
+              postCaption={internalQuoteTarget.postCaption}
+              postConfig={internalQuoteTarget.postConfig}
+              readerName={profile?.name || "Pembaca AnzaBook"}
+            />
+          );
+        })()}
     </div>
   );
 }

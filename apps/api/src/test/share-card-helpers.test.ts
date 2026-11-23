@@ -145,7 +145,7 @@ describe("Share Card Helpers (Issue #13)", () => {
         isPosted: false,
         bookSlug: null,
       }),
-    ).toBe("https://anzabook.id/explore");
+    ).toBe("https://anzabook.id/app?tab=explore");
 
     const wa = buildWhatsAppShareUrl("Halo AnzaBook");
     expect(wa).toBe("https://api.whatsapp.com/send?text=Halo%20AnzaBook");
@@ -180,6 +180,29 @@ describe("Share Card Helpers (Issue #13)", () => {
     expect(sessionCap).toContain("30 mnt");
     expect(sessionCap).toContain("14 hlm");
     expect(sessionCap).toContain("Mengalir");
+
+    const hiddenDurationCap = buildSessionShareCaption({
+      title: "Baca Malam · Bumi Manusia",
+      bookTitle: "Bumi Manusia",
+      durationSec: null,
+      pagesRead: 14,
+      tempoLabel: null,
+      shareUrl: "https://anzabook.id/post/session/2",
+    });
+    expect(hiddenDurationCap).not.toContain("0 dtk");
+    expect(hiddenDurationCap).toContain("Bumi Manusia · 14 hlm");
+
+    const hiddenAllCap = buildSessionShareCaption({
+      title: "Baca Malam · Bumi Manusia",
+      bookTitle: "Bumi Manusia",
+      durationSec: 0,
+      pagesRead: 0,
+      tempoLabel: "",
+      shareUrl: "https://anzabook.id/post/session/2",
+    });
+    expect(hiddenAllCap).not.toContain("0 dtk");
+    expect(hiddenAllCap).not.toContain("Bumi Manusia ·");
+    expect(hiddenAllCap).toContain("\n\nBumi Manusia\n\n");
   });
 
   it("extracts real surrounding passage context and returns null when absent", () => {

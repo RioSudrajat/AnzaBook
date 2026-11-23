@@ -107,6 +107,10 @@ export type SessionCardRenderInput = {
   config: SessionPostConfig;
 };
 
+export type CardRenderOptions = {
+  isCancelled?: () => boolean;
+};
+
 export async function ensureCanvasFontsReady(): Promise<void> {
   if (typeof document === "undefined" || !("fonts" in document)) return;
   try {
@@ -507,15 +511,19 @@ function buildQuoteLocationLabel(
 export async function renderQuoteCardToCanvas(
   canvas: HTMLCanvasElement,
   input: QuoteCardRenderInput,
+  options?: CardRenderOptions,
 ): Promise<void> {
+  await ensureCanvasFontsReady();
+  if (options?.isCancelled?.()) return;
+
+  const coverImg = await loadCanvasImage(input.bookCoverUrl);
+  if (options?.isCancelled?.()) return;
+
   const { width, height } = CARD_DIMENSIONS[input.config.aspect];
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
-
-  await ensureCanvasFontsReady();
-  const coverImg = await loadCanvasImage(input.bookCoverUrl);
 
   const isStory = input.config.aspect === "story";
   const align = input.config.alignment;
@@ -1112,20 +1120,24 @@ function collectVisibleSessionMetrics(
 export async function renderSessionCardToCanvas(
   canvas: HTMLCanvasElement,
   input: SessionCardRenderInput,
+  options?: CardRenderOptions,
 ): Promise<void> {
-  const { width, height } = CARD_DIMENSIONS[input.config.aspect];
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-
   await ensureCanvasFontsReady();
+  if (options?.isCancelled?.()) return;
+
   const [coverImg, photoImg] = await Promise.all([
     loadCanvasImage(input.bookCoverUrl),
     input.config.template === "photo_overlay"
       ? loadCanvasImage(input.photoUrl)
       : Promise.resolve(null),
   ]);
+  if (options?.isCancelled?.()) return;
+
+  const { width, height } = CARD_DIMENSIONS[input.config.aspect];
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
 
   const isStory = input.config.aspect === "story";
   const padX = 88;

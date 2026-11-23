@@ -246,7 +246,7 @@ export function buildSharePostUrl(params: {
     return `${cleanOrigin}/books/${encodeURIComponent(cleanSlug)}`;
   }
 
-  return `${cleanOrigin}/explore`;
+  return `${cleanOrigin}/app?tab=explore`;
 }
 
 export function buildWhatsAppShareUrl(text: string): string {
@@ -285,13 +285,20 @@ export function buildQuoteShareCaption(params: {
 export function buildSessionShareCaption(params: {
   title: string;
   bookTitle: string;
-  durationSec: number;
+  durationSec?: number | null;
   pagesRead?: number;
   tempoLabel?: string | null;
   note?: string | null;
   shareUrl: string;
 }): string {
-  const metrics: string[] = [formatShareDuration(params.durationSec)];
+  const metrics: string[] = [];
+  if (
+    params.durationSec != null &&
+    Number.isFinite(params.durationSec) &&
+    params.durationSec > 0
+  ) {
+    metrics.push(formatShareDuration(params.durationSec));
+  }
   if (params.pagesRead && params.pagesRead > 0) {
     metrics.push(`${params.pagesRead} hlm`);
   }
@@ -299,10 +306,12 @@ export function buildSessionShareCaption(params: {
     metrics.push(`Ritme ${params.tempoLabel.trim()}`);
   }
 
-  const lines = [
-    params.title.trim(),
-    `${params.bookTitle.trim()} · ${metrics.join(" · ")}`,
-  ];
+  const bookSummaryLine =
+    metrics.length > 0
+      ? `${params.bookTitle.trim()} · ${metrics.join(" · ")}`
+      : params.bookTitle.trim();
+
+  const lines = [params.title.trim(), bookSummaryLine];
 
   if (params.note?.trim()) {
     lines.push(params.note.trim());

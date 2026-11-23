@@ -1,4 +1,5 @@
 import type { HighlightColor, QuotePostConfig } from "@starter/shared/types";
+import type { ReaderTheme } from "./reader-toolbar";
 import {
   QuotePostComposerDialog,
   type QuoteComposerTarget,
@@ -6,6 +7,7 @@ import {
 
 export type HighlightStoryDialogProps = {
   isOpen: boolean;
+  theme?: ReaderTheme;
   onClose: () => void;
   highlightId?: string | null;
   bookTitle: string;
@@ -33,6 +35,7 @@ export type HighlightStoryDialogProps = {
 
 export function HighlightStoryDialog({
   isOpen,
+  theme,
   onClose,
   highlightId,
   bookTitle,
@@ -75,6 +78,7 @@ export function HighlightStoryDialog({
   return (
     <QuotePostComposerDialog
       isOpen={isOpen}
+      theme={theme}
       onClose={onClose}
       target={target}
       readerName={readerName}

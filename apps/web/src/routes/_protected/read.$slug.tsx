@@ -1881,6 +1881,17 @@ function ReaderBook() {
         ...input,
       });
       setIsSessionPosted(updated.isPosted);
+      setCreatedSession((prev) =>
+        prev && prev.id === updated.id
+          ? {
+              ...prev,
+              isPosted: updated.isPosted,
+              title: updated.title,
+              note: updated.note,
+              postConfig: updated.postConfig,
+            }
+          : prev,
+      );
     } catch (err) {
       setPostSessionError(
         err instanceof Error

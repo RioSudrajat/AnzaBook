@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Check, Copy, Download, Share2, MessageCircle, X } from "lucide-react";
 import type { CardAspect } from "@starter/shared/types";
+import type { ReaderTheme } from "@/features/reader/components/reader-toolbar";
 import { buildWhatsAppShareUrl } from "../card-helpers";
 import {
   copyTextToClipboard,
@@ -14,6 +15,7 @@ type ComposerDialogShellProps = {
   onClose: () => void;
   title: string;
   subtitle?: string;
+  theme?: ReaderTheme;
   preview: ReactNode;
   controls: ReactNode;
 };
@@ -23,11 +25,17 @@ export function ComposerDialogShell({
   onClose,
   title,
   subtitle,
+  theme,
   preview,
   controls,
 }: ComposerDialogShellProps) {
   const dialogRef = useRef<HTMLDialogElement | null>(null);
+  const onCloseRef = useRef(onClose);
   const titleId = useId();
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -45,21 +53,51 @@ export function ComposerDialogShell({
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const isOutside = (e: PointerEvent) => {
+      const rect = dialog.getBoundingClientRect();
+      return (
+        e.clientX < rect.left ||
+        e.clientX > rect.right ||
+        e.clientY < rect.top ||
+        e.clientY > rect.bottom
+      );
+    };
+
+    let pressedOutside = false;
+    const handlePointerDown = (e: PointerEvent) => {
+      if (!dialog.open) return;
+      pressedOutside = isOutside(e);
+    };
+    const handlePointerUp = (e: PointerEvent) => {
+      if (dialog.open && pressedOutside && isOutside(e)) {
+        onCloseRef.current();
+      }
+      pressedOutside = false;
+    };
+
+    dialog.addEventListener("pointerdown", handlePointerDown);
+    dialog.addEventListener("pointerup", handlePointerUp);
+    return () => {
+      dialog.removeEventListener("pointerdown", handlePointerDown);
+      dialog.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, []);
+
   return (
     <dialog
       ref={dialogRef}
-      closedby="any"
+      {...({ closedby: "any" } as Record<string, string>)}
+      data-theme={theme}
       aria-labelledby={titleId}
       onCancel={(e) => {
         e.preventDefault();
         onClose();
       }}
-      onClick={(e) => {
-        if (e.target === dialogRef.current) {
-          onClose();
-        }
-      }}
-      className="m-auto w-[min(1040px,calc(100vw-24px))] max-h-[calc(100dvh-24px)] overflow-y-auto overflow-x-hidden rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-0 text-[var(--color-ink)] shadow-2xl open:flex open:flex-col"
+      className="m-auto w-[min(1040px,calc(100vw-24px))] max-h-[calc(100dvh-24px)] overflow-y-auto overflow-x-hidden rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-0 text-[var(--color-ink)] shadow-2xl backdrop:bg-[rgb(19_17_15_/_0.58)] backdrop:backdrop-blur-xs open:flex open:flex-col"
     >
       <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[var(--color-rule)] bg-[var(--color-paper-2)] px-4 py-3 sm:px-6 sm:py-4">
         <div className="min-w-0">
@@ -70,7 +108,7 @@ export function ComposerDialogShell({
             {title}
           </h2>
           {subtitle ? (
-            <p className="truncate text-xs text-[var(--color-ink-muted)] sm:text-sm">
+            <p className="truncate text-xs text-[var(--color-muted)] sm:text-sm">
               {subtitle}
             </p>
           ) : null}
@@ -79,7 +117,7 @@ export function ComposerDialogShell({
           type="button"
           onClick={onClose}
           aria-label="Tutup dialog"
-          className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-soft)] transition-colors hover:bg-[var(--color-paper-3)] hover:text-[var(--color-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+          className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-2)] transition-colors hover:bg-[var(--color-paper-3)] hover:text-[var(--color-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
         >
           <X className="h-5 w-5" />
         </button>
@@ -129,7 +167,7 @@ export function CanvasPreviewFrame({
       >
         {children}
       </div>
-      <p className="font-mono text-[11px] uppercase tracking-wider text-[var(--color-ink-muted)]">
+      <p className="font-mono text-[11px] uppercase tracking-wider text-[var(--color-muted)]">
         {aspect === "story"
           ? "Kanvas 1080 × 1920 px (9:16)"
           : "Kanvas 1080 × 1080 px (1:1)"}
@@ -238,7 +276,7 @@ export function ComposerShareBar({
 
   return (
     <div className="flex flex-col gap-2.5 border-t border-[var(--color-rule)] pt-4">
-      <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+      <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
         Bagikan ke Luar & Ekspor 1080p
       </p>
 
@@ -291,7 +329,7 @@ export function ComposerShareBar({
         <p
           role="status"
           aria-live="polite"
-          className="text-xs font-medium text-[var(--color-ink-soft)]"
+          className="text-xs font-medium text-[var(--color-ink-2)]"
         >
           {feedback}
         </p>

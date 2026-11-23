@@ -13,6 +13,7 @@ import type {
   QuoteTemplate,
 } from "@starter/shared/types";
 import { useTogglePostHighlight } from "@/features/social/hooks";
+import type { ReaderTheme } from "@/features/reader/components/reader-toolbar";
 import {
   buildQuoteShareCaption,
   buildSharePostUrl,
@@ -45,6 +46,7 @@ export type QuoteComposerTarget = {
 
 export type QuotePostComposerDialogProps = {
   isOpen: boolean;
+  theme?: ReaderTheme;
   onClose: () => void;
   target: QuoteComposerTarget | null;
   readerName: string;
@@ -76,6 +78,7 @@ const DEFAULT_QUOTE_CONFIG: QuotePostConfig = {
 
 export function QuotePostComposerDialog({
   isOpen,
+  theme,
   onClose,
   target,
   readerName,
@@ -88,6 +91,7 @@ export function QuotePostComposerDialog({
     return (
       <ComposerDialogShell
         isOpen={isOpen}
+        theme={theme}
         onClose={onClose}
         title="Bagikan & Post Kutipan"
         preview={null}
@@ -100,6 +104,7 @@ export function QuotePostComposerDialog({
     <QuotePostComposerInner
       key={`${target.id ?? "draft"}-${isOpen ? "open" : "closed"}-${target.selectedText.slice(0, 24)}`}
       isOpen={isOpen}
+      theme={theme}
       onClose={onClose}
       target={target}
       readerName={readerName}
@@ -116,6 +121,7 @@ export function QuotePostComposerDialog({
 
 type QuotePostComposerInnerProps = {
   isOpen: boolean;
+  theme?: ReaderTheme;
   onClose: () => void;
   target: QuoteComposerTarget;
   readerName: string;
@@ -127,6 +133,7 @@ type QuotePostComposerInnerProps = {
 
 function QuotePostComposerInner({
   isOpen,
+  theme,
   onClose,
   target,
   readerName,
@@ -171,22 +178,24 @@ function QuotePostComposerInner({
     if (!canvas) return;
     let cancelled = false;
 
-    void renderQuoteCardToCanvas(canvas, {
-      quote: target.selectedText,
-      bookTitle: target.bookTitle,
-      bookAuthor: target.bookAuthor,
-      bookCoverUrl: target.bookCoverUrl,
-      bookCoverColor: target.bookCoverColor,
-      chapterNumber: target.chapterNumber,
-      pageNumber: target.pageNumber,
-      highlightColor: target.color,
-      note: target.note,
-      surroundingContext: target.surroundingContext,
-      readerName,
-      config,
-    }).then(() => {
-      if (cancelled) return;
-    });
+    void renderQuoteCardToCanvas(
+      canvas,
+      {
+        quote: target.selectedText,
+        bookTitle: target.bookTitle,
+        bookAuthor: target.bookAuthor,
+        bookCoverUrl: target.bookCoverUrl,
+        bookCoverColor: target.bookCoverColor,
+        chapterNumber: target.chapterNumber,
+        pageNumber: target.pageNumber,
+        highlightColor: target.color,
+        note: target.note,
+        surroundingContext: target.surroundingContext,
+        readerName,
+        config,
+      },
+      { isCancelled: () => cancelled },
+    );
 
     return () => {
       cancelled = true;
@@ -259,14 +268,14 @@ function QuotePostComposerInner({
     <>
       <div className="rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-3.5">
         <div className="mb-1.5 flex items-center justify-between gap-2 text-xs">
-          <span className="font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+          <span className="font-semibold uppercase tracking-wider text-[var(--color-muted)]">
             Kutipan Dipilih
           </span>
           <span
             className={`font-mono ${
               excerptCheck.isTooLong
                 ? "font-semibold text-[#B91C1C]"
-                : "text-[var(--color-ink-muted)]"
+                : "text-[var(--color-muted)]"
             }`}
           >
             {excerptCheck.length}/{excerptCheck.maxLength} karakter
@@ -289,7 +298,7 @@ function QuotePostComposerInner({
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+          <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
             Template Kartu
           </span>
           <div className="grid grid-cols-2 gap-2">
@@ -303,11 +312,11 @@ function QuotePostComposerInner({
                   className={`flex min-h-11 flex-col items-start justify-center rounded-lg border px-3 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] ${
                     active
                       ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-ink)]"
-                      : "border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-soft)] hover:bg-[var(--color-paper-3)]"
+                      : "border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-2)] hover:bg-[var(--color-paper-3)]"
                   }`}
                 >
                   <span className="text-xs font-semibold">{tpl.label}</span>
-                  <span className="text-[11px] text-[var(--color-ink-muted)]">
+                  <span className="text-[11px] text-[var(--color-muted)]">
                     {tpl.hint}
                   </span>
                 </button>
@@ -318,7 +327,7 @@ function QuotePostComposerInner({
 
         <div className="flex flex-col gap-3">
           <div>
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+            <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
               Rasio Kanvas
             </span>
             <div className="grid grid-cols-2 gap-2">
@@ -335,7 +344,7 @@ function QuotePostComposerInner({
                   className={`min-h-11 rounded-lg border px-3 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] ${
                     config.aspect === item.id
                       ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-ink)]"
-                      : "border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-soft)] hover:bg-[var(--color-paper-3)]"
+                      : "border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-2)] hover:bg-[var(--color-paper-3)]"
                   }`}
                 >
                   {item.label}
@@ -345,7 +354,7 @@ function QuotePostComposerInner({
           </div>
 
           <div>
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+            <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
               Perataan Teks
             </span>
             <div className="grid grid-cols-2 gap-2">
@@ -355,7 +364,7 @@ function QuotePostComposerInner({
                 className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] ${
                   config.alignment === "left"
                     ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-ink)]"
-                    : "border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-soft)] hover:bg-[var(--color-paper-3)]"
+                    : "border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-2)] hover:bg-[var(--color-paper-3)]"
                 }`}
               >
                 <AlignLeft className="h-3.5 w-3.5" />
@@ -367,7 +376,7 @@ function QuotePostComposerInner({
                 className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] ${
                   config.alignment === "center"
                     ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-ink)]"
-                    : "border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-soft)] hover:bg-[var(--color-paper-3)]"
+                    : "border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-2)] hover:bg-[var(--color-paper-3)]"
                 }`}
               >
                 <AlignCenter className="h-3.5 w-3.5" />
@@ -382,11 +391,11 @@ function QuotePostComposerInner({
         <div className="flex items-center justify-between gap-2">
           <label
             htmlFor={captionId}
-            className="text-xs font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]"
+            className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]"
           >
             Opini / Konteks Tambahan
           </label>
-          <span className="font-mono text-[11px] text-[var(--color-ink-muted)]">
+          <span className="font-mono text-[11px] text-[var(--color-muted)]">
             {postCaption.length}/500
           </span>
         </div>
@@ -397,7 +406,7 @@ function QuotePostComposerInner({
           value={postCaption}
           onChange={(e) => setPostCaption(e.target.value)}
           placeholder="Tulis mengapa paragraf ini berkesan bagimu..."
-          className="w-full rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-3.5 py-2.5 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:border-[var(--color-accent)] focus:outline-none"
+          className="w-full rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-3.5 py-2.5 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-muted)] focus:border-[var(--color-accent)] focus:outline-none"
         />
       </div>
 
@@ -417,7 +426,7 @@ function QuotePostComposerInner({
             <span className="block text-xs font-semibold text-[var(--color-ink)]">
               Sertakan catatan pribadi di kartu & feed publik
             </span>
-            <span className="block truncate text-xs text-[var(--color-ink-muted)]">
+            <span className="block truncate text-xs text-[var(--color-muted)]">
               Catatanmu: "{target.note.trim()}"
             </span>
           </div>
@@ -434,7 +443,7 @@ function QuotePostComposerInner({
                 (!localIsPosted && excerptCheck.isTooLong)
               }
               onClick={() => void handlePublish(true)}
-              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-[#13110F] transition-colors hover:bg-[var(--color-accent-hover)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)]"
+              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-[var(--color-accent-ink)] transition-all hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)]"
             >
               {togglePostMutation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -453,7 +462,7 @@ function QuotePostComposerInner({
                 type="button"
                 disabled={togglePostMutation.isPending}
                 onClick={() => void handlePublish(false)}
-                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-4 py-2.5 text-xs font-semibold text-[var(--color-ink-soft)] transition-colors hover:bg-[var(--color-paper-3)] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-4 py-2.5 text-xs font-semibold text-[var(--color-ink-2)] transition-colors hover:bg-[var(--color-paper-3)] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
               >
                 Tarik dari Feed
               </button>
@@ -492,6 +501,7 @@ function QuotePostComposerInner({
   return (
     <ComposerDialogShell
       isOpen={isOpen}
+      theme={theme}
       onClose={onClose}
       title="Bagikan & Post Kutipan"
       subtitle={`${target.bookTitle}${target.bookAuthor ? ` · ${target.bookAuthor}` : ""}`}

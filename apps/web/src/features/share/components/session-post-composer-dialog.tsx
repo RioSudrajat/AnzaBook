@@ -6,6 +6,7 @@ import type {
   SessionTemplate,
 } from "@starter/shared/types";
 import { useTogglePostSession } from "@/features/social/hooks";
+import type { ReaderTheme } from "@/features/reader/components/reader-toolbar";
 import {
   buildSessionShareCaption,
   buildSharePostUrl,
@@ -45,6 +46,7 @@ export type SessionComposerTarget = {
 
 export type SessionPostComposerDialogProps = {
   isOpen: boolean;
+  theme?: ReaderTheme;
   onClose: () => void;
   target: SessionComposerTarget | null;
   readerName: string;
@@ -88,6 +90,7 @@ const DEFAULT_SESSION_CONFIG: SessionPostConfig = {
 
 export function SessionPostComposerDialog({
   isOpen,
+  theme,
   onClose,
   target,
   readerName,
@@ -103,6 +106,7 @@ export function SessionPostComposerDialog({
     return (
       <ComposerDialogShell
         isOpen={isOpen}
+        theme={theme}
         onClose={onClose}
         title="Bagikan & Post Sesi Baca"
         preview={null}
@@ -115,6 +119,7 @@ export function SessionPostComposerDialog({
     <SessionPostComposerInner
       key={`${target.sessionId ?? target.bookTitle}-${isOpen ? "open" : "closed"}`}
       isOpen={isOpen}
+      theme={theme}
       onClose={onClose}
       target={target}
       readerName={readerName}
@@ -132,6 +137,7 @@ export function SessionPostComposerDialog({
 
 type SessionPostComposerInnerProps = {
   isOpen: boolean;
+  theme?: ReaderTheme;
   onClose: () => void;
   target: SessionComposerTarget;
   readerName: string;
@@ -148,6 +154,7 @@ type SessionPostComposerInnerProps = {
 
 function SessionPostComposerInner({
   isOpen,
+  theme,
   onClose,
   target,
   readerName,
@@ -213,28 +220,30 @@ function SessionPostComposerInner({
     if (!canvas) return;
     let cancelled = false;
 
-    void renderSessionCardToCanvas(canvas, {
-      title: sessionTitle.trim() || target.bookTitle,
-      bookTitle: target.bookTitle,
-      bookAuthor: target.bookAuthor,
-      bookCoverUrl: target.bookCoverUrl,
-      bookCoverColor: target.bookCoverColor,
-      durationSec: target.durationSec,
-      pagesRead: target.pagesRead,
-      avgWpm: target.avgWpm,
-      startChapterNumber: target.startChapterNumber,
-      endChapterNumber: target.endChapterNumber,
-      startProgressPercent: target.startProgressPercent,
-      endProgressPercent: target.endProgressPercent,
-      streakDays: target.streakDays,
-      note: note.trim() || null,
-      photoUrl: localPhotoUrl,
-      recentSessions,
-      readerName,
-      config,
-    }).then(() => {
-      if (cancelled) return;
-    });
+    void renderSessionCardToCanvas(
+      canvas,
+      {
+        title: sessionTitle.trim() || target.bookTitle,
+        bookTitle: target.bookTitle,
+        bookAuthor: target.bookAuthor,
+        bookCoverUrl: target.bookCoverUrl,
+        bookCoverColor: target.bookCoverColor,
+        durationSec: target.durationSec,
+        pagesRead: target.pagesRead,
+        avgWpm: target.avgWpm,
+        startChapterNumber: target.startChapterNumber,
+        endChapterNumber: target.endChapterNumber,
+        startProgressPercent: target.startProgressPercent,
+        endProgressPercent: target.endProgressPercent,
+        streakDays: target.streakDays,
+        note: note.trim() || null,
+        photoUrl: localPhotoUrl,
+        recentSessions,
+        readerName,
+        config,
+      },
+      { isCancelled: () => cancelled },
+    );
 
     return () => {
       cancelled = true;
@@ -265,7 +274,7 @@ function SessionPostComposerInner({
   const shareText = buildSessionShareCaption({
     title: sessionTitle.trim() || target.bookTitle,
     bookTitle: target.bookTitle,
-    durationSec: config.showDuration ? target.durationSec : 0,
+    durationSec: config.showDuration ? target.durationSec : null,
     pagesRead: config.showPages ? target.pagesRead : undefined,
     tempoLabel: tempoText,
     note,
@@ -337,7 +346,7 @@ function SessionPostComposerInner({
 
   const controlsNode = (
     <>
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-3.5 py-2.5 text-xs text-[var(--color-ink-soft)]">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-3.5 py-2.5 text-xs text-[var(--color-ink-2)]">
         <span className="font-mono font-semibold text-[var(--color-ink)]">
           {formatShareDuration(target.durationSec)}
         </span>
@@ -358,7 +367,7 @@ function SessionPostComposerInner({
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+          <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
             Template Kartu
           </span>
           <div className="grid grid-cols-2 gap-2">
@@ -372,11 +381,11 @@ function SessionPostComposerInner({
                   className={`flex min-h-11 flex-col items-start justify-center rounded-lg border px-3 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] ${
                     active
                       ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-ink)]"
-                      : "border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-soft)] hover:bg-[var(--color-paper-3)]"
+                      : "border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-2)] hover:bg-[var(--color-paper-3)]"
                   }`}
                 >
                   <span className="text-xs font-semibold">{tpl.label}</span>
-                  <span className="text-[11px] text-[var(--color-ink-muted)]">
+                  <span className="text-[11px] text-[var(--color-muted)]">
                     {tpl.hint}
                   </span>
                 </button>
@@ -387,7 +396,7 @@ function SessionPostComposerInner({
 
         <div className="flex flex-col gap-3">
           <div>
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+            <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
               Rasio Kanvas
             </span>
             <div className="grid grid-cols-2 gap-2">
@@ -404,7 +413,7 @@ function SessionPostComposerInner({
                   className={`min-h-11 rounded-lg border px-3 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] ${
                     config.aspect === item.id
                       ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-ink)]"
-                      : "border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-soft)] hover:bg-[var(--color-paper-3)]"
+                      : "border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-2)] hover:bg-[var(--color-paper-3)]"
                   }`}
                 >
                   {item.label}
@@ -415,7 +424,7 @@ function SessionPostComposerInner({
 
           {config.template === "transparent_sticker" ? (
             <div>
-              <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+              <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
                 Warna Tinta Stiker
               </span>
               <div className="grid grid-cols-2 gap-2">
@@ -432,7 +441,7 @@ function SessionPostComposerInner({
                     className={`min-h-11 rounded-lg border px-3 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] ${
                       (config.stickerInk ?? "light") === item.id
                         ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-ink)]"
-                        : "border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-soft)] hover:bg-[var(--color-paper-3)]"
+                        : "border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-2)] hover:bg-[var(--color-paper-3)]"
                     }`}
                   >
                     {item.label}
@@ -454,7 +463,7 @@ function SessionPostComposerInner({
               >
                 Foto Latar Perangkat (Klien-Sisi)
               </label>
-              <p className="text-xs text-[var(--color-ink-muted)]">
+              <p className="text-xs text-[var(--color-muted)]">
                 Foto diproses langsung di peramban untuk unduhan PNG/Story tanpa
                 diunggah ke server.
               </p>
@@ -482,7 +491,7 @@ function SessionPostComposerInner({
                   type="button"
                   aria-label="Hapus foto latar"
                   onClick={() => setLocalPhotoUrl(null)}
-                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper-2)] text-[var(--color-ink-soft)] hover:bg-[var(--color-paper-3)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper-2)] text-[var(--color-ink-2)] hover:bg-[var(--color-paper-3)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -497,11 +506,11 @@ function SessionPostComposerInner({
           <div className="flex items-center justify-between">
             <label
               htmlFor={titleInputId}
-              className="text-xs font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]"
+              className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]"
             >
               Judul Sesi
             </label>
-            <span className="font-mono text-[11px] text-[var(--color-ink-muted)]">
+            <span className="font-mono text-[11px] text-[var(--color-muted)]">
               {sessionTitle.length}/140
             </span>
           </div>
@@ -512,7 +521,7 @@ function SessionPostComposerInner({
             value={sessionTitle}
             onChange={(e) => setSessionTitle(e.target.value)}
             placeholder="Baca Malam · Bumi Manusia"
-            className="min-h-11 w-full rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-3.5 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:border-[var(--color-accent)] focus:outline-none"
+            className="min-h-11 w-full rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-3.5 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-muted)] focus:border-[var(--color-accent)] focus:outline-none"
           />
         </div>
 
@@ -520,11 +529,11 @@ function SessionPostComposerInner({
           <div className="flex items-center justify-between">
             <label
               htmlFor={noteInputId}
-              className="text-xs font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]"
+              className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]"
             >
               Refleksi Singkat (Opsional)
             </label>
-            <span className="font-mono text-[11px] text-[var(--color-ink-muted)]">
+            <span className="font-mono text-[11px] text-[var(--color-muted)]">
               {note.length}/500
             </span>
           </div>
@@ -535,13 +544,13 @@ function SessionPostComposerInner({
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Kesan utama setelah sesi ini..."
-            className="min-h-11 w-full rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-3.5 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:border-[var(--color-accent)] focus:outline-none"
+            className="min-h-11 w-full rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-3.5 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-muted)] focus:border-[var(--color-accent)] focus:outline-none"
           />
         </div>
       </div>
 
       <div>
-        <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+        <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
           Privasi Metrik Kartu
         </span>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -577,7 +586,7 @@ function SessionPostComposerInner({
               type="button"
               disabled={togglePostMutation.isPending}
               onClick={() => void handlePublish(true)}
-              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-[#13110F] transition-colors hover:bg-[var(--color-accent-hover)] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)]"
+              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-[var(--color-accent-ink)] transition-all hover:brightness-95 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)]"
             >
               {togglePostMutation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -596,7 +605,7 @@ function SessionPostComposerInner({
                 type="button"
                 disabled={togglePostMutation.isPending}
                 onClick={() => void handlePublish(false)}
-                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-4 py-2.5 text-xs font-semibold text-[var(--color-ink-soft)] transition-colors hover:bg-[var(--color-paper-3)] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-4 py-2.5 text-xs font-semibold text-[var(--color-ink-2)] transition-colors hover:bg-[var(--color-paper-3)] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
               >
                 Tarik dari Feed
               </button>
@@ -635,6 +644,7 @@ function SessionPostComposerInner({
   return (
     <ComposerDialogShell
       isOpen={isOpen}
+      theme={theme}
       onClose={onClose}
       title="Bagikan & Post Sesi Baca"
       subtitle={`${target.bookTitle}${target.bookAuthor ? ` · ${target.bookAuthor}` : ""}`}
