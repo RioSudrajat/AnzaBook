@@ -25,19 +25,20 @@ export function GlossyProgressBar({
 
   return (
     <div className="fixed bottom-6 inset-x-0 z-40 flex justify-center px-4 pointer-events-none select-none">
-      <div className="pointer-events-auto flex items-center gap-3 px-4 py-2.5 rounded-full bg-black/60 dark:bg-black/75 backdrop-blur-md border border-white/20 shadow-2xl text-white font-mono text-xs transition-all hover:bg-black/80">
+      <div className="pointer-events-auto flex items-center gap-3 px-4 py-2 rounded-full bg-black/75 backdrop-blur-md border border-white/20 shadow-2xl text-white font-mono tabular-nums text-xs transition-colors hover:bg-black/85">
         {/* Previous Chapter button */}
         {onPrevChapter && (
           <button
             type="button"
             onClick={onPrevChapter}
             disabled={!hasPrev}
-            className={`p-1 rounded-full hover:bg-white/10 transition-colors ${
+            aria-label="Bab Sebelumnya"
+            className={`min-h-9 min-w-9 flex items-center justify-center rounded-full hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white transition-colors ${
               !hasPrev ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
             }`}
             title="Bab Sebelumnya"
           >
-            <ChevronLeft className="size-4" />
+            <ChevronLeft className="size-4" aria-hidden="true" />
           </button>
         )}
 
@@ -57,7 +58,7 @@ export function GlossyProgressBar({
         </div>
 
         {/* Progress Percentage */}
-        <div className="text-[11px] font-bold text-white/90 shrink-0 w-8 text-right">
+        <div className="text-[11px] font-bold text-white/90 shrink-0 w-9 text-right">
           {safePercent}%
         </div>
 
@@ -66,11 +67,11 @@ export function GlossyProgressBar({
           <button
             type="button"
             onClick={onOpenRating}
-            className="p-1 rounded-full hover:bg-white/15 text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+            className="min-h-9 min-w-9 flex items-center justify-center rounded-full hover:bg-white/15 text-amber-400 hover:text-amber-300 focus-visible:outline-2 focus-visible:outline-white transition-colors cursor-pointer"
             title="Beri Rating Naskah"
             aria-label="Beri Rating"
           >
-            <Star className="size-3.5 fill-amber-400/40" />
+            <Star className="size-3.5 fill-amber-400/40" aria-hidden="true" />
           </button>
         )}
 
@@ -80,12 +81,13 @@ export function GlossyProgressBar({
             type="button"
             onClick={onNextChapter}
             disabled={!hasNext}
-            className={`p-1 rounded-full hover:bg-white/10 transition-colors ${
+            aria-label="Bab Berikutnya"
+            className={`min-h-9 min-w-9 flex items-center justify-center rounded-full hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white transition-colors ${
               !hasNext ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
             }`}
             title="Bab Berikutnya"
           >
-            <ChevronRight className="size-4" />
+            <ChevronRight className="size-4" aria-hidden="true" />
           </button>
         )}
       </div>

@@ -9,9 +9,12 @@ import type {
 } from "@starter/shared/validators/publisher";
 import type {
   ApplyAuthorInput,
+  PublishHighlightPostInput,
+  PublishSessionPostInput,
   UpdateProfileBioInput,
 } from "@starter/shared/validators/social";
 import type { UpdateCalendarInput } from "@starter/shared/validators/community";
+import { communityKeys } from "@/features/community/queries";
 import {
   applyAuthor,
   applyPublisher,
@@ -302,11 +305,10 @@ export function useTogglePostHighlight() {
   return useMutation({
     mutationFn: ({
       highlightId,
-      isPosted,
+      ...input
     }: {
       highlightId: string;
-      isPosted?: boolean;
-    }) => togglePostHighlight(highlightId, isPosted),
+    } & PublishHighlightPostInput) => togglePostHighlight(highlightId, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: socialKeys.all });
       queryClient.invalidateQueries({ queryKey: ["books", "highlights"] });
@@ -319,15 +321,13 @@ export function useTogglePostSession() {
   return useMutation({
     mutationFn: ({
       sessionId,
-      note,
-      isPosted,
+      ...input
     }: {
       sessionId: string;
-      note?: string;
-      isPosted?: boolean;
-    }) => togglePostSession(sessionId, { note, isPosted }),
+    } & PublishSessionPostInput) => togglePostSession(sessionId, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: socialKeys.all });
+      queryClient.invalidateQueries({ queryKey: communityKeys.sessions() });
       queryClient.invalidateQueries({ queryKey: ["reading", "sessions"] });
     },
   });

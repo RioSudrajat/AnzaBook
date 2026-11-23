@@ -4,7 +4,9 @@ import type {
   DataResponse,
   ManuscriptSubmissionDto,
   PublisherDto,
+  QuotePostConfig,
   ReaderDirectoryItemDto,
+  SessionPostConfig,
   SocialProfileDto,
   SocialRelationItemDto,
   UnifiedExploreResultDto,
@@ -19,6 +21,8 @@ import type {
 } from "@starter/shared/validators/publisher";
 import type {
   ApplyAuthorInput,
+  PublishHighlightPostInput,
+  PublishSessionPostInput,
   UpdateProfileBioInput,
 } from "@starter/shared/validators/social";
 import type { UpdateCalendarInput } from "@starter/shared/validators/community";
@@ -335,31 +339,48 @@ export async function updateCalendarProfile(
 
 export async function togglePostHighlight(
   highlightId: string,
-  isPosted?: boolean,
-): Promise<{ id: string; isPosted: boolean; postedAt: string | null }> {
+  input?: boolean | PublishHighlightPostInput,
+): Promise<{
+  id: string;
+  isPosted: boolean;
+  postCaption: string | null;
+  postConfig: QuotePostConfig | null;
+  postedAt: string | null;
+}> {
+  const body = typeof input === "boolean" ? { isPosted: input } : (input ?? {});
   const { data } = await apiFetch<
-    DataResponse<{ id: string; isPosted: boolean; postedAt: string | null }>
+    DataResponse<{
+      id: string;
+      isPosted: boolean;
+      postCaption: string | null;
+      postConfig: QuotePostConfig | null;
+      postedAt: string | null;
+    }>
   >(`/api/social/highlights/${encodeURIComponent(highlightId)}/toggle-post`, {
     method: "POST",
-    body: { isPosted },
+    body,
   });
   return data;
 }
 
 export async function togglePostSession(
   sessionId: string,
-  input: { note?: string; isPosted?: boolean },
+  input: PublishSessionPostInput,
 ): Promise<{
   id: string;
   isPosted: boolean;
+  title: string | null;
   note: string | null;
+  postConfig: SessionPostConfig | null;
   postedAt: string | null;
 }> {
   const { data } = await apiFetch<
     DataResponse<{
       id: string;
       isPosted: boolean;
+      title: string | null;
       note: string | null;
+      postConfig: SessionPostConfig | null;
       postedAt: string | null;
     }>
   >(`/api/social/sessions/${encodeURIComponent(sessionId)}/toggle-post`, {

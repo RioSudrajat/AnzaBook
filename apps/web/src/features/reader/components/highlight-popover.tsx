@@ -9,6 +9,7 @@ type HighlightPopoverProps = {
     color: HighlightColor;
     note?: string;
     chapterNumber?: number;
+    paragraphIndex?: number;
   }) => Promise<void>;
 };
 
@@ -18,6 +19,9 @@ export function HighlightPopover({
 }: HighlightPopoverProps) {
   const [selectedText, setSelectedText] = useState("");
   const [selectedChapterNumber, setSelectedChapterNumber] = useState<
+    number | undefined
+  >(undefined);
+  const [selectedParagraphIndex, setSelectedParagraphIndex] = useState<
     number | undefined
   >(undefined);
   const [position, setPosition] = useState<{ x: number; y: number } | null>(
@@ -51,14 +55,34 @@ export function HighlightPopover({
           return;
         }
 
-        // Detect chapter number from the DOM hierarchy
+        // Detect chapter number and paragraph index from the DOM hierarchy
         let detectedChapter: number | undefined;
+        let detectedParagraph: number | undefined;
         let node: Node | null = selection.anchorNode;
         while (node) {
-          if (node instanceof HTMLElement && node.dataset.chapterNumber) {
-            const num = parseInt(node.dataset.chapterNumber, 10);
-            if (!isNaN(num)) {
-              detectedChapter = num;
+          if (node instanceof HTMLElement) {
+            if (
+              detectedParagraph === undefined &&
+              node.dataset.readerParagraph !== undefined
+            ) {
+              const pNum = parseInt(node.dataset.readerParagraph, 10);
+              if (!isNaN(pNum)) {
+                detectedParagraph = pNum;
+              }
+            }
+            if (
+              detectedChapter === undefined &&
+              node.dataset.chapterNumber !== undefined
+            ) {
+              const num = parseInt(node.dataset.chapterNumber, 10);
+              if (!isNaN(num)) {
+                detectedChapter = num;
+              }
+            }
+            if (
+              detectedChapter !== undefined &&
+              detectedParagraph !== undefined
+            ) {
               break;
             }
           }
@@ -70,6 +94,7 @@ export function HighlightPopover({
 
         setSelectedText(text);
         setSelectedChapterNumber(detectedChapter);
+        setSelectedParagraphIndex(detectedParagraph);
         setPosition({
           x: Math.max(16, rect.left + rect.width / 2),
           y: Math.max(10, rect.top - 10),
@@ -108,6 +133,7 @@ export function HighlightPopover({
         color,
         note: note.trim() || undefined,
         chapterNumber: selectedChapterNumber,
+        paragraphIndex: selectedParagraphIndex,
       });
       setPosition(null);
       setShowNoteInput(false);

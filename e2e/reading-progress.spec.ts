@@ -80,3 +80,69 @@ test("Explore category filters return real titles with the shared cover", async 
   await expect(results.getByRole("link", { name: /Madilog/ })).toHaveCount(0);
   await expect(results.locator("[data-book-cover]")).toHaveCount(2);
 });
+
+test("Post-Reading Exit Prompt skips immediate exit and shows real metrics after forward progress", async ({
+  page,
+}) => {
+  await signUp(page.request, "Pembaca Ringkasan Sesi");
+  const slug = "madilog-tan-malaka";
+  const detail = await page.request.get(`${API_URL}/api/books/${slug}`);
+  expect(detail.ok()).toBeTruthy();
+  const { data: book } = await detail.json();
+
+  // 1. Immediate exit (< 15s and no forward progress) navigates straight home without modal.
+  await page.goto(`/read/${slug}`);
+  await expect(page.locator("#chapter-sec-1")).toBeVisible();
+  await page.getByRole("button", { name: "Keluar ke Home" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Ringkasan Sesi Baca" }),
+  ).toHaveCount(0);
+  await expect(page).toHaveURL(/\/app/);
+
+  // 2. Forward progress into chapter 2 triggers the exit sheet with real telemetry.
+  await page.goto(`/read/${slug}`);
+  const secondChapter = page.locator("#chapter-sec-2");
+  await expect(secondChapter).toBeVisible();
+  await secondChapter.evaluate((section) =>
+    section.scrollIntoView({ block: "start" }),
+  );
+  await expect(page.getByText(/Bab 2\//)).toBeVisible();
+
+  await page.getByRole("button", { name: "Keluar ke Home" }).click();
+  const exitDialog = page.getByRole("dialog", { name: "Ringkasan Sesi Baca" });
+  await expect(exitDialog).toBeVisible();
+  await expect(exitDialog.getByText("Durasi Aktif")).toBeVisible();
+  await expect(exitDialog.getByText("Halaman Standar")).toBeVisible();
+  await expect(exitDialog.getByText("Progres Buku")).toBeVisible();
+  await expect(
+    exitDialog.getByRole("button", { name: "Post / Bagikan Sesi" }),
+  ).toBeVisible();
+
+  // 3. Escape dismisses the modal cleanly so reading can resume, then further progress prompts again.
+  await page.keyboard.press("Escape");
+  await expect(exitDialog).not.toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/read/${slug}`));
+
+  await secondChapter
+    .locator("[data-reader-paragraph]")
+    .last()
+    .evaluate((el) => el.scrollIntoView({ block: "start" }));
+  await page.getByRole("button", { name: "Keluar ke Home" }).click();
+  await expect(exitDialog).toBeVisible();
+
+  // 4. 1-click Lewati & Keluar exits home while keeping the session private by default.
+  await exitDialog.getByRole("button", { name: "Lewati & Keluar" }).click();
+  await expect(page).toHaveURL(/\/app/);
+
+  const sessionsRes = await page.request.get(
+    `${API_URL}/api/reading/sessions/${book.id}`,
+  );
+  expect(sessionsRes.ok()).toBeTruthy();
+  const { data: sessions } = await sessionsRes.json();
+  expect(sessions.length).toBeGreaterThanOrEqual(2);
+  expect(sessions[0]).toMatchObject({
+    endChapterNumber: 2,
+    isPosted: false,
+  });
+  expect(sessions[0].wordsRead).toBeGreaterThan(0);
+});
