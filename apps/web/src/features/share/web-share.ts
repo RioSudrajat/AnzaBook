@@ -75,11 +75,10 @@ export async function shareCanvasNative(params: {
   }
 
   try {
+    // Share an image-only payload so mobile OS share sheets (Android Chrome / iOS Safari)
+    // expose image-first targets like Instagram Stories instead of link/text-only targets.
     await navigator.share({
       files: [file],
-      title: params.title,
-      text: params.text,
-      url: params.url,
     });
     return "shared";
   } catch (err) {

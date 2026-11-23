@@ -683,7 +683,7 @@ function ReaderBook() {
   // Reader Settings State
   const [theme, setTheme] = useState<ReaderTheme>("manila");
   const [fontFamily, setFontFamily] = useState<ReaderFont>("serif");
-  const [fontSize, setFontSize] = useState<number>(18);
+  const [fontSize, setFontSize] = useState<number>(16);
   // Default language: Bahasa Indonesia (not split)
   const [languageView, setLanguageView] = useState<LanguageView>("id");
   const [readingLayout, setReadingLayout] = useState<ReadingLayout>("scroll");

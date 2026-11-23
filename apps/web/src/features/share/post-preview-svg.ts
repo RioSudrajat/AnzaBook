@@ -180,13 +180,15 @@ export function buildPostPreviewSvg(post: ExplorePostItemDto): string {
   const metricsSvg = visibleMetrics
     .map((metric, idx) => {
       const x = 68 + idx * 232;
-      const valueText = metric.hint
-        ? `${metric.value} (${metric.hint})`
-        : metric.value;
+      const valueY = metric.hint ? 66 : 76;
+      const hintSvg = metric.hint
+        ? `<text x="18" y="92" font-size="16" fill="${muted}">${escapeXml(truncateText(metric.hint, 18))}</text>`
+        : "";
       return `<g transform="translate(${x} 388)">
         <rect width="214" height="106" rx="10" fill="${isDark ? "#231F1B" : "#EFE9DC"}" stroke="${rule}" stroke-width="1.5"/>
         <text x="18" y="34" font-size="15" fill="${muted}">${escapeXml(metric.label)}</text>
-        <text x="18" y="76" font-size="24" fill="${fg}">${escapeXml(truncateText(valueText, 16))}</text>
+        <text x="18" y="${valueY}" font-size="24" fill="${fg}">${escapeXml(truncateText(metric.value, 16))}</text>
+        ${hintSvg}
       </g>`;
     })
     .join("");

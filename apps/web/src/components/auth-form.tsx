@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { ArrowRight, LoaderCircle } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, LoaderCircle } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,7 @@ export function AuthForm({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [pending, setPending] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(
     socialError ? "Login Google gagal. Coba lagi atau masuk dengan email." : "",
   );
@@ -123,11 +124,13 @@ export function AuthForm({
                 id="name"
                 name="name"
                 autoComplete="name"
+                enterKeyHint="next"
                 placeholder="Your name"
                 required
                 minLength={1}
                 maxLength={100}
                 pattern=".*\S.*"
+                className="h-11"
               />
             </div>
           )}
@@ -137,24 +140,52 @@ export function AuthForm({
               id="email"
               name="email"
               type="email"
-              autoComplete="email"
+              autoComplete="username"
+              spellCheck={false}
+              enterKeyHint="next"
               placeholder="you@example.com"
               required
               maxLength={254}
+              className="h-11"
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete={signingUp ? "new-password" : "current-password"}
-              required
-              minLength={8}
-              maxLength={128}
-              aria-describedby={signingUp ? "password-hint" : undefined}
-            />
+            <div className="relative flex items-center">
+              <Input
+                id="password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete={signingUp ? "new-password" : "current-password"}
+                enterKeyHint="done"
+                required
+                minLength={8}
+                maxLength={128}
+                aria-describedby={signingUp ? "password-hint" : undefined}
+                className="h-11 pr-12"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-pressed={showPassword}
+                aria-label={
+                  showPassword
+                    ? "Sembunyikan kata sandi"
+                    : "Tampilkan kata sandi"
+                }
+                aria-describedby="password-toggle-warning"
+                className="absolute right-0 inline-flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring cursor-pointer"
+              >
+                {showPassword ? (
+                  <EyeOff className="size-4" aria-hidden="true" />
+                ) : (
+                  <Eye className="size-4" aria-hidden="true" />
+                )}
+              </button>
+              <span id="password-toggle-warning" className="sr-only">
+                Peringatan: tombol ini menampilkan kata sandi di layar.
+              </span>
+            </div>
             {signingUp && (
               <p id="password-hint" className="text-sm text-muted-foreground">
                 Use at least 8 characters.

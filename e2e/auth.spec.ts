@@ -25,7 +25,13 @@ test("signup, persisted session, signout, rejected password, and signin work acr
   await page.goto("/sign-up");
   await page.getByLabel("Name", { exact: true }).fill("Ada Builder");
   await page.getByLabel("Email", { exact: true }).fill(email);
-  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
+  const passwordField = page.getByLabel("Password", { exact: true });
+  await passwordField.fill(PASSWORD);
+  await expect(passwordField).toHaveAttribute("type", "password");
+  await page.getByRole("button", { name: "Tampilkan kata sandi" }).click();
+  await expect(passwordField).toHaveAttribute("type", "text");
+  await page.getByRole("button", { name: "Sembunyikan kata sandi" }).click();
+  await expect(passwordField).toHaveAttribute("type", "password");
   await page
     .getByRole("button", { name: "Create account", exact: true })
     .click();
@@ -59,7 +65,12 @@ test("signup, persisted session, signout, rejected password, and signin work acr
   await expect(
     page.getByRole("alert").filter({ hasText: "We couldn't sign you in." }),
   ).toContainText("Check your email and password");
-  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
+  await passwordField.fill(PASSWORD);
+  await expect(passwordField).toHaveAttribute("type", "password");
+  await page.getByRole("button", { name: "Tampilkan kata sandi" }).click();
+  await expect(passwordField).toHaveAttribute("type", "text");
+  await page.getByRole("button", { name: "Sembunyikan kata sandi" }).click();
+  await expect(passwordField).toHaveAttribute("type", "password");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/\/app$/);
   expect(errors).toEqual([]);

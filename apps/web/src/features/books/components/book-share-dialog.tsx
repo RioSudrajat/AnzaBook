@@ -102,11 +102,9 @@ export function BookShareDialog({
         navigator.canShare({ files: [file] })
       ) {
         try {
+          // Image-only payload keeps Instagram Stories visible in mobile OS share sheets.
           await navigator.share({
             files: [file],
-            title,
-            text: `${title} di AnzaBook`,
-            url,
           });
           setShowInstagramGuide(false);
           setFeedback("Kartu buku dikirim ke lembar bagikan sistem.");

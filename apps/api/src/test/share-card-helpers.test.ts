@@ -344,6 +344,23 @@ describe("Share Card Helpers (Issue #13)", () => {
     });
     expect(allHiddenVm.template).toBe("literary_index");
     expect(allHiddenVm.metrics).toEqual([]);
+
+    const revealedWpmVm = resolveSessionCardViewModel({
+      ...sessionPost,
+      postConfig: {
+        template: "cover_trail",
+        aspect: "4:3",
+        showWpm: true,
+        showDuration: true,
+        showPages: true,
+      },
+    });
+    expect(revealedWpmVm.metrics.find((m) => m.key === "tempo")).toEqual({
+      key: "tempo",
+      label: "Ritme Baca",
+      value: "190 wpm",
+      hint: "Mengalir",
+    });
   });
 
   it("supports 4:3 landscape card aspect ratio in Zod validator and share filenames", () => {

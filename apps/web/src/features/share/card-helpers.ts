@@ -544,11 +544,12 @@ export function resolveSessionCardViewModel(
     post.avgWpm > 0
   ) {
     const tempo = shareTempoLabel(post.avgWpm);
+    const wpmText = `${Math.round(post.avgWpm)} wpm`;
     metrics.push({
       key: "tempo",
       label: "Ritme Baca",
-      value: tempo || `${Math.round(post.avgWpm)} WPM`,
-      hint: tempo ? `${Math.round(post.avgWpm)} WPM` : undefined,
+      value: wpmText,
+      hint: tempo || undefined,
     });
   }
   if (

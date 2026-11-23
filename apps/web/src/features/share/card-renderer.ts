@@ -1155,8 +1155,8 @@ function collectVisibleSessionMetrics(
       input.avgWpm && input.avgWpm > 0 ? `${Math.round(input.avgWpm)} wpm` : "";
     items.push({
       label: "RITME BACA",
-      value: label || wpmValue || "-",
-      subValue: label && wpmValue ? wpmValue : undefined,
+      value: wpmValue || label || "-",
+      subValue: wpmValue && label ? label : undefined,
     });
   }
   return items;
