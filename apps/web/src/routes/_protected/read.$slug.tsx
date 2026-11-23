@@ -1089,10 +1089,16 @@ function ReaderBook() {
         });
         return;
       }
-      setScrollPosition({
-        chapter: target,
-        percent: checkpoint?.lastScrollPercent ?? 0,
-      });
+      const userAlreadyScrolledPastStart =
+        target === loadedChapters[0]?.chapterNumber &&
+        (checkpoint?.lastScrollPercent ?? 0) === 0 &&
+        window.scrollY >= 80;
+      if (!userAlreadyScrolledPastStart) {
+        setScrollPosition({
+          chapter: target,
+          percent: checkpoint?.lastScrollPercent ?? 0,
+        });
+      }
       finalizeSessionRestore({
         chapterNumber: target,
         paragraphIndex: checkpoint?.lastParagraphIndex ?? 0,
@@ -1128,7 +1134,10 @@ function ReaderBook() {
         window.scrollTo({
           top: top + (length * checkpoint.lastScrollPercent) / 100,
         });
-      } else {
+      } else if (
+        target !== loadedChapters[0]?.chapterNumber ||
+        window.scrollY < 80
+      ) {
         section.scrollIntoView({ block: "start" });
       }
     });
@@ -1465,7 +1474,7 @@ function ReaderBook() {
       const bookLast = payload.allChapters.at(-1)?.chapterNumber ?? lastLoaded;
       if (
         lastLoaded < bookLast &&
-        targetIndex >= Math.max(0, spreads.length - 3)
+        targetIndex >= Math.max(0, spreads.length - 4)
       ) {
         void prefetchChapter(lastLoaded + 1);
       }
@@ -2606,6 +2615,8 @@ function ReaderBook() {
               fontSize={fontSize}
               coverColor={book.coverColor}
               isPremiumPreview={isPremiumPreview}
+              allChapterNumbers={allChapterNumbers}
+              hasFullAccess={Boolean(payload?.hasFullAccess)}
               renderFragment={(fragment, chapterNumber) => (
                 <>
                   {renderHighlightedText(

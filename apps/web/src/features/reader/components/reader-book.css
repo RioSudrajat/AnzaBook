@@ -107,22 +107,30 @@
 .reader-leaf {
   display: flex;
   flex-direction: column;
-  gap: 0.58em;
+  gap: 0.72em;
   height: 100%;
   min-width: 0;
   min-height: 0;
-  padding: 20px 20px 24px;
+  padding: 20px 22px 24px;
   background-color: var(--reader-paper);
   font-size: var(--reader-leaf-size);
-  line-height: 1.62;
+  line-height: 1.66;
   overflow: hidden;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .reader-leaf > p {
   flex: none;
   margin: 0;
-  text-align: start;
+  text-align: justify;
+  text-justify: inter-word;
+  hyphens: auto;
+  text-indent: 1.4em;
+}
+
+.reader-leaf > p[data-opening="true"],
+.reader-leaf > p[data-continuation="true"] {
+  text-indent: 0;
 }
 
 .reader-leaf-heading {
