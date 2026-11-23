@@ -5,44 +5,7 @@ import type { ExplorePostItemDto } from "@starter/shared/types";
 import { AnzaLogoMark } from "@/components/brand";
 import { resolveSessionCardViewModel } from "@/features/share/card-helpers";
 import { cn } from "@/lib/utils";
-
-function SessionCoverThumb({
-  book,
-  className,
-}: {
-  book: ExplorePostItemDto["book"];
-  className?: string;
-}) {
-  if (book.coverUrl) {
-    return (
-      <img
-        src={book.coverUrl}
-        alt={`Sampul ${book.title}`}
-        loading="lazy"
-        className={cn(
-          "aspect-[7/10] w-12 shrink-0 rounded-md object-cover shadow-sm border border-black/15",
-          className,
-        )}
-      />
-    );
-  }
-
-  return (
-    <div
-      aria-hidden="true"
-      className={cn(
-        "aspect-[7/10] w-12 shrink-0 rounded-md border border-white/15 p-1.5 shadow-sm flex flex-col justify-between text-[#F6F2E9]",
-        className,
-      )}
-      style={{ backgroundColor: book.coverColor || "#3D3229" }}
-    >
-      <AnzaLogoMark variant="badge" className="size-3 self-end" />
-      <p className="font-serif text-[8px] font-bold leading-tight line-clamp-3">
-        {book.title}
-      </p>
-    </div>
-  );
-}
+import { BookCoverThumb } from "./book-cover-thumb";
 
 type SessionPostCardProps = {
   post: ExplorePostItemDto;
@@ -138,7 +101,7 @@ export function SessionPostCard({
           style={{ borderColor: ruleColor }}
         >
           {vm.template === "cover_trail" && (
-            <SessionCoverThumb
+            <BookCoverThumb
               book={post.book}
               className={isStandalone ? "w-14 sm:w-16" : "w-12"}
             />

@@ -165,11 +165,9 @@ function QuotePostComposerInner({
   const excerptCheck = getQuoteExcerptValidation(target.selectedText);
 
   const updateConfig = (patch: Partial<QuotePostConfig>) => {
-    setConfig((prev) => {
-      const next = { ...prev, ...patch };
-      onConfigSnapshot(next);
-      return next;
-    });
+    const next = { ...config, ...patch };
+    setConfig(next);
+    onConfigSnapshot(next);
   };
 
   useEffect(() => {

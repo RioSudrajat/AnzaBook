@@ -191,9 +191,12 @@ export function buildPostPreviewSvg(post: ExplorePostItemDto): string {
     })
     .join("");
 
-  const trailSummary = vm.trail.chapterLabel
-    ? `Jejak Baca · ${vm.trail.chapterLabel} (${vm.trail.startPercent}% → ${vm.trail.endPercent}%)`
-    : `Jejak Baca · ${vm.trail.startPercent}% → ${vm.trail.endPercent}%`;
+  const latinChapterLabel = vm.trail.chapterLabel
+    ? vm.trail.chapterLabel.replace(/\s*→\s*/g, " ke ")
+    : null;
+  const trailSummary = latinChapterLabel
+    ? `Jejak Baca · ${latinChapterLabel} (${vm.trail.startPercent}% - ${vm.trail.endPercent}%)`
+    : `Jejak Baca · ${vm.trail.startPercent}% - ${vm.trail.endPercent}%`;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
   <defs>

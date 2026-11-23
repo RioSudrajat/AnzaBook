@@ -5,6 +5,7 @@ import type { ExplorePostItemDto, HighlightColor } from "@starter/shared/types";
 import { AnzaLogoMark } from "@/components/brand";
 import { resolveQuoteCardViewModel } from "@/features/share/card-helpers";
 import { cn } from "@/lib/utils";
+import { BookCoverThumb } from "./book-cover-thumb";
 
 const STABILO_STYLES: Record<
   HighlightColor,
@@ -31,47 +32,6 @@ const STABILO_STYLES: Record<
     accent: "#60A5FA",
   },
 };
-
-function MiniBookThumb({
-  book,
-  className,
-}: {
-  book: ExplorePostItemDto["book"];
-  className?: string;
-}) {
-  if (book.coverUrl) {
-    return (
-      <img
-        src={book.coverUrl}
-        alt={`Sampul ${book.title}`}
-        loading="lazy"
-        className={cn(
-          "aspect-[7/10] w-14 shrink-0 rounded-md object-cover shadow-sm border border-black/15",
-          className,
-        )}
-      />
-    );
-  }
-
-  return (
-    <div
-      aria-hidden="true"
-      className={cn(
-        "relative aspect-[7/10] w-14 shrink-0 overflow-hidden rounded-md border border-white/15 p-1.5 shadow-sm flex flex-col justify-between text-[#F6F2E9]",
-        className,
-      )}
-      style={{ backgroundColor: book.coverColor || "#3D3229" }}
-    >
-      <div className="flex items-center justify-end">
-        <AnzaLogoMark variant="badge" className="size-3.5" />
-      </div>
-      <p className="font-serif text-[9px] font-bold leading-tight line-clamp-3">
-        {book.title}
-      </p>
-      <span className="h-0.5 w-6 bg-[var(--color-accent)] rounded-full" />
-    </div>
-  );
-}
 
 type QuotePostCardProps = {
   post: ExplorePostItemDto;
@@ -174,7 +134,7 @@ export function QuotePostCard({
           )}
         >
           {vm.template === "book_cover" && (
-            <MiniBookThumb
+            <BookCoverThumb
               book={post.book}
               className={cn(
                 isStandalone ? "w-16 sm:w-20" : "w-14 sm:w-16",

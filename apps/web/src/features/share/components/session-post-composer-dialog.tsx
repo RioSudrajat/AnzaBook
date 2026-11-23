@@ -207,11 +207,9 @@ function SessionPostComposerInner({
   }, [localPhotoUrl]);
 
   const updateConfig = (patch: Partial<SessionPostConfig>) => {
-    setConfig((prev) => {
-      const next = { ...prev, ...patch };
-      onConfigSnapshot(next);
-      return next;
-    });
+    const next = { ...config, ...patch };
+    setConfig(next);
+    onConfigSnapshot(next);
   };
 
   useEffect(() => {

@@ -14,6 +14,7 @@ import {
   resolveSessionCardViewModel,
   shareTempoLabel,
 } from "@/features/share/card-helpers";
+import { BookCoverThumb } from "@/features/share/components/book-cover-thumb";
 import { CopyLinkButton } from "@/features/share/components/copy-link-button";
 import { PostShareDialog } from "@/features/share/components/post-share-dialog";
 import { QuotePostCard } from "@/features/share/components/quote-post-card";
@@ -211,7 +212,7 @@ function PublicPostPage() {
           >
             <Link
               to="/"
-              className="inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-[var(--color-ink-2)] hover:bg-[var(--color-paper-2)] hover:text-[var(--color-ink)] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+              className="inline-flex min-h-11 shrink-0 whitespace-nowrap items-center rounded-lg px-3 text-sm font-medium text-[var(--color-ink-2)] hover:bg-[var(--color-paper-2)] hover:text-[var(--color-ink)] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
             >
               Katalog
             </Link>
@@ -219,14 +220,14 @@ function PublicPostPage() {
               <Link
                 to="/app"
                 search={{ tab: "explore" }}
-                className="inline-flex min-h-11 items-center rounded-lg bg-[var(--color-ink)] px-4 text-sm font-semibold text-[var(--color-paper)] hover:opacity-90 transition-opacity focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+                className="inline-flex min-h-11 shrink-0 whitespace-nowrap items-center rounded-lg bg-[var(--color-ink)] px-3.5 sm:px-4 text-xs sm:text-sm font-semibold text-[var(--color-paper)] hover:opacity-90 transition-opacity focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
               >
                 Jelajahi Feed
               </Link>
             ) : (
               <Link
                 to="/sign-in"
-                className="inline-flex min-h-11 items-center rounded-lg border border-[var(--color-rule)] px-4 text-sm font-medium text-[var(--color-ink)] hover:bg-[var(--color-paper-2)] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+                className="inline-flex min-h-11 shrink-0 whitespace-nowrap items-center rounded-lg border border-[var(--color-rule)] px-4 text-sm font-medium text-[var(--color-ink)] hover:bg-[var(--color-paper-2)] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
               >
                 Masuk
               </Link>
@@ -283,25 +284,7 @@ function PublicPostPage() {
           <aside className="space-y-6 lg:sticky lg:top-8 min-w-0">
             <div className="rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-5 sm:p-6 space-y-5">
               <div className="flex items-start gap-4">
-                {post.book.coverUrl ? (
-                  <img
-                    src={post.book.coverUrl}
-                    alt={`Sampul ${post.book.title}`}
-                    className="aspect-[7/10] w-16 shrink-0 rounded-md object-cover border border-black/15 shadow-sm"
-                  />
-                ) : (
-                  <div
-                    aria-hidden="true"
-                    className="aspect-[7/10] w-16 shrink-0 rounded-md p-2 flex flex-col justify-end text-[#F6F2E9] shadow-sm"
-                    style={{
-                      backgroundColor: post.book.coverColor || "#3D3229",
-                    }}
-                  >
-                    <span className="font-serif text-[10px] font-bold leading-tight line-clamp-3">
-                      {post.book.title}
-                    </span>
-                  </div>
-                )}
+                <BookCoverThumb book={post.book} className="w-16" />
                 <div className="min-w-0 space-y-1">
                   <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--color-muted)]">
                     Dari Buku

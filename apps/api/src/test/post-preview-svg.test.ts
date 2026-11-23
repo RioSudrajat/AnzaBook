@@ -96,6 +96,8 @@ describe("Dynamic OG Post Preview SVG Builder (Issue #14)", () => {
     expect(svg).toContain("11 hlm");
     expect(svg).toContain("20%");
     expect(svg).toContain("45%");
+    expect(svg).toContain("Bab 1 ke Bab 2");
+    expect(svg).not.toContain("→");
     expect(svg).not.toContain("205 WPM");
     expect(svg).not.toContain("15 mnt");
     expect(svg).not.toContain("<image");
