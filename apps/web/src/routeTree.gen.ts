@@ -31,6 +31,8 @@ import { Route as ProtectedCommunitiesNewRouteImport } from './routes/_protected
 import { Route as ProtectedProfileEditRouteImport } from './routes/_protected/profile.edit'
 import { Route as ProtectedPublishersNewRouteImport } from './routes/_protected/publishers.new'
 import { Route as ProtectedReadSlugRouteImport } from './routes/_protected/read.$slug'
+import { Route as PostPreviewTypeIdRouteImport } from './routes/post-preview.$type.$id'
+import { Route as PostTypeIdRouteImport } from './routes/post.$type.$id'
 import { Route as ProtectedMembershipCheckoutOrderIdRouteImport } from './routes/_protected/membership.checkout.$orderId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -141,6 +143,16 @@ const ProtectedReadSlugRoute = ProtectedReadSlugRouteImport.update({
   path: '/read/$slug',
   getParentRoute: () => ProtectedRoute,
 } as any)
+const PostPreviewTypeIdRoute = PostPreviewTypeIdRouteImport.update({
+  id: '/post-preview/$type/$id',
+  path: '/post-preview/$type/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PostTypeIdRoute = PostTypeIdRouteImport.update({
+  id: '/post/$type/$id',
+  path: '/post/$type/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProtectedMembershipCheckoutOrderIdRoute =
   ProtectedMembershipCheckoutOrderIdRouteImport.update({
     id: '/membership/checkout/$orderId',
@@ -169,6 +181,8 @@ export interface FileRoutesByFullPath {
   '/profile/edit': typeof ProtectedProfileEditRoute
   '/publishers/new': typeof ProtectedPublishersNewRoute
   '/read/$slug': typeof ProtectedReadSlugRoute
+  '/post-preview/$type/$id': typeof PostPreviewTypeIdRoute
+  '/post/$type/$id': typeof PostTypeIdRoute
   '/membership/checkout/$orderId': typeof ProtectedMembershipCheckoutOrderIdRoute
 }
 export interface FileRoutesByTo {
@@ -192,6 +206,8 @@ export interface FileRoutesByTo {
   '/profile/edit': typeof ProtectedProfileEditRoute
   '/publishers/new': typeof ProtectedPublishersNewRoute
   '/read/$slug': typeof ProtectedReadSlugRoute
+  '/post-preview/$type/$id': typeof PostPreviewTypeIdRoute
+  '/post/$type/$id': typeof PostTypeIdRoute
   '/membership/checkout/$orderId': typeof ProtectedMembershipCheckoutOrderIdRoute
 }
 export interface FileRoutesById {
@@ -218,6 +234,8 @@ export interface FileRoutesById {
   '/_protected/profile/edit': typeof ProtectedProfileEditRoute
   '/_protected/publishers/new': typeof ProtectedPublishersNewRoute
   '/_protected/read/$slug': typeof ProtectedReadSlugRoute
+  '/post-preview/$type/$id': typeof PostPreviewTypeIdRoute
+  '/post/$type/$id': typeof PostTypeIdRoute
   '/_protected/membership/checkout/$orderId': typeof ProtectedMembershipCheckoutOrderIdRoute
 }
 export interface FileRouteTypes {
@@ -243,6 +261,8 @@ export interface FileRouteTypes {
     | '/profile/edit'
     | '/publishers/new'
     | '/read/$slug'
+    | '/post-preview/$type/$id'
+    | '/post/$type/$id'
     | '/membership/checkout/$orderId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -266,6 +286,8 @@ export interface FileRouteTypes {
     | '/profile/edit'
     | '/publishers/new'
     | '/read/$slug'
+    | '/post-preview/$type/$id'
+    | '/post/$type/$id'
     | '/membership/checkout/$orderId'
   id:
     | '__root__'
@@ -291,6 +313,8 @@ export interface FileRouteTypes {
     | '/_protected/profile/edit'
     | '/_protected/publishers/new'
     | '/_protected/read/$slug'
+    | '/post-preview/$type/$id'
+    | '/post/$type/$id'
     | '/_protected/membership/checkout/$orderId'
   fileRoutesById: FileRoutesById
 }
@@ -307,6 +331,8 @@ export interface RootRouteChildren {
   EventsSlugRoute: typeof EventsSlugRoute
   PSlugRoute: typeof PSlugRoute
   UUsernameRoute: typeof UUsernameRoute
+  PostPreviewTypeIdRoute: typeof PostPreviewTypeIdRoute
+  PostTypeIdRoute: typeof PostTypeIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -465,6 +491,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProtectedReadSlugRouteImport
       parentRoute: typeof ProtectedRoute
     }
+    '/post-preview/$type/$id': {
+      id: '/post-preview/$type/$id'
+      path: '/post-preview/$type/$id'
+      fullPath: '/post-preview/$type/$id'
+      preLoaderRoute: typeof PostPreviewTypeIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/post/$type/$id': {
+      id: '/post/$type/$id'
+      path: '/post/$type/$id'
+      fullPath: '/post/$type/$id'
+      preLoaderRoute: typeof PostTypeIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_protected/membership/checkout/$orderId': {
       id: '/_protected/membership/checkout/$orderId'
       path: '/membership/checkout/$orderId'
@@ -529,6 +569,8 @@ const rootRouteChildren: RootRouteChildren = {
   EventsSlugRoute: EventsSlugRoute,
   PSlugRoute: PSlugRoute,
   UUsernameRoute: UUsernameRoute,
+  PostPreviewTypeIdRoute: PostPreviewTypeIdRoute,
+  PostTypeIdRoute: PostTypeIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
