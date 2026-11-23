@@ -124,7 +124,7 @@ export function ReaderToolbar({
             size="sm"
             onClick={onExit}
             disabled={isSaving}
-            className="min-h-10 min-w-10 sm:min-h-11 sm:min-w-11 shrink-0 p-1 sm:px-2.5 rounded-full hover:bg-muted/60"
+            className="min-h-11 min-w-11 shrink-0 p-1 sm:px-2.5 rounded-full hover:bg-muted/60"
             aria-label="Keluar ke Home"
           >
             <IosArrowLeft className="size-4" aria-hidden="true" />

@@ -265,6 +265,13 @@
     background: var(--color-accent-soft);
     color: var(--color-ink);
   }
+  dialog:modal {
+    overscroll-behavior: contain;
+  }
+  dialog::backdrop {
+    overflow: hidden;
+    overscroll-behavior: contain;
+  }
 }
 
 @layer components {

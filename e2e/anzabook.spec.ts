@@ -77,6 +77,11 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     await expect(page.getByText(/^\d+%$/)).toBeVisible();
 
     await page.getByRole("button", { name: "Keluar ke Home" }).click();
+    const exitDialog = page.getByRole("dialog", {
+      name: "Ringkasan Sesi Baca",
+    });
+    await expect(exitDialog).toBeVisible();
+    await exitDialog.getByRole("button", { name: "Lewati & Keluar" }).click();
     await expect(page).toHaveURL(/\/app/);
     await expect(
       page.getByRole("region", { name: "Lanjutkan Membaca" }),

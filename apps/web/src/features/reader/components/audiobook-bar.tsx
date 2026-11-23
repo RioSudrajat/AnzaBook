@@ -17,6 +17,7 @@ type AudiobookBarProps = {
   activeParagraphIndex: number;
   totalParagraphs: number;
   onParagraphChange: (index: number) => void;
+  onPlaybackStateChange?: (isPlaying: boolean) => void;
   onClose?: () => void;
 };
 
@@ -28,6 +29,7 @@ export function AudiobookBar({
   activeParagraphIndex,
   totalParagraphs,
   onParagraphChange,
+  onPlaybackStateChange,
   onClose,
 }: AudiobookBarProps) {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -35,6 +37,13 @@ export function AudiobookBar({
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
   const [isMuted, setIsMuted] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    onPlaybackStateChange?.(isPlaying);
+    return () => {
+      onPlaybackStateChange?.(false);
+    };
+  }, [isPlaying, onPlaybackStateChange]);
 
   // If no audio URL, simulate playback across totalDurationSeconds
   useEffect(() => {

@@ -8,15 +8,7 @@ import {
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import {
-  CheckCircle2,
-  Flame,
-  Share2,
-  Sparkles,
-  Star,
-  Trophy,
-  X,
-} from "lucide-react";
+import { CheckCircle2, Star } from "lucide-react";
 import { z } from "zod";
 import {
   encodeZeroWidthFingerprint,
@@ -27,7 +19,6 @@ import {
   computeBookPagination,
   getChapterAndPageFromGlobal,
 } from "@starter/shared/chapter-pagination";
-import { bookProgressPercent } from "@starter/shared/reading-progress";
 import { resolveReaderDrmPolicy } from "@starter/shared/validators/drm";
 import type {
   BookChapterSummaryDto,
@@ -40,6 +31,7 @@ import type {
   ManuscriptChapterDto,
 } from "@starter/shared/types";
 import type { SaveReadingProgressInput } from "@starter/shared/validators/reading";
+import type { PublishSessionPostInput } from "@starter/shared/validators/social";
 import { Button } from "@/components/ui/button";
 import { getBookReader } from "@/features/books/api";
 import {
@@ -77,6 +69,10 @@ import { HighlightPopover } from "@/features/reader/components/highlight-popover
 import { HighlightStoryDialog } from "@/features/reader/components/highlight-story-dialog";
 import { HighlightsSidebar } from "@/features/reader/components/highlights-sidebar";
 import { MarginaliaDrawer } from "@/features/reader/components/marginalia-drawer";
+import {
+  PostReadingExitSheet,
+  type PostReadingSessionSummary,
+} from "@/features/reader/components/post-reading-exit-sheet";
 import { ReaderSidebarToc } from "@/features/reader/components/reader-sidebar-toc";
 import { RatingDialog } from "@/features/reader/components/rating-dialog";
 import { ReaderSlideView } from "@/features/reader/components/reader-slide-view";
@@ -87,6 +83,16 @@ import {
   type ReadingLayout,
   ReaderToolbar,
 } from "@/features/reader/components/reader-toolbar";
+import { useActiveReadingTimer } from "@/features/reader/hooks/use-active-reading-timer";
+import {
+  buildBookWordMap,
+  computeBookWordWeightedPercent,
+  computeSessionMetrics,
+  computeStandardPageForPosition,
+  shouldShowExitPrompt,
+  type ChapterTextSource,
+  type ReadingAnchor,
+} from "@/features/reader/session-metrics";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import ImageExtension from "@tiptap/extension-image";
@@ -711,17 +717,18 @@ function ReaderBook() {
   const [saveError, setSaveError] = useState(false);
   const [expiredAccess, setExpiredAccess] = useState<string | null>(null);
 
-  // Marginalia & Finish Modal State
+  // Marginalia & Exit Prompt State
   const [activeParagraphIndex, setActiveParagraphIndex] = useState<number>(0);
   const [marginaliaParagraph, setMarginaliaParagraph] = useState<number | null>(
     null,
   );
-  const [isFinishModalOpen, setIsFinishModalOpen] = useState<boolean>(false);
-  const [sessionSummary, setSessionSummary] = useState<{
-    durationMinutes: number;
-    pagesRead: number;
-    wpm: number;
-  } | null>(null);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  const [isExitPromptOpen, setIsExitPromptOpen] = useState<boolean>(false);
+  const [sessionSummary, setSessionSummary] =
+    useState<PostReadingSessionSummary | null>(null);
+  const [postSessionError, setPostSessionError] = useState<string | null>(null);
+  const [hasRestoredSessionAnchor, setHasRestoredSessionAnchor] =
+    useState(false);
 
   // Highlight Story Dialog State
   const [storyDialogData, setStoryDialogData] = useState<{
@@ -737,7 +744,9 @@ function ReaderBook() {
 
   const readerCanvasRef = useRef<HTMLDivElement>(null);
   const paywallRef = useRef<HTMLElement>(null);
-  const startTimeRef = useRef<number>(0);
+  const chapterCacheRef = useRef<Map<number, ChapterTextSource>>(new Map());
+  const sessionStartAnchorRef = useRef<ReadingAnchor | null>(null);
+  const sessionHighlightsCountRef = useRef<number>(0);
   const sessionIdRef = useRef<string | null>(null);
   const savingRef = useRef(false);
   const pendingCheckpoint = useRef<ReturnType<typeof setTimeout> | undefined>(
@@ -748,8 +757,43 @@ function ReaderBook() {
   const { mutate: saveProgress, mutateAsync: saveProgressAsync } =
     saveProgressMutation;
 
+  const isLocked =
+    error instanceof ApiError && error.code === "FORBIDDEN_DIGITAL_ACCESS";
+  const isDrmSuspendedError =
+    error instanceof ApiError && error.code === "READER_SUSPENDED";
+  const isReaderSuspended =
+    !isAuthorOrPublisher &&
+    !isManuscript &&
+    (suspendedNow ||
+      isDrmSuspendedError ||
+      (readerDrmStatus?.status !== undefined &&
+        readerDrmStatus.status !== "active"));
+  const isExpired =
+    expiredAccess !== null && expiredAccess === payload?.accessExpiresAt;
+  const isMissing = error instanceof ApiError && error.status === 404;
+
+  const isTimerPaused =
+    !hasRestoredSessionAnchor ||
+    isSaving ||
+    isExitPromptOpen ||
+    isRatingOpen ||
+    Boolean(share) ||
+    storyDialogData.isOpen ||
+    isConfigDialogOpen ||
+    isExpired ||
+    isLocked ||
+    isReaderSuspended;
+
+  const {
+    getActiveSeconds,
+    recordActivity: recordReadingActivity,
+    reset: resetActiveTimer,
+  } = useActiveReadingTimer({
+    isPaused: isTimerPaused,
+    isAudioPlaying,
+  });
+
   useEffect(() => {
-    startTimeRef.current = Date.now();
     return () => clearTimeout(pendingCheckpoint.current);
   }, []);
 
@@ -789,6 +833,26 @@ function ReaderBook() {
     }
     return loadedChapters;
   }, [isAuthorOrPublisher, liveChapters, loadedChapters]);
+
+  useEffect(() => {
+    for (const ch of accessibleChapters) {
+      chapterCacheRef.current.set(ch.chapterNumber, {
+        chapterNumber: ch.chapterNumber,
+        contentId: ch.contentId,
+        contentEn: ch.contentEn,
+      });
+    }
+  }, [accessibleChapters]);
+
+  const allChapterNumbers = useMemo(
+    () => displayChapters.map((c) => c.chapterNumber),
+    [displayChapters],
+  );
+
+  const bookWordMap = useMemo(
+    () => buildBookWordMap(accessibleChapters, languageView, allChapterNumbers),
+    [accessibleChapters, languageView, allChapterNumbers],
+  );
 
   const prefetchChapter = useCallback(
     async (targetChapter: number) => {
@@ -949,6 +1013,13 @@ function ReaderBook() {
     );
     const frame = requestAnimationFrame(() => {
       hasRestoredRef.current = true;
+      const finalizeSessionRestore = (anchor: ReadingAnchor) => {
+        sessionStartAnchorRef.current = anchor;
+        sessionHighlightsCountRef.current = 0;
+        setHasRestoredSessionAnchor(true);
+        requestAnimationFrame(() => resetActiveTimer());
+      };
+
       if (savedChapter && checkpoint?.layout === "slide") {
         setReadingLayout("slide");
         const legacyPage = getChapterAndPageFromGlobal(
@@ -976,27 +1047,50 @@ function ReaderBook() {
           checkpoint.lastParagraphIndex ??
           readableParagraphs[legacyTextIndex] ??
           -1;
+        const restoredParagraph =
+          readableParagraphs.find((index) => index >= savedIndex) ?? savedIndex;
         setSlidePosition({
           chapter: savedChapter.chapterNumber,
-          paragraph:
-            readableParagraphs.find((index) => index >= savedIndex) ??
-            savedIndex,
+          paragraph: restoredParagraph,
           offset: 0,
+        });
+        finalizeSessionRestore({
+          chapterNumber: savedChapter.chapterNumber,
+          paragraphIndex: Math.max(0, restoredParagraph),
+          scrollPercent: checkpoint?.lastScrollPercent ?? 0,
         });
         return;
       }
       if (
         !savedChapter &&
         requestedChapter === loadedChapters[0]?.chapterNumber
-      )
+      ) {
+        finalizeSessionRestore({
+          chapterNumber: requestedChapter,
+          paragraphIndex: 0,
+          scrollPercent: 0,
+        });
         return;
+      }
 
       const target = savedChapter?.chapterNumber ?? requestedChapter;
       const section = chapterSection(target);
-      if (!section) return;
+      if (!section) {
+        finalizeSessionRestore({
+          chapterNumber: target,
+          paragraphIndex: checkpoint?.lastParagraphIndex ?? 0,
+          scrollPercent: checkpoint?.lastScrollPercent ?? 0,
+        });
+        return;
+      }
       setScrollPosition({
         chapter: target,
         percent: checkpoint?.lastScrollPercent ?? 0,
+      });
+      finalizeSessionRestore({
+        chapterNumber: target,
+        paragraphIndex: checkpoint?.lastParagraphIndex ?? 0,
+        scrollPercent: checkpoint?.lastScrollPercent ?? 0,
       });
       if (
         payload.hasFullAccess &&
@@ -1042,10 +1136,35 @@ function ReaderBook() {
     payload,
     progress,
     requestedChapter,
+    resetActiveTimer,
     savedProgress,
     search.chapter,
     waitingForCheckpoint,
   ]);
+
+  useEffect(() => {
+    if (
+      readingLayout !== "slide" ||
+      !hasRestoredSessionAnchor ||
+      !activeSpread ||
+      !sessionStartAnchorRef.current ||
+      sessionStartAnchorRef.current.slideIndex !== undefined
+    ) {
+      return;
+    }
+    if (
+      activeSpread.chapter.chapterNumber ===
+      sessionStartAnchorRef.current.chapterNumber
+    ) {
+      sessionStartAnchorRef.current.slideIndex = slideIndex;
+      sessionStartAnchorRef.current.scrollPercent = Math.min(
+        99,
+        Math.round(
+          (activeSpread.chapterPage / activeSpread.chapterPages) * 100,
+        ),
+      );
+    }
+  }, [activeSpread, hasRestoredSessionAnchor, readingLayout, slideIndex]);
 
   useEffect(() => {
     const pending = pendingChapterNavRef.current;
@@ -1318,6 +1437,7 @@ function ReaderBook() {
   ]);
 
   function turnPage(target: SlideSpread) {
+    recordReadingActivity();
     setSlidePosition(target.position);
     const position = captureSlidePosition(target);
     if (position) queueCheckpoint(position);
@@ -1479,12 +1599,27 @@ function ReaderBook() {
     color: HighlightColor;
     note?: string;
     chapterNumber?: number;
+    paragraphIndex?: number;
   }) => {
     const cleanSelectedText = stripZeroWidthCharacters(
       data.selectedText,
     ).trim();
     if (!cleanSelectedText) return;
     const targetChapter = data.chapterNumber ?? activeChapterNum;
+    const targetParagraph = data.paragraphIndex ?? activeParagraphIndex;
+    const sessionWordMap = buildBookWordMap(
+      Array.from(chapterCacheRef.current.values()),
+      languageView,
+      allChapterNumbers,
+    );
+    const computedPageNumber =
+      readingLayout === "slide" && activeSpread
+        ? activeSpread.chapterPage
+        : computeStandardPageForPosition(
+            sessionWordMap,
+            targetChapter,
+            targetParagraph,
+          );
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const optHighlight: BookHighlightDto = {
       id: tempId,
@@ -1492,7 +1627,7 @@ function ReaderBook() {
       bookId,
       chapterId: null,
       chapterNumber: targetChapter,
-      pageNumber: activeSpread?.chapterPage ?? 1,
+      pageNumber: computedPageNumber,
       selectedText: cleanSelectedText,
       color: data.color,
       note: data.note || null,
@@ -1509,12 +1644,13 @@ function ReaderBook() {
       const saved = await createHighlightMutation.mutateAsync({
         bookId,
         chapterNumber: targetChapter,
-        pageNumber: activeSpread?.chapterPage ?? 1,
+        pageNumber: computedPageNumber,
         selectedText: cleanSelectedText,
         color: data.color,
         note: data.note,
       });
 
+      sessionHighlightsCountRef.current += 1;
       // Replace temp highlight with server result
       setOptimisticHighlights((prev) =>
         prev.map((h) => (h.id === tempId ? saved : h)),
@@ -1550,7 +1686,7 @@ function ReaderBook() {
   };
 
   async function saveSession(
-    destination: "home" | "membership" | "summary",
+    destination: "exit" | "home" | "membership" | "summary",
     finishedBook = false,
   ) {
     if (savingRef.current) return;
@@ -1561,6 +1697,9 @@ function ReaderBook() {
 
     try {
       const position = capturePosition();
+      const activeSeconds = Math.min(28_800, getActiveSeconds());
+      let openExitSheet = destination === "summary";
+
       if (bookId && position) {
         const finalChapter =
           payload?.allChapters.at(-1)?.chapterNumber ===
@@ -1576,55 +1715,84 @@ function ReaderBook() {
           position.lastScrollPercent = 100;
         }
         await saveProgressAsync(position);
-        if (startTimeRef.current) {
-          const durationSeconds = Math.min(
-            28_800,
-            Math.max(1, Math.round((Date.now() - startTimeRef.current) / 1000)),
-          );
-          const positionChapter = loadedChapters.find(
-            (item: BookReaderChapterDto) =>
-              item.chapterNumber === position.lastChapterNumber,
-          );
-          const words = splitParagraphs(
-            positionChapter?.contentId ?? chapter?.contentId,
-          )
-            .slice(0, (position.lastParagraphIndex ?? 0) + 1)
-            .join(" ")
-            .split(/\s+/)
-            .filter(Boolean).length;
-          const pagesRead = Math.max(1, Math.ceil(words / 250));
-          const wpm = Math.max(
-            30,
-            Math.min(1200, Math.round((words * 60) / durationSeconds)),
-          );
-          sessionIdRef.current ??= crypto.randomUUID();
-          const createdSession = await createSessionMutation.mutateAsync({
-            sessionId: sessionIdRef.current,
-            bookId,
-            pagesRead,
-            durationSeconds,
-            avgWpm: wpm,
-            mode: "full",
-          });
-          if (createdSession?.id) {
-            setCreatedSessionId(createdSession.id);
-            setIsSessionPosted(false);
-          }
-          sessionIdRef.current = null;
-          startTimeRef.current = 0;
-          setSessionSummary({
-            durationMinutes: Math.max(1, Math.round(durationSeconds / 60)),
-            pagesRead,
-            wpm,
+
+        const sessionWordMap = buildBookWordMap(
+          Array.from(chapterCacheRef.current.values()),
+          languageView,
+          allChapterNumbers,
+        );
+        const endAnchor: ReadingAnchor = {
+          chapterNumber: position.lastChapterNumber,
+          paragraphIndex: position.lastParagraphIndex ?? 0,
+          scrollPercent: position.lastScrollPercent,
+          slideIndex: readingLayout === "slide" ? slideIndex : undefined,
+        };
+        const startAnchor: ReadingAnchor = sessionStartAnchorRef.current ?? {
+          ...endAnchor,
+        };
+        const metrics = computeSessionMetrics({
+          map: sessionWordMap,
+          start: startAnchor,
+          end: endAnchor,
+          activeSeconds,
+          hasFullAccess: Boolean(payload?.hasFullAccess),
+        });
+
+        sessionIdRef.current ??= crypto.randomUUID();
+        const createdSession = await createSessionMutation.mutateAsync({
+          sessionId: sessionIdRef.current,
+          bookId,
+          wordsRead: metrics.wordsRead,
+          pagesRead: metrics.pagesRead,
+          durationSeconds: Math.max(1, metrics.activeSeconds),
+          avgWpm: metrics.apiAvgWpm,
+          startProgressPercent: metrics.startProgressPercent,
+          endProgressPercent: metrics.endProgressPercent,
+          startChapterNumber: metrics.startChapterNumber,
+          endChapterNumber: metrics.endChapterNumber,
+          highlightsCount: sessionHighlightsCountRef.current,
+          mode: isAudioPlaying ? "audio" : "full",
+        });
+
+        const resolvedSessionId = createdSession?.id ?? null;
+        if (resolvedSessionId) {
+          setCreatedSessionId(resolvedSessionId);
+          setIsSessionPosted(false);
+        }
+        setPostSessionError(null);
+        setSessionSummary({
+          sessionId: resolvedSessionId,
+          bookTitle: editorialTitle || payload?.book?.title || "Buku",
+          bookAuthor: payload?.book?.author || user.name || "Penulis",
+          activeSeconds: metrics.activeSeconds,
+          wordsRead: metrics.wordsRead,
+          pagesRead: metrics.pagesRead,
+          rawWpm: metrics.rawWpm,
+          tempo: metrics.tempo,
+          startProgressPercent: metrics.startProgressPercent,
+          endProgressPercent: metrics.endProgressPercent,
+          startChapterNumber: metrics.startChapterNumber,
+          endChapterNumber: metrics.endChapterNumber,
+          highlightsCount: sessionHighlightsCountRef.current,
+        });
+        sessionIdRef.current = null;
+
+        if (destination === "exit") {
+          openExitSheet = shouldShowExitPrompt({
+            activeSeconds: metrics.activeSeconds,
+            hasForwardProgress: metrics.hasForwardProgress,
           });
         }
       }
-      if (destination === "home") {
-        await navigate({ to: "/app", search: { tab: "home" } });
-      } else if (destination === "membership") {
+
+      if (destination === "membership") {
         await navigate({ to: "/membership", search: { book: slug } });
+      } else if (destination === "home") {
+        await navigate({ to: "/app", search: { tab: "home" } });
+      } else if (openExitSheet) {
+        setIsExitPromptOpen(true);
       } else {
-        setIsFinishModalOpen(true);
+        await navigate({ to: "/app", search: { tab: "home" } });
       }
     } catch {
       setSaveError(true);
@@ -1647,25 +1815,40 @@ function ReaderBook() {
     void saveSession("membership");
   }
 
-  function closeSessionSummary() {
-    setIsFinishModalOpen(false);
-    startTimeRef.current = Date.now();
+  function handleResumeReading() {
+    setIsExitPromptOpen(false);
+    setPostSessionError(null);
+    const pos = capturePosition();
+    sessionStartAnchorRef.current = pos
+      ? {
+          chapterNumber: pos.lastChapterNumber,
+          paragraphIndex: pos.lastParagraphIndex ?? 0,
+          scrollPercent: pos.lastScrollPercent,
+          slideIndex: readingLayout === "slide" ? slideIndex : undefined,
+        }
+      : null;
+    sessionHighlightsCountRef.current = 0;
+    sessionIdRef.current = null;
+    resetActiveTimer();
   }
 
-  const isLocked =
-    error instanceof ApiError && error.code === "FORBIDDEN_DIGITAL_ACCESS";
-  const isDrmSuspendedError =
-    error instanceof ApiError && error.code === "READER_SUSPENDED";
-  const isReaderSuspended =
-    !isAuthorOrPublisher &&
-    !isManuscript &&
-    (suspendedNow ||
-      isDrmSuspendedError ||
-      (readerDrmStatus?.status !== undefined &&
-        readerDrmStatus.status !== "active"));
-  const isExpired =
-    expiredAccess !== null && expiredAccess === payload?.accessExpiresAt;
-  const isMissing = error instanceof ApiError && error.status === 404;
+  async function handlePublishSession(input: PublishSessionPostInput) {
+    if (!createdSessionId) return;
+    setPostSessionError(null);
+    try {
+      const updated = await togglePostSessionMutation.mutateAsync({
+        sessionId: createdSessionId,
+        ...input,
+      });
+      setIsSessionPosted(updated.isPosted);
+    } catch (err) {
+      setPostSessionError(
+        err instanceof Error
+          ? err.message
+          : "Gagal membagikan sesi ke linimasa. Coba lagi.",
+      );
+    }
+  }
 
   const hiddenFingerprint = useMemo(
     () =>
@@ -1947,13 +2130,12 @@ function ReaderBook() {
   const nextChapter = payload.hasFullAccess
     ? allChapters[chapterIndex + 1]?.chapterNumber
     : undefined;
-  const currentPercent = payload.hasFullAccess
-    ? bookProgressPercent(
-        chapterIndex,
-        allChapters.length,
-        scrollPosition.percent,
-      )
-    : scrollPosition.percent;
+  const currentPercent = computeBookWordWeightedPercent(
+    bookWordMap,
+    activeChapterNum,
+    scrollPosition.percent,
+    Boolean(payload.hasFullAccess),
+  );
 
   return (
     <DrmShield
@@ -1988,12 +2170,15 @@ function ReaderBook() {
             allChapters={displayChapters}
             onSelectChapter={handleSelectChapter}
             onFinishSession={() => void saveSession("summary")}
-            onExit={() => void saveSession("home")}
+            onExit={() => void saveSession("exit")}
             isSaving={isSaving}
             isAudioOpen={isAudioOpen}
             onToggleAudio={
               currentChapter.audioUrl
-                ? () => setIsAudioOpen(!isAudioOpen)
+                ? () => {
+                    if (isAudioOpen) setIsAudioPlaying(false);
+                    setIsAudioOpen(!isAudioOpen);
+                  }
                 : undefined
             }
             isDrmEnabled={drmPolicy.isEnabled}
@@ -2043,12 +2228,17 @@ function ReaderBook() {
                 activeParagraphIndex={activeParagraphIndex}
                 totalParagraphs={chapterParagraphCount}
                 onParagraphChange={(idx) => {
+                  recordReadingActivity();
                   setActiveParagraphIndex(idx);
                   chapterSection(currentChapter.chapterNumber)
                     ?.querySelector(`[data-reader-paragraph="${idx}"]`)
                     ?.scrollIntoView({ block: "center" });
                 }}
-                onClose={() => setIsAudioOpen(false)}
+                onPlaybackStateChange={setIsAudioPlaying}
+                onClose={() => {
+                  setIsAudioPlaying(false);
+                  setIsAudioOpen(false);
+                }}
               />
             </div>
           )}
@@ -2496,136 +2686,25 @@ function ReaderBook() {
           onClose={() => setMarginaliaParagraph(null)}
         />
 
-        {/* Finish Session Celebration Modal */}
-        {isFinishModalOpen && sessionSummary && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="finish-title"
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200 text-foreground"
-          >
-            <div className="max-w-md w-full bg-card border border-border rounded-[12px] p-6 shadow-2xl relative">
-              <button
-                type="button"
-                onClick={closeSessionSummary}
-                className="absolute right-4 top-4 p-1.5 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted"
-                aria-label="Tutup"
-              >
-                <X className="size-4" />
-              </button>
-
-              <div className="text-center">
-                <div className="size-14 rounded-full bg-[var(--color-accent)]/15 text-[var(--color-accent)] flex items-center justify-center mx-auto mb-3">
-                  <Trophy className="size-7" />
-                </div>
-
-                <h3 id="finish-title" className="font-serif text-xl font-bold">
-                  Sesi Membaca Tercatat!
-                </h3>
-                <p className="text-xs text-muted-foreground mt-1 font-sans">
-                  Pencapaian membaca Anda untuk <strong>{book.title}</strong>{" "}
-                  telah disimpan di linimasa profil.
-                </p>
-
-                {/* Telemetry Highlights */}
-                <div className="mt-5 grid grid-cols-3 gap-2 p-3 rounded-[8px] bg-muted/40 border border-border font-mono text-center">
-                  <div>
-                    <span className="text-[10px] uppercase text-muted-foreground block">
-                      Durasi
-                    </span>
-                    <span className="font-bold text-sm text-foreground">
-                      {sessionSummary.durationMinutes} mnt
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] uppercase text-muted-foreground block">
-                      Halaman
-                    </span>
-                    <span className="font-bold text-sm text-foreground">
-                      {sessionSummary.pagesRead} hal
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] uppercase text-muted-foreground block">
-                      Kecepatan
-                    </span>
-                    <span className="font-bold text-sm text-[var(--color-accent)] flex items-center justify-center gap-0.5">
-                      <Flame className="size-3" />
-                      {sessionSummary.wpm} WPM
-                    </span>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="mt-6 flex flex-col gap-2.5">
-                  {createdSessionId && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={async () => {
-                        const nextPosted = !isSessionPosted;
-                        setIsSessionPosted(nextPosted);
-                        try {
-                          await togglePostSessionMutation.mutateAsync({
-                            sessionId: createdSessionId,
-                            isPosted: nextPosted,
-                          });
-                        } catch (err) {
-                          console.error("Gagal mengubah publikasi sesi:", err);
-                        }
-                      }}
-                      className={`gap-2 font-mono text-xs cursor-pointer transition-colors ${
-                        isSessionPosted
-                          ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/40"
-                          : "border-border hover:bg-muted"
-                      }`}
-                    >
-                      <Sparkles className="size-3.5" />
-                      <span>
-                        {isSessionPosted
-                          ? "Sesi Dipost ke Linimasa Publik ✓"
-                          : "Post Sesi ke Linimasa Komunitas / Publik"}
-                      </span>
-                    </Button>
-                  )}
-
-                  <Button
-                    asChild
-                    className="gap-2 font-mono text-xs bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent)]/90"
-                  >
-                    <Link to="/app" search={{ tab: "library" }}>
-                      <Share2 className="size-3.5" />
-                      Flex Your Reading di My Library
-                    </Link>
-                  </Button>
-
-                  {nextChapter !== undefined ? (
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        closeSessionSummary();
-                        void handleSelectChapter(nextChapter);
-                      }}
-                      className="font-mono text-xs"
-                    >
-                      Lanjut ke Bab {nextChapter}
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      asChild
-                      className="font-mono text-xs"
-                    >
-                      <Link to="/app" search={{ tab: "home" }}>
-                        Kembali ke Home
-                      </Link>
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Post-Reading Session Summary & Optional Share Sheet */}
+        <PostReadingExitSheet
+          isOpen={isExitPromptOpen}
+          theme={theme}
+          summary={sessionSummary}
+          isPosted={isSessionPosted}
+          isSubmittingPost={togglePostSessionMutation.isPending}
+          postError={postSessionError}
+          nextChapter={nextChapter}
+          onSkipAndExit={() =>
+            void navigate({ to: "/app", search: { tab: "home" } })
+          }
+          onResumeReading={handleResumeReading}
+          onContinueNextChapter={(targetChapter) => {
+            handleResumeReading();
+            void handleSelectChapter(targetChapter);
+          }}
+          onPublishSession={handlePublishSession}
+        />
         {/* Author Manuscript Submission & Configuration Dialog */}
         {isAuthorOrPublisher && (
           <ManuscriptConfigDialog
