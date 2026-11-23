@@ -7,7 +7,7 @@ import type {
 } from "@starter/shared/types";
 import { siteConfig } from "@/config/site";
 import { useAuthors, useBooks, useCollections } from "@/features/books/hooks";
-import { useUserShelves } from "@/features/community/hooks";
+import { useReadingSessions, useUserShelves } from "@/features/community/hooks";
 import { AllHighlightsDialog } from "@/features/dashboard/components/all-highlights-dialog";
 import { AppShell } from "@/features/dashboard/components/app-shell";
 import { DashboardEvents } from "@/features/events/components/dashboard-events";
@@ -94,10 +94,33 @@ export default function AppPage() {
   const { data: authors = [] } = useAuthors();
   const { data: collections = [] } = useCollections();
   const { data: shelves = [] } = useUserShelves();
+  const { data: sessionsData } = useReadingSessions();
   const { data: membership } = useMembershipSummary();
+
+  const recentSessions = sessionsData?.data ?? [];
+  const streakDays = sessionsData?.summary?.currentStreakDays ?? null;
 
   const books = booksData?.data || [];
   const bulletinBook = booksData?.bulletin || null;
+  const resolveBookMeta = (
+    bookId?: string | null,
+    fallbackTitle?: string | null,
+    fallbackCoverUrl?: string | null,
+  ) => {
+    const matched = bookId
+      ? (shelves.find((item) => item.bookId === bookId)?.book ??
+        books.find((item) => item.id === bookId) ??
+        null)
+      : null;
+
+    return {
+      title: matched?.title || fallbackTitle?.trim() || "AnzaBook",
+      author: matched?.author ?? null,
+      slug: matched?.slug ?? null,
+      coverUrl: matched?.coverUrl ?? fallbackCoverUrl ?? null,
+      coverColor: matched?.coverColor ?? null,
+    };
+  };
   const currentlyReading = shelves.filter(
     (item) => item.shelfStatus === "reading",
   );
@@ -222,6 +245,9 @@ export default function AppPage() {
           onOpenFlexStory={(session, bookTitle) => {
             setFlexStoryState({ isOpen: true, session, bookTitle });
           }}
+          onOpenQuoteStory={(hl) => {
+            setQuoteStoryState({ isOpen: true, highlight: hl });
+          }}
         />
       )}
 
@@ -249,29 +275,63 @@ export default function AppPage() {
         }}
       />
 
-      <FlexReadingDialog
-        isOpen={flexStoryState.isOpen}
-        session={flexStoryState.session}
-        bookTitle={flexStoryState.bookTitle}
-        userName={user.name}
-        onClose={() =>
-          setFlexStoryState((prev) => ({ ...prev, isOpen: false }))
-        }
-      />
+      {(() => {
+        const flexMeta = resolveBookMeta(
+          flexStoryState.session?.bookId,
+          flexStoryState.bookTitle || flexStoryState.session?.bookTitle,
+          flexStoryState.session?.bookCoverUrl,
+        );
+        return (
+          <FlexReadingDialog
+            isOpen={flexStoryState.isOpen}
+            session={flexStoryState.session}
+            bookTitle={flexMeta.title}
+            bookAuthor={flexMeta.author}
+            bookSlug={flexMeta.slug}
+            bookCoverUrl={flexMeta.coverUrl}
+            bookCoverColor={flexMeta.coverColor}
+            streakDays={streakDays}
+            recentSessions={recentSessions}
+            userName={user.name}
+            onClose={() =>
+              setFlexStoryState((prev) => ({ ...prev, isOpen: false }))
+            }
+          />
+        );
+      })()}
 
-      {quoteStoryState.highlight && (
-        <HighlightStoryDialog
-          isOpen={quoteStoryState.isOpen}
-          onClose={() => setQuoteStoryState({ isOpen: false, highlight: null })}
-          bookTitle="Sains, Logika, dan Seni untuk Hidup Bermutu"
-          bookAuthor="Zenius"
-          chapterNumber={quoteStoryState.highlight.chapterNumber}
-          highlightText={quoteStoryState.highlight.selectedText}
-          color={quoteStoryState.highlight.color}
-          note={quoteStoryState.highlight.note || undefined}
-          readerName={user.name}
-        />
-      )}
+      {quoteStoryState.highlight &&
+        (() => {
+          const hl = quoteStoryState.highlight;
+          const quoteMeta = resolveBookMeta(
+            hl.bookId,
+            hl.bookTitle,
+            hl.bookCoverUrl,
+          );
+          return (
+            <HighlightStoryDialog
+              isOpen={quoteStoryState.isOpen}
+              onClose={() =>
+                setQuoteStoryState({ isOpen: false, highlight: null })
+              }
+              highlightId={hl.id}
+              bookTitle={quoteMeta.title}
+              bookAuthor={quoteMeta.author}
+              bookSlug={quoteMeta.slug}
+              bookCoverUrl={hl.bookCoverUrl ?? quoteMeta.coverUrl}
+              bookCoverColor={quoteMeta.coverColor}
+              chapterNumber={hl.chapterNumber}
+              pageNumber={hl.pageNumber}
+              highlightText={hl.selectedText}
+              color={hl.color}
+              note={hl.note || undefined}
+              isPosted={hl.isPosted}
+              postCaption={hl.postCaption}
+              postConfig={hl.postConfig}
+              readerName={user.name}
+            />
+          );
+        })()}
     </AppShell>
   );
 }

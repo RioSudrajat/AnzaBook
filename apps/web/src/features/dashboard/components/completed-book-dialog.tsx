@@ -242,7 +242,11 @@ export function CompletedBookDialog({
                       title="Flex kutipan atau pencapaian sesi ini"
                     >
                       <Share2 className="size-3.5" />
-                      <span className="hidden sm:inline">Flex Sesi</span>
+                      <span className="hidden sm:inline">
+                        {session.isPosted
+                          ? "Dipost · Bagikan"
+                          : "Post & Bagikan"}
+                      </span>
                     </Button>
                   </li>
                 ))}

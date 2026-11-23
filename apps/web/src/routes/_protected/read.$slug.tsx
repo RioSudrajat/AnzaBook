@@ -29,6 +29,7 @@ import type {
   DigitalPolicy,
   HighlightColor,
   ManuscriptChapterDto,
+  ReadingSessionDto,
 } from "@starter/shared/types";
 import type { SaveReadingProgressInput } from "@starter/shared/validators/reading";
 import type { PublishSessionPostInput } from "@starter/shared/validators/social";
@@ -58,7 +59,10 @@ import {
   type SlideSpread,
 } from "@/features/reader/slide-pagination";
 import { ApiError } from "@/lib/api/client";
-import { useCreateReadingSession } from "@/features/community/hooks";
+import {
+  useCreateReadingSession,
+  useReadingSessions,
+} from "@/features/community/hooks";
 import { AudiobookBar } from "@/features/reader/components/audiobook-bar";
 import {
   DrmShield,
@@ -68,6 +72,8 @@ import { GlossyProgressBar } from "@/features/reader/components/glossy-progress-
 import { HighlightPopover } from "@/features/reader/components/highlight-popover";
 import { HighlightStoryDialog } from "@/features/reader/components/highlight-story-dialog";
 import { HighlightsSidebar } from "@/features/reader/components/highlights-sidebar";
+import { FlexReadingDialog } from "@/features/share/components/flex-reading-dialog";
+import { extractSurroundingContext } from "@/features/share/card-helpers";
 import { MarginaliaDrawer } from "@/features/reader/components/marginalia-drawer";
 import {
   PostReadingExitSheet,
@@ -134,7 +140,6 @@ import {
   useUpdateManuscript,
   useSubmitManuscriptDraft,
   useReviewManuscript,
-  useTogglePostHighlight,
   useTogglePostSession,
 } from "@/features/social/hooks";
 import "@/features/reader/editor/components/editor-styles.css";
@@ -508,11 +513,15 @@ function ReaderBook() {
   const { data: bookHighlights = [] } = useBookHighlights(bookId);
   const createHighlightMutation = useCreateHighlight(bookId);
   const deleteHighlightMutation = useDeleteHighlight(bookId);
-  const togglePostHighlightMutation = useTogglePostHighlight();
   const togglePostSessionMutation = useTogglePostSession();
+  const { data: sessionsData } = useReadingSessions();
 
-  const [createdSessionId, setCreatedSessionId] = useState<string | null>(null);
+  const [createdSession, setCreatedSession] =
+    useState<ReadingSessionDto | null>(null);
+  const createdSessionId = createdSession?.id ?? null;
+  const [isSessionComposerOpen, setIsSessionComposerOpen] = useState(false);
   const [isSessionPosted, setIsSessionPosted] = useState(false);
+  const suppressResumeOnCloseRef = useRef(false);
 
   // Local optimistic highlights to ensure immediate instant stabilo rendering
   const [optimisticHighlights, setOptimisticHighlights] = useState<
@@ -730,16 +739,13 @@ function ReaderBook() {
   const [hasRestoredSessionAnchor, setHasRestoredSessionAnchor] =
     useState(false);
 
-  // Highlight Story Dialog State
+  // Quote Composer Dialog State
   const [storyDialogData, setStoryDialogData] = useState<{
     isOpen: boolean;
-    text: string;
-    color: HighlightColor;
-    note?: string;
+    highlight: BookHighlightDto | null;
   }>({
     isOpen: false,
-    text: "",
-    color: "yellow",
+    highlight: null,
   });
 
   const readerCanvasRef = useRef<HTMLDivElement>(null);
@@ -776,6 +782,7 @@ function ReaderBook() {
     !hasRestoredSessionAnchor ||
     isSaving ||
     isExitPromptOpen ||
+    isSessionComposerOpen ||
     isRatingOpen ||
     Boolean(share) ||
     storyDialogData.isOpen ||
@@ -1569,13 +1576,11 @@ function ReaderBook() {
     }
   }
 
-  // Handle Flexing a specific highlight
+  // Handle opening unified Quote Composer for a highlight
   const handleFlexHighlight = (h: BookHighlightDto) => {
     setStoryDialogData({
       isOpen: true,
-      text: h.selectedText,
-      color: h.color,
-      note: h.note || undefined,
+      highlight: h,
     });
   };
 
@@ -1600,6 +1605,7 @@ function ReaderBook() {
     note?: string;
     chapterNumber?: number;
     paragraphIndex?: number;
+    openComposer?: boolean;
   }) => {
     const cleanSelectedText = stripZeroWidthCharacters(
       data.selectedText,
@@ -1636,7 +1642,9 @@ function ReaderBook() {
 
     // 1. Instantly show highlight in text and increment counter
     setOptimisticHighlights((prev) => [optHighlight, ...prev]);
-    setIsHighlightsOpen(true);
+    if (!data.openComposer) {
+      setIsHighlightsOpen(true);
+    }
     setMarginaliaParagraph(null);
 
     // 2. Persist to API
@@ -1651,10 +1659,23 @@ function ReaderBook() {
       });
 
       sessionHighlightsCountRef.current += 1;
+
+      const hydratedHighlight: BookHighlightDto = {
+        ...saved,
+        bookTitle: saved.bookTitle ?? book.title,
+        bookCoverUrl: saved.bookCoverUrl ?? book.coverUrl,
+      };
       // Replace temp highlight with server result
       setOptimisticHighlights((prev) =>
-        prev.map((h) => (h.id === tempId ? saved : h)),
+        prev.map((h) => (h.id === tempId ? hydratedHighlight : h)),
       );
+
+      if (data.openComposer) {
+        setStoryDialogData({
+          isOpen: true,
+          highlight: hydratedHighlight,
+        });
+      }
     } catch (err) {
       console.error("Gagal menyimpan stabilo ke server:", err);
     }
@@ -1667,21 +1688,6 @@ function ReaderBook() {
       await deleteHighlightMutation.mutateAsync(id);
     } catch (err) {
       console.error("Gagal menghapus stabilo:", err);
-    }
-  };
-
-  // Handle toggling highlight public post status
-  const handleTogglePostHighlight = async (id: string, isPosted: boolean) => {
-    setOptimisticHighlights((prev) =>
-      prev.map((h) => (h.id === id ? { ...h, isPosted } : h)),
-    );
-    try {
-      await togglePostHighlightMutation.mutateAsync({
-        highlightId: id,
-        isPosted,
-      });
-    } catch (err) {
-      console.error("Gagal mengubah status publikasi stabilo:", err);
     }
   };
 
@@ -1738,27 +1744,65 @@ function ReaderBook() {
           hasFullAccess: Boolean(payload?.hasFullAccess),
         });
 
-        sessionIdRef.current ??= crypto.randomUUID();
-        const createdSession = await createSessionMutation.mutateAsync({
-          sessionId: sessionIdRef.current,
-          bookId,
-          wordsRead: metrics.wordsRead,
-          pagesRead: metrics.pagesRead,
-          durationSeconds: Math.max(1, metrics.activeSeconds),
-          avgWpm: metrics.apiAvgWpm,
-          startProgressPercent: metrics.startProgressPercent,
-          endProgressPercent: metrics.endProgressPercent,
-          startChapterNumber: metrics.startChapterNumber,
-          endChapterNumber: metrics.endChapterNumber,
-          highlightsCount: sessionHighlightsCountRef.current,
-          mode: isAudioPlaying ? "audio" : "full",
+        const hasMeaningfulSession = shouldShowExitPrompt({
+          activeSeconds: metrics.activeSeconds,
+          hasForwardProgress: metrics.hasForwardProgress,
         });
 
-        const resolvedSessionId = createdSession?.id ?? null;
-        if (resolvedSessionId) {
-          setCreatedSessionId(resolvedSessionId);
-          setIsSessionPosted(false);
+        if (destination === "exit") {
+          openExitSheet = hasMeaningfulSession;
         }
+
+        const shouldRecordSession =
+          destination === "summary" || hasMeaningfulSession;
+
+        let resolvedSessionId: string | null = null;
+        if (shouldRecordSession) {
+          sessionIdRef.current ??= crypto.randomUUID();
+          const persistedSession = await createSessionMutation.mutateAsync({
+            sessionId: sessionIdRef.current,
+            bookId,
+            wordsRead: metrics.wordsRead,
+            pagesRead: metrics.pagesRead,
+            durationSeconds: Math.max(1, metrics.activeSeconds),
+            avgWpm: metrics.apiAvgWpm,
+            startProgressPercent: metrics.startProgressPercent,
+            endProgressPercent: metrics.endProgressPercent,
+            startChapterNumber: metrics.startChapterNumber,
+            endChapterNumber: metrics.endChapterNumber,
+            highlightsCount: sessionHighlightsCountRef.current,
+            mode: isAudioPlaying ? "audio" : "full",
+          });
+
+          resolvedSessionId = persistedSession?.id ?? null;
+          if (persistedSession?.id) {
+            setCreatedSession({
+              ...persistedSession,
+              bookTitle:
+                persistedSession.bookTitle ||
+                editorialTitle ||
+                payload?.book?.title ||
+                book.title,
+              bookCoverUrl: persistedSession.bookCoverUrl ?? book.coverUrl,
+              startChapterNumber:
+                persistedSession.startChapterNumber ??
+                metrics.startChapterNumber,
+              endChapterNumber:
+                persistedSession.endChapterNumber ?? metrics.endChapterNumber,
+              startProgressPercent:
+                persistedSession.startProgressPercent ??
+                metrics.startProgressPercent,
+              endProgressPercent:
+                persistedSession.endProgressPercent ??
+                metrics.endProgressPercent,
+            });
+            setIsSessionPosted(Boolean(persistedSession.isPosted));
+          }
+          sessionIdRef.current = null;
+        } else {
+          setCreatedSession(null);
+        }
+
         setPostSessionError(null);
         setSessionSummary({
           sessionId: resolvedSessionId,
@@ -1775,14 +1819,6 @@ function ReaderBook() {
           endChapterNumber: metrics.endChapterNumber,
           highlightsCount: sessionHighlightsCountRef.current,
         });
-        sessionIdRef.current = null;
-
-        if (destination === "exit") {
-          openExitSheet = shouldShowExitPrompt({
-            activeSeconds: metrics.activeSeconds,
-            hasForwardProgress: metrics.hasForwardProgress,
-          });
-        }
       }
 
       if (destination === "membership") {
@@ -1818,6 +1854,10 @@ function ReaderBook() {
   function handleResumeReading() {
     setIsExitPromptOpen(false);
     setPostSessionError(null);
+    if (suppressResumeOnCloseRef.current) {
+      suppressResumeOnCloseRef.current = false;
+      return;
+    }
     const pos = capturePosition();
     sessionStartAnchorRef.current = pos
       ? {
@@ -2649,7 +2689,6 @@ function ReaderBook() {
           onSelectHighlight={handleSelectHighlight}
           onFlexHighlight={handleFlexHighlight}
           onDeleteHighlight={handleDeleteHighlight}
-          onTogglePostHighlight={handleTogglePostHighlight}
         />
 
         {share && (
@@ -2662,19 +2701,107 @@ function ReaderBook() {
           />
         )}
 
-        {/* 9:16 Flex Your Reading Story Generator Dialog */}
-        <HighlightStoryDialog
-          isOpen={storyDialogData.isOpen}
-          onClose={() =>
-            setStoryDialogData((prev) => ({ ...prev, isOpen: false }))
-          }
+        {/* Unified Quote Post & Share Composer */}
+        {(() => {
+          const hl = storyDialogData.highlight;
+          const matchedChapter = hl
+            ? loadedChapters.find(
+                (item) => item.chapterNumber === hl.chapterNumber,
+              )
+            : null;
+          const surroundingContext = hl
+            ? extractSurroundingContext(
+                matchedChapter?.contentId ?? currentChapter.contentId,
+                hl.selectedText,
+              )
+            : null;
+
+          return (
+            <HighlightStoryDialog
+              isOpen={storyDialogData.isOpen && Boolean(hl)}
+              theme={theme}
+              onClose={() =>
+                setStoryDialogData((prev) => ({ ...prev, isOpen: false }))
+              }
+              highlightId={hl?.id}
+              bookTitle={hl?.bookTitle ?? book.title}
+              bookAuthor={book.author}
+              bookSlug={slug}
+              bookCoverUrl={hl?.bookCoverUrl ?? book.coverUrl}
+              bookCoverColor={book.coverColor}
+              chapterNumber={hl?.chapterNumber ?? activeChapterNum}
+              pageNumber={hl?.pageNumber ?? activeSpread?.chapterPage}
+              highlightText={hl?.selectedText ?? ""}
+              color={hl?.color ?? "yellow"}
+              note={hl?.note}
+              surroundingContext={surroundingContext}
+              isPosted={hl?.isPosted}
+              postCaption={hl?.postCaption}
+              postConfig={hl?.postConfig}
+              readerName={user.name}
+              onPublishedChange={(result) => {
+                setOptimisticHighlights((prev) =>
+                  prev.map((item) =>
+                    item.id === result.id
+                      ? {
+                          ...item,
+                          isPosted: result.isPosted,
+                          postCaption: result.postCaption,
+                          postConfig: result.postConfig,
+                        }
+                      : item,
+                  ),
+                );
+                setStoryDialogData((prev) =>
+                  prev.highlight && prev.highlight.id === result.id
+                    ? {
+                        ...prev,
+                        highlight: {
+                          ...prev.highlight,
+                          isPosted: result.isPosted,
+                          postCaption: result.postCaption,
+                          postConfig: result.postConfig,
+                        },
+                      }
+                    : prev,
+                );
+              }}
+            />
+          );
+        })()}
+
+        <FlexReadingDialog
+          isOpen={isSessionComposerOpen}
+          theme={theme}
+          onClose={() => {
+            setIsSessionComposerOpen(false);
+            handleResumeReading();
+          }}
+          session={createdSession}
           bookTitle={book.title}
           bookAuthor={book.author}
-          chapterNumber={activeChapterNum}
-          highlightText={storyDialogData.text}
-          color={storyDialogData.color}
-          note={storyDialogData.note}
-          readerName={user.name}
+          bookSlug={slug}
+          bookCoverUrl={book.coverUrl}
+          bookCoverColor={book.coverColor}
+          streakDays={sessionsData?.summary?.currentStreakDays ?? null}
+          recentSessions={
+            sessionsData?.data ?? (createdSession ? [createdSession] : [])
+          }
+          userName={user.name}
+          onPublishedChange={(result) => {
+            setIsSessionPosted(result.isPosted);
+            setCreatedSession((prev) =>
+              prev && prev.id === result.id
+                ? {
+                    ...prev,
+                    isPosted: result.isPosted,
+                    title: result.title,
+                    note: result.note,
+                    postConfig: result.postConfig,
+                  }
+                : prev,
+            );
+          }}
         />
 
         {/* Marginalia Comments Drawer */}
@@ -2704,6 +2831,11 @@ function ReaderBook() {
             void handleSelectChapter(targetChapter);
           }}
           onPublishSession={handlePublishSession}
+          onOpenExternalComposer={() => {
+            suppressResumeOnCloseRef.current = true;
+            setIsExitPromptOpen(false);
+            setIsSessionComposerOpen(true);
+          }}
         />
         {/* Author Manuscript Submission & Configuration Dialog */}
         {isAuthorOrPublisher && (

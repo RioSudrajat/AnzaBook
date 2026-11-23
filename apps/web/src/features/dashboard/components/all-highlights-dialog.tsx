@@ -150,20 +150,21 @@ export function AllHighlightsDialog({
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between pt-1 text-[10px] font-mono text-muted-foreground">
-                    <span>
-                      Bab {hl.chapterNumber} &bull; Hal {hl.pageNumber}
+                  <div className="flex items-center justify-between gap-2 pt-1 text-[10px] font-mono text-muted-foreground">
+                    <span className="truncate">
+                      {hl.bookTitle ? `${hl.bookTitle} · ` : ""}Bab{" "}
+                      {hl.chapterNumber} &bull; Hal {hl.pageNumber}
                     </span>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                       <Button
                         size="sm"
                         variant="ghost"
                         onClick={() => onOpenStory(hl)}
-                        className="h-6 px-2 text-[10px] font-mono gap-1 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                        className="h-7 px-2.5 text-[10px] font-mono gap-1 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
                       >
                         <Share2 className="size-3" />
-                        Flex Story
+                        {hl.isPosted ? "Dipost · Bagikan" : "Post & Bagikan"}
                       </Button>
 
                       <button
