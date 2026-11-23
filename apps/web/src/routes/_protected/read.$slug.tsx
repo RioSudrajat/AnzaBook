@@ -521,7 +521,6 @@ function ReaderBook() {
   const createdSessionId = createdSession?.id ?? null;
   const [isSessionComposerOpen, setIsSessionComposerOpen] = useState(false);
   const [isSessionPosted, setIsSessionPosted] = useState(false);
-  const suppressResumeOnCloseRef = useRef(false);
 
   // Local optimistic highlights to ensure immediate instant stabilo rendering
   const [optimisticHighlights, setOptimisticHighlights] = useState<
@@ -1854,10 +1853,6 @@ function ReaderBook() {
   function handleResumeReading() {
     setIsExitPromptOpen(false);
     setPostSessionError(null);
-    if (suppressResumeOnCloseRef.current) {
-      suppressResumeOnCloseRef.current = false;
-      return;
-    }
     const pos = capturePosition();
     sessionStartAnchorRef.current = pos
       ? {
@@ -2843,7 +2838,6 @@ function ReaderBook() {
           }}
           onPublishSession={handlePublishSession}
           onOpenExternalComposer={() => {
-            suppressResumeOnCloseRef.current = true;
             setIsExitPromptOpen(false);
             setIsSessionComposerOpen(true);
           }}

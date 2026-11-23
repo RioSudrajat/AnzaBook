@@ -9,6 +9,7 @@ import type {
 } from "@starter/shared/validators/publisher";
 import type {
   ApplyAuthorInput,
+  PublicSocialPostType,
   PublishHighlightPostInput,
   PublishSessionPostInput,
   UpdateProfileBioInput,
@@ -37,6 +38,7 @@ import {
   manuscriptDetailQuery,
   myManuscriptsQuery,
   mySocialProfileQuery,
+  publicSocialPostQuery,
   publisherDetailQuery,
   publisherKeys,
   publisherManuscriptsQuery,
@@ -329,4 +331,8 @@ export function useTogglePostSession() {
       queryClient.invalidateQueries({ queryKey: communityKeys.sessions() });
     },
   });
+}
+
+export function usePublicSocialPost(type: PublicSocialPostType, id: string) {
+  return useQuery(publicSocialPostQuery(type, id));
 }
