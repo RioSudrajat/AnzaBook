@@ -1,3 +1,5 @@
+import { getManuscriptStatusMeta } from "@/features/publisher/publisher-helpers";
+
 export function formatRoleName(role?: string | null): string {
   if (!role) return "Anggota";
   switch (role.toLowerCase()) {
@@ -19,25 +21,7 @@ export function formatRoleName(role?: string | null): string {
 }
 
 export function formatManuscriptStatus(status?: string | null): string {
-  if (!status) return "Draf";
-  switch (status.toLowerCase()) {
-    case "draft":
-      return "Draf";
-    case "submitted":
-      return "Diajukan";
-    case "under_review":
-      return "Sedang Ditinjau";
-    case "revision_requested":
-      return "Perlu Revisi";
-    case "accepted":
-      return "Disetujui";
-    case "published":
-      return "Diterbitkan";
-    case "rejected":
-      return "Ditolak";
-    default:
-      return status.replace(/_/g, " ");
-  }
+  return getManuscriptStatusMeta(status).label;
 }
 
 export function formatDigitalPolicy(policy?: string | null): string {
@@ -51,6 +35,7 @@ export function formatDigitalPolicy(policy?: string | null): string {
       return "Koleksi Nakama";
     case "print_claim_only":
       return "Klaim Cetak Fisik";
+    case "free_open":
     case "free":
       return "Akses Terbuka";
     default:

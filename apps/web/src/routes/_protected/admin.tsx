@@ -13,13 +13,13 @@ const adminSearchSchema = z.object({
     .enum([
       "calendars",
       "partners",
-      "manuscripts",
       "claim-batches",
       "financials",
       "drm-security",
       "notes",
     ])
-    .optional(),
+    .optional()
+    .catch(undefined),
 });
 
 export const Route = createFileRoute("/_protected/admin")({

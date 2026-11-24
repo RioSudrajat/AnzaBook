@@ -1,10 +1,12 @@
 import { queryOptions } from "@tanstack/react-query";
+import type { ListSubmissionTargetsInput } from "@starter/shared/validators/publisher";
 import type { PublicSocialPostType } from "@starter/shared/validators/social";
 import {
   exploreAuthors,
   exploreReaders,
   fetchUnifiedExplore,
   getManuscript,
+  getMyManagedPublishers,
   getMyManuscripts,
   getMySocialProfile,
   getPublicSocialPost,
@@ -13,6 +15,9 @@ import {
   getUserFollowers,
   getUserFollowing,
   getUserProfile,
+  listPublisherBooks,
+  listPublisherMembers,
+  listSubmissionTargets,
   listVerifiedPublishers,
 } from "./api";
 
@@ -43,7 +48,18 @@ export const socialKeys = {
 export const publisherKeys = {
   all: ["publisher"] as const,
   verified: () => [...publisherKeys.all, "verified"] as const,
+  submissionTargets: (params?: ListSubmissionTargetsInput) =>
+    [
+      ...publisherKeys.all,
+      "submission-targets",
+      params?.q?.trim() ?? "",
+      params?.topic?.trim() ?? "",
+      params?.limit ?? 50,
+    ] as const,
+  myManaged: () => [...publisherKeys.all, "mine"] as const,
   detail: (slug: string) => [...publisherKeys.all, "detail", slug] as const,
+  books: (slug: string) => [...publisherKeys.all, "books", slug] as const,
+  members: (slug: string) => [...publisherKeys.all, "members", slug] as const,
   myManuscripts: () => [...publisherKeys.all, "manuscripts", "mine"] as const,
   manuscriptDetail: (idOrSlug: string) =>
     [...publisherKeys.all, "manuscript", idOrSlug] as const,
@@ -121,10 +137,40 @@ export function verifiedPublishersQuery() {
   });
 }
 
+export function submissionTargetsQuery(params?: ListSubmissionTargetsInput) {
+  return queryOptions({
+    queryKey: publisherKeys.submissionTargets(params),
+    queryFn: ({ signal }) => listSubmissionTargets(params, signal),
+  });
+}
+
+export function myManagedPublishersQuery() {
+  return queryOptions({
+    queryKey: publisherKeys.myManaged(),
+    queryFn: ({ signal }) => getMyManagedPublishers(signal),
+  });
+}
+
 export function publisherDetailQuery(slug: string) {
   return queryOptions({
     queryKey: publisherKeys.detail(slug),
     queryFn: ({ signal }) => getPublisherBySlug(slug, signal),
+    enabled: Boolean(slug),
+  });
+}
+
+export function publisherBooksQuery(slug: string) {
+  return queryOptions({
+    queryKey: publisherKeys.books(slug),
+    queryFn: ({ signal }) => listPublisherBooks(slug, signal),
+    enabled: Boolean(slug),
+  });
+}
+
+export function publisherMembersQuery(slug: string) {
+  return queryOptions({
+    queryKey: publisherKeys.members(slug),
+    queryFn: ({ signal }) => listPublisherMembers(slug, signal),
     enabled: Boolean(slug),
   });
 }

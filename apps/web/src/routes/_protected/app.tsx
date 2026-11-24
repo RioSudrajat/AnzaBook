@@ -17,6 +17,7 @@ import { DashboardHome } from "@/features/dashboard/components/dashboard-home";
 import { DashboardLibrary } from "@/features/dashboard/components/dashboard-library";
 import { DashboardProfile } from "@/features/dashboard/components/dashboard-profile";
 import { DashboardSettings } from "@/features/dashboard/components/dashboard-settings";
+import { PublisherHubView } from "@/features/publisher/components/publisher-hub-view";
 import { useMembershipSummary } from "@/features/membership/hooks";
 import { HighlightStoryDialog } from "@/features/reader/components/highlight-story-dialog";
 import { FlexReadingDialog } from "@/features/share/components/flex-reading-dialog";
@@ -214,6 +215,8 @@ export default function AppPage() {
         ) : (
           <DashboardEvents />
         ))}
+
+      {activeTab === "publisher" && <PublisherHubView />}
 
       {activeTab === "library" && (
         <DashboardLibrary

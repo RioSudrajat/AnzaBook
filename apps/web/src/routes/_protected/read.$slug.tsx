@@ -130,17 +130,21 @@ import {
 import { SubstackEditorToolbar } from "@/features/reader/editor/components/substack-editor-toolbar";
 import { ReaderBookHeader } from "@/features/reader/components/reader-book-header";
 import { ManuscriptConfigDialog } from "@/features/reader/components/manuscript-config-dialog";
+import { PublishManuscriptDialog } from "@/features/publisher/components/publish-manuscript-dialog";
+import { canReviewManuscripts } from "@/features/publisher/publisher-helpers";
 import {
   buildUnifiedDocFromChapters,
   extractChaptersFromJson,
   type ExtractedChapter,
 } from "@/features/reader/editor/manuscript-json";
 import {
+  useEditPublisherManuscript,
   useManuscript,
-  useUpdateManuscript,
+  useMyManagedPublishers,
+  useReviewPublisherManuscript,
   useSubmitManuscriptDraft,
-  useReviewManuscript,
   useTogglePostSession,
+  useUpdateManuscript,
 } from "@/features/social/hooks";
 import "@/features/reader/editor/components/editor-styles.css";
 
@@ -150,6 +154,8 @@ const readSearchSchema = z.object({
   page: z.coerce.number().int().min(1).optional(),
   drm: z.coerce.boolean().optional(),
   editorial: z.enum(["preview", "edit"]).optional(),
+  publisherSlug: z.string().optional(),
+  targetPublisherId: z.string().optional(),
 });
 
 export const Route = createFileRoute("/_protected/read/$slug")({
@@ -355,8 +361,11 @@ function ReaderBook() {
   } = useManuscript(manuscriptId);
 
   const updateManuscriptMutation = useUpdateManuscript();
+  const editPublisherManuscriptMutation = useEditPublisherManuscript();
   const submitDraftMutation = useSubmitManuscriptDraft();
-  const reviewMutation = useReviewManuscript();
+  const reviewPublisherMutation = useReviewPublisherManuscript();
+  const { data: myManagedPublishers = [] } =
+    useMyManagedPublishers(isManuscript);
 
   const {
     data: bookPayload,
@@ -458,11 +467,21 @@ function ReaderBook() {
   const bookAuthorUserId = (
     payload?.book as { authorUserId?: string | null } | undefined
   )?.authorUserId;
-  const isAuthorOrPublisher = Boolean(
-    isManuscript ||
-    (bookAuthorUserId && bookAuthorUserId === user.id) ||
-    user.role === "admin",
+  const isAuthorOwner = Boolean(
+    (isManuscript && manuscript?.authorUserId === user.id) ||
+    (!isManuscript && bookAuthorUserId && bookAuthorUserId === user.id),
   );
+  const managedTargetPublisher = manuscript?.publisherId
+    ? myManagedPublishers.find((pub) => pub.id === manuscript.publisherId)
+    : undefined;
+  const isPublisherCurator = Boolean(
+    isManuscript &&
+    managedTargetPublisher &&
+    canReviewManuscripts(managedTargetPublisher.role),
+  );
+  const activePublisherSlug =
+    search.publisherSlug || managedTargetPublisher?.slug || "";
+  const isAuthorOrPublisher = Boolean(isAuthorOwner || isPublisherCurator);
 
   const [editMode, setEditMode] = useState<"preview" | "edit">(
     search.editorial ??
@@ -475,8 +494,9 @@ function ReaderBook() {
   const [editorialCoverColor, setEditorialCoverColor] =
     useState<string>("#181614");
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
-  const [, setIsPublishDialogOpen] = useState(false);
+  const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
   const [editorialNotes, setEditorialNotes] = useState("");
+  const [reviewError, setReviewError] = useState<string | null>(null);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
 
   const coverInitializedRef = useRef(false);
@@ -634,6 +654,7 @@ function ReaderBook() {
   }, [editor, editMode]);
 
   const isPublisherReview = Boolean(
+    isPublisherCurator &&
     isManuscript &&
     manuscript &&
     (manuscript.status === "pending_review" ||
@@ -647,31 +668,44 @@ function ReaderBook() {
     try {
       const fullDocJson = editor.getJSON();
       const extracted = extractChaptersFromJson(fullDocJson);
+      const chapterPayload = extracted.map((chap) => ({
+        chapterNumber: chap.chapterNumber,
+        titleId: chap.title,
+        contentId: JSON.stringify(chap.doc),
+        blueprintContent: JSON.stringify(chap.doc),
+        estimatedMinutes: Math.max(
+          1,
+          Math.ceil(
+            chap.plainTextParagraphs.join(" ").split(/\s+/).length / 200,
+          ),
+        ),
+      }));
+      const baseFields = {
+        title: editorialTitle.trim() || undefined,
+        coverUrl:
+          editorialCoverUrl === "template"
+            ? null
+            : editorialCoverUrl !== undefined
+              ? editorialCoverUrl
+              : undefined,
+        chapters: chapterPayload,
+      };
 
-      await updateManuscriptMutation.mutateAsync({
-        idOrSlug: manuscriptId,
-        input: {
-          title: editorialTitle.trim() || undefined,
-          coverUrl:
-            editorialCoverUrl === "template"
-              ? null
-              : editorialCoverUrl !== undefined
-                ? editorialCoverUrl
-                : undefined,
-          chapters: extracted.map((chap) => ({
-            chapterNumber: chap.chapterNumber,
-            titleId: chap.title,
-            contentId: JSON.stringify(chap.doc),
-            blueprintContent: JSON.stringify(chap.doc),
-            estimatedMinutes: Math.max(
-              1,
-              Math.ceil(
-                chap.plainTextParagraphs.join(" ").split(/\s+/).length / 200,
-              ),
-            ),
-          })),
-        },
-      });
+      if (isPublisherCurator && activePublisherSlug) {
+        await editPublisherManuscriptMutation.mutateAsync({
+          slug: activePublisherSlug,
+          idOrSlug: manuscriptId,
+          input: {
+            ...baseFields,
+            editorialNotes: editorialNotes.trim() || undefined,
+          },
+        });
+      } else {
+        await updateManuscriptMutation.mutateAsync({
+          idOrSlug: manuscriptId,
+          input: baseFields,
+        });
+      }
       await refetchManuscript();
     } catch (err) {
       console.error("Failed to save manuscript draft", err);
@@ -786,6 +820,7 @@ function ReaderBook() {
     Boolean(share) ||
     storyDialogData.isOpen ||
     isConfigDialogOpen ||
+    isPublishDialogOpen ||
     isExpired ||
     isLocked ||
     isReaderSuspended;
@@ -2854,14 +2889,16 @@ function ReaderBook() {
           }}
         />
         {/* Author Manuscript Submission & Configuration Dialog */}
-        {isAuthorOrPublisher && (
+        {isAuthorOwner && (
           <ManuscriptConfigDialog
             isOpen={isConfigDialogOpen}
             onClose={() => setIsConfigDialogOpen(false)}
             initialData={{
               title: editorialTitle || book.title,
               synopsis: book.synopsis || "",
-              publisherId: manuscript?.publisherId || "",
+              category: manuscript?.category || "",
+              publisherId:
+                search.targetPublisherId || manuscript?.publisherId || "",
               digitalPolicy: book.digitalPolicy,
             }}
             onSubmit={async (config) => {
@@ -2889,99 +2926,194 @@ function ReaderBook() {
           />
         )}
 
-        {/* Publisher Review & Revision Inline Bar (Zero Modal Dialog - Read & Review seamlessly) */}
-        {isPublisherReview && isManuscript && (
-          <div className="fixed bottom-0 inset-x-0 z-50 bg-card/95 backdrop-blur-md border-t border-border shadow-2xl p-3 sm:px-6 animate-in slide-in-from-bottom duration-200">
-            <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
-              <div className="flex-1 w-full space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground font-semibold">
-                    Studio Penerbit: Meninjau Naskah &quot;
-                    {editorialTitle || book.title}&quot;
-                  </span>
+        {/* Publisher Atomic Catalog Publish Dialog */}
+        {isPublisherReview &&
+          isManuscript &&
+          manuscript &&
+          activePublisherSlug && (
+            <PublishManuscriptDialog
+              isOpen={isPublishDialogOpen}
+              onClose={() => setIsPublishDialogOpen(false)}
+              publisherSlug={activePublisherSlug}
+              publisherName={
+                managedTargetPublisher?.name ?? manuscript.publisherName
+              }
+              manuscript={manuscript}
+              initialTitle={editorialTitle || manuscript.title}
+              initialCoverUrl={editorialCoverUrl}
+            />
+          )}
+
+        {/* Publisher Review & Revision Bar */}
+        {isPublisherReview &&
+          isManuscript &&
+          manuscript &&
+          activePublisherSlug && (
+            <div className="fixed bottom-0 inset-x-0 z-50 bg-[var(--color-paper-2)]/95 backdrop-blur-md border-t border-[var(--color-rule)] shadow-2xl p-3 sm:px-6 text-[var(--color-ink)]">
+              <div className="max-w-5xl mx-auto space-y-2">
+                {reviewError && (
+                  <p
+                    role="alert"
+                    className="rounded-lg border border-[var(--color-error)]/40 bg-[var(--color-error-soft)] px-3 py-1.5 text-xs"
+                  >
+                    {reviewError}
+                  </p>
+                )}
+
+                <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                  <div className="flex-1 w-full space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="size-2 rounded-full bg-[var(--color-accent)]" />
+                      <label
+                        htmlFor="studio-review-notes"
+                        className="text-[11px] font-mono uppercase tracking-wider text-[var(--color-muted)] font-semibold"
+                      >
+                        Kurasi {managedTargetPublisher?.name || "Penerbit"}:{" "}
+                        {editorialTitle || book.title}
+                      </label>
+                    </div>
+                    <input
+                      id="studio-review-notes"
+                      type="text"
+                      value={editorialNotes}
+                      onChange={(e) => {
+                        setEditorialNotes(e.target.value);
+                        if (reviewError) setReviewError(null);
+                      }}
+                      placeholder="Ketik catatan editorial, instruksi revisi, atau alasan penolakan..."
+                      className="w-full min-h-11 text-xs bg-[var(--color-paper)] border border-[var(--color-rule)] rounded-lg px-3 py-2 outline-none focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] placeholder:text-[var(--color-muted)]"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 shrink-0 justify-end">
+                    {manuscript.status !== "in_editing" && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={reviewPublisherMutation.isPending}
+                        onClick={async () => {
+                          setReviewError(null);
+                          try {
+                            await reviewPublisherMutation.mutateAsync({
+                              slug: activePublisherSlug,
+                              idOrSlug: manuscriptId,
+                              input: {
+                                action: "start_editing",
+                                notes: editorialNotes.trim() || undefined,
+                              },
+                            });
+                            setEditMode("edit");
+                            await refetchManuscript();
+                          } catch (err) {
+                            setReviewError(
+                              err instanceof Error
+                                ? err.message
+                                : "Gagal memulai penyuntingan naskah.",
+                            );
+                          }
+                        }}
+                        className="min-h-11 px-3.5 text-xs font-semibold rounded-xl cursor-pointer"
+                      >
+                        Mulai Sunting
+                      </Button>
+                    )}
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={reviewPublisherMutation.isPending}
+                      onClick={async () => {
+                        const trimmed = editorialNotes.trim();
+                        if (!trimmed) {
+                          setReviewError(
+                            "Isi catatan revisi sebelum meminta perbaikan kepada penulis.",
+                          );
+                          return;
+                        }
+                        setReviewError(null);
+                        try {
+                          await reviewPublisherMutation.mutateAsync({
+                            slug: activePublisherSlug,
+                            idOrSlug: manuscriptId,
+                            input: {
+                              action: "request_revision",
+                              notes: trimmed,
+                            },
+                          });
+                          await refetchManuscript();
+                          void navigate({
+                            to: "/p/$slug/studio",
+                            params: { slug: activePublisherSlug },
+                          });
+                        } catch (err) {
+                          setReviewError(
+                            err instanceof Error
+                              ? err.message
+                              : "Gagal mengirim permintaan revisi.",
+                          );
+                        }
+                      }}
+                      className="min-h-11 px-3.5 text-xs font-semibold border-[var(--color-accent)]/60 bg-[var(--color-accent-soft)] text-[var(--color-ink)] rounded-xl cursor-pointer"
+                    >
+                      Minta Revisi
+                    </Button>
+
+                    <Button
+                      type="button"
+                      disabled={reviewPublisherMutation.isPending}
+                      onClick={() => {
+                        setReviewError(null);
+                        setIsPublishDialogOpen(true);
+                      }}
+                      className="min-h-11 px-4 text-xs font-semibold bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:brightness-95 rounded-xl cursor-pointer"
+                    >
+                      Setujui &amp; Terbitkan
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={reviewPublisherMutation.isPending}
+                      onClick={async () => {
+                        const trimmed = editorialNotes.trim();
+                        if (!trimmed) {
+                          setReviewError(
+                            "Isi alasan penolakan sebelum menolak naskah.",
+                          );
+                          return;
+                        }
+                        setReviewError(null);
+                        try {
+                          await reviewPublisherMutation.mutateAsync({
+                            slug: activePublisherSlug,
+                            idOrSlug: manuscriptId,
+                            input: {
+                              action: "reject",
+                              notes: trimmed,
+                            },
+                          });
+                          await refetchManuscript();
+                          void navigate({
+                            to: "/p/$slug/studio",
+                            params: { slug: activePublisherSlug },
+                          });
+                        } catch (err) {
+                          setReviewError(
+                            err instanceof Error
+                              ? err.message
+                              : "Gagal menolak naskah.",
+                          );
+                        }
+                      }}
+                      className="min-h-11 px-3.5 text-xs text-[var(--color-error)] border-[var(--color-error)]/40 hover:bg-[var(--color-error-soft)] rounded-xl cursor-pointer"
+                    >
+                      Tolak
+                    </Button>
+                  </div>
                 </div>
-                <input
-                  type="text"
-                  value={editorialNotes}
-                  onChange={(e) => setEditorialNotes(e.target.value)}
-                  placeholder="Ketik catatan kurasi atau instruksi revisi untuk penulis di sini..."
-                  className="w-full text-xs bg-background/80 border border-border/80 rounded-lg px-3 py-1.5 outline-none focus:border-[var(--color-accent)] placeholder:text-muted-foreground/60"
-                />
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0 w-full md:w-auto justify-end">
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={reviewMutation.isPending}
-                  onClick={async () => {
-                    await reviewMutation.mutateAsync({
-                      idOrSlug: manuscriptId,
-                      input: {
-                        action: "request_revision",
-                        notes:
-                          editorialNotes ||
-                          "Perlu revisi pada bagian tertentu sesuai catatan editorial.",
-                      },
-                    });
-                    refetchManuscript();
-                    navigate({ to: "/app", search: { tab: "profile" } });
-                  }}
-                  className="h-8 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-lg cursor-pointer"
-                >
-                  Minta Revisi
-                </Button>
-
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={reviewMutation.isPending}
-                  onClick={async () => {
-                    await reviewMutation.mutateAsync({
-                      idOrSlug: manuscriptId,
-                      input: {
-                        action: "approve",
-                        notes:
-                          editorialNotes || "Naskah disetujui untuk terbit.",
-                      },
-                    });
-                    refetchManuscript();
-                    navigate({ to: "/app", search: { tab: "profile" } });
-                  }}
-                  className="h-8 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg cursor-pointer"
-                >
-                  {reviewMutation.isPending
-                    ? "Menerbitkan..."
-                    : "Setujui & Terbitkan"}
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={reviewMutation.isPending}
-                  onClick={async () => {
-                    await reviewMutation.mutateAsync({
-                      idOrSlug: manuscriptId,
-                      input: {
-                        action: "reject",
-                        notes:
-                          editorialNotes ||
-                          "Naskah belum sesuai dengan kriteria kurasi penerbit.",
-                      },
-                    });
-                    refetchManuscript();
-                    navigate({ to: "/app", search: { tab: "profile" } });
-                  }}
-                  className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/10 rounded-lg"
-                >
-                  Tolak
-                </Button>
               </div>
             </div>
-          </div>
-        )}
+          )}
       </div>
     </DrmShield>
   );

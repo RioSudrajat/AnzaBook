@@ -10,8 +10,6 @@ import {
   getAdminCalendars,
   getAdminDrmEvents,
   getAdminDrmSuspensions,
-  getAdminManuscriptDetail,
-  getAdminManuscripts,
   getAdminOverview,
   getAdminPublishers,
   getClaimBatchCodes,
@@ -28,10 +26,6 @@ export const adminKeys = {
     [...adminKeys.all, "author-applications", params ?? {}] as const,
   publishers: (params?: AdminListQueryInput) =>
     [...adminKeys.all, "publishers", params ?? {}] as const,
-  manuscripts: (params?: AdminListQueryInput) =>
-    [...adminKeys.all, "manuscripts", params ?? {}] as const,
-  manuscriptDetail: (id: string) =>
-    [...adminKeys.all, "manuscript-detail", id] as const,
   claimBatchCodes: (batchId: string) =>
     [...adminKeys.all, "claim-batch-codes", batchId] as const,
   drmEvents: (params?: AdminDrmEventsQueryInput) =>
@@ -69,21 +63,6 @@ export function adminPublishersQuery(params?: AdminListQueryInput) {
   return queryOptions({
     queryKey: adminKeys.publishers(params),
     queryFn: ({ signal }) => getAdminPublishers(params, signal),
-  });
-}
-
-export function adminManuscriptsQuery(params?: AdminListQueryInput) {
-  return queryOptions({
-    queryKey: adminKeys.manuscripts(params),
-    queryFn: ({ signal }) => getAdminManuscripts(params, signal),
-  });
-}
-
-export function adminManuscriptDetailQuery(id: string) {
-  return queryOptions({
-    queryKey: adminKeys.manuscriptDetail(id),
-    queryFn: ({ signal }) => getAdminManuscriptDetail(id, signal),
-    enabled: Boolean(id),
   });
 }
 

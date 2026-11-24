@@ -1,10 +1,14 @@
 import type {
   AuthorDirectoryItemDto,
+  BookSummaryDto,
   CommunityCalendarDto,
   DataResponse,
   ExplorePostItemDto,
+  ManagedPublisherSummaryDto,
   ManuscriptSubmissionDto,
+  PublishManuscriptResultDto,
   PublisherDto,
+  PublisherMemberDto,
   QuotePostConfig,
   ReaderDirectoryItemDto,
   SessionPostConfig,
@@ -13,12 +17,19 @@ import type {
   UnifiedExploreResultDto,
 } from "@starter/shared/types";
 import type {
+  AddPublisherMemberInput,
   ApplyPublisherInput,
   CreateManuscriptDraftInput,
+  ListSubmissionTargetsInput,
+  PublishManuscriptInput,
+  PublisherEditManuscriptInput,
+  PublisherReviewManuscriptInput,
   ReviewManuscriptInput,
   SubmitManuscriptInput,
   UpdateManuscriptInput,
+  UpdatePublisherBookInput,
   UpdatePublisherInput,
+  UpdatePublisherMemberInput,
 } from "@starter/shared/validators/publisher";
 import type {
   ApplyAuthorInput,
@@ -28,7 +39,9 @@ import type {
   UpdateProfileBioInput,
 } from "@starter/shared/validators/social";
 import type { UpdateCalendarInput } from "@starter/shared/validators/community";
-import { apiFetch } from "@/lib/api/client";
+import { listBooks } from "@/features/books/api";
+import { rankSubmissionTargets } from "@/features/publisher/publisher-helpers";
+import { ApiError, apiFetch } from "@/lib/api/client";
 
 export async function getMySocialProfile(
   signal?: AbortSignal,
@@ -187,6 +200,57 @@ export async function listVerifiedPublishers(
   return data;
 }
 
+export async function listSubmissionTargets(
+  params?: ListSubmissionTargetsInput,
+  signal?: AbortSignal,
+): Promise<PublisherDto[]> {
+  const queryObj: Record<string, string | number> = {};
+  if (params?.q?.trim()) queryObj.q = params.q.trim();
+  if (params?.topic?.trim()) queryObj.topic = params.topic.trim();
+  if (params?.limit) queryObj.limit = params.limit;
+
+  try {
+    const { data } = await apiFetch<DataResponse<PublisherDto[]>>(
+      "/api/publisher/submission-targets",
+      {
+        query: Object.keys(queryObj).length > 0 ? queryObj : undefined,
+        signal,
+      },
+    );
+    return rankSubmissionTargets(data, {
+      q: params?.q,
+      topic: params?.topic,
+    });
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      const fallbackList = await listVerifiedPublishers(signal);
+      return rankSubmissionTargets(fallbackList, {
+        q: params?.q,
+        topic: params?.topic,
+      });
+    }
+    throw error;
+  }
+}
+
+export async function getMyManagedPublishers(
+  signal?: AbortSignal,
+): Promise<ManagedPublisherSummaryDto[]> {
+  try {
+    const { data } = await apiFetch<DataResponse<ManagedPublisherSummaryDto[]>>(
+      "/api/publisher/mine",
+      { signal },
+    );
+    return data;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      const profile = await getMySocialProfile(signal);
+      return profile.managedPublishers ?? [];
+    }
+    throw error;
+  }
+}
+
 export async function getPublisherBySlug(
   slug: string,
   signal?: AbortSignal,
@@ -194,6 +258,166 @@ export async function getPublisherBySlug(
   const { data } = await apiFetch<DataResponse<PublisherDto>>(
     `/api/publisher/${encodeURIComponent(slug)}`,
     { signal },
+  );
+  return data;
+}
+
+export async function listPublisherBooks(
+  slug: string,
+  signal?: AbortSignal,
+): Promise<BookSummaryDto[]> {
+  try {
+    const { data } = await apiFetch<DataResponse<BookSummaryDto[]>>(
+      `/api/publisher/${encodeURIComponent(slug)}/books`,
+      { signal },
+    );
+    return data;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      const response = await listBooks({ publisher: slug, limit: 100 }, signal);
+      return response.data;
+    }
+    throw error;
+  }
+}
+
+export async function updatePublisherBook(
+  slug: string,
+  bookId: string,
+  input: UpdatePublisherBookInput,
+): Promise<BookSummaryDto> {
+  const { data } = await apiFetch<DataResponse<BookSummaryDto>>(
+    `/api/publisher/${encodeURIComponent(slug)}/books/${encodeURIComponent(bookId)}`,
+    {
+      method: "PATCH",
+      body: input,
+    },
+  );
+  return data;
+}
+
+export async function listPublisherMembers(
+  slug: string,
+  signal?: AbortSignal,
+): Promise<PublisherMemberDto[]> {
+  try {
+    const { data } = await apiFetch<DataResponse<PublisherMemberDto[]>>(
+      `/api/publisher/${encodeURIComponent(slug)}/members`,
+      { signal },
+    );
+    return data;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return [];
+    }
+    throw error;
+  }
+}
+
+export async function addPublisherMember(
+  slug: string,
+  input: AddPublisherMemberInput,
+): Promise<PublisherMemberDto> {
+  const { data } = await apiFetch<DataResponse<PublisherMemberDto>>(
+    `/api/publisher/${encodeURIComponent(slug)}/members`,
+    {
+      method: "POST",
+      body: input,
+    },
+  );
+  return data;
+}
+
+export async function updatePublisherMember(
+  slug: string,
+  memberId: string,
+  input: UpdatePublisherMemberInput,
+): Promise<PublisherMemberDto> {
+  const { data } = await apiFetch<DataResponse<PublisherMemberDto>>(
+    `/api/publisher/${encodeURIComponent(slug)}/members/${encodeURIComponent(memberId)}`,
+    {
+      method: "PATCH",
+      body: input,
+    },
+  );
+  return data;
+}
+
+export async function removePublisherMember(
+  slug: string,
+  memberId: string,
+): Promise<{ removed: boolean }> {
+  const { data } = await apiFetch<DataResponse<{ removed: boolean }>>(
+    `/api/publisher/${encodeURIComponent(slug)}/members/${encodeURIComponent(memberId)}`,
+    {
+      method: "DELETE",
+    },
+  );
+  return data;
+}
+
+export async function editPublisherManuscript(
+  slug: string,
+  idOrSlug: string,
+  input: PublisherEditManuscriptInput,
+): Promise<ManuscriptSubmissionDto> {
+  try {
+    const { data } = await apiFetch<DataResponse<ManuscriptSubmissionDto>>(
+      `/api/publisher/${encodeURIComponent(slug)}/manuscripts/${encodeURIComponent(idOrSlug)}`,
+      {
+        method: "PATCH",
+        body: input,
+      },
+    );
+    return data;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return updateManuscript(idOrSlug, input);
+    }
+    throw error;
+  }
+}
+
+export async function reviewPublisherManuscript(
+  slug: string,
+  idOrSlug: string,
+  input: PublisherReviewManuscriptInput,
+): Promise<ManuscriptSubmissionDto> {
+  try {
+    const { data } = await apiFetch<DataResponse<ManuscriptSubmissionDto>>(
+      `/api/publisher/${encodeURIComponent(slug)}/manuscripts/${encodeURIComponent(idOrSlug)}/review`,
+      {
+        method: "POST",
+        body: input,
+      },
+    );
+    return data;
+  } catch (error) {
+    if (
+      error instanceof ApiError &&
+      error.status === 404 &&
+      input.action !== "start_editing"
+    ) {
+      return reviewManuscript(idOrSlug, {
+        action: input.action,
+        notes: input.notes,
+      });
+    }
+    throw error;
+  }
+}
+
+export async function publishPublisherManuscript(
+  slug: string,
+  idOrSlug: string,
+  input?: PublishManuscriptInput,
+): Promise<PublishManuscriptResultDto> {
+  const { data } = await apiFetch<DataResponse<PublishManuscriptResultDto>>(
+    `/api/publisher/${encodeURIComponent(slug)}/manuscripts/${encodeURIComponent(idOrSlug)}/publish`,
+    {
+      method: "POST",
+      body: input ?? {},
+    },
   );
   return data;
 }

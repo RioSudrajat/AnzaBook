@@ -45,6 +45,7 @@ import {
 } from "@/features/social/hooks";
 import { useAllHighlights } from "@/features/books/hooks";
 import { BookCover } from "@/features/books/components/book-cover";
+import { getManuscriptStatusBadgeClass } from "@/features/publisher/publisher-helpers";
 import { HighlightStoryDialog } from "@/features/reader/components/highlight-story-dialog";
 import { FlexReadingDialog } from "@/features/share/components/flex-reading-dialog";
 import { SocialRelationsDialog } from "@/features/social/components/social-relations-dialog";
@@ -1417,22 +1418,6 @@ function DashboardProfileContent({
             ) : (
               <div className="space-y-3">
                 {manuscripts.map((item) => {
-                  const statusColors: Record<string, string> = {
-                    draft: "bg-muted text-foreground border-border",
-                    submitted:
-                      "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30",
-                    under_review:
-                      "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
-                    revision_requested:
-                      "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30",
-                    accepted:
-                      "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
-                    published:
-                      "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/40",
-                    rejected:
-                      "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30",
-                  };
-
                   return (
                     <div
                       key={item.id}
@@ -1445,10 +1430,9 @@ function DashboardProfileContent({
                               {item.title}
                             </h5>
                             <span
-                              className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold uppercase border ${
-                                statusColors[item.status] ||
-                                "bg-muted text-foreground"
-                              }`}
+                              className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold uppercase border ${getManuscriptStatusBadgeClass(
+                                item.status,
+                              )}`}
                             >
                               {formatManuscriptStatus(item.status)}
                             </span>
@@ -1643,7 +1627,7 @@ function DashboardProfileContent({
                         )}
                       </div>
 
-                      <div className="pt-3 border-t border-border flex items-center justify-between text-xs">
+                      <div className="pt-3 border-t border-border flex flex-wrap items-center justify-between gap-2 text-xs">
                         <span className="text-xs text-muted-foreground">
                           Peran:{" "}
                           <strong className="text-foreground font-medium">
@@ -1651,20 +1635,29 @@ function DashboardProfileContent({
                           </strong>
                         </span>
 
-                        {isVerified ? (
+                        <div className="flex flex-wrap items-center gap-3">
                           <Link
                             to="/p/$slug"
                             params={{ slug: p.slug }}
-                            className="inline-flex items-center gap-1.5 font-semibold text-[var(--color-accent)] hover:underline"
+                            className="inline-flex min-h-9 items-center text-xs font-medium text-muted-foreground hover:text-foreground hover:underline"
                           >
-                            <span>Buka Halaman Redaksi</span>
-                            <ArrowRight className="size-3.5" />
+                            Halaman Publik
                           </Link>
-                        ) : (
-                          <span className="text-xs text-muted-foreground italic">
-                            Verifikasi dibutuhkan
-                          </span>
-                        )}
+                          {isVerified ? (
+                            <Link
+                              to="/p/$slug/studio"
+                              params={{ slug: p.slug }}
+                              className="inline-flex min-h-9 items-center gap-1.5 font-semibold text-[var(--color-accent)] hover:underline"
+                            >
+                              <span>Buka Studio Penerbit</span>
+                              <ArrowRight className="size-3.5" />
+                            </Link>
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">
+                              Verifikasi dibutuhkan
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
