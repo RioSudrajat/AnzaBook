@@ -136,7 +136,7 @@ test.describe("Publisher Studio, Dual Submission Flow, and Admin Cleanup (Issue 
     // 4. Publisher owner opens Dedicated Studio and verifies all 4 tabs & incoming manuscript
     await ownerPage.goto(`/p/${publisherSlug}/studio`);
     await expect(
-      ownerPage.getByRole("heading", { name: publisherName }),
+      ownerPage.getByRole("heading", { name: publisherName, exact: true }),
     ).toBeVisible();
     expect(await fitsWidth(ownerPage)).toBe(true);
 

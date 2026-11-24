@@ -972,9 +972,9 @@ export function PublisherStudioView({
           )}
 
           <div className="space-y-1.5 min-w-0">
-            <h1 className="font-serif text-2xl sm:text-3xl font-bold tracking-tight truncate">
+            <h2 className="font-serif text-2xl sm:text-3xl font-bold tracking-tight truncate">
               {publisher.name}
-            </h1>
+            </h2>
             <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
               <span className="inline-flex items-center gap-1 rounded-md border border-[var(--color-rule)] bg-[var(--color-paper)] px-2.5 py-0.5 text-[var(--color-ink-2)]">
                 <ShieldCheck
@@ -1146,9 +1146,9 @@ export function PublisherStudioView({
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="space-y-1.5 min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="font-serif text-lg font-bold text-[var(--color-ink)] break-words">
+                        <h3 className="font-serif text-lg font-bold text-[var(--color-ink)] break-words">
                           {item.title}
-                        </h2>
+                        </h3>
                         <span
                           className={`rounded-md border px-2.5 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wide ${getManuscriptStatusBadgeClass(
                             item.status,
