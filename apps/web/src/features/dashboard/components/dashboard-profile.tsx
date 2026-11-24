@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Clock,
   Edit3,
+  ExternalLink,
   Flame,
   Globe,
   Layers,
@@ -953,7 +954,20 @@ function DashboardProfileContent({
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
+                        {session.isPosted && (
+                          <Link
+                            to="/post/$type/$id"
+                            params={{ type: "session", id: session.id }}
+                            className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium text-foreground hover:bg-muted transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+                          >
+                            <ExternalLink
+                              className="size-3.5"
+                              aria-hidden="true"
+                            />
+                            <span>Lihat Post</span>
+                          </Link>
+                        )}
                         {isOwnProfile && (
                           <Button
                             type="button"
@@ -1027,32 +1041,47 @@ function DashboardProfileContent({
                         {hl.bookTitle ? `${hl.bookTitle} · ` : ""}Bab{" "}
                         {hl.chapterNumber} · Halaman {hl.pageNumber}
                       </span>
-                      {isOwnProfile && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={hl.isPosted ? "outline" : "default"}
-                          onClick={() => {
-                            if (onOpenQuoteStory) {
-                              onOpenQuoteStory(hl);
-                              return;
-                            }
-                            setInternalQuoteTarget(hl);
-                          }}
-                          className={`text-xs min-h-11 px-3.5 inline-flex items-center gap-1.5 cursor-pointer ${
-                            hl.isPosted
-                              ? "border-emerald-600/30 text-emerald-700 dark:text-emerald-400 bg-emerald-500/10"
-                              : "bg-[var(--color-accent)] hover:brightness-95 text-[var(--color-accent-ink)] font-semibold"
-                          }`}
-                        >
-                          <Share2 className="size-3.5" />
-                          <span>
-                            {hl.isPosted
-                              ? "Dipost · Bagikan"
-                              : "Post & Bagikan"}
-                          </span>
-                        </Button>
-                      )}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {hl.isPosted && (
+                          <Link
+                            to="/post/$type/$id"
+                            params={{ type: "quote", id: hl.id }}
+                            className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium text-foreground hover:bg-muted transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+                          >
+                            <ExternalLink
+                              className="size-3.5"
+                              aria-hidden="true"
+                            />
+                            <span>Lihat Post</span>
+                          </Link>
+                        )}
+                        {isOwnProfile && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={hl.isPosted ? "outline" : "default"}
+                            onClick={() => {
+                              if (onOpenQuoteStory) {
+                                onOpenQuoteStory(hl);
+                                return;
+                              }
+                              setInternalQuoteTarget(hl);
+                            }}
+                            className={`text-xs min-h-11 px-3.5 inline-flex items-center gap-1.5 cursor-pointer ${
+                              hl.isPosted
+                                ? "border-emerald-600/30 text-emerald-700 dark:text-emerald-400 bg-emerald-500/10"
+                                : "bg-[var(--color-accent)] hover:brightness-95 text-[var(--color-accent-ink)] font-semibold"
+                            }`}
+                          >
+                            <Share2 className="size-3.5" />
+                            <span>
+                              {hl.isPosted
+                                ? "Dipost · Bagikan"
+                                : "Post & Bagikan"}
+                            </span>
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}

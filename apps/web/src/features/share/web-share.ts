@@ -1,20 +1,6 @@
-import type { CardAspect } from "@starter/shared/types";
+export { sanitizeShareFilename } from "./card-helpers";
 
 export type NativeShareResult = "shared" | "cancelled" | "unsupported";
-
-export function sanitizeShareFilename(
-  prefix: string,
-  title: string,
-  aspect: CardAspect,
-): string {
-  const cleanTitle = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 42);
-  const ratioTag = aspect === "story" ? "9x16" : "1x1";
-  return `anzabook-${prefix}-${cleanTitle || "kartu"}-${ratioTag}.png`;
-}
 
 export async function canvasToPngBlob(
   canvas: HTMLCanvasElement,
@@ -89,11 +75,10 @@ export async function shareCanvasNative(params: {
   }
 
   try {
+    // Share an image-only payload so mobile OS share sheets (Android Chrome / iOS Safari)
+    // expose image-first targets like Instagram Stories instead of link/text-only targets.
     await navigator.share({
       files: [file],
-      title: params.title,
-      text: params.text,
-      url: params.url,
     });
     return "shared";
   } catch (err) {

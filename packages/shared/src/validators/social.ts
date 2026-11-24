@@ -127,7 +127,7 @@ export const sessionTemplateSchema = z.enum([
   "literary_index",
 ]);
 
-export const cardAspectSchema = z.enum(["square", "story"]);
+export const cardAspectSchema = z.enum(["square", "story", "4:3"]);
 
 export const quotePostConfigSchema = z
   .object({
@@ -181,6 +181,22 @@ export const publishSessionPostSchema = z
   })
   .strict();
 
+export const publicSocialPostTypeSchema = z.enum(["quote", "session"]);
+
+export const publicSocialPostParamsSchema = z
+  .object({
+    type: publicSocialPostTypeSchema,
+    id: z.string().uuid("ID postingan tidak valid"),
+  })
+  .strict();
+
+export const socialResourceIdParamSchema = z
+  .object({
+    id: z.string().uuid("ID item tidak valid"),
+  })
+  .strict();
+
+export type PublicSocialPostType = z.infer<typeof publicSocialPostTypeSchema>;
 export type PublishHighlightPostInput = z.infer<
   typeof publishHighlightPostSchema
 >;

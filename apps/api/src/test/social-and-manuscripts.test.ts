@@ -615,4 +615,245 @@ describe("Social Profile, 4D Explore, Community Membership & Manuscript Studio A
       },
     });
   });
+
+  it("exposes public posts via GET /api/social/posts/:type/:id, enriches Explore/Profile feeds, enforces FLEX-03 privacy, and validates UUID params", async () => {
+    const reader = agent();
+    const anon = agent();
+    const email = await signUp(reader, "Nadia Pustakawan");
+
+    const [dbReader] = await db
+      .select()
+      .from(user)
+      .where(eq(user.email, email));
+    expect(dbReader).toBeDefined();
+
+    const [seededBook] = await db.select().from(books).limit(1);
+    expect(seededBook).toBeDefined();
+
+    // 1. Private highlight must return 404 on public post endpoint
+    const [highlight] = await db
+      .insert(bookHighlights)
+      .values({
+        userId: dbReader.id,
+        bookId: seededBook.id,
+        chapterNumber: 3,
+        pageNumber: 42,
+        selectedText:
+          "Membaca dengan tenang mengubah gagasan rumit menjadi kompas harian.",
+        note: "CatatanRahasiaUnik9981",
+        color: "yellow",
+      })
+      .returning();
+
+    const privateQuoteRes = await anon.get(
+      `/api/social/posts/quote/${highlight.id}`,
+    );
+    expect(privateQuoteRes.status).toBe(404);
+    expect(privateQuoteRes.body.error.code).toBe("POST_NOT_FOUND");
+
+    // Publish quote with caption and includeNote: false
+    const pubQuoteRes = await reader
+      .post(`/api/social/highlights/${highlight.id}/toggle-post`)
+      .set(originHeader)
+      .send({
+        isPosted: true,
+        postCaption: "RefleksiKopiSenja4412",
+        postConfig: {
+          template: "book_cover",
+          aspect: "square",
+          alignment: "left",
+          includeNote: false,
+        },
+      });
+    expect(pubQuoteRes.status).toBe(200);
+
+    // Anonymous fetch succeeds with enriched metadata and zero private note/email leak
+    const publicQuoteRes = await anon.get(
+      `/api/social/posts/quote/${highlight.id}`,
+    );
+    expect(publicQuoteRes.status).toBe(200);
+    expect(publicQuoteRes.body.data).toMatchObject({
+      id: highlight.id,
+      type: "quote",
+      content: highlight.selectedText,
+      note: null,
+      postCaption: "RefleksiKopiSenja4412",
+      chapterNumber: 3,
+      pageNumber: 42,
+      postConfig: {
+        template: "book_cover",
+        aspect: "square",
+        alignment: "left",
+        includeNote: false,
+      },
+      book: {
+        id: seededBook.id,
+        slug: seededBook.slug,
+        coverUrl: seededBook.coverUrl,
+      },
+    });
+    expect(JSON.stringify(publicQuoteRes.body.data)).not.toContain(email);
+
+    // Explore finds quote via postCaption, but NOT via hidden private note
+    const exploreByCaption = await anon.get(
+      "/api/social/explore?q=RefleksiKopiSenja4412",
+    );
+    expect(exploreByCaption.status).toBe(200);
+    const exploredQuote = exploreByCaption.body.data.posts.find(
+      (p: { id: string }) => p.id === highlight.id,
+    );
+    expect(exploredQuote).toMatchObject({
+      id: highlight.id,
+      note: null,
+      postCaption: "RefleksiKopiSenja4412",
+      chapterNumber: 3,
+      pageNumber: 42,
+      book: { coverUrl: seededBook.coverUrl },
+    });
+
+    const exploreBySecretNote = await anon.get(
+      "/api/social/explore?q=CatatanRahasiaUnik9981",
+    );
+    expect(exploreBySecretNote.status).toBe(200);
+    expect(
+      exploreBySecretNote.body.data.posts.find(
+        (p: { id: string }) => p.id === highlight.id,
+      ),
+    ).toBeUndefined();
+
+    // 2. Reading session privacy & telemetry enrichment
+    const sessionRes = await reader
+      .post("/api/reading")
+      .set(originHeader)
+      .send({
+        bookId: seededBook.id,
+        wordsRead: 1000,
+        durationSeconds: 360,
+        avgWpm: 167,
+        startProgressPercent: 12,
+        endProgressPercent: 34,
+        startChapterNumber: 1,
+        endChapterNumber: 2,
+        highlightsCount: 3,
+      });
+    expect(sessionRes.status).toBe(201);
+    const sessionId = sessionRes.body.data.id as string;
+
+    // Private session must return 404
+    const privateSessionRes = await anon.get(
+      `/api/social/posts/session/${sessionId}`,
+    );
+    expect(privateSessionRes.status).toBe(404);
+    expect(privateSessionRes.body.error.code).toBe("POST_NOT_FOUND");
+
+    // Publish session hiding WPM and duration (FLEX-03)
+    const pubSessionRes = await reader
+      .post(`/api/social/sessions/${sessionId}/toggle-post`)
+      .set(originHeader)
+      .send({
+        isPosted: true,
+        title: "SesiSubuhTenang7782",
+        note: null,
+        postConfig: {
+          template: "literary_index",
+          aspect: "story",
+          showWpm: false,
+          showDuration: false,
+          showPages: true,
+        },
+      });
+    expect(pubSessionRes.status).toBe(200);
+
+    // Check public post, Explore search by title, and Public Profile consistently
+    const publicSessionRes = await anon.get(
+      `/api/social/posts/session/${sessionId}`,
+    );
+    expect(publicSessionRes.status).toBe(200);
+
+    const exploreSessionRes = await anon.get(
+      "/api/social/explore?q=SesiSubuhTenang7782",
+    );
+    expect(exploreSessionRes.status).toBe(200);
+    const exploredSession = exploreSessionRes.body.data.posts.find(
+      (p: { id: string }) => p.id === sessionId,
+    );
+
+    const usernameOrId = dbReader.username || dbReader.id;
+    const profileRes = await anon.get(`/api/social/users/${usernameOrId}`);
+    expect(profileRes.status).toBe(200);
+    const profileQuote = profileRes.body.data.publicActivities.find(
+      (p: { id: string }) => p.id === highlight.id,
+    );
+    const profileSession = profileRes.body.data.publicActivities.find(
+      (p: { id: string }) => p.id === sessionId,
+    );
+
+    expect(profileQuote).toMatchObject({
+      id: highlight.id,
+      note: null,
+      postCaption: "RefleksiKopiSenja4412",
+      chapterNumber: 3,
+      pageNumber: 42,
+      book: { coverUrl: seededBook.coverUrl },
+    });
+
+    for (const sessionPost of [
+      publicSessionRes.body.data,
+      exploredSession,
+      profileSession,
+    ]) {
+      expect(sessionPost).toBeDefined();
+      expect(sessionPost).toMatchObject({
+        id: sessionId,
+        type: "session",
+        title: "SesiSubuhTenang7782",
+        avgWpm: null,
+        startProgressPercent: 12,
+        endProgressPercent: 34,
+        startChapterNumber: 1,
+        endChapterNumber: 2,
+        highlightsCount: 3,
+        postConfig: {
+          template: "literary_index",
+          aspect: "story",
+          showWpm: false,
+          showDuration: false,
+          showPages: true,
+        },
+        book: {
+          id: seededBook.id,
+          coverUrl: seededBook.coverUrl,
+        },
+      });
+      expect(sessionPost.durationSeconds).toBeUndefined();
+      expect(sessionPost.pagesRead).toBeGreaterThan(0);
+      expect(sessionPost.wordsRead).toBe(1000);
+      expect(sessionPost.content).not.toMatch(/menit|detik|wpm/i);
+    }
+
+    // 3. Malformed params must return 422 VALIDATION_ERROR (never 500 from Postgres)
+    const badTypeRes = await anon.get(
+      `/api/social/posts/review/${highlight.id}`,
+    );
+    expect(badTypeRes.status).toBe(422);
+    expect(badTypeRes.body.error.code).toBe("VALIDATION_ERROR");
+
+    const badPublicIdRes = await anon.get("/api/social/posts/quote/not-a-uuid");
+    expect(badPublicIdRes.status).toBe(422);
+    expect(badPublicIdRes.body.error.code).toBe("VALIDATION_ERROR");
+
+    const badHighlightToggleRes = await reader
+      .post("/api/social/highlights/not-a-uuid/toggle-post")
+      .set(originHeader)
+      .send({ isPosted: true });
+    expect(badHighlightToggleRes.status).toBe(422);
+    expect(badHighlightToggleRes.body.error.code).toBe("VALIDATION_ERROR");
+
+    const badSessionToggleRes = await reader
+      .post("/api/social/sessions/not-a-uuid/toggle-post")
+      .set(originHeader)
+      .send({ isPosted: true });
+    expect(badSessionToggleRes.status).toBe(422);
+    expect(badSessionToggleRes.body.error.code).toBe("VALIDATION_ERROR");
+  });
 });

@@ -81,6 +81,11 @@ test("BookCover, OG preview, Canvas renderer, and DESIGN.md consume the new Open
   );
   assert.ok(ogPreview.includes("ANZA_ARCH_LOGO_PATHS"));
 
+  const postOgPreview = readRepoFile(
+    "apps/web/src/features/share/post-preview-svg.ts",
+  );
+  assert.ok(postOgPreview.includes("ANZA_ARCH_LOGO_PATHS"));
+
   const canvasRenderer = readRepoFile(
     "apps/web/src/features/share/canvas-renderer.ts",
   );

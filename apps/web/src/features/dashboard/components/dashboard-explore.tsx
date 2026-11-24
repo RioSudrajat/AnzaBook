@@ -1,15 +1,13 @@
 import { useState, useTransition } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
-  Bookmark,
   BookOpen,
   Building2,
   CheckCircle,
-  Clock,
+  ExternalLink,
   Heart,
   MapPin,
   MessageSquare,
-  Quote,
   Search,
   Share2,
   Star,
@@ -26,6 +24,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BookCatalogCard } from "@/features/books/components/book-catalog-card";
 import { useCatalogBooks, useCategories } from "@/features/books/hooks";
+import { PostShareDialog } from "@/features/share/components/post-share-dialog";
+import { QuotePostCard } from "@/features/share/components/quote-post-card";
+import { SessionPostCard } from "@/features/share/components/session-post-card";
 import {
   useFollowUser,
   useUnfollowUser,
@@ -768,15 +769,16 @@ function UserSearchRow({
   );
 }
 
-// Sub-component: PostFeedItem (Quote Card or Review Card matching screenshot)
 function PostFeedItem({ post }: { post: ExplorePostItemDto }) {
   const [isLiked, setIsLiked] = useState(false);
-  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
 
   const formattedDate = new Date(post.createdAt).toLocaleDateString("id-ID", {
     day: "numeric",
     month: "short",
   });
+
+  const isShareablePost = post.type === "quote" || post.type === "session";
 
   return (
     <article className="rounded-xl border border-border/80 bg-card p-4 space-y-3 shadow-xs hover:border-foreground/30 transition-colors">
@@ -785,7 +787,7 @@ function PostFeedItem({ post }: { post: ExplorePostItemDto }) {
         <Link
           to="/u/$username"
           params={{ username: post.author.username || post.author.id }}
-          className="flex items-center gap-2.5 min-w-0 group"
+          className="flex items-center gap-2.5 min-w-0 group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] rounded-md"
         >
           {post.author.image ? (
             <img
@@ -824,82 +826,17 @@ function PostFeedItem({ post }: { post: ExplorePostItemDto }) {
         )}
       </div>
 
-      {/* Content: Quote Card (green/sage card) OR Reading Session OR Review Paragraph */}
+      {/* Content: Styled Quote Card, Session Card, or Review Paragraph */}
       {post.type === "quote" ? (
-        <div className="rounded-xl bg-[#283618] text-[#fefae0] dark:bg-[#1f2b13] dark:text-[#f3ecc8] p-5 space-y-3 relative overflow-hidden shadow-xs border border-[#3a4d23]">
-          <Quote className="size-7 text-[#dda15e] opacity-80" />
-          <p className="font-serif text-sm sm:text-base leading-relaxed tracking-wide">
-            &ldquo;{post.content}&rdquo;
-          </p>
-
-          {post.note && (
-            <p className="text-xs text-[#fefae0]/80 italic border-t border-[#fefae0]/15 pt-2">
-              Catatan: {post.note}
-            </p>
-          )}
-
-          <div className="flex items-center justify-between pt-2 text-xs text-[#dda15e] font-medium">
-            <Link
-              to="/books/$slug"
-              params={{ slug: post.book.slug }}
-              className="hover:underline flex items-center gap-1.5 truncate"
-            >
-              <BookOpen className="size-3.5 shrink-0" />
-              <span>
-                {post.book.title} — {post.book.author}
-              </span>
-            </Link>
-
-            <button
-              type="button"
-              onClick={() => setIsBookmarked(!isBookmarked)}
-              className="text-[#fefae0] hover:text-[#dda15e] transition-colors p-1"
-              aria-label="Simpan kutipan"
-            >
-              <Bookmark
-                className={`size-4 ${isBookmarked ? "fill-current" : ""}`}
-              />
-            </button>
-          </div>
-        </div>
+        <QuotePostCard post={post} as="div" />
       ) : post.type === "session" ? (
-        <div className="space-y-3">
-          <div className="p-4 rounded-xl border border-border/80 bg-muted/40 space-y-2">
-            <div className="flex items-center gap-2 font-mono text-xs font-semibold text-foreground">
-              <Clock className="size-4 text-orange-600" />
-              <span>
-                {Math.round((post.durationSeconds || 0) / 60)} menit baca •{" "}
-                {post.pagesRead || 0} halaman
-              </span>
-            </div>
-            {post.note && (
-              <p className="font-serif text-sm leading-relaxed text-foreground/90 italic">
-                &ldquo;{post.note}&rdquo;
-              </p>
-            )}
-          </div>
-
-          <Link
-            to="/books/$slug"
-            params={{ slug: post.book.slug }}
-            className="flex items-center gap-2.5 p-2 rounded-lg bg-muted/50 hover:bg-muted border border-border/60 transition-colors w-fit max-w-full"
-          >
-            <BookOpen className="size-3.5 text-muted-foreground shrink-0" />
-            <span className="text-xs font-medium text-foreground truncate">
-              {post.book.title}
-            </span>
-            <span className="text-[11px] text-muted-foreground truncate">
-              oleh {post.book.author}
-            </span>
-          </Link>
-        </div>
+        <SessionPostCard post={post} as="div" />
       ) : (
         <div className="space-y-3">
           <p className="text-xs sm:text-sm leading-relaxed text-foreground/90 whitespace-pre-line">
             {post.content}
           </p>
 
-          {/* Book reference tag */}
           <Link
             to="/books/$slug"
             params={{ slug: post.book.slug }}
@@ -917,11 +854,11 @@ function PostFeedItem({ post }: { post: ExplorePostItemDto }) {
       )}
 
       {/* Social interaction footer */}
-      <div className="flex items-center gap-6 pt-1 text-muted-foreground text-xs">
+      <div className="flex flex-wrap items-center gap-3 pt-1 text-muted-foreground text-xs">
         <button
           type="button"
           onClick={() => setIsLiked(!isLiked)}
-          className={`flex items-center gap-1.5 hover:text-red-500 transition-colors ${
+          className={`inline-flex min-h-10 items-center gap-1.5 px-2 rounded-md hover:text-red-500 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] cursor-pointer ${
             isLiked ? "text-red-500 font-semibold" : ""
           }`}
         >
@@ -931,27 +868,46 @@ function PostFeedItem({ post }: { post: ExplorePostItemDto }) {
 
         <button
           type="button"
-          className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+          className="inline-flex min-h-10 items-center gap-1.5 px-2 rounded-md hover:text-foreground transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] cursor-pointer"
         >
           <MessageSquare className="size-4" />
           <span>Balas</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => {
-            if (navigator.clipboard) {
-              void navigator.clipboard.writeText(
-                `${post.content} — ${post.book.title} di AnzaBook`,
-              );
+        <div className="ml-auto flex items-center gap-1.5">
+          {isShareablePost && (
+            <Link
+              to="/post/$type/$id"
+              params={{ type: post.type, id: post.id }}
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+            >
+              <ExternalLink className="size-3.5" aria-hidden="true" />
+              <span>Detail</span>
+            </Link>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setIsShareOpen(true)}
+            className="inline-flex min-h-10 min-w-10 items-center justify-center gap-1.5 rounded-md px-2.5 hover:bg-muted hover:text-foreground transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] cursor-pointer"
+            aria-label={
+              post.type === "session"
+                ? "Bagikan sesi membaca"
+                : post.type === "quote"
+                  ? "Bagikan kutipan"
+                  : "Bagikan ulasan"
             }
-          }}
-          className="flex items-center gap-1.5 hover:text-foreground transition-colors ml-auto"
-          aria-label="Bagikan kutipan"
-        >
-          <Share2 className="size-4" />
-        </button>
+          >
+            <Share2 className="size-4" aria-hidden="true" />
+            <span className="hidden sm:inline">Bagikan</span>
+          </button>
+        </div>
       </div>
+
+      <PostShareDialog
+        post={isShareOpen ? post : null}
+        onClose={() => setIsShareOpen(false)}
+      />
     </article>
   );
 }

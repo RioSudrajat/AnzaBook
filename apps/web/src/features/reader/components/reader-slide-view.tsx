@@ -15,10 +15,11 @@ import {
   IosStar,
 } from "@/components/ui/ios-icons";
 import { pageFold } from "../page-fold";
-import type {
-  SlideFragment,
-  SlideLeaf,
-  SlideSpread,
+import {
+  computeStableBookSlideMeta,
+  type SlideFragment,
+  type SlideLeaf,
+  type SlideSpread,
 } from "../slide-pagination";
 import "./reader-book.css";
 
@@ -44,6 +45,8 @@ type ReaderSlideViewProps = {
   fontSize: number;
   coverColor: string;
   isPremiumPreview: boolean;
+  allChapterNumbers?: readonly number[];
+  hasFullAccess?: boolean;
   renderFragment: (fragment: SlideFragment, chapterNumber: number) => ReactNode;
 };
 
@@ -74,11 +77,17 @@ function Leaf({
           <h1>{spread.chapter.title}</h1>
         </header>
       )}
-      {leaf?.fragments.map((fragment, index) => (
+      {leaf?.fragments.map((fragment, idx) => (
         <p
-          key={fragment.paragraph}
+          key={`${fragment.paragraph}-${fragment.start}`}
+          data-opening={
+            leaf.heading && idx === 0 && fragment.start === 0
+              ? "true"
+              : undefined
+          }
+          data-continuation={fragment.start > 0 ? "true" : undefined}
           data-preview-fade={
-            (fade && index === leaf.fragments.length - 1) || undefined
+            (fade && idx === leaf.fragments.length - 1) || undefined
           }
         >
           {renderFragment(fragment, spread.chapter.chapterNumber)}
@@ -130,6 +139,8 @@ export function ReaderSlideView({
   fontSize,
   coverColor,
   isPremiumPreview,
+  allChapterNumbers,
+  hasFullAccess,
   renderFragment,
 }: ReaderSlideViewProps) {
   const book = useRef<HTMLDivElement>(null);
@@ -140,6 +151,12 @@ export function ReaderSlideView({
   const [turn, setTurn] = useState<Turn | null>(null);
   const spread = spreads[index];
   const visible = turn?.to ?? spread;
+  const pageMeta = computeStableBookSlideMeta({
+    spreads,
+    index,
+    allChapterNumbers,
+    hasFullAccess,
+  });
   const canPrev = index > 0;
   const canNext = index < spreads.length - 1;
   const previewFade = isPremiumPreview && visible === spreads.at(-1);
@@ -487,7 +504,8 @@ export function ReaderSlideView({
             aria-live="polite"
             className="whitespace-nowrap px-1 font-mono text-xs tabular-nums"
           >
-            {spread && `Page ${index + 1} of ${spreads.length}`}
+            {spread &&
+              `Page ${pageMeta.displayPage} of ${pageMeta.displayTotal}`}
           </span>
           <Button
             variant="ghost"

@@ -207,11 +207,9 @@ function SessionPostComposerInner({
   }, [localPhotoUrl]);
 
   const updateConfig = (patch: Partial<SessionPostConfig>) => {
-    setConfig((prev) => {
-      const next = { ...prev, ...patch };
-      onConfigSnapshot(next);
-      return next;
-    });
+    const next = { ...config, ...patch };
+    setConfig(next);
+    onConfigSnapshot(next);
   };
 
   useEffect(() => {
@@ -399,18 +397,19 @@ function SessionPostComposerInner({
             <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
               Rasio Kanvas
             </span>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {(
                 [
-                  { id: "story", label: "9:16 Story" },
-                  { id: "square", label: "1:1 Square" },
+                  { id: "story", label: "9:16" },
+                  { id: "square", label: "1:1" },
+                  { id: "4:3", label: "4:3" },
                 ] as const
               ).map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => updateConfig({ aspect: item.id })}
-                  className={`min-h-11 rounded-lg border px-3 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] ${
+                  className={`min-h-11 rounded-lg border px-2.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] ${
                     config.aspect === item.id
                       ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-ink)]"
                       : "border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink-2)] hover:bg-[var(--color-paper-3)]"

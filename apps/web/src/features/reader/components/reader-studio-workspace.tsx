@@ -98,7 +98,7 @@ export function ReaderStudioWorkspace({
   const reviewMutation = useReviewManuscript();
 
   const [theme, setTheme] = React.useState<ReaderTheme>("manila");
-  const fontSize = 18;
+  const fontSize = 16;
   const [fontFamily, setFontFamily] = React.useState<"serif" | "sans">("serif");
 
   // Editorial workspace state

@@ -1,4 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
+import type { PublicSocialPostType } from "@starter/shared/validators/social";
 import {
   exploreAuthors,
   exploreReaders,
@@ -6,6 +7,7 @@ import {
   getManuscript,
   getMyManuscripts,
   getMySocialProfile,
+  getPublicSocialPost,
   getPublisherBySlug,
   getPublisherManuscripts,
   getUserFollowers,
@@ -34,6 +36,8 @@ export const socialKeys = {
       params?.category ?? "",
       params?.sort ?? "",
     ] as const,
+  post: (type: PublicSocialPostType, id: string) =>
+    [...socialKeys.all, "post", type, id] as const,
 };
 
 export const publisherKeys = {
@@ -99,6 +103,14 @@ export function unifiedExploreQuery(params?: {
   return queryOptions({
     queryKey: socialKeys.explore(params),
     queryFn: ({ signal }) => fetchUnifiedExplore(params, signal),
+  });
+}
+
+export function publicSocialPostQuery(type: PublicSocialPostType, id: string) {
+  return queryOptions({
+    queryKey: socialKeys.post(type, id),
+    queryFn: ({ signal }) => getPublicSocialPost(type, id, signal),
+    enabled: Boolean(id),
   });
 }
 

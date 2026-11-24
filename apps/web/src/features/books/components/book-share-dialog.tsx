@@ -1,6 +1,15 @@
 import { useRef, useState } from "react";
 import { Dialog } from "radix-ui";
-import { Copy, ExternalLink, MessageCircle, Send, X } from "lucide-react";
+import {
+  Copy,
+  Download,
+  ExternalLink,
+  Loader2,
+  MessageCircle,
+  Send,
+  X,
+} from "lucide-react";
+import { InstagramIcon } from "@/features/share/components/instagram-icon";
 import { Button } from "@/components/ui/button";
 import { bookPreviewPath } from "@/features/books/book-share";
 
@@ -19,6 +28,8 @@ export function BookShareDialog({
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [feedback, setFeedback] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
+  const [showInstagramGuide, setShowInstagramGuide] = useState(false);
   const link = encodeURIComponent(url);
   const targets = [
     {
@@ -46,6 +57,88 @@ export function BookShareDialog({
       input.current?.focus();
       input.current?.select();
       setFeedback("Salin tautan dari kolom yang dipilih.");
+    }
+  }
+
+  async function fetchBookCardFile(): Promise<{
+    blob: Blob;
+    file: File;
+    filename: string;
+  }> {
+    const response = await fetch(bookPreviewPath(slug));
+    if (!response.ok) {
+      throw new Error("Gagal menyiapkan kartu gambar buku.");
+    }
+    const blob = await response.blob();
+    const filename = `anzabook-buku-${slug}.png`;
+    const file = new File([blob], filename, { type: "image/png" });
+    return { blob, file, filename };
+  }
+
+  function triggerBlobDownload(blob: Blob, filename: string) {
+    const objectUrl = URL.createObjectURL(blob);
+    try {
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = filename;
+      anchor.rel = "noopener";
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+    } finally {
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    }
+  }
+
+  async function shareToInstagram() {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      const { blob, file, filename } = await fetchBookCardFile();
+      if (
+        typeof navigator !== "undefined" &&
+        typeof navigator.share === "function" &&
+        typeof navigator.canShare === "function" &&
+        navigator.canShare({ files: [file] })
+      ) {
+        try {
+          // Image-only payload keeps Instagram Stories visible in mobile OS share sheets.
+          await navigator.share({
+            files: [file],
+          });
+          setShowInstagramGuide(false);
+          setFeedback("Kartu buku dikirim ke lembar bagikan sistem.");
+          return;
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") {
+            return;
+          }
+        }
+      }
+      triggerBlobDownload(blob, filename);
+      setShowInstagramGuide(true);
+      setFeedback(
+        "Kartu PNG buku sudah diunduh. Di desktop, browser tidak bisa membuka editor IG Story secara langsung — unggah lewat Instagram atau buka di HP untuk kirim langsung ke IG Story.",
+      );
+    } catch {
+      setFeedback("Gagal menyiapkan gambar buku untuk Instagram. Coba lagi.");
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  async function downloadBookCard() {
+    if (isExporting) return;
+    setIsExporting(true);
+    setShowInstagramGuide(false);
+    try {
+      const { blob, filename } = await fetchBookCardFile();
+      triggerBlobDownload(blob, filename);
+      setFeedback("Kartu gambar buku berhasil diunduh.");
+    } catch {
+      setFeedback("Gagal mengunduh gambar buku. Coba lagi.");
+    } finally {
+      setIsExporting(false);
     }
   }
 
@@ -100,6 +193,51 @@ export function BookShareDialog({
             height={630}
             className="aspect-[40/21] w-full rounded-sm border border-border bg-muted object-cover"
           />
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant="default"
+              disabled={isExporting}
+              onClick={() => void shareToInstagram()}
+              className="min-h-11 bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:brightness-95 font-semibold"
+            >
+              {isExporting ? (
+                <Loader2 className="animate-spin" aria-hidden="true" />
+              ) : (
+                <InstagramIcon aria-hidden="true" />
+              )}
+              <span>IG Story</span>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isExporting}
+              onClick={() => void downloadBookCard()}
+              className="min-h-11"
+            >
+              <Download aria-hidden="true" />
+              <span>Unduh PNG</span>
+            </Button>
+          </div>
+
+          {showInstagramGuide && (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--color-accent)]/35 bg-muted/50 px-3 py-2.5 text-xs text-foreground/90">
+              <span className="min-w-0 flex-1">
+                PNG kartu buku sudah diunduh. Unggah ke Story lewat Instagram
+                atau buka dari HP untuk kirim langsung ke IG Story.
+              </span>
+              <a
+                href="https://www.instagram.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-md bg-[var(--color-accent)] px-3 text-xs font-semibold text-[var(--color-accent-ink)] hover:brightness-95"
+              >
+                <ExternalLink className="size-3.5" aria-hidden="true" />
+                <span>Buka Instagram</span>
+              </a>
+            </div>
+          )}
+
           <div className="my-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {targets.map(({ label, href, Icon }) => (
               <Button
@@ -139,16 +277,17 @@ export function BookShareDialog({
               <Copy />
             </Button>
           </div>
-          {typeof navigator.share === "function" && (
-            <Button
-              variant="ghost"
-              className="mt-2 min-h-11"
-              onClick={() => void shareLink()}
-            >
-              <ExternalLink />
-              Aplikasi lain
-            </Button>
-          )}
+          {typeof navigator !== "undefined" &&
+            typeof navigator.share === "function" && (
+              <Button
+                variant="ghost"
+                className="mt-2 min-h-11"
+                onClick={() => void shareLink()}
+              >
+                <ExternalLink />
+                Aplikasi lain
+              </Button>
+            )}
           {feedback && (
             <p role="status" className="mt-2 text-sm text-muted-foreground">
               {feedback}

@@ -521,7 +521,6 @@ function ReaderBook() {
   const createdSessionId = createdSession?.id ?? null;
   const [isSessionComposerOpen, setIsSessionComposerOpen] = useState(false);
   const [isSessionPosted, setIsSessionPosted] = useState(false);
-  const suppressResumeOnCloseRef = useRef(false);
 
   // Local optimistic highlights to ensure immediate instant stabilo rendering
   const [optimisticHighlights, setOptimisticHighlights] = useState<
@@ -684,7 +683,7 @@ function ReaderBook() {
   // Reader Settings State
   const [theme, setTheme] = useState<ReaderTheme>("manila");
   const [fontFamily, setFontFamily] = useState<ReaderFont>("serif");
-  const [fontSize, setFontSize] = useState<number>(18);
+  const [fontSize, setFontSize] = useState<number>(16);
   // Default language: Bahasa Indonesia (not split)
   const [languageView, setLanguageView] = useState<LanguageView>("id");
   const [readingLayout, setReadingLayout] = useState<ReadingLayout>("scroll");
@@ -1090,10 +1089,16 @@ function ReaderBook() {
         });
         return;
       }
-      setScrollPosition({
-        chapter: target,
-        percent: checkpoint?.lastScrollPercent ?? 0,
-      });
+      const userAlreadyScrolledPastStart =
+        target === loadedChapters[0]?.chapterNumber &&
+        (checkpoint?.lastScrollPercent ?? 0) === 0 &&
+        window.scrollY >= 80;
+      if (!userAlreadyScrolledPastStart) {
+        setScrollPosition({
+          chapter: target,
+          percent: checkpoint?.lastScrollPercent ?? 0,
+        });
+      }
       finalizeSessionRestore({
         chapterNumber: target,
         paragraphIndex: checkpoint?.lastParagraphIndex ?? 0,
@@ -1129,7 +1134,10 @@ function ReaderBook() {
         window.scrollTo({
           top: top + (length * checkpoint.lastScrollPercent) / 100,
         });
-      } else {
+      } else if (
+        target !== loadedChapters[0]?.chapterNumber ||
+        window.scrollY < 80
+      ) {
         section.scrollIntoView({ block: "start" });
       }
     });
@@ -1466,7 +1474,7 @@ function ReaderBook() {
       const bookLast = payload.allChapters.at(-1)?.chapterNumber ?? lastLoaded;
       if (
         lastLoaded < bookLast &&
-        targetIndex >= Math.max(0, spreads.length - 3)
+        targetIndex >= Math.max(0, spreads.length - 4)
       ) {
         void prefetchChapter(lastLoaded + 1);
       }
@@ -1854,10 +1862,6 @@ function ReaderBook() {
   function handleResumeReading() {
     setIsExitPromptOpen(false);
     setPostSessionError(null);
-    if (suppressResumeOnCloseRef.current) {
-      suppressResumeOnCloseRef.current = false;
-      return;
-    }
     const pos = capturePosition();
     sessionStartAnchorRef.current = pos
       ? {
@@ -2611,6 +2615,8 @@ function ReaderBook() {
               fontSize={fontSize}
               coverColor={book.coverColor}
               isPremiumPreview={isPremiumPreview}
+              allChapterNumbers={allChapterNumbers}
+              hasFullAccess={Boolean(payload?.hasFullAccess)}
               renderFragment={(fragment, chapterNumber) => (
                 <>
                   {renderHighlightedText(
@@ -2843,7 +2849,6 @@ function ReaderBook() {
           }}
           onPublishSession={handlePublishSession}
           onOpenExternalComposer={() => {
-            suppressResumeOnCloseRef.current = true;
             setIsExitPromptOpen(false);
             setIsSessionComposerOpen(true);
           }}

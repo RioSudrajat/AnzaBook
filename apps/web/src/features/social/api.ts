@@ -2,6 +2,7 @@ import type {
   AuthorDirectoryItemDto,
   CommunityCalendarDto,
   DataResponse,
+  ExplorePostItemDto,
   ManuscriptSubmissionDto,
   PublisherDto,
   QuotePostConfig,
@@ -21,6 +22,7 @@ import type {
 } from "@starter/shared/validators/publisher";
 import type {
   ApplyAuthorInput,
+  PublicSocialPostType,
   PublishHighlightPostInput,
   PublishSessionPostInput,
   UpdateProfileBioInput,
@@ -380,6 +382,18 @@ export async function togglePostSession(
       method: "POST",
       body: input,
     },
+  );
+  return data;
+}
+
+export async function getPublicSocialPost(
+  type: PublicSocialPostType,
+  id: string,
+  signal?: AbortSignal,
+): Promise<ExplorePostItemDto> {
+  const { data } = await apiFetch<DataResponse<ExplorePostItemDto>>(
+    `/api/social/posts/${encodeURIComponent(type)}/${encodeURIComponent(id)}`,
+    { signal },
   );
   return data;
 }

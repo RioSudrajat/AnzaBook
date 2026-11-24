@@ -139,7 +139,7 @@ export function ShareStudioPanel({
   });
 
   return (
-    <div className="grid grid-cols-1 gap-6 rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-5 lg:grid-cols-[minmax(0,380px)_1fr]">
+    <div className="grid grid-cols-1 gap-6 rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-5 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
       <div className="flex items-center justify-center rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-4">
         <CanvasPreviewFrame
           aspect={config.aspect}
@@ -173,11 +173,12 @@ export function ShareStudioPanel({
           ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           {(
             [
-              { id: "square", label: "1:1 Square" },
-              { id: "story", label: "9:16 Story" },
+              { id: "square", label: "1:1" },
+              { id: "story", label: "9:16" },
+              { id: "4:3", label: "4:3" },
             ] as const
           ).map((ratio) => (
             <button

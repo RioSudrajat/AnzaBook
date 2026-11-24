@@ -16,6 +16,7 @@ import {
   MapPin,
   MessageSquare,
   Package,
+  Share2,
   ShoppingBag,
   Sparkles,
   Star,
@@ -39,6 +40,7 @@ import {
 import { FlagIcon } from "@/components/ui/flag-icon";
 import { BookCover } from "@/features/books/components/book-cover";
 import { BookCatalogCard } from "@/features/books/components/book-catalog-card";
+import { BookShareDialog } from "@/features/books/components/book-share-dialog";
 import { ClaimCodeDialog } from "@/features/books/components/claim-code-dialog";
 import { LiveStockTracker } from "@/features/books/components/live-stock-tracker";
 import { StoreMap } from "@/features/books/components/store-map";
@@ -111,6 +113,7 @@ function B2B2CActionButtons({
   onStartReading,
   onReadSample,
   onSaveToLibrary,
+  onShareBook,
   onPurchaseAlacarte,
   shelfSaved,
   shelfError,
@@ -124,6 +127,7 @@ function B2B2CActionButtons({
   onStartReading: () => void;
   onReadSample: () => void;
   onSaveToLibrary: () => void;
+  onShareBook: (trigger: HTMLButtonElement) => void;
   onPurchaseAlacarte: () => void;
   shelfSaved: boolean;
   shelfError: boolean;
@@ -378,6 +382,18 @@ function B2B2CActionButtons({
         </p>
       )}
 
+      {/* Share Book Button (common for all) */}
+      <Button
+        type="button"
+        onClick={(event) => onShareBook(event.currentTarget)}
+        variant="outline"
+        size="lg"
+        className="w-full min-h-11 bg-background text-foreground border-border hover:bg-muted font-medium text-xs gap-2 transition-colors cursor-pointer"
+      >
+        <Share2 className="size-4" aria-hidden="true" />
+        Bagikan Buku
+      </Button>
+
       {/* Physical Stock Button */}
       {book.hasPhysical && (
         <Button
@@ -422,6 +438,9 @@ export default function BookDetailPage() {
 
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const [purchaseSuccess, setPurchaseSuccess] = useState(false);
+  const [shareTrigger, setShareTrigger] = useState<HTMLButtonElement | null>(
+    null,
+  );
 
   const upsertShelfMutation = useUpsertShelf();
   const createReviewMutation = useCreateReview(slug);
@@ -755,6 +774,7 @@ export default function BookDetailPage() {
                   onStartReading={handleStartReading}
                   onReadSample={handleReadSample}
                   onSaveToLibrary={handleSaveToLibrary}
+                  onShareBook={setShareTrigger}
                   onPurchaseAlacarte={handlePurchaseAlacarte}
                   shelfSaved={shelfSaved}
                   shelfError={shelfError}
@@ -1065,6 +1085,7 @@ export default function BookDetailPage() {
               onStartReading={handleStartReading}
               onReadSample={handleReadSample}
               onSaveToLibrary={handleSaveToLibrary}
+              onShareBook={setShareTrigger}
               onPurchaseAlacarte={handlePurchaseAlacarte}
               shelfSaved={shelfSaved}
               shelfError={shelfError}
@@ -1192,6 +1213,20 @@ export default function BookDetailPage() {
           </div>
         )}
       </div>
+
+      {shareTrigger && (
+        <BookShareDialog
+          slug={book.slug}
+          title={book.title}
+          url={
+            typeof window !== "undefined"
+              ? new URL(bookPagePath(book.slug), window.location.origin).href
+              : bookPagePath(book.slug)
+          }
+          trigger={shareTrigger}
+          onClose={() => setShareTrigger(null)}
+        />
+      )}
     </>
   );
 

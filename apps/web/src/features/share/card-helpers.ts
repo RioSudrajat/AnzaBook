@@ -1,5 +1,12 @@
 import { classifyReadingTempo } from "@starter/shared/reading-progress";
-import type { SessionTemplate } from "@starter/shared/types";
+import type {
+  CardAspect,
+  ExplorePostItemDto,
+  QuotePostConfig,
+  QuoteTemplate,
+  SessionPostConfig,
+  SessionTemplate,
+} from "@starter/shared/types";
 
 /** Mirrors backend DRM-05 public quote length guard in social.service.ts. */
 export const MAX_PUBLIC_QUOTE_CHARS = 400;
@@ -389,4 +396,226 @@ export function extractSurroundingContext(
   }
 
   return snippet;
+}
+
+export type QuoteCardViewModel = {
+  template: QuoteTemplate;
+  alignment: "left" | "center";
+  caption: string | null;
+  note: string | null;
+  locationLabel: string | null;
+  palette: AdaptiveCoverPalette;
+};
+
+export type SessionCardMetricItem = {
+  key: "duration" | "pages" | "tempo" | "highlights";
+  label: string;
+  value: string;
+  hint?: string;
+};
+
+export type SessionTrailInfo = {
+  hasTrail: boolean;
+  startPercent: number;
+  endPercent: number;
+  deltaPercent: number;
+  chapterLabel: string | null;
+};
+
+export type SessionCardViewModel = {
+  template: Exclude<SessionTemplate, "photo_overlay">;
+  stickerInk: "light" | "dark";
+  title: string;
+  note: string | null;
+  metrics: SessionCardMetricItem[];
+  trail: SessionTrailInfo;
+  palette: AdaptiveCoverPalette;
+};
+
+const VALID_QUOTE_TEMPLATES = new Set<QuoteTemplate>([
+  "book_cover",
+  "furrow_paper",
+  "night_stabilo",
+  "cover_tint",
+]);
+
+const VALID_SESSION_TEMPLATES = new Set<SessionTemplate>([
+  "cover_trail",
+  "photo_overlay",
+  "transparent_sticker",
+  "literary_index",
+]);
+
+function isQuotePostConfig(
+  config: ExplorePostItemDto["postConfig"],
+): config is QuotePostConfig {
+  return Boolean(
+    config &&
+    "includeNote" in config &&
+    VALID_QUOTE_TEMPLATES.has(config.template),
+  );
+}
+
+function isSessionPostConfig(
+  config: ExplorePostItemDto["postConfig"],
+): config is SessionPostConfig {
+  return Boolean(
+    config &&
+    "showWpm" in config &&
+    VALID_SESSION_TEMPLATES.has(config.template),
+  );
+}
+
+function clampPercent(value: number | null | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+export function resolveQuoteCardViewModel(
+  post: ExplorePostItemDto,
+): QuoteCardViewModel {
+  const config = isQuotePostConfig(post.postConfig) ? post.postConfig : null;
+  const template: QuoteTemplate = config?.template ?? "book_cover";
+  const alignment: "left" | "center" =
+    config?.alignment === "center" ? "center" : "left";
+  const caption = post.postCaption?.trim() || null;
+  const note =
+    config?.includeNote === true && post.note?.trim() ? post.note.trim() : null;
+
+  const locationParts: string[] = [];
+  if (typeof post.chapterNumber === "number" && post.chapterNumber > 0) {
+    locationParts.push(`Bab ${post.chapterNumber}`);
+  }
+  if (typeof post.pageNumber === "number" && post.pageNumber > 0) {
+    locationParts.push(`Hal. ${post.pageNumber}`);
+  }
+
+  return {
+    template,
+    alignment,
+    caption,
+    note,
+    locationLabel: locationParts.length > 0 ? locationParts.join(" · ") : null,
+    palette: deriveAdaptiveCoverPalette(post.book.coverColor),
+  };
+}
+
+export function resolveSessionCardViewModel(
+  post: ExplorePostItemDto,
+): SessionCardViewModel {
+  const config = isSessionPostConfig(post.postConfig) ? post.postConfig : null;
+  const template = resolveSafeInAppSessionTemplate(
+    config?.template ?? "cover_trail",
+  );
+  const showDuration = config?.showDuration !== false;
+  const showPages = config?.showPages !== false;
+  const showWpm = config?.showWpm !== false;
+  const stickerInk = config?.stickerInk === "light" ? "light" : "dark";
+
+  const metrics: SessionCardMetricItem[] = [];
+  if (
+    showDuration &&
+    typeof post.durationSeconds === "number" &&
+    Number.isFinite(post.durationSeconds) &&
+    post.durationSeconds > 0
+  ) {
+    metrics.push({
+      key: "duration",
+      label: "Durasi Aktif",
+      value: formatShareDuration(post.durationSeconds),
+    });
+  }
+  if (
+    showPages &&
+    typeof post.pagesRead === "number" &&
+    Number.isFinite(post.pagesRead) &&
+    post.pagesRead > 0
+  ) {
+    metrics.push({
+      key: "pages",
+      label: "Halaman",
+      value: `${post.pagesRead} hlm`,
+    });
+  }
+  if (
+    showWpm &&
+    typeof post.avgWpm === "number" &&
+    Number.isFinite(post.avgWpm) &&
+    post.avgWpm > 0
+  ) {
+    const tempo = shareTempoLabel(post.avgWpm);
+    const wpmText = `${Math.round(post.avgWpm)} wpm`;
+    metrics.push({
+      key: "tempo",
+      label: "Ritme Baca",
+      value: wpmText,
+      hint: tempo || undefined,
+    });
+  }
+  if (
+    typeof post.highlightsCount === "number" &&
+    Number.isFinite(post.highlightsCount) &&
+    post.highlightsCount > 0
+  ) {
+    metrics.push({
+      key: "highlights",
+      label: "Kutipan",
+      value: `${post.highlightsCount} catatan`,
+    });
+  }
+
+  const hasProgress =
+    typeof post.startProgressPercent === "number" ||
+    typeof post.endProgressPercent === "number";
+  const startPercent = clampPercent(post.startProgressPercent);
+  const endPercent = clampPercent(
+    post.endProgressPercent ?? post.startProgressPercent,
+  );
+  const deltaPercent = Math.max(0, endPercent - startPercent);
+
+  let chapterLabel: string | null = null;
+  const startCh =
+    typeof post.startChapterNumber === "number" && post.startChapterNumber > 0
+      ? post.startChapterNumber
+      : null;
+  const endCh =
+    typeof post.endChapterNumber === "number" && post.endChapterNumber > 0
+      ? post.endChapterNumber
+      : null;
+  if (startCh && endCh && startCh !== endCh) {
+    chapterLabel = `Bab ${startCh} → Bab ${endCh}`;
+  } else if (endCh || startCh) {
+    chapterLabel = `Bab ${endCh ?? startCh}`;
+  }
+
+  return {
+    template,
+    stickerInk,
+    title: post.title?.trim() || `Sesi Membaca · ${post.book.title}`,
+    note: post.note?.trim() || null,
+    metrics,
+    trail: {
+      hasTrail: hasProgress || Boolean(chapterLabel),
+      startPercent,
+      endPercent,
+      deltaPercent,
+      chapterLabel,
+    },
+    palette: deriveAdaptiveCoverPalette(post.book.coverColor),
+  };
+}
+
+export function sanitizeShareFilename(
+  prefix: string,
+  title: string,
+  aspect: CardAspect,
+): string {
+  const cleanTitle = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 42);
+  const ratioTag =
+    aspect === "story" ? "9x16" : aspect === "4:3" ? "4x3" : "1x1";
+  return `anzabook-${prefix}-${cleanTitle || "kartu"}-${ratioTag}.png`;
 }

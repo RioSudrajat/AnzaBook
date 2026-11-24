@@ -22,6 +22,7 @@ export const CARD_DIMENSIONS: Record<
 > = {
   square: { width: 1080, height: 1080 },
   story: { width: 1080, height: 1920 },
+  "4:3": { width: 1440, height: 1080 },
 };
 
 const FONT_SERIF = '"Literata", Georgia, serif';
@@ -130,6 +131,12 @@ export async function loadCanvasImage(
   const trimmed = src.trim();
   const isLocalBlobOrData =
     trimmed.startsWith("blob:") || trimmed.startsWith("data:");
+  const isRemoteUrl =
+    trimmed.startsWith("https://") || trimmed.startsWith("http://");
+  if (!isLocalBlobOrData && !isRemoteUrl) {
+    // Legacy relative paths like /covers/*.svg are procedural fallback covers, not static files.
+    return null;
+  }
 
   return new Promise((resolve) => {
     const img = new Image();
@@ -526,8 +533,9 @@ export async function renderQuoteCardToCanvas(
   if (!ctx) return;
 
   const isStory = input.config.aspect === "story";
+  const isLandscape43 = input.config.aspect === "4:3";
   const align = input.config.alignment;
-  const padX = isStory ? 96 : 92;
+  const padX = isStory ? 96 : isLandscape43 ? 124 : 92;
   const contentW = width - padX * 2;
   const locationLabel = buildQuoteLocationLabel(
     input.chapterNumber,
@@ -1089,10 +1097,46 @@ function drawReadingTrail(
   ctx.restore();
 }
 
+type SessionMetricEntry = {
+  label: string;
+  value: string;
+  subValue?: string;
+};
+
+function drawFittedText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  fontWeight: number,
+  initialSize: number,
+  minSize: number,
+  fontFamily: string,
+) {
+  let size = initialSize;
+  ctx.font = `${fontWeight} ${size}px ${fontFamily}`;
+  while (size > minSize && ctx.measureText(text).width > maxWidth) {
+    size -= 2;
+    ctx.font = `${fontWeight} ${size}px ${fontFamily}`;
+  }
+  let output = text;
+  if (ctx.measureText(output).width > maxWidth) {
+    while (
+      output.length > 1 &&
+      ctx.measureText(`${output}…`).width > maxWidth
+    ) {
+      output = output.slice(0, -1).trimEnd();
+    }
+    output = `${output}…`;
+  }
+  ctx.fillText(output, x, y, maxWidth);
+}
+
 function collectVisibleSessionMetrics(
   input: SessionCardRenderInput,
-): Array<{ label: string; value: string }> {
-  const items: Array<{ label: string; value: string }> = [];
+): SessionMetricEntry[] {
+  const items: SessionMetricEntry[] = [];
   if (input.config.showDuration) {
     items.push({
       label: "DURASI AKTIF",
@@ -1111,7 +1155,8 @@ function collectVisibleSessionMetrics(
       input.avgWpm && input.avgWpm > 0 ? `${Math.round(input.avgWpm)} wpm` : "";
     items.push({
       label: "RITME BACA",
-      value: label ? (wpmValue ? `${label} · ${wpmValue}` : label) : "-",
+      value: wpmValue || label || "-",
+      subValue: wpmValue && label ? label : undefined,
     });
   }
   return items;
@@ -1140,7 +1185,8 @@ export async function renderSessionCardToCanvas(
   if (!ctx) return;
 
   const isStory = input.config.aspect === "story";
-  const padX = 88;
+  const isLandscape43 = input.config.aspect === "4:3";
+  const padX = isLandscape43 ? 116 : 88;
   const contentW = width - padX * 2;
   const visibleMetrics = collectVisibleSessionMetrics(input);
   const streakTag =
@@ -1227,20 +1273,56 @@ export async function renderSessionCardToCanvas(
 
     if (visibleMetrics.length > 0) {
       const metricY = trailY + 124;
-      const colW = contentW / visibleMetrics.length;
+      const colGap = 24;
+      const colW =
+        (contentW - (visibleMetrics.length - 1) * colGap) /
+        visibleMetrics.length;
       ctx.save();
       ctx.shadowColor = shadowColor;
       ctx.shadowBlur = 14;
       ctx.shadowOffsetY = 3;
       visibleMetrics.forEach((item, idx) => {
-        const mx = padX + idx * colW;
-        ctx.font = `700 20px ${FONT_MONO}`;
+        const mx = padX + idx * (colW + colGap);
         ctx.fillStyle = muted;
-        ctx.fillText(item.label, mx, metricY);
+        drawFittedText(
+          ctx,
+          item.label,
+          mx,
+          metricY,
+          colW,
+          700,
+          20,
+          14,
+          FONT_MONO,
+        );
 
-        ctx.font = `700 44px ${FONT_MONO}`;
         ctx.fillStyle = fg;
-        ctx.fillText(item.value, mx, metricY + 54);
+        drawFittedText(
+          ctx,
+          item.value,
+          mx,
+          metricY + 50,
+          colW,
+          700,
+          42,
+          24,
+          FONT_MONO,
+        );
+
+        if (item.subValue) {
+          ctx.fillStyle = muted;
+          drawFittedText(
+            ctx,
+            item.subValue,
+            mx,
+            metricY + 80,
+            colW,
+            600,
+            20,
+            14,
+            FONT_MONO,
+          );
+        }
       });
       ctx.restore();
     }
@@ -1327,16 +1409,52 @@ export async function renderSessionCardToCanvas(
 
     if (visibleMetrics.length > 0) {
       const metricY = trailY + 116;
-      const colW = contentW / visibleMetrics.length;
+      const colGap = 24;
+      const colW =
+        (contentW - (visibleMetrics.length - 1) * colGap) /
+        visibleMetrics.length;
       visibleMetrics.forEach((item, idx) => {
-        const mx = padX + idx * colW;
-        ctx.font = `700 18px ${FONT_MONO}`;
+        const mx = padX + idx * (colW + colGap);
         ctx.fillStyle = "rgba(255, 255, 255, 0.70)";
-        ctx.fillText(item.label, mx, metricY);
+        drawFittedText(
+          ctx,
+          item.label,
+          mx,
+          metricY,
+          colW,
+          700,
+          18,
+          13,
+          FONT_MONO,
+        );
 
-        ctx.font = `700 36px ${FONT_MONO}`;
         ctx.fillStyle = "#FFFFFF";
-        ctx.fillText(item.value, mx, metricY + 46);
+        drawFittedText(
+          ctx,
+          item.value,
+          mx,
+          metricY + 44,
+          colW,
+          700,
+          36,
+          22,
+          FONT_MONO,
+        );
+
+        if (item.subValue) {
+          ctx.fillStyle = "rgba(255, 255, 255, 0.76)";
+          drawFittedText(
+            ctx,
+            item.subValue,
+            mx,
+            metricY + 72,
+            colW,
+            600,
+            19,
+            13,
+            FONT_MONO,
+          );
+        }
       });
     }
 
@@ -1431,22 +1549,57 @@ export async function renderSessionCardToCanvas(
       const boxY = trailY + 96;
       const colW =
         (contentW - (visibleMetrics.length - 1) * 18) / visibleMetrics.length;
+      const innerPad = 22;
+      const maxTextW = Math.max(80, colW - innerPad * 2);
       visibleMetrics.forEach((item, idx) => {
         const bx = padX + idx * (colW + 18);
-        drawRoundedRectPath(ctx, bx, boxY, colW, 132, 14);
+        drawRoundedRectPath(ctx, bx, boxY, colW, 138, 14);
         ctx.fillStyle = FURROW.paper2;
         ctx.fill();
         ctx.strokeStyle = FURROW.rule;
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        ctx.font = `700 18px ${FONT_MONO}`;
         ctx.fillStyle = FURROW.inkMuted;
-        ctx.fillText(item.label, bx + 24, boxY + 44);
+        drawFittedText(
+          ctx,
+          item.label,
+          bx + innerPad,
+          boxY + 40,
+          maxTextW,
+          700,
+          17,
+          12,
+          FONT_MONO,
+        );
 
-        ctx.font = `700 32px ${FONT_MONO}`;
         ctx.fillStyle = FURROW.ink;
-        ctx.fillText(item.value, bx + 24, boxY + 94);
+        drawFittedText(
+          ctx,
+          item.value,
+          bx + innerPad,
+          boxY + (item.subValue ? 82 : 94),
+          maxTextW,
+          700,
+          32,
+          20,
+          FONT_MONO,
+        );
+
+        if (item.subValue) {
+          ctx.fillStyle = FURROW.inkMuted;
+          drawFittedText(
+            ctx,
+            item.subValue,
+            bx + innerPad,
+            boxY + 114,
+            maxTextW,
+            600,
+            19,
+            13,
+            FONT_MONO,
+          );
+        }
       });
     }
 
@@ -1597,22 +1750,57 @@ export async function renderSessionCardToCanvas(
     const metricTop = trailY + 108;
     const colW =
       (innerW - (visibleMetrics.length - 1) * 18) / visibleMetrics.length;
+    const innerPad = 20;
+    const maxTextW = Math.max(80, colW - innerPad * 2);
     visibleMetrics.forEach((item, idx) => {
       const mx = innerX + idx * (colW + 18);
-      drawRoundedRectPath(ctx, mx, metricTop, colW, 134, 16);
+      drawRoundedRectPath(ctx, mx, metricTop, colW, 138, 16);
       ctx.fillStyle = "rgba(254, 253, 251, 0.06)";
       ctx.fill();
       ctx.strokeStyle = "rgba(246, 242, 233, 0.14)";
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
-      ctx.font = `700 18px ${FONT_MONO}`;
       ctx.fillStyle = "rgba(246, 242, 233, 0.64)";
-      ctx.fillText(item.label, mx + 22, metricTop + 44);
+      drawFittedText(
+        ctx,
+        item.label,
+        mx + innerPad,
+        metricTop + 40,
+        maxTextW,
+        700,
+        17,
+        12,
+        FONT_MONO,
+      );
 
-      ctx.font = `700 32px ${FONT_MONO}`;
       ctx.fillStyle = FURROW.paper;
-      ctx.fillText(item.value, mx + 22, metricTop + 94);
+      drawFittedText(
+        ctx,
+        item.value,
+        mx + innerPad,
+        metricTop + (item.subValue ? 82 : 94),
+        maxTextW,
+        700,
+        32,
+        20,
+        FONT_MONO,
+      );
+
+      if (item.subValue) {
+        ctx.fillStyle = "rgba(246, 242, 233, 0.72)";
+        drawFittedText(
+          ctx,
+          item.subValue,
+          mx + innerPad,
+          metricTop + 114,
+          maxTextW,
+          600,
+          19,
+          13,
+          FONT_MONO,
+        );
+      }
     });
   }
 
