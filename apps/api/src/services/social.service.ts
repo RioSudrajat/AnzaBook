@@ -340,6 +340,7 @@ export async function getSocialProfile(
       logoUrl: publishers.logoUrl,
       headerImageUrl: publishers.headerImageUrl,
       city: publishers.city,
+      topics: publishers.topics,
       verificationStatus: publishers.verificationStatus,
       rejectionReason: publishers.rejectionReason,
       role: publisherMembers.role,
@@ -360,6 +361,7 @@ export async function getSocialProfile(
       logoUrl: p.logoUrl,
       headerImageUrl: p.headerImageUrl,
       city: p.city,
+      topics: p.topics ?? [],
       verificationStatus: p.verificationStatus,
       rejectionReason: isSelf ? p.rejectionReason : null,
       role: p.role,
@@ -422,11 +424,21 @@ export async function getSocialProfile(
     Number(booksPublishedRow?.count || 0) > 0
   ) {
     const bookRows = await db
-      .select()
+      .select({
+        book: books,
+        publisher: {
+          name: publishers.name,
+          slug: publishers.slug,
+          logoUrl: publishers.logoUrl,
+        },
+      })
       .from(books)
+      .leftJoin(publishers, eq(books.publisherId, publishers.id))
       .where(eq(books.authorUserId, targetUser.id))
       .orderBy(desc(books.publishedYear));
-    publishedBooks = bookRows.map(toBookSummary);
+    publishedBooks = bookRows.map(({ book, publisher }) =>
+      toBookSummary(book, publisher),
+    );
   }
 
   // Public reading shelves belonging to target user (not viewer)
@@ -1290,8 +1302,16 @@ export async function unifiedExplore(
   }
 
   const bookRows = await db
-    .select()
+    .select({
+      book: books,
+      publisher: {
+        name: publishers.name,
+        slug: publishers.slug,
+        logoUrl: publishers.logoUrl,
+      },
+    })
     .from(books)
+    .leftJoin(publishers, eq(books.publisherId, publishers.id))
     .where(bookConditions.length > 0 ? and(...bookConditions) : undefined)
     .orderBy(
       params.sort === "latest"
@@ -1300,7 +1320,9 @@ export async function unifiedExplore(
     )
     .limit(20);
 
-  const booksList = bookRows.map(toBookSummary);
+  const booksList = bookRows.map(({ book, publisher }) =>
+    toBookSummary(book, publisher),
+  );
 
   // 3. Communities
   const commConditions = [
@@ -1349,6 +1371,9 @@ export async function unifiedExplore(
         ilike(publishers.name, searchPattern),
         ilike(publishers.city, searchPattern),
         ilike(publishers.description, searchPattern),
+        sql`exists (
+          select 1 from jsonb_array_elements_text(${publishers.topics}) as t where t ilike ${searchPattern}
+        )`,
       )!,
     );
   }
@@ -1360,6 +1385,7 @@ export async function unifiedExplore(
       logoUrl: publishers.logoUrl,
       headerImageUrl: publishers.headerImageUrl,
       city: publishers.city,
+      topics: publishers.topics,
       verificationStatus: publishers.verificationStatus,
     })
     .from(publishers)
@@ -1373,8 +1399,9 @@ export async function unifiedExplore(
     logoUrl: p.logoUrl,
     headerImageUrl: p.headerImageUrl,
     city: p.city,
+    topics: p.topics ?? [],
     verificationStatus: p.verificationStatus,
-    role: "editor",
+    role: null,
   }));
 
   // 5. Posts (Reviews, Posted Quotes & Posted Sessions)

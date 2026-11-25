@@ -442,7 +442,16 @@ export async function getReadableParagraphCount(
   );
 }
 
-export function toBookSummary(row: typeof books.$inferSelect): BookSummaryDto {
+export type BookSummaryPublisher = {
+  name: string | null;
+  slug: string | null;
+  logoUrl: string | null;
+};
+
+export function toBookSummary(
+  row: typeof books.$inferSelect,
+  publisher?: BookSummaryPublisher | null,
+): BookSummaryDto {
   return {
     id: row.id,
     slug: row.slug,
@@ -475,6 +484,9 @@ export function toBookSummary(row: typeof books.$inferSelect): BookSummaryDto {
     collectionName: row.collectionName,
     genres: (row.genres as string[]) || [],
     publisherId: row.publisherId,
+    publisherSlug: publisher?.slug ?? null,
+    publisherName: publisher?.name ?? null,
+    publisherLogoUrl: publisher?.logoUrl ?? null,
     authorUserId: row.authorUserId,
     alacartePriceIdr: row.alacartePriceIdr,
   };
@@ -532,24 +544,44 @@ export async function listBooks(query: ListBooksQuery) {
   }
 
   const rows = await db
-    .select()
+    .select({
+      book: books,
+      publisher: {
+        name: publishers.name,
+        slug: publishers.slug,
+        logoUrl: publishers.logoUrl,
+      },
+    })
     .from(books)
+    .leftJoin(publishers, eq(books.publisherId, publishers.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(books.isWeeklyBulletin), desc(books.createdAt), books.id)
     .limit(query.limit + 1)
     .offset(query.offset);
 
-  const data = rows.slice(0, query.limit).map(toBookSummary);
+  const data = rows
+    .slice(0, query.limit)
+    .map(({ book, publisher }) => toBookSummary(book, publisher));
 
   const [bulletinRow] = await db
-    .select()
+    .select({
+      book: books,
+      publisher: {
+        name: publishers.name,
+        slug: publishers.slug,
+        logoUrl: publishers.logoUrl,
+      },
+    })
     .from(books)
+    .leftJoin(publishers, eq(books.publisherId, publishers.id))
     .where(eq(books.isWeeklyBulletin, true))
     .limit(1);
 
   return {
     data,
-    bulletin: bulletinRow ? toBookSummary(bulletinRow) : null,
+    bulletin: bulletinRow
+      ? toBookSummary(bulletinRow.book, bulletinRow.publisher)
+      : null,
     meta: {
       limit: query.limit,
       offset: query.offset,
@@ -562,23 +594,22 @@ export async function getBookBySlug(
   slug: string,
   userId?: string,
 ): Promise<BookDetailDto | null> {
-  const [book] = await db
-    .select()
+  const [bookRow] = await db
+    .select({
+      book: books,
+      publisher: {
+        name: publishers.name,
+        slug: publishers.slug,
+        logoUrl: publishers.logoUrl,
+      },
+    })
     .from(books)
+    .leftJoin(publishers, eq(books.publisherId, publishers.id))
     .where(eq(books.slug, slug))
     .limit(1);
 
-  if (!book) return null;
-
-  let publisherSlug: string | null = null;
-  if (book.publisherId) {
-    const [pub] = await db
-      .select({ slug: publishers.slug })
-      .from(publishers)
-      .where(eq(publishers.id, book.publisherId))
-      .limit(1);
-    if (pub) publisherSlug = pub.slug;
-  }
+  if (!bookRow) return null;
+  const { book, publisher } = bookRow;
 
   const editions = await db
     .select()
@@ -683,8 +714,7 @@ export async function getBookBySlug(
   );
 
   return {
-    ...toBookSummary(book),
-    publisherSlug,
+    ...toBookSummary(book, publisher),
     chapters,
     editions: editions.map((e) => ({
       id: e.id,

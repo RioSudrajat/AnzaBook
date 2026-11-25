@@ -1,16 +1,12 @@
-import { randomBytes, randomUUID } from "node:crypto";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { randomBytes } from "node:crypto";
+import { desc, eq, inArray, sql } from "drizzle-orm";
 import type {
   AdminOverviewDto,
   BookClaimBatchDto,
-  DigitalPolicy,
-  ManuscriptSubmissionDto,
   PublisherDto,
 } from "@starter/shared/types";
 import type {
-  AdminEditManuscriptInput,
   AdminListQueryInput,
-  AdminPublishManuscriptInput,
   AdminReviewAuthorApplicationInput,
   AdminVerifyCalendarInput,
   AdminVerifyPublisherInput,
@@ -19,30 +15,18 @@ import type { CreateClaimBatchInput } from "@starter/shared/validators/publisher
 import { db } from "../db";
 import {
   authorApplications,
-  bookChapters,
   bookClaimBatches,
   bookClaimCodes,
   bookPurchases,
   books,
   communityCalendars,
   communityWalletLedgers,
-  manuscriptChapters,
-  manuscriptSubmissions,
   membershipOrders,
   publishers,
   user,
 } from "../db/schema";
 import { HttpError } from "../lib/http-error";
 import { countRecentHighRiskDrmEvents24h } from "./drm.service";
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/--+/g, "-")
-    .trim();
-}
 
 function generateClaimCode(): string {
   return `ANZ-${randomBytes(6).toString("hex").toUpperCase()}`;
@@ -53,7 +37,6 @@ export async function getAdminOverview(): Promise<AdminOverviewDto> {
     [pendingCalRow],
     [pendingAuthorRow],
     [pendingPubRow],
-    [pendingManuRow],
     [membershipRevRow],
     [alacarteRevRow],
     [affiliateRow],
@@ -71,10 +54,6 @@ export async function getAdminOverview(): Promise<AdminOverviewDto> {
       .select({ count: sql<number>`count(*)` })
       .from(publishers)
       .where(eq(publishers.verificationStatus, "pending")),
-    db
-      .select({ count: sql<number>`count(*)` })
-      .from(manuscriptSubmissions)
-      .where(eq(manuscriptSubmissions.status, "pending_review")),
     db
       .select({ total: sql<number>`COALESCE(SUM(price_idr), 0)` })
       .from(membershipOrders)
@@ -106,7 +85,6 @@ export async function getAdminOverview(): Promise<AdminOverviewDto> {
     pendingCalendarsCount: Number(pendingCalRow?.count ?? 0),
     pendingAuthorsCount: Number(pendingAuthorRow?.count ?? 0),
     pendingPublishersCount: Number(pendingPubRow?.count ?? 0),
-    pendingManuscriptsCount: Number(pendingManuRow?.count ?? 0),
     highRiskDrmEvents24hCount,
     estimatedNakamaRoyaltyPoolIdr,
     totalAlacarteSalesIdr: Number(alacarteRevRow?.totalSales ?? 0),
@@ -354,338 +332,6 @@ export async function verifyAdminPublisher(
     createdAt: updated.createdAt.toISOString(),
     updatedAt: updated.updatedAt.toISOString(),
   };
-}
-
-export async function listAdminManuscripts(
-  query: AdminListQueryInput,
-): Promise<ManuscriptSubmissionDto[]> {
-  const whereClause = query.status
-    ? eq(
-        manuscriptSubmissions.status,
-        query.status as
-          "pending_review" | "in_editing" | "published" | "rejected",
-      )
-    : undefined;
-
-  const rows = await db
-    .select({
-      id: manuscriptSubmissions.id,
-      authorUserId: manuscriptSubmissions.authorUserId,
-      publisherId: manuscriptSubmissions.publisherId,
-      title: manuscriptSubmissions.title,
-      synopsis: manuscriptSubmissions.synopsis,
-      proposedDigitalPolicy: manuscriptSubmissions.proposedDigitalPolicy,
-      proposedAlacartePriceIdr: manuscriptSubmissions.proposedAlacartePriceIdr,
-      printSimJson: manuscriptSubmissions.printSimJson,
-      status: manuscriptSubmissions.status,
-      rejectionReason: manuscriptSubmissions.rejectionReason,
-      publishedBookId: manuscriptSubmissions.publishedBookId,
-      createdAt: manuscriptSubmissions.createdAt,
-      updatedAt: manuscriptSubmissions.updatedAt,
-      authorName: user.name,
-      authorPenName: user.authorPenName,
-      publisherName: publishers.name,
-    })
-    .from(manuscriptSubmissions)
-    .leftJoin(user, eq(manuscriptSubmissions.authorUserId, user.id))
-    .leftJoin(publishers, eq(manuscriptSubmissions.publisherId, publishers.id))
-    .where(whereClause)
-    .orderBy(desc(manuscriptSubmissions.createdAt))
-    .limit(query.limit ?? 50)
-    .offset(query.offset ?? 0);
-
-  return rows.map((r) => ({
-    ...r,
-    authorName: r.authorName ?? undefined,
-    authorPenName: r.authorPenName ?? undefined,
-    publisherName: r.publisherName ?? undefined,
-    createdAt: r.createdAt.toISOString(),
-    updatedAt: r.updatedAt.toISOString(),
-  }));
-}
-
-type DatabaseExecutor =
-  typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
-
-export async function getAdminManuscriptById(
-  id: string,
-  d: DatabaseExecutor = db,
-): Promise<ManuscriptSubmissionDto> {
-  const [submission] = await d
-    .select({
-      id: manuscriptSubmissions.id,
-      authorUserId: manuscriptSubmissions.authorUserId,
-      publisherId: manuscriptSubmissions.publisherId,
-      title: manuscriptSubmissions.title,
-      synopsis: manuscriptSubmissions.synopsis,
-      proposedDigitalPolicy: manuscriptSubmissions.proposedDigitalPolicy,
-      proposedAlacartePriceIdr: manuscriptSubmissions.proposedAlacartePriceIdr,
-      printSimJson: manuscriptSubmissions.printSimJson,
-      status: manuscriptSubmissions.status,
-      rejectionReason: manuscriptSubmissions.rejectionReason,
-      publishedBookId: manuscriptSubmissions.publishedBookId,
-      createdAt: manuscriptSubmissions.createdAt,
-      updatedAt: manuscriptSubmissions.updatedAt,
-      authorName: user.name,
-      authorPenName: user.authorPenName,
-      publisherName: publishers.name,
-    })
-    .from(manuscriptSubmissions)
-    .leftJoin(user, eq(manuscriptSubmissions.authorUserId, user.id))
-    .leftJoin(publishers, eq(manuscriptSubmissions.publisherId, publishers.id))
-    .where(eq(manuscriptSubmissions.id, id));
-
-  if (!submission) {
-    throw new HttpError(404, "NOT_FOUND", "Naskah tidak ditemukan.");
-  }
-
-  const chapters = await d
-    .select()
-    .from(manuscriptChapters)
-    .where(eq(manuscriptChapters.manuscriptId, id))
-    .orderBy(manuscriptChapters.chapterNumber);
-
-  return {
-    ...submission,
-    authorName: submission.authorName ?? undefined,
-    authorPenName: submission.authorPenName ?? undefined,
-    publisherName: submission.publisherName ?? undefined,
-    totalChapters: chapters.length,
-    chapters: chapters.map((c) => ({
-      ...c,
-      createdAt: c.createdAt.toISOString(),
-      updatedAt: c.updatedAt.toISOString(),
-    })),
-    createdAt: submission.createdAt.toISOString(),
-    updatedAt: submission.updatedAt.toISOString(),
-  };
-}
-
-export async function updateAdminManuscript(
-  id: string,
-  input: AdminEditManuscriptInput,
-): Promise<ManuscriptSubmissionDto> {
-  return await db.transaction(async (tx) => {
-    const [existing] = await tx
-      .select()
-      .from(manuscriptSubmissions)
-      .where(eq(manuscriptSubmissions.id, id));
-
-    if (!existing) {
-      throw new HttpError(404, "NOT_FOUND", "Naskah tidak ditemukan.");
-    }
-
-    const updateData: Partial<typeof manuscriptSubmissions.$inferInsert> = {
-      updatedAt: new Date(),
-    };
-
-    if (input.title !== undefined) updateData.title = input.title;
-    if (input.synopsis !== undefined) updateData.synopsis = input.synopsis;
-    if (input.proposedDigitalPolicy !== undefined)
-      updateData.proposedDigitalPolicy = input.proposedDigitalPolicy;
-    if (input.proposedAlacartePriceIdr !== undefined)
-      updateData.proposedAlacartePriceIdr = input.proposedAlacartePriceIdr;
-    if (input.status !== undefined) updateData.status = input.status;
-    if (input.rejectionReason !== undefined)
-      updateData.rejectionReason = input.rejectionReason;
-
-    await tx
-      .update(manuscriptSubmissions)
-      .set(updateData)
-      .where(eq(manuscriptSubmissions.id, id));
-
-    if (input.chapters && input.chapters.length > 0) {
-      for (const ch of input.chapters) {
-        if (ch.id) {
-          await tx
-            .update(manuscriptChapters)
-            .set({
-              titleId: ch.titleId,
-              contentId: ch.contentId,
-              contentEn: ch.contentEn ?? null,
-              blueprintContent: ch.blueprintContent ?? null,
-              estimatedMinutes: ch.estimatedMinutes,
-              updatedAt: new Date(),
-            })
-            .where(
-              and(
-                eq(manuscriptChapters.id, ch.id),
-                eq(manuscriptChapters.manuscriptId, id),
-              ),
-            );
-        } else {
-          await tx.insert(manuscriptChapters).values({
-            manuscriptId: id,
-            chapterNumber: ch.chapterNumber,
-            titleId: ch.titleId,
-            contentId: ch.contentId,
-            contentEn: ch.contentEn ?? null,
-            blueprintContent: ch.blueprintContent ?? null,
-            estimatedMinutes: ch.estimatedMinutes,
-          });
-        }
-      }
-    }
-
-    return await getAdminManuscriptById(id, tx);
-  });
-}
-
-export async function publishAdminManuscript(
-  id: string,
-  overrides?: AdminPublishManuscriptInput,
-) {
-  return await db.transaction(async (tx) => {
-    const [manuscript] = await tx
-      .select()
-      .from(manuscriptSubmissions)
-      .where(eq(manuscriptSubmissions.id, id));
-
-    if (!manuscript) {
-      throw new HttpError(404, "NOT_FOUND", "Naskah tidak ditemukan.");
-    }
-
-    const chapters = await tx
-      .select()
-      .from(manuscriptChapters)
-      .where(eq(manuscriptChapters.manuscriptId, id))
-      .orderBy(manuscriptChapters.chapterNumber);
-
-    if (chapters.length === 0) {
-      throw new HttpError(
-        400,
-        "NO_CHAPTERS",
-        "Naskah belum memiliki bab untuk diterbitkan.",
-      );
-    }
-
-    const [authorUser] = await tx
-      .select()
-      .from(user)
-      .where(eq(user.id, manuscript.authorUserId));
-
-    const authorName =
-      overrides?.author ||
-      authorUser?.authorPenName ||
-      authorUser?.name ||
-      "Penulis AnzaBook";
-
-    const digitalPolicy: DigitalPolicy =
-      (overrides?.digitalPolicy as DigitalPolicy | undefined) ||
-      manuscript.proposedDigitalPolicy ||
-      "sample_only";
-
-    const alacartePriceIdr =
-      overrides?.alacartePriceIdr !== undefined
-        ? overrides.alacartePriceIdr
-        : (manuscript.proposedAlacartePriceIdr ??
-          (digitalPolicy === "alacarte_only" ? 45000 : null));
-
-    const coverUrl = overrides?.coverUrl || "/covers/default-book.jpg";
-
-    const slug = `${slugify(manuscript.title)}-${randomUUID().slice(0, 8)}`;
-    const readingMinutes = chapters.reduce(
-      (sum, c) => sum + (c.estimatedMinutes || 5),
-      0,
-    );
-    const pageCount = Math.max(chapters.length * 15, 20);
-
-    // Insert into books
-    const [book] = await tx
-      .insert(books)
-      .values({
-        slug,
-        title: manuscript.title,
-        author: authorName,
-        synopsis: manuscript.synopsis,
-        coverUrl,
-        digitalPolicy,
-        alacartePriceIdr,
-        publisherId: manuscript.publisherId,
-        authorUserId: manuscript.authorUserId,
-        totalChapters: chapters.length,
-        readingMinutes,
-        pageCount,
-        hasPhysical:
-          digitalPolicy === "print_claim_only" ||
-          digitalPolicy === "hybrid_nakama_alacarte",
-      })
-      .returning();
-
-    // Insert all chapters into bookChapters
-    for (const ch of chapters) {
-      await tx.insert(bookChapters).values({
-        bookId: book.id,
-        chapterNumber: ch.chapterNumber,
-        titleId: ch.titleId,
-        contentId: ch.contentId,
-        contentEn: ch.contentEn,
-        blueprintContent: ch.blueprintContent ?? "",
-      });
-    }
-
-    let initialBatch: typeof bookClaimBatches.$inferSelect | null = null;
-
-    // If print_claim_only and publisher is present, generate initial 500 free claim codes
-    if (digitalPolicy === "print_claim_only" && manuscript.publisherId) {
-      const [batch] = await tx
-        .insert(bookClaimBatches)
-        .values({
-          bookId: book.id,
-          publisherId: manuscript.publisherId,
-          batchName: `Batch Perdana (500 Eks) - ${manuscript.title.slice(0, 50)}`,
-          totalCodes: 500,
-          unitFeeIdr: 0,
-          billingStatus: "free_tier",
-        })
-        .returning();
-
-      initialBatch = batch;
-
-      const codeRecords: {
-        bookId: string;
-        batchId: string;
-        code: string;
-        isDemo: boolean;
-      }[] = [];
-
-      for (let i = 0; i < 500; i++) {
-        codeRecords.push({
-          bookId: book.id,
-          batchId: batch.id,
-          code: generateClaimCode(),
-          isDemo: false,
-        });
-      }
-
-      await tx.insert(bookClaimCodes).values(codeRecords);
-    }
-
-    // Update manuscript status
-    await tx
-      .update(manuscriptSubmissions)
-      .set({
-        status: "published",
-        publishedBookId: book.id,
-        updatedAt: new Date(),
-      })
-      .where(eq(manuscriptSubmissions.id, id));
-
-    return {
-      publishedBookId: book.id,
-      book: {
-        ...book,
-        createdAt: book.createdAt.toISOString(),
-        updatedAt: book.updatedAt.toISOString(),
-      },
-      claimBatch: initialBatch
-        ? {
-            ...initialBatch,
-            createdAt: initialBatch.createdAt.toISOString(),
-          }
-        : null,
-    };
-  });
 }
 
 export async function createAdminClaimBatch(

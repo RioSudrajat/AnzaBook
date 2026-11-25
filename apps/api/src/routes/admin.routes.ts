@@ -1,8 +1,6 @@
 import { Router, type RequestHandler } from "express";
 import {
-  adminEditManuscriptSchema,
   adminListQuerySchema,
-  adminPublishManuscriptSchema,
   adminReviewAuthorApplicationSchema,
   adminVerifyCalendarSchema,
   adminVerifyPublisherSchema,
@@ -26,15 +24,11 @@ import { requireTrustedOrigin } from "../middleware/origin";
 import {
   createAdminClaimBatch,
   getAdminClaimBatchCodes,
-  getAdminManuscriptById,
   getAdminOverview,
   listAdminAuthorApplications,
   listAdminCalendars,
-  listAdminManuscripts,
   listAdminPublishers,
-  publishAdminManuscript,
   reviewAdminAuthorApplication,
-  updateAdminManuscript,
   verifyAdminCalendar,
   verifyAdminPublisher,
 } from "../services/admin-cms.service";
@@ -120,34 +114,6 @@ adminRouter.patch("/publishers/:id/verify", jsonBody, async (req, res) => {
   const input = adminVerifyPublisherSchema.parse(req.body);
   const publisher = await verifyAdminPublisher(req.params.id as string, input);
   res.json({ data: publisher });
-});
-
-// ---------------- Manuscripts & Catalog Publishing ---------------- //
-
-adminRouter.get("/manuscripts", async (req, res) => {
-  const query = adminListQuerySchema.parse(req.query);
-  const manuscripts = await listAdminManuscripts(query);
-  res.json({ data: manuscripts });
-});
-
-adminRouter.get("/manuscripts/:id", async (req, res) => {
-  const manuscript = await getAdminManuscriptById(req.params.id as string);
-  res.json({ data: manuscript });
-});
-
-adminRouter.patch("/manuscripts/:id", jsonBody, async (req, res) => {
-  const input = adminEditManuscriptSchema.parse(req.body);
-  const manuscript = await updateAdminManuscript(
-    req.params.id as string,
-    input,
-  );
-  res.json({ data: manuscript });
-});
-
-adminRouter.post("/manuscripts/:id/publish", jsonBody, async (req, res) => {
-  const input = adminPublishManuscriptSchema.parse(req.body);
-  const result = await publishAdminManuscript(req.params.id as string, input);
-  res.json({ data: result });
 });
 
 // ---------------- Claim Code Batches (Skema A Phygital) ---------------- //

@@ -1,12 +1,19 @@
 import { Router } from "express";
+import { z } from "zod";
 import { calculatePrintEconomics } from "@starter/shared/print-economics";
 import {
+  addPublisherMemberSchema,
   applyPublisherSchema,
+  authorUpdateManuscriptSchema,
   createManuscriptDraftSchema,
-  reviewManuscriptSchema,
+  listSubmissionTargetsQuerySchema,
+  publishManuscriptSchema,
+  publisherEditManuscriptSchema,
+  publisherReviewManuscriptSchema,
   simulatePrintSchema,
   submitManuscriptSchema,
-  updateManuscriptSchema,
+  updatePublisherBookSchema,
+  updatePublisherMemberSchema,
   updatePublisherSchema,
 } from "@starter/shared/validators/publisher";
 import { HttpError } from "../lib/http-error";
@@ -16,19 +23,42 @@ import { requireTrustedOrigin } from "../middleware/origin";
 import {
   applyPublisher,
   createManuscriptDraft,
+  editPublisherManuscript,
   getManuscript,
   getPublisherBySlug,
+  listMyManagedPublishers,
   listMyManuscripts,
   listPublisherManuscripts,
+  listSubmissionTargets,
   listVerifiedPublishers,
-  reviewManuscript,
+  reviewPublisherManuscript,
   submitManuscript,
   submitManuscriptDraft,
   updateManuscript,
   updatePublisher,
 } from "../services/publisher.service";
+import {
+  addPublisherMember,
+  listPublisherBooks,
+  listPublisherMembers,
+  publishPublisherManuscript,
+  removePublisherMember,
+  updatePublisherBook,
+  updatePublisherMember,
+} from "../services/publisher-publishing.service";
 
 export const publisherRouter = Router();
+
+const submitDraftBodySchema = z
+  .object({
+    publisherId: z
+      .string()
+      .uuid("ID penerbit tidak valid")
+      .optional()
+      .nullable(),
+  })
+  .strict()
+  .optional();
 
 // Print Economics Simulator
 publisherRouter.post("/simulate", jsonBody, async (req, res) => {
@@ -44,6 +74,21 @@ publisherRouter.get("/list", optionalAuth, async (req, res) => {
   res.json({ data: publishers });
 });
 
+// Author submission targets ranked by official AnzaBook pin + topic overlap
+publisherRouter.get("/submission-targets", optionalAuth, async (req, res) => {
+  const currentUserId = req.auth?.user.id;
+  const query = listSubmissionTargetsQuerySchema.parse(req.query);
+  const targets = await listSubmissionTargets(query, currentUserId);
+  res.json({ data: targets });
+});
+
+// List publishers managed by authenticated caller (including pending/rejected)
+publisherRouter.get("/mine", requireAuth, async (req, res) => {
+  const userId = getAuth(req).user.id;
+  const managed = await listMyManagedPublishers(userId);
+  res.json({ data: managed });
+});
+
 // Apply to become partner publisher
 publisherRouter.post(
   "/apply",
@@ -55,22 +100,6 @@ publisherRouter.post(
     const input = applyPublisherSchema.parse(req.body);
     const publisher = await applyPublisher(userId, input);
     res.status(201).json({ data: publisher });
-  },
-);
-
-// Update partner publisher profile (manager or admin)
-publisherRouter.patch(
-  "/:slug",
-  requireAuth,
-  requireTrustedOrigin,
-  jsonBody,
-  async (req, res) => {
-    const userId = getAuth(req).user.id;
-    const userRole = getAuth(req).user.role || undefined;
-    const slug = String(req.params.slug);
-    const input = updatePublisherSchema.parse(req.body);
-    const publisher = await updatePublisher(userId, slug, input, userRole);
-    res.json({ data: publisher });
   },
 );
 
@@ -109,16 +138,15 @@ publisherRouter.get("/manuscripts/mine", requireAuth, async (req, res) => {
   res.json({ data: manuscripts });
 });
 
-// Get manuscript by id or slug (author, publisher, or admin)
+// Get manuscript by id or slug (author or publisher owner/editor)
 publisherRouter.get("/manuscripts/:idOrSlug", requireAuth, async (req, res) => {
   const userId = getAuth(req).user.id;
-  const userRole = getAuth(req).user.role || undefined;
   const idOrSlug = String(req.params.idOrSlug);
-  const manuscript = await getManuscript(userId, idOrSlug, userRole);
+  const manuscript = await getManuscript(userId, idOrSlug);
   res.json({ data: manuscript });
 });
 
-// Update manuscript draft or content
+// Update manuscript draft or revision content (author only, locked once submitted/published)
 publisherRouter.patch(
   "/manuscripts/:idOrSlug",
   requireAuth,
@@ -126,20 +154,14 @@ publisherRouter.patch(
   jsonBody,
   async (req, res) => {
     const userId = getAuth(req).user.id;
-    const userRole = getAuth(req).user.role || undefined;
     const idOrSlug = String(req.params.idOrSlug);
-    const input = updateManuscriptSchema.parse(req.body);
-    const manuscript = await updateManuscript(
-      userId,
-      idOrSlug,
-      input,
-      userRole,
-    );
+    const input = authorUpdateManuscriptSchema.parse(req.body);
+    const manuscript = await updateManuscript(userId, idOrSlug, input);
     res.json({ data: manuscript });
   },
 );
 
-// Submit manuscript draft to publisher
+// Submit manuscript draft to publisher (falls back to official anzabook when omitted)
 publisherRouter.post(
   "/manuscripts/:idOrSlug/submit",
   requireAuth,
@@ -148,47 +170,175 @@ publisherRouter.post(
   async (req, res) => {
     const userId = getAuth(req).user.id;
     const idOrSlug = String(req.params.idOrSlug);
-    const publisherId = req.body?.publisherId
-      ? String(req.body.publisherId)
-      : null;
+    const body = submitDraftBodySchema.parse(req.body);
     const manuscript = await submitManuscriptDraft(
       userId,
       idOrSlug,
-      publisherId,
+      body?.publisherId ?? null,
     );
     res.json({ data: manuscript });
   },
 );
 
-// Review manuscript by publisher or admin
-publisherRouter.post(
-  "/manuscripts/:idOrSlug/review",
+// Publisher Studio: Incoming manuscripts inbox (owner/editor)
+publisherRouter.get("/:slug/manuscripts", requireAuth, async (req, res) => {
+  const userId = getAuth(req).user.id;
+  const slug = String(req.params.slug);
+  const manuscripts = await listPublisherManuscripts(userId, slug);
+  res.json({ data: manuscripts });
+});
+
+// Publisher Studio: Edit incoming manuscript & editorial notes (owner/editor)
+publisherRouter.patch(
+  "/:slug/manuscripts/:idOrSlug",
   requireAuth,
   requireTrustedOrigin,
   jsonBody,
   async (req, res) => {
     const userId = getAuth(req).user.id;
-    const userRole = getAuth(req).user.role || undefined;
+    const slug = String(req.params.slug);
     const idOrSlug = String(req.params.idOrSlug);
-    const input = reviewManuscriptSchema.parse(req.body);
-    const manuscript = await reviewManuscript(
+    const input = publisherEditManuscriptSchema.parse(req.body);
+    const manuscript = await editPublisherManuscript(
       userId,
+      slug,
       idOrSlug,
       input,
-      userRole,
     );
     res.json({ data: manuscript });
   },
 );
 
-// Publisher incoming manuscripts inbox
-publisherRouter.get("/:slug/manuscripts", requireAuth, async (req, res) => {
+// Publisher Studio: Review incoming manuscript (start_editing | request_revision | reject)
+publisherRouter.post(
+  "/:slug/manuscripts/:idOrSlug/review",
+  requireAuth,
+  requireTrustedOrigin,
+  jsonBody,
+  async (req, res) => {
+    const userId = getAuth(req).user.id;
+    const slug = String(req.params.slug);
+    const idOrSlug = String(req.params.idOrSlug);
+    const input = publisherReviewManuscriptSchema.parse(req.body);
+    const manuscript = await reviewPublisherManuscript(
+      userId,
+      slug,
+      idOrSlug,
+      input,
+    );
+    res.json({ data: manuscript });
+  },
+);
+
+// Publisher Studio: Atomically publish manuscript to catalog (verified publisher + owner/editor)
+publisherRouter.post(
+  "/:slug/manuscripts/:idOrSlug/publish",
+  requireAuth,
+  requireTrustedOrigin,
+  jsonBody,
+  async (req, res) => {
+    const userId = getAuth(req).user.id;
+    const slug = String(req.params.slug);
+    const idOrSlug = String(req.params.idOrSlug);
+    const input = publishManuscriptSchema.parse(req.body);
+    const result = await publishPublisherManuscript(
+      userId,
+      slug,
+      idOrSlug,
+      input,
+    );
+    res.json({ data: result });
+  },
+);
+
+// Publisher Studio: List published books owned by publisher (owner/editor)
+publisherRouter.get("/:slug/books", requireAuth, async (req, res) => {
   const userId = getAuth(req).user.id;
-  const userRole = getAuth(req).user.role || undefined;
   const slug = String(req.params.slug);
-  const manuscripts = await listPublisherManuscripts(userId, slug, userRole);
-  res.json({ data: manuscripts });
+  const catalog = await listPublisherBooks(userId, slug);
+  res.json({ data: catalog });
 });
+
+// Publisher Studio: Update published book owned by publisher (owner/editor)
+publisherRouter.patch(
+  "/:slug/books/:bookId",
+  requireAuth,
+  requireTrustedOrigin,
+  jsonBody,
+  async (req, res) => {
+    const userId = getAuth(req).user.id;
+    const slug = String(req.params.slug);
+    const bookId = String(req.params.bookId);
+    const input = updatePublisherBookSchema.parse(req.body);
+    const updated = await updatePublisherBook(userId, slug, bookId, input);
+    res.json({ data: updated });
+  },
+);
+
+// Publisher Studio: Team member management (owner only)
+publisherRouter.get("/:slug/members", requireAuth, async (req, res) => {
+  const userId = getAuth(req).user.id;
+  const slug = String(req.params.slug);
+  const members = await listPublisherMembers(userId, slug);
+  res.json({ data: members });
+});
+
+publisherRouter.post(
+  "/:slug/members",
+  requireAuth,
+  requireTrustedOrigin,
+  jsonBody,
+  async (req, res) => {
+    const userId = getAuth(req).user.id;
+    const slug = String(req.params.slug);
+    const input = addPublisherMemberSchema.parse(req.body);
+    const created = await addPublisherMember(userId, slug, input);
+    res.status(201).json({ data: created });
+  },
+);
+
+publisherRouter.patch(
+  "/:slug/members/:memberId",
+  requireAuth,
+  requireTrustedOrigin,
+  jsonBody,
+  async (req, res) => {
+    const userId = getAuth(req).user.id;
+    const slug = String(req.params.slug);
+    const memberId = String(req.params.memberId);
+    const input = updatePublisherMemberSchema.parse(req.body);
+    const updated = await updatePublisherMember(userId, slug, memberId, input);
+    res.json({ data: updated });
+  },
+);
+
+publisherRouter.delete(
+  "/:slug/members/:memberId",
+  requireAuth,
+  requireTrustedOrigin,
+  async (req, res) => {
+    const userId = getAuth(req).user.id;
+    const slug = String(req.params.slug);
+    const memberId = String(req.params.memberId);
+    const result = await removePublisherMember(userId, slug, memberId);
+    res.json({ data: result });
+  },
+);
+
+// Update partner publisher profile (owner only)
+publisherRouter.patch(
+  "/:slug",
+  requireAuth,
+  requireTrustedOrigin,
+  jsonBody,
+  async (req, res) => {
+    const userId = getAuth(req).user.id;
+    const slug = String(req.params.slug);
+    const input = updatePublisherSchema.parse(req.body);
+    const publisher = await updatePublisher(userId, slug, input);
+    res.json({ data: publisher });
+  },
+);
 
 // Public: Get publisher detail by slug
 publisherRouter.get("/:slug", optionalAuth, async (req, res) => {
