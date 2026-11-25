@@ -1,7 +1,20 @@
 import { z } from "zod";
+import type { AccessTier, BookDistributionModel } from "../types/api";
 
 const ROOT_RELATIVE_ASSET_PATH_REGEX = /^\/(?!\/)[^\s]*$/;
 const HTTP_URL_SCHEMA = z.string().url({ protocol: /^https?$/ });
+
+export const DEFAULT_DIGITAL_BOOK_PRICE_IDR = 45_000;
+
+export function deriveAccessTier(
+  model: BookDistributionModel,
+  hasPhysical: boolean,
+): AccessTier {
+  if (model === "free_open") return "free";
+  if (model === "print_code_only") return "premium_physical";
+  if (model === "nakama_or_purchase" && hasPhysical) return "premium_physical";
+  return "premium";
+}
 
 /**
  * Validates an asset reference as an HTTP(S) URL, a root-relative path
@@ -105,12 +118,19 @@ export const applyPublisherSchema = z
 
 export const updatePublisherSchema = applyPublisherSchema.partial();
 
-export const digitalPolicyEnum = z.enum([
+export const bookDistributionModelEnum = z.enum([
   "free_open",
-  "print_claim_only",
-  "sample_only",
-  "alacarte_only",
-  "hybrid_nakama_alacarte",
+  "print_code_only",
+  "nakama_subscription",
+  "single_purchase",
+  "nakama_or_purchase",
+]);
+
+export const sourceLanguageEnum = z.enum(["id", "en"]);
+export const targetAudienceEnum = z.enum([
+  "general",
+  "young_adult",
+  "mature_academic",
 ]);
 
 export const manuscriptStatusEnum = z.enum([
@@ -144,10 +164,21 @@ export const createManuscriptDraftSchema = z
     title: z.string().min(1, "Judul naskah wajib diisi").max(255),
     slug: z.string().max(255).optional().nullable(),
     coverUrl: z.string().optional().nullable(),
+    coverColor: z
+      .string()
+      .regex(/^#[0-9a-f]{3,8}$/i, "Format warna hex tidak valid")
+      .optional()
+      .nullable(),
     category: z.string().max(80).optional().nullable(),
     synopsis: z.string().max(5000).default(""),
-    proposedDigitalPolicy: digitalPolicyEnum.default("hybrid_nakama_alacarte"),
-    proposedAlacartePriceIdr: z
+    sourceLanguage: sourceLanguageEnum.default("id").optional(),
+    targetAudience: targetAudienceEnum.default("general").optional(),
+    authorNotes: z.string().max(2000).optional().nullable(),
+    isbn: z.string().trim().max(32).optional().nullable(),
+    estimatedPages: z.number().int().min(1).max(3000).optional().nullable(),
+    proposedDigitalPolicy:
+      bookDistributionModelEnum.default("nakama_or_purchase"),
+    proposedDigitalPriceIdr: z
       .number()
       .int()
       .min(0)
@@ -173,8 +204,8 @@ export const submitManuscriptSchema = z
       .string()
       .min(10, "Sinopsis naskah minimal 10 karakter")
       .max(5000, "Sinopsis naskah maksimal 5000 karakter"),
-    proposedDigitalPolicy: digitalPolicyEnum,
-    proposedAlacartePriceIdr: z
+    proposedDigitalPolicy: bookDistributionModelEnum,
+    proposedDigitalPriceIdr: z
       .number()
       .int("Harga harus berupa bilangan bulat")
       .min(0, "Harga minimal 0")
@@ -183,7 +214,17 @@ export const submitManuscriptSchema = z
       .nullable(),
     printSimJson: z.record(z.string(), z.unknown()).optional().nullable(),
     coverUrl: z.string().optional().nullable(),
+    coverColor: z
+      .string()
+      .regex(/^#[0-9a-f]{3,8}$/i, "Format warna hex tidak valid")
+      .optional()
+      .nullable(),
     category: z.string().max(80).optional().nullable(),
+    sourceLanguage: sourceLanguageEnum.optional(),
+    targetAudience: targetAudienceEnum.optional(),
+    authorNotes: z.string().max(2000).optional().nullable(),
+    isbn: z.string().trim().max(32).optional().nullable(),
+    estimatedPages: z.number().int().min(1).max(3000).optional().nullable(),
     chapters: z.array(submitManuscriptChapterSchema).optional(),
   })
   .strict();
@@ -192,10 +233,20 @@ const manuscriptEditableFields = {
   title: z.string().min(1).max(255).optional(),
   slug: z.string().max(255).optional().nullable(),
   coverUrl: z.string().optional().nullable(),
+  coverColor: z
+    .string()
+    .regex(/^#[0-9a-f]{3,8}$/i, "Format warna hex tidak valid")
+    .optional()
+    .nullable(),
   category: z.string().max(80).optional().nullable(),
   synopsis: z.string().max(5000).optional(),
-  proposedDigitalPolicy: digitalPolicyEnum.optional(),
-  proposedAlacartePriceIdr: z
+  sourceLanguage: sourceLanguageEnum.optional(),
+  targetAudience: targetAudienceEnum.optional(),
+  authorNotes: z.string().max(2000).optional().nullable(),
+  isbn: z.string().trim().max(32).optional().nullable(),
+  estimatedPages: z.number().int().min(1).max(3000).optional().nullable(),
+  proposedDigitalPolicy: bookDistributionModelEnum.optional(),
+  proposedDigitalPriceIdr: z
     .number()
     .int()
     .min(0)
@@ -245,17 +296,31 @@ export const publisherReviewManuscriptSchema = z
 
 export const publishManuscriptSchema = z
   .object({
-    coverUrl: z.string().optional().nullable(),
-    author: z.string().min(1).max(255).optional(),
-    digitalPolicy: digitalPolicyEnum.optional(),
-    alacartePriceIdr: z
+    title: z.string().trim().min(2).max(255).optional(),
+    synopsis: z.string().trim().min(10).max(5000).optional(),
+    coverUrl: safeAssetUrlSchema("URL cover tidak valid").optional().nullable(),
+    coverColor: z
+      .string()
+      .regex(/^#[0-9a-f]{3,8}$/i, "Format warna hex tidak valid")
+      .optional(),
+    author: z.string().trim().min(1).max(255).optional(),
+    digitalPolicy: bookDistributionModelEnum.optional(),
+    digitalPriceIdr: z
       .number()
       .int()
       .min(0)
       .max(10_000_000)
       .optional()
       .nullable(),
+    hasPhysical: z.boolean().optional(),
     categories: z.array(z.string().trim().min(1).max(60)).max(10).optional(),
+    publishedYear: z.number().int().min(1900).max(2100).optional(),
+    originalTitle: z.string().trim().max(255).optional().nullable(),
+    translator: z.string().trim().max(255).optional().nullable(),
+    collectionName: z.string().trim().max(120).optional().nullable(),
+    isbn: z.string().trim().max(32).optional().nullable(),
+    rakyatPriceIdr: z.number().int().min(5000).max(5_000_000).optional(),
+    standardPriceIdr: z.number().int().min(5000).max(5_000_000).optional(),
   })
   .strict()
   .optional();
@@ -288,54 +353,73 @@ export const updatePublisherMemberSchema = z
 
 export const updatePublisherBookSchema = z
   .object({
-    title: z.string().min(2).max(255).optional(),
-    synopsis: z.string().min(10).max(5000).optional(),
-    coverUrl: z.string().optional().nullable(),
-    categories: z.array(z.string().trim().min(1).max(60)).max(10).optional(),
-    digitalPolicy: digitalPolicyEnum.optional(),
-    alacartePriceIdr: z
-      .number()
-      .int()
-      .min(0)
-      .max(10_000_000)
-      .optional()
-      .nullable(),
-  })
-  .strict();
-
-/** @deprecated Removed in Issue #9 (Slice 2) */
-export const updateManuscriptSchema = z
-  .object({
-    title: z.string().min(1).max(255).optional(),
-    synopsis: z.string().max(5000).optional(),
-    coverUrl: z.string().optional().nullable(),
-    category: z.string().max(80).optional().nullable(),
-    proposedDigitalPolicy: digitalPolicyEnum.optional(),
-    proposedAlacartePriceIdr: z
-      .number()
-      .int()
-      .min(0)
-      .max(10_000_000)
-      .optional()
-      .nullable(),
-    printSimJson: z.record(z.string(), z.unknown()).optional().nullable(),
-    status: manuscriptStatusEnum.optional(),
-    editorialNotes: z.string().max(2000).optional().nullable(),
-    rejectionReason: z.string().max(1000).optional().nullable(),
-    publishedBookId: z
+    title: z.string().trim().min(2).max(255).optional(),
+    synopsis: z.string().trim().min(10).max(5000).optional(),
+    author: z.string().trim().min(1).max(255).optional(),
+    coverUrl: safeAssetUrlSchema("URL cover tidak valid").optional().nullable(),
+    coverColor: z
       .string()
-      .uuid("ID buku tidak valid")
+      .regex(/^#[0-9a-f]{3,8}$/i, "Format warna hex tidak valid")
+      .optional(),
+    categories: z.array(z.string().trim().min(1).max(60)).max(10).optional(),
+    digitalPolicy: bookDistributionModelEnum.optional(),
+    digitalPriceIdr: z
+      .number()
+      .int()
+      .min(0)
+      .max(10_000_000)
       .optional()
       .nullable(),
-    chapters: z.array(submitManuscriptChapterSchema).optional(),
+    hasPhysical: z.boolean().optional(),
+    publishedYear: z.number().int().min(1900).max(2100).optional(),
+    originalTitle: z.string().trim().max(255).optional().nullable(),
+    translator: z.string().trim().max(255).optional().nullable(),
+    collectionName: z.string().trim().max(120).optional().nullable(),
+    rakyatPriceIdr: z.number().int().min(5000).max(5_000_000).optional(),
+    standardPriceIdr: z.number().int().min(5000).max(5_000_000).optional(),
+  })
+  .strict()
+  .superRefine((data, ctx) => {
+    if (
+      (data.digitalPolicy === "single_purchase" ||
+        data.digitalPolicy === "nakama_or_purchase") &&
+      data.digitalPriceIdr === 0
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["digitalPriceIdr"],
+        message: "Harga beli satuan digital harus lebih dari Rp0",
+      });
+    }
+  });
+
+export const addApprovedWriterSchema = z
+  .object({
+    identifier: z
+      .string()
+      .trim()
+      .min(2, "Masukkan email atau username penulis")
+      .max(255),
+    canFastTrack: z.boolean().default(true),
   })
   .strict();
 
-/** @deprecated Removed in Issue #9 (Slice 2) */
-export const reviewManuscriptSchema = z
+export const updateBookInventorySchema = z
   .object({
-    action: z.enum(["approve", "request_revision", "reject"]),
-    notes: z.string().max(2000).optional().nullable(),
+    items: z
+      .array(
+        z
+          .object({
+            branchId: z.string().uuid("ID cabang toko tidak valid"),
+            rakyatStock: z.number().int().min(0).max(100_000),
+            standardStock: z.number().int().min(0).max(100_000),
+            stockStatus: z
+              .enum(["available", "low_stock", "out_of_stock"])
+              .optional(),
+          })
+          .strict(),
+      )
+      .max(100),
   })
   .strict();
 
@@ -355,7 +439,7 @@ export const createClaimBatchSchema = z
   })
   .strict();
 
-export const purchaseBookAlacarteSchema = z
+export const purchaseBookSchema = z
   .object({
     bookId: z.string().uuid("ID buku tidak valid").optional(),
     affiliateCalendarId: z
@@ -406,11 +490,10 @@ export type UpdatePublisherMemberInput = z.infer<
 export type UpdatePublisherBookInput = z.infer<
   typeof updatePublisherBookSchema
 >;
-/** @deprecated Removed in Issue #9 (Slice 2) */
-export type UpdateManuscriptInput = z.infer<typeof updateManuscriptSchema>;
-/** @deprecated Removed in Issue #9 (Slice 2) */
-export type ReviewManuscriptInput = z.infer<typeof reviewManuscriptSchema>;
-export type CreateClaimBatchInput = z.infer<typeof createClaimBatchSchema>;
-export type PurchaseBookAlacarteInput = z.infer<
-  typeof purchaseBookAlacarteSchema
+export type AddApprovedWriterInput = z.input<typeof addApprovedWriterSchema>;
+export type AddApprovedWriterOutput = z.output<typeof addApprovedWriterSchema>;
+export type UpdateBookInventoryInput = z.infer<
+  typeof updateBookInventorySchema
 >;
+export type CreateClaimBatchInput = z.infer<typeof createClaimBatchSchema>;
+export type PurchaseBookInput = z.infer<typeof purchaseBookSchema>;

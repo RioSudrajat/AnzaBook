@@ -62,8 +62,8 @@ export async function createReadingSession(
 
   const hasMembership = !!(await getActiveMembership(userId));
   const isNakamaEligible =
-    book.digitalPolicy === "sample_only" ||
-    book.digitalPolicy === "hybrid_nakama_alacarte";
+    book.digitalPolicy === "nakama_subscription" ||
+    book.digitalPolicy === "nakama_or_purchase";
   const isWpmValid = input.avgWpm >= 80 && input.avgWpm <= 600;
   const isDurationValid =
     input.durationSeconds >= 120 && input.durationSeconds <= 3600;

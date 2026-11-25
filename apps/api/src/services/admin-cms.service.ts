@@ -38,7 +38,7 @@ export async function getAdminOverview(): Promise<AdminOverviewDto> {
     [pendingAuthorRow],
     [pendingPubRow],
     [membershipRevRow],
-    [alacarteRevRow],
+    [singlePurchaseRevRow],
     [affiliateRow],
     highRiskDrmEvents24hCount,
   ] = await Promise.all([
@@ -87,10 +87,12 @@ export async function getAdminOverview(): Promise<AdminOverviewDto> {
     pendingPublishersCount: Number(pendingPubRow?.count ?? 0),
     highRiskDrmEvents24hCount,
     estimatedNakamaRoyaltyPoolIdr,
-    totalAlacarteSalesIdr: Number(alacarteRevRow?.totalSales ?? 0),
-    totalPublisherShareIdr: Number(alacarteRevRow?.totalPublisherShare ?? 0),
+    totalSinglePurchaseSalesIdr: Number(singlePurchaseRevRow?.totalSales ?? 0),
+    totalPublisherShareIdr: Number(
+      singlePurchaseRevRow?.totalPublisherShare ?? 0,
+    ),
     totalAffiliateCommissionsIdr: Number(affiliateRow?.totalAffiliate ?? 0),
-    totalNetAnzabookIdr: Number(alacarteRevRow?.totalNetAnzabook ?? 0),
+    totalNetAnzabookIdr: Number(singlePurchaseRevRow?.totalNetAnzabook ?? 0),
   };
 }
 

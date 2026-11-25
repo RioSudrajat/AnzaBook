@@ -20,7 +20,12 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import type { DigitalPolicy } from "@starter/shared/types";
+import type {
+  BookDistributionModel,
+  ManuscriptSourceLanguage,
+  ManuscriptTargetAudience,
+} from "@starter/shared/types";
+import { DEFAULT_DIGITAL_BOOK_PRICE_IDR } from "@starter/shared/validators/publisher";
 import { calculatePrintEconomics } from "@starter/shared/print-economics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,11 +38,13 @@ export interface ManuscriptConfigData {
   title: string;
   synopsis: string;
   category: string;
+  sourceLanguage: ManuscriptSourceLanguage;
   availableLanguages: string[];
   accessTier: "free" | "premium" | "premium_physical";
-  digitalPolicy: DigitalPolicy;
+  digitalPolicy: BookDistributionModel;
+  proposedDigitalPriceIdr: number | null;
   hasPhysicalPrint: boolean;
-  targetAudience: string;
+  targetAudience: ManuscriptTargetAudience;
   estimatedPages: number;
   isbn?: string;
   publisherId: string;
@@ -52,33 +59,50 @@ interface ManuscriptConfigDialogProps {
   isSubmitting?: boolean;
 }
 
-const ACCESS_MODELS: ReadonlyArray<{
-  id: "free" | "premium" | "premium_physical";
+const DISTRIBUTION_MODELS: ReadonlyArray<{
+  policy: BookDistributionModel;
   title: string;
   description: string;
-  policy: DigitalPolicy;
+  accessTier: "free" | "premium" | "premium_physical";
   hasPhysical: boolean;
 }> = [
   {
-    id: "free",
-    title: "Akses Terbuka",
-    description: "Gratis untuk seluruh pembaca umum di AnzaBook.",
-    policy: "free_open",
-    hasPhysical: false,
-  },
-  {
-    id: "premium",
-    title: "Premium Nakama",
-    description: "Koleksi Nakama & pembelian satuan dengan bagi hasil royalti.",
-    policy: "hybrid_nakama_alacarte",
-    hasPhysical: false,
-  },
-  {
-    id: "premium_physical",
-    title: "Digital + Cetak Fisik",
-    description: "Distribusi digital sekaligus edisi cetak fisik berlisensi.",
-    policy: "hybrid_nakama_alacarte",
+    policy: "nakama_or_purchase",
+    title: "Nakama & Beli Satuan",
+    description:
+      "Bisa dibaca anggota Nakama sekaligus tersedia untuk pembelian satuan.",
+    accessTier: "premium_physical",
     hasPhysical: true,
+  },
+  {
+    policy: "single_purchase",
+    title: "Beli Satuan",
+    description:
+      "Pembaca membeli akses digital selamanya (tidak masuk paket Nakama).",
+    accessTier: "premium",
+    hasPhysical: false,
+  },
+  {
+    policy: "nakama_subscription",
+    title: "Khusus Anggota Nakama",
+    description:
+      "Eksklusif bagi pelanggan aktif Nakama dengan sistem bagi hasil.",
+    accessTier: "premium",
+    hasPhysical: false,
+  },
+  {
+    policy: "print_code_only",
+    title: "Eksklusif Pembeli Buku Cetak",
+    description: "Akses digital dibuka lewat kode klaim pada buku fisik.",
+    accessTier: "premium_physical",
+    hasPhysical: true,
+  },
+  {
+    policy: "free_open",
+    title: "Gratis Terbuka",
+    description: "Gratis dan terbuka untuk seluruh pembaca AnzaBook.",
+    accessTier: "free",
+    hasPhysical: false,
   },
 ];
 
@@ -96,23 +120,33 @@ function ManuscriptConfigFormContent({
   const [category, setCategory] = useState(
     initialData?.category || "Fiksi Sastra",
   );
-  const [hasEnglish, setHasEnglish] = useState(
-    initialData?.availableLanguages?.includes("en") || false,
+  const [sourceLanguage, setSourceLanguage] =
+    useState<ManuscriptSourceLanguage>(initialData?.sourceLanguage || "id");
+  const [hasCompanionEnglish, setHasCompanionEnglish] = useState(
+    Boolean(initialData?.availableLanguages?.includes("en")),
   );
-  const [accessTier, setAccessTier] = useState<
-    "free" | "premium" | "premium_physical"
-  >(initialData?.accessTier || "premium");
-  const [digitalPolicy, setDigitalPolicy] = useState<DigitalPolicy>(
-    initialData?.digitalPolicy || "hybrid_nakama_alacarte",
+  const [digitalPolicy, setDigitalPolicy] = useState<BookDistributionModel>(
+    initialData?.digitalPolicy || "nakama_or_purchase",
   );
+  const [proposedDigitalPriceIdr, setProposedDigitalPriceIdr] =
+    useState<string>(
+      initialData?.proposedDigitalPriceIdr != null
+        ? String(initialData.proposedDigitalPriceIdr)
+        : String(DEFAULT_DIGITAL_BOOK_PRICE_IDR),
+    );
   const [hasPhysicalPrint, setHasPhysicalPrint] = useState(
-    initialData?.hasPhysicalPrint ?? true,
+    initialData?.hasPhysicalPrint ??
+      (digitalPolicy === "print_code_only" ||
+        digitalPolicy === "nakama_or_purchase"),
   );
-  const [targetAudience, setTargetAudience] = useState(
-    initialData?.targetAudience || "Semua Umur (General)",
+  const [targetAudience, setTargetAudience] =
+    useState<ManuscriptTargetAudience>(
+      initialData?.targetAudience || "general",
+    );
+  const [estimatedPages, setEstimatedPages] = useState<number>(
+    initialData?.estimatedPages || 180,
   );
-  const estimatedPages = initialData?.estimatedPages || 180;
-  const isbn = initialData?.isbn || "";
+  const [isbn, setIsbn] = useState(initialData?.isbn || "");
   const [publisherId, setPublisherId] = useState(
     initialData?.publisherId || "",
   );
@@ -178,20 +212,52 @@ function ManuscriptConfigFormContent({
       return;
     }
 
-    const availableLanguages = ["id"];
-    if (hasEnglish) availableLanguages.push("en");
+    const availableLanguages =
+      sourceLanguage === "en"
+        ? ["en", "id"]
+        : hasCompanionEnglish
+          ? ["id", "en"]
+          : ["id"];
+
+    const requiresPrice =
+      digitalPolicy === "single_purchase" ||
+      digitalPolicy === "nakama_or_purchase";
+    const parsedPrice = requiresPrice
+      ? Number.parseInt(proposedDigitalPriceIdr.trim(), 10)
+      : null;
+
+    if (
+      requiresPrice &&
+      (Number.isNaN(parsedPrice ?? Number.NaN) ||
+        (parsedPrice ?? 0) < 0 ||
+        (parsedPrice ?? 0) > 10_000_000)
+    ) {
+      setValidationError(
+        "Usulan harga beli satuan harus antara Rp0 - Rp10.000.000.",
+      );
+      return;
+    }
+
+    const selectedModel =
+      DISTRIBUTION_MODELS.find((m) => m.policy === digitalPolicy) ??
+      DISTRIBUTION_MODELS[0];
 
     try {
       await onSubmit({
         title: title.trim(),
         synopsis: synopsis.trim(),
         category,
+        sourceLanguage,
         availableLanguages,
-        accessTier,
+        accessTier: selectedModel.accessTier,
         digitalPolicy,
+        proposedDigitalPriceIdr: parsedPrice,
         hasPhysicalPrint,
         targetAudience,
-        estimatedPages: Number(estimatedPages) || 180,
+        estimatedPages: Math.min(
+          3000,
+          Math.max(1, Number(estimatedPages) || 180),
+        ),
         isbn: isbn.trim() || undefined,
         publisherId: selectedPublisherId,
         authorNotes: authorNotes.trim() || undefined,
@@ -461,36 +527,40 @@ function ManuscriptConfigFormContent({
           )}
         </fieldset>
 
-        {/* 3. Bahasa & Target Pembaca */}
+        {/* 3. Bahasa, Target Pembaca & Data Fisik */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-3.5">
-          <div className="space-y-2">
-            <span className="text-xs font-semibold flex items-center gap-1.5">
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="ms-config-language"
+              className="text-xs font-semibold flex items-center gap-1.5"
+            >
               <Globe
                 className="size-3.5 text-[var(--color-ink-2)]"
                 aria-hidden="true"
               />
-              <span>Ketersediaan Bahasa</span>
-            </span>
-            <div className="space-y-2 text-[11px]">
-              <label className="flex items-center gap-2 text-[var(--color-muted)]">
-                <input
-                  type="checkbox"
-                  checked
-                  disabled
-                  className="size-4 accent-[var(--color-accent)]"
-                />
-                <span>Bahasa Indonesia (Utama)</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer text-[var(--color-ink)]">
-                <input
-                  type="checkbox"
-                  checked={hasEnglish}
-                  onChange={(e) => setHasEnglish(e.target.checked)}
-                  className="size-4 cursor-pointer accent-[var(--color-accent)]"
-                />
-                <span>Tersedia Terjemahan Bahasa Inggris</span>
-              </label>
-            </div>
+              <span>Bahasa Utama Naskah</span>
+            </Label>
+            <select
+              id="ms-config-language"
+              name="sourceLanguage"
+              value={sourceLanguage}
+              onChange={(e) =>
+                setSourceLanguage(e.target.value as ManuscriptSourceLanguage)
+              }
+              className="w-full h-11 px-3 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper-2)] text-xs text-[var(--color-ink)]"
+            >
+              <option value="id">Bahasa Indonesia</option>
+              <option value="en">Bahasa Inggris</option>
+            </select>
+            <label className="flex items-center gap-2 pt-1 text-[11px] text-[var(--color-ink-2)] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={hasCompanionEnglish}
+                onChange={(e) => setHasCompanionEnglish(e.target.checked)}
+                className="size-4 accent-[var(--color-accent)]"
+              />
+              <span>Sertakan dukungan dwibahasa (ID &amp; EN)</span>
+            </label>
           </div>
 
           <div className="space-y-1.5">
@@ -504,47 +574,74 @@ function ManuscriptConfigFormContent({
               id="ms-config-audience"
               name="targetAudience"
               value={targetAudience}
-              onChange={(e) => setTargetAudience(e.target.value)}
+              onChange={(e) =>
+                setTargetAudience(e.target.value as ManuscriptTargetAudience)
+              }
               className="w-full h-11 px-3 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper-2)] text-xs text-[var(--color-ink)]"
             >
-              <option value="Semua Umur (General)">
-                Semua Umur (General Audience)
-              </option>
-              <option value="Remaja 13+ (Young Adult)">
-                Remaja 13+ (Young Adult)
-              </option>
-              <option value="Dewasa 18+ (Mature/Academic)">
-                Dewasa 18+ (Mature / Akademik)
-              </option>
+              <option value="general">Umum (Semua Kalangan)</option>
+              <option value="young_adult">Remaja (13+)</option>
+              <option value="mature_academic">Dewasa &amp; Akademik</option>
             </select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="ms-config-pages" className="text-xs font-semibold">
+              Perkiraan Jumlah Halaman
+            </Label>
+            <Input
+              id="ms-config-pages"
+              name="estimatedPages"
+              type="number"
+              min={1}
+              max={3000}
+              value={estimatedPages}
+              onChange={(e) =>
+                setEstimatedPages(Number.parseInt(e.target.value || "180", 10))
+              }
+              className="min-h-11 text-xs bg-[var(--color-paper-2)]"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="ms-config-isbn" className="text-xs font-semibold">
+              ISBN (Opsional)
+            </Label>
+            <Input
+              id="ms-config-isbn"
+              name="isbn"
+              value={isbn}
+              onChange={(e) => setIsbn(e.target.value)}
+              placeholder="Contoh: 978-602-..."
+              className="min-h-11 text-xs font-mono bg-[var(--color-paper-2)]"
+            />
           </div>
         </div>
 
-        {/* 4. Model Akses & Lisensi Digital */}
-        <fieldset className="space-y-2">
+        {/* 4. Model Distribusi & Harga */}
+        <fieldset className="space-y-2.5">
           <legend className="text-xs font-semibold flex items-center gap-1.5 pb-1">
             <Layers
               className="size-3.5 text-[var(--color-accent)]"
               aria-hidden="true"
             />
-            <span>Model Akses &amp; Lisensi Digital</span>
+            <span>Model Distribusi Buku</span>
           </legend>
 
           <div
             role="radiogroup"
-            aria-label="Model akses distribusi buku"
-            className="grid grid-cols-1 sm:grid-cols-3 gap-2.5"
+            aria-label="Model distribusi buku"
+            className="grid grid-cols-1 sm:grid-cols-2 gap-2.5"
           >
-            {ACCESS_MODELS.map((model) => {
-              const isSelected = accessTier === model.id;
+            {DISTRIBUTION_MODELS.map((model) => {
+              const isSelected = digitalPolicy === model.policy;
               return (
                 <button
-                  key={model.id}
+                  key={model.policy}
                   type="button"
                   role="radio"
                   aria-checked={isSelected}
                   onClick={() => {
-                    setAccessTier(model.id);
                     setDigitalPolicy(model.policy);
                     setHasPhysicalPrint(model.hasPhysical);
                   }}
@@ -570,6 +667,29 @@ function ManuscriptConfigFormContent({
               );
             })}
           </div>
+
+          {(digitalPolicy === "single_purchase" ||
+            digitalPolicy === "nakama_or_purchase") && (
+            <div className="pt-2 space-y-1.5">
+              <Label
+                htmlFor="ms-config-price"
+                className="text-xs font-semibold"
+              >
+                Usulan Harga Beli Satuan Digital (IDR)
+              </Label>
+              <Input
+                id="ms-config-price"
+                name="proposedDigitalPriceIdr"
+                type="number"
+                min={0}
+                max={10000000}
+                step={1000}
+                value={proposedDigitalPriceIdr}
+                onChange={(e) => setProposedDigitalPriceIdr(e.target.value)}
+                className="min-h-11 text-xs font-mono bg-[var(--color-paper)]"
+              />
+            </div>
+          )}
         </fieldset>
 
         {/* 5. Cetak Fisik */}

@@ -22,11 +22,11 @@ import {
 import { resolveReaderDrmPolicy } from "@starter/shared/validators/drm";
 import type {
   BookChapterSummaryDto,
+  BookDistributionModel,
   BookHighlightDto,
   BookReaderChapterDto,
   BookReaderPayloadDto,
   BookSummaryDto,
-  DigitalPolicy,
   HighlightColor,
   ManuscriptChapterDto,
   ReadingSessionDto,
@@ -418,8 +418,8 @@ function ReaderBook() {
         totalChapters: chaps.length,
         accessTier: "free" as const,
         digitalPolicy:
-          (manuscript.proposedDigitalPolicy as DigitalPolicy) ||
-          "hybrid_nakama_alacarte",
+          (manuscript.proposedDigitalPolicy as BookDistributionModel) ||
+          "nakama_or_purchase",
         authorUserId: manuscript.authorUserId,
         publisherId: manuscript.publisherId,
       } as unknown as BookSummaryDto,
@@ -2684,12 +2684,12 @@ function ReaderBook() {
                 Akhir cuplikan
               </h2>
               <p className="mx-auto max-w-sm text-base leading-relaxed">
-                {book.digitalPolicy === "print_claim_only"
+                {book.digitalPolicy === "print_code_only"
                   ? "Klaim kode dari buku cetak untuk membuka naskah lengkap."
                   : "Jadi Nakama untuk melanjutkan buku ini dan membuka koleksi Premium."}
               </p>
               <Button asChild size="lg" className="min-h-11">
-                {book.digitalPolicy === "print_claim_only" ? (
+                {book.digitalPolicy === "print_code_only" ? (
                   <Link to="/books/$slug" params={{ slug }}>
                     Buka detail dan klaim kode
                   </Link>
@@ -2895,11 +2895,18 @@ function ReaderBook() {
             onClose={() => setIsConfigDialogOpen(false)}
             initialData={{
               title: editorialTitle || book.title,
-              synopsis: book.synopsis || "",
+              synopsis: manuscript?.synopsis || book.synopsis || "",
               category: manuscript?.category || "",
+              sourceLanguage: manuscript?.sourceLanguage || "id",
+              targetAudience: manuscript?.targetAudience || "general",
+              authorNotes: manuscript?.authorNotes || "",
+              isbn: manuscript?.isbn || "",
+              estimatedPages: manuscript?.estimatedPages || 180,
               publisherId:
                 search.targetPublisherId || manuscript?.publisherId || "",
               digitalPolicy: book.digitalPolicy,
+              proposedDigitalPriceIdr:
+                manuscript?.proposedDigitalPriceIdr ?? 45_000,
             }}
             onSubmit={async (config) => {
               await handleSaveDraft();
@@ -2910,7 +2917,14 @@ function ReaderBook() {
                     title: config.title,
                     synopsis: config.synopsis,
                     category: config.category,
+                    sourceLanguage: config.sourceLanguage,
+                    targetAudience: config.targetAudience,
+                    authorNotes: config.authorNotes || null,
+                    isbn: config.isbn || null,
+                    estimatedPages: config.estimatedPages,
                     proposedDigitalPolicy: config.digitalPolicy,
+                    proposedDigitalPriceIdr:
+                      config.proposedDigitalPriceIdr ?? null,
                   },
                 });
                 await submitDraftMutation.mutateAsync({
@@ -2927,7 +2941,7 @@ function ReaderBook() {
         )}
 
         {/* Publisher Atomic Catalog Publish Dialog */}
-        {isPublisherReview &&
+        {(isPublisherReview || isPublishDialogOpen) &&
           isManuscript &&
           manuscript &&
           activePublisherSlug && (

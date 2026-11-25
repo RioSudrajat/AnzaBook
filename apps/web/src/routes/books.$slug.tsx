@@ -49,7 +49,7 @@ import {
   useBookReviews,
   useBooks,
   useCreateReview,
-  usePurchaseBookAlacarte,
+  usePurchaseDigitalBook,
 } from "@/features/books/hooks";
 import { bookDetailQuery } from "@/features/books/queries";
 import { useUpsertShelf } from "@/features/community/hooks";
@@ -114,7 +114,7 @@ function B2B2CActionButtons({
   onReadSample,
   onSaveToLibrary,
   onShareBook,
-  onPurchaseAlacarte,
+  onPurchaseDigitalBook,
   shelfSaved,
   shelfError,
   isSavingShelf,
@@ -128,7 +128,7 @@ function B2B2CActionButtons({
   onReadSample: () => void;
   onSaveToLibrary: () => void;
   onShareBook: (trigger: HTMLButtonElement) => void;
-  onPurchaseAlacarte: () => void;
+  onPurchaseDigitalBook: () => void;
   shelfSaved: boolean;
   shelfError: boolean;
   isSavingShelf: boolean;
@@ -137,15 +137,16 @@ function B2B2CActionButtons({
   purchaseSuccess: boolean;
 }) {
   const policy = book.digitalPolicy;
-  const isClaimOnly = policy === "print_claim_only";
-  const isSampleOnly = policy === "sample_only";
-  const isAlacarteOnly = policy === "alacarte_only";
-  const isHybrid = policy === "hybrid_nakama_alacarte";
+  const isClaimOnly = policy === "print_code_only";
+  const isNakamaOnly = policy === "nakama_subscription";
+  const isSinglePurchase = policy === "single_purchase";
+  const isNakamaOrPurchase = policy === "nakama_or_purchase";
   const isFree = policy === "free_open";
 
-  const priceFormatted = book.alacartePriceIdr
-    ? formatIdr(book.alacartePriceIdr)
-    : "Rp25.000";
+  const priceFormatted =
+    book.digitalPriceIdr && book.digitalPriceIdr > 0
+      ? formatIdr(book.digitalPriceIdr)
+      : "Rp45.000";
 
   return (
     <div className="w-full max-w-[280px] space-y-3 font-mono text-left">
@@ -153,29 +154,29 @@ function B2B2CActionButtons({
       {isClaimOnly && (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] font-sans leading-snug text-amber-900 dark:text-amber-200">
           <div className="font-bold flex items-center gap-1 text-amber-700 dark:text-amber-300 font-mono text-[10px] uppercase">
-            <span>🛡️ Eksklusif Cetak Fisik</span>
+            <span>🛡️ Eksklusif Pembeli Buku Cetak</span>
           </div>
           <p className="mt-1 text-[11px]">
-            Eksklusif Pemilik Buku Cetak Resmi — Tidak Dijual Eceran Digital.
-            Masukkan kode unik buku fisik Anda untuk membuka akses.
+            Eksklusif Pemilik Buku Cetak Resmi — Tidak Dijual Satuan Digital.
+            Masukkan kode unik buku fisik Anda untuk membuka akses penuh.
           </p>
         </div>
       )}
 
-      {isSampleOnly && (
+      {isNakamaOnly && (
         <div className="rounded-lg border border-border/80 bg-muted/40 p-2.5 text-[11px] font-sans leading-snug text-foreground/80">
           <div className="font-bold flex items-center gap-1 font-mono text-[10px] uppercase text-foreground">
-            <span>👑 Nakama Reader Pool</span>
+            <span>👑 Khusus Anggota Nakama</span>
           </div>
           <p className="mt-1 text-[11px]">
             Buka Penuh dengan Langganan Nakama — Buku ini termasuk dalam
-            Ekosistem Nakama Club Reader.
+            ekosistem langganan Nakama Club.
           </p>
         </div>
       )}
 
-      {/* 2. Primary B2B2C Action Scheme Buttons */}
-      {/* Scheme A: print_claim_only */}
+      {/* 2. Primary Distribution Action Buttons */}
+      {/* Model A: print_code_only */}
       {isClaimOnly && (
         <>
           {isLoggedIn ? (
@@ -203,13 +204,13 @@ function B2B2CActionButtons({
             className="w-full h-11 bg-background text-foreground border-border hover:bg-muted font-medium text-xs gap-2 transition-all active:scale-95"
           >
             <BookOpen className="size-4" />
-            Baca Sampel Bab 1
+            Baca Cuplikan Bab 1
           </Button>
         </>
       )}
 
-      {/* Scheme B: sample_only */}
-      {isSampleOnly && (
+      {/* Model B: nakama_subscription */}
+      {isNakamaOnly && (
         <>
           <Button
             onClick={onStartReading}
@@ -257,11 +258,11 @@ function B2B2CActionButtons({
         </>
       )}
 
-      {/* Scheme C: alacarte_only */}
-      {isAlacarteOnly && (
+      {/* Model C: single_purchase */}
+      {isSinglePurchase && (
         <>
           <Button
-            onClick={onPurchaseAlacarte}
+            onClick={onPurchaseDigitalBook}
             disabled={isPurchasing}
             size="lg"
             className="w-full h-12 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs gap-2 shadow-md transition-all active:scale-95"
@@ -291,7 +292,7 @@ function B2B2CActionButtons({
             className="w-full h-11 bg-background text-foreground border-border hover:bg-muted font-medium text-xs gap-2 transition-all active:scale-95"
           >
             <BookOpen className="size-4" />
-            Baca Sampel Bab 1
+            Baca Cuplikan Bab 1
           </Button>
 
           {purchaseError && (
@@ -302,11 +303,11 @@ function B2B2CActionButtons({
         </>
       )}
 
-      {/* Scheme Hybrid: hybrid_nakama_alacarte */}
-      {isHybrid && (
+      {/* Model D: nakama_or_purchase */}
+      {isNakamaOrPurchase && (
         <>
           <Button
-            onClick={onPurchaseAlacarte}
+            onClick={onPurchaseDigitalBook}
             disabled={isPurchasing}
             size="lg"
             className="w-full h-12 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs gap-2 shadow-md transition-all active:scale-95"
@@ -335,11 +336,17 @@ function B2B2CActionButtons({
             onClick={onReadSample}
             variant="outline"
             size="sm"
-            className="w-full h-10 bg-background text-foreground text-xs gap-2 transition-all active:scale-95"
+            className="w-full h-11 bg-background text-foreground text-xs gap-2 transition-all active:scale-95"
           >
             <BookOpen className="size-3.5" />
-            Baca Sampel Bab 1
+            Baca Cuplikan Bab 1
           </Button>
+
+          {purchaseError && (
+            <p role="alert" className="text-xs text-destructive font-sans">
+              {purchaseError}
+            </p>
+          )}
         </>
       )}
 
@@ -444,7 +451,7 @@ export default function BookDetailPage() {
 
   const upsertShelfMutation = useUpsertShelf();
   const createReviewMutation = useCreateReview(slug);
-  const purchaseMutation = usePurchaseBookAlacarte(slug);
+  const purchaseMutation = usePurchaseDigitalBook(slug);
 
   // Capture Affiliate Referral ref=cal_<slug> to sessionStorage
   useEffect(() => {
@@ -473,7 +480,7 @@ export default function BookDetailPage() {
     });
   };
 
-  const handlePurchaseAlacarte = async () => {
+  const handlePurchaseDigitalBook = async () => {
     if (!isLoggedIn) {
       navigate({
         to: "/sign-in",
@@ -568,7 +575,7 @@ export default function BookDetailPage() {
     }
   };
 
-  const isPremium = book.accessTier === "premium";
+  const isPremium = book.accessTier !== "free";
 
   const body = (
     <>
@@ -770,6 +777,66 @@ export default function BookDetailPage() {
                 ))}
               </div>
 
+              {/* Bibliography & Edition Metadata */}
+              {(book.publishedYear ||
+                book.originalTitle ||
+                book.translator ||
+                book.collectionName ||
+                book.pageCount > 0) && (
+                <dl className="mt-5 grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-xl border border-border/80 bg-muted/30 p-3.5 text-xs">
+                  {book.publishedYear && (
+                    <div>
+                      <dt className="font-mono text-[11px] text-muted-foreground">
+                        Tahun Terbit
+                      </dt>
+                      <dd className="font-semibold text-foreground mt-0.5">
+                        {book.publishedYear}
+                      </dd>
+                    </div>
+                  )}
+                  {book.pageCount > 0 && (
+                    <div>
+                      <dt className="font-mono text-[11px] text-muted-foreground">
+                        Tebal Halaman
+                      </dt>
+                      <dd className="font-semibold text-foreground mt-0.5">
+                        {book.pageCount} halaman
+                      </dd>
+                    </div>
+                  )}
+                  {book.originalTitle && (
+                    <div className="col-span-2 sm:col-span-1">
+                      <dt className="font-mono text-[11px] text-muted-foreground">
+                        Judul Asli
+                      </dt>
+                      <dd className="font-semibold text-foreground mt-0.5 italic">
+                        {book.originalTitle}
+                      </dd>
+                    </div>
+                  )}
+                  {book.translator && (
+                    <div>
+                      <dt className="font-mono text-[11px] text-muted-foreground">
+                        Penerjemah
+                      </dt>
+                      <dd className="font-semibold text-foreground mt-0.5">
+                        {book.translator}
+                      </dd>
+                    </div>
+                  )}
+                  {book.collectionName && (
+                    <div>
+                      <dt className="font-mono text-[11px] text-muted-foreground">
+                        Seri / Koleksi
+                      </dt>
+                      <dd className="font-semibold text-foreground mt-0.5">
+                        {book.collectionName}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              )}
+
               {/* Mobile Cover & Action Buttons Block */}
               <div className="block lg:hidden my-6 p-4 rounded-xl border border-border/80 bg-card/60 flex flex-col items-center">
                 <BookCover
@@ -783,7 +850,7 @@ export default function BookDetailPage() {
                   onReadSample={handleReadSample}
                   onSaveToLibrary={handleSaveToLibrary}
                   onShareBook={setShareTrigger}
-                  onPurchaseAlacarte={handlePurchaseAlacarte}
+                  onPurchaseDigitalBook={handlePurchaseDigitalBook}
                   shelfSaved={shelfSaved}
                   shelfError={shelfError}
                   isSavingShelf={upsertShelfMutation.isPending}
@@ -1094,7 +1161,7 @@ export default function BookDetailPage() {
               onReadSample={handleReadSample}
               onSaveToLibrary={handleSaveToLibrary}
               onShareBook={setShareTrigger}
-              onPurchaseAlacarte={handlePurchaseAlacarte}
+              onPurchaseDigitalBook={handlePurchaseDigitalBook}
               shelfSaved={shelfSaved}
               shelfError={shelfError}
               isSavingShelf={upsertShelfMutation.isPending}

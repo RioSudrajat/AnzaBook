@@ -10,10 +10,10 @@ export const listBooksQuerySchema = z
       .enum([
         "all",
         "free_open",
-        "print_claim_only",
-        "sample_only",
-        "alacarte_only",
-        "hybrid_nakama_alacarte",
+        "print_code_only",
+        "nakama_subscription",
+        "single_purchase",
+        "nakama_or_purchase",
       ])
       .optional()
       .default("all"),
@@ -78,10 +78,10 @@ export type ListBooksInput = {
   digitalPolicy?:
     | "all"
     | "free_open"
-    | "print_claim_only"
-    | "sample_only"
-    | "alacarte_only"
-    | "hybrid_nakama_alacarte";
+    | "print_code_only"
+    | "nakama_subscription"
+    | "single_purchase"
+    | "nakama_or_purchase";
   publisher?: string;
   collection?: string;
   paperTier?:

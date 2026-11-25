@@ -679,7 +679,7 @@ describe("Community Calendars & Events API", () => {
   });
 
   it("unlocks sample reading access (chapter 1 and 2) for attendees with going RSVP on linked book event", async () => {
-    // 1. Get book id for sample_only book "sains-logika-seni-hidup-bermutu"
+    // 1. Get book id for nakama_subscription book "sains-logika-seni-hidup-bermutu"
     const bookSlug = "sains-logika-seni-hidup-bermutu";
     const anon = agent();
     const bookRes = await anon.get(`/api/books/${bookSlug}`);

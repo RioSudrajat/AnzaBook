@@ -41,7 +41,7 @@ export type BookSeed = {
   totalChapters: number;
   readingMinutes: number;
   audioDurationMinutes: number;
-  digitalPolicy: "free_open" | "sample_only";
+  digitalPolicy: "free_open" | "nakama_subscription";
   accessTier: "free" | "premium" | "premium_physical";
   hasPhysical: boolean;
   securityLevel: string;

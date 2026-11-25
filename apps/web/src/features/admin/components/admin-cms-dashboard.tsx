@@ -33,6 +33,7 @@ import type {
   PublisherDto,
 } from "@starter/shared/types";
 import { roleHasPermission } from "@starter/shared/permissions";
+import { formatDigitalPolicy } from "@/lib/formatters";
 import { ApiError } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1796,7 +1797,7 @@ function TabClaimBatches() {
               <option value="">-- Pilih Judul Buku --</option>
               {booksList.map((b) => (
                 <option key={b.id} value={b.id}>
-                  {b.title} ({b.digitalPolicy})
+                  {b.title} ({formatDigitalPolicy(b.digitalPolicy)})
                 </option>
               ))}
             </select>
@@ -2013,7 +2014,7 @@ function TabFinancials({
   overview: AdminOverviewDto | undefined;
 }) {
   const nakamaPool = overview?.estimatedNakamaRoyaltyPoolIdr ?? 0;
-  const alacarteSales = overview?.totalAlacarteSalesIdr ?? 0;
+  const singlePurchaseSales = overview?.totalSinglePurchaseSalesIdr ?? 0;
   const publisherShare = overview?.totalPublisherShareIdr ?? 0;
   const anzabookNet = overview?.totalNetAnzabookIdr ?? 0;
   const affiliateCommissions = overview?.totalAffiliateCommissionsIdr ?? 0;
@@ -2026,7 +2027,7 @@ function TabFinancials({
         </h2>
         <p className="text-sm text-muted-foreground">
           Transparansi pembagian pendapatan ekosistem AnzaBook: 55% Nakama Pool
-          untuk penulis/penerbit, 75% omzet buku satuan, dan 10% komisi kas
+          untuk penulis/penerbit, 75% omzet pembelian satuan, dan 10% komisi kas
           komunitas.
         </p>
       </div>
@@ -2049,14 +2050,14 @@ function TabFinancials({
           </p>
         </div>
 
-        {/* Card 2: Ala Carte Sales */}
+        {/* Card 2: Single Purchase Sales */}
         <div className="rounded-xl border border-border bg-card p-6 space-y-3 shadow-xs">
           <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             <span>Buku Satuan (75% : 25%)</span>
             <BookOpen className="size-4" aria-hidden="true" />
           </div>
           <div className="text-3xl font-extrabold text-foreground">
-            {formatIdr(alacarteSales)}
+            {formatIdr(singlePurchaseSales)}
           </div>
           <div className="space-y-1 text-xs text-muted-foreground">
             <div className="flex justify-between">

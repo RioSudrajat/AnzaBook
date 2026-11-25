@@ -12,7 +12,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import type {
-  DigitalPolicy,
+  BookDistributionModel,
   QuotePostConfig,
   SessionPostConfig,
 } from "@starter/shared/types";
@@ -45,16 +45,16 @@ export const books = pgTable(
       .notNull()
       .default(0),
     digitalPolicy: varchar("digital_policy", { length: 32 })
-      .$type<DigitalPolicy>()
+      .$type<BookDistributionModel>()
       .notNull()
-      .default("sample_only"),
+      .default("nakama_subscription"),
     publisherId: uuid("publisher_id").references(() => publishers.id, {
       onDelete: "set null",
     }),
     authorUserId: text("author_user_id").references(() => user.id, {
       onDelete: "set null",
     }),
-    alacartePriceIdr: integer("alacarte_price_idr"),
+    digitalPriceIdr: integer("digital_price_idr"),
     accessTier: varchar("access_tier", { length: 32 })
       .$type<"free" | "premium" | "premium_physical">()
       .notNull()

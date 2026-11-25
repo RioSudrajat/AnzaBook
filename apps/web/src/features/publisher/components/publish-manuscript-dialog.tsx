@@ -1,15 +1,20 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "@tanstack/react-router";
-import { CheckCircle2, Sparkles, X } from "lucide-react";
+import { CheckCircle2, Sparkles, Upload, X } from "lucide-react";
 import type {
-  DigitalPolicy,
+  BookDistributionModel,
   ManuscriptSubmissionDto,
   PublishManuscriptResultDto,
 } from "@starter/shared/types";
+import { DEFAULT_DIGITAL_BOOK_PRICE_IDR } from "@starter/shared/validators/publisher";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { usePublishPublisherManuscript } from "@/features/social/hooks";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  usePublishPublisherManuscript,
+  useUploadMediaImage,
+} from "@/features/social/hooks";
 import { ApiError } from "@/lib/api/client";
 import { formatDigitalPolicy } from "@/lib/formatters";
 
@@ -24,11 +29,11 @@ export interface PublishManuscriptDialogProps {
   onPublished?: (result: PublishManuscriptResultDto) => void;
 }
 
-const DIGITAL_POLICIES: DigitalPolicy[] = [
-  "hybrid_nakama_alacarte",
-  "sample_only",
-  "alacarte_only",
-  "print_claim_only",
+const DISTRIBUTION_MODELS: BookDistributionModel[] = [
+  "nakama_or_purchase",
+  "nakama_subscription",
+  "single_purchase",
+  "print_code_only",
   "free_open",
 ];
 
@@ -42,7 +47,15 @@ function PublishDialogFormContent({
   onPublished,
 }: Omit<PublishManuscriptDialogProps, "isOpen">) {
   const publishMutation = usePublishPublisherManuscript();
+  const uploadMutation = useUploadMediaImage();
+  const coverFileInputRef = useRef<HTMLInputElement>(null);
 
+  const [titleOverride, setTitleOverride] = useState(
+    initialTitle?.trim() || manuscript.title,
+  );
+  const [synopsisOverride, setSynopsisOverride] = useState(
+    manuscript.synopsis || "",
+  );
   const [authorOverride, setAuthorOverride] = useState(
     manuscript.authorPenName || manuscript.authorName || "",
   );
@@ -50,32 +63,81 @@ function PublishDialogFormContent({
     const candidate = initialCoverUrl ?? manuscript.coverUrl ?? "";
     return candidate === "template" ? "" : candidate;
   });
-  const [digitalPolicy, setDigitalPolicy] = useState<DigitalPolicy>(
-    manuscript.proposedDigitalPolicy || "hybrid_nakama_alacarte",
+  const [coverColor, setCoverColor] = useState(
+    manuscript.coverColor || "#3D2B1F",
   );
-  const [alacartePriceIdr, setAlacartePriceIdr] = useState(
-    manuscript.proposedAlacartePriceIdr != null
-      ? String(manuscript.proposedAlacartePriceIdr)
-      : "",
+  const [digitalPolicy, setDigitalPolicy] = useState<BookDistributionModel>(
+    manuscript.proposedDigitalPolicy || "nakama_or_purchase",
   );
+  const [digitalPriceIdr, setDigitalPriceIdr] = useState(() => {
+    const policy = manuscript.proposedDigitalPolicy || "nakama_or_purchase";
+    if (manuscript.proposedDigitalPriceIdr != null) {
+      return String(manuscript.proposedDigitalPriceIdr);
+    }
+    return policy === "single_purchase" || policy === "nakama_or_purchase"
+      ? String(DEFAULT_DIGITAL_BOOK_PRICE_IDR)
+      : "";
+  });
   const [categoriesInput, setCategoriesInput] = useState(
     manuscript.category || "",
   );
+  const [isbn, setIsbn] = useState(manuscript.isbn || "");
+  const [publishedYear, setPublishedYear] = useState(
+    String(new Date().getFullYear()),
+  );
+  const [originalTitle, setOriginalTitle] = useState("");
+  const [translator, setTranslator] = useState("");
+  const [collectionName, setCollectionName] = useState("");
+  const [hasPhysical, setHasPhysical] = useState(
+    (manuscript.proposedDigitalPolicy || "nakama_or_purchase") ===
+      "print_code_only" ||
+      (manuscript.proposedDigitalPolicy || "nakama_or_purchase") ===
+        "nakama_or_purchase",
+  );
+  const [rakyatPriceIdr, setRakyatPriceIdr] = useState("45000");
+  const [standardPriceIdr, setStandardPriceIdr] = useState("75000");
+
   const [formError, setFormError] = useState<string | null>(null);
   const [publishedResult, setPublishedResult] =
     useState<PublishManuscriptResultDto | null>(null);
 
   const chapterCount =
     manuscript.chapters?.length || manuscript.totalChapters || 1;
-  const displayTitle = initialTitle?.trim() || manuscript.title;
+  const displayTitle = titleOverride.trim() || manuscript.title;
+
+  const handleUploadCover = async (file: File) => {
+    setFormError(null);
+    try {
+      const uploaded = await uploadMutation.mutateAsync(file);
+      setCoverUrl(uploaded.url);
+    } catch (error) {
+      setFormError(
+        error instanceof Error ? error.message : "Gagal mengunggah sampul.",
+      );
+    }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
-    const parsedPrice = alacartePriceIdr.trim()
-      ? Number.parseInt(alacartePriceIdr.trim(), 10)
-      : null;
+    if (titleOverride.trim().length < 2) {
+      setFormError("Judul buku minimal 2 karakter.");
+      return;
+    }
+    if (synopsisOverride.trim().length < 10) {
+      setFormError("Sinopsis buku minimal 10 karakter.");
+      return;
+    }
+
+    const requiresPrice =
+      digitalPolicy === "single_purchase" ||
+      digitalPolicy === "nakama_or_purchase";
+    const parsedPrice = digitalPriceIdr.trim()
+      ? Number.parseInt(digitalPriceIdr.trim(), 10)
+      : requiresPrice
+        ? DEFAULT_DIGITAL_BOOK_PRICE_IDR
+        : null;
 
     if (
       parsedPrice !== null &&
@@ -83,9 +145,21 @@ function PublishDialogFormContent({
         parsedPrice < 0 ||
         parsedPrice > 10_000_000)
     ) {
-      setFormError("Harga satuan harus antara Rp0 hingga Rp10.000.000.");
+      setFormError("Harga beli satuan harus antara Rp0 hingga Rp10.000.000.");
       return;
     }
+
+    const parsedYear = publishedYear.trim()
+      ? Number.parseInt(publishedYear.trim(), 10)
+      : undefined;
+    const parsedRakyat =
+      hasPhysical && rakyatPriceIdr.trim()
+        ? Number.parseInt(rakyatPriceIdr.trim(), 10)
+        : undefined;
+    const parsedStandard =
+      hasPhysical && standardPriceIdr.trim()
+        ? Number.parseInt(standardPriceIdr.trim(), 10)
+        : undefined;
 
     const categories = categoriesInput
       .split(",")
@@ -98,11 +172,31 @@ function PublishDialogFormContent({
         slug: publisherSlug,
         idOrSlug: manuscript.id,
         input: {
-          coverUrl: coverUrl.trim() || undefined,
+          title: titleOverride.trim(),
+          synopsis: synopsisOverride.trim(),
+          coverUrl: coverUrl.trim() || null,
+          coverColor: /^#[0-9a-f]{3,8}$/i.test(coverColor.trim())
+            ? coverColor.trim()
+            : undefined,
           author: authorOverride.trim() || undefined,
           digitalPolicy,
-          alacartePriceIdr: parsedPrice,
+          digitalPriceIdr: parsedPrice,
+          hasPhysical,
           categories: categories.length > 0 ? categories : undefined,
+          publishedYear:
+            parsedYear && Number.isFinite(parsedYear) ? parsedYear : undefined,
+          originalTitle: originalTitle.trim() || null,
+          translator: translator.trim() || null,
+          collectionName: collectionName.trim() || null,
+          isbn: isbn.trim() || null,
+          rakyatPriceIdr:
+            parsedRakyat && Number.isFinite(parsedRakyat)
+              ? parsedRakyat
+              : undefined,
+          standardPriceIdr:
+            parsedStandard && Number.isFinite(parsedStandard)
+              ? parsedStandard
+              : undefined,
         },
       });
       setPublishedResult(result);
@@ -236,52 +330,143 @@ function PublishDialogFormContent({
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">
-          <Label htmlFor="publish-author" className="text-xs font-semibold">
-            Nama Penulis di Katalog
+          <Label htmlFor="publish-title" className="text-xs font-semibold">
+            Judul Buku di Katalog
           </Label>
           <Input
-            id="publish-author"
-            name="author"
-            value={authorOverride}
-            onChange={(e) => setAuthorOverride(e.target.value)}
-            placeholder="Nama penulis atau nama pena"
+            id="publish-title"
+            name="title"
+            value={titleOverride}
+            onChange={(e) => setTitleOverride(e.target.value)}
+            required
             className="min-h-11 bg-[var(--color-paper)]"
             autoFocus
           />
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="publish-cover-url" className="text-xs font-semibold">
-            URL Cover Buku (Opsional)
+          <Label htmlFor="publish-synopsis" className="text-xs font-semibold">
+            Sinopsis Resmi Buku
           </Label>
-          <Input
-            id="publish-cover-url"
-            name="coverUrl"
-            value={coverUrl}
-            onChange={(e) => setCoverUrl(e.target.value)}
-            placeholder="https://... atau /covers/sampul.jpg"
-            autoCorrect="off"
-            autoCapitalize="none"
-            spellCheck={false}
-            className="min-h-11 font-mono text-xs bg-[var(--color-paper)]"
+          <Textarea
+            id="publish-synopsis"
+            name="synopsis"
+            rows={3}
+            value={synopsisOverride}
+            onChange={(e) => setSynopsisOverride(e.target.value)}
+            required
+            className="text-xs bg-[var(--color-paper)]"
           />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
+            <Label htmlFor="publish-author" className="text-xs font-semibold">
+              Nama Penulis di Katalog
+            </Label>
+            <Input
+              id="publish-author"
+              name="author"
+              value={authorOverride}
+              onChange={(e) => setAuthorOverride(e.target.value)}
+              placeholder="Nama penulis atau nama pena"
+              className="min-h-11 bg-[var(--color-paper)]"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="publish-cover-color"
+              className="text-xs font-semibold"
+            >
+              Warna Aksen Sampul
+            </Label>
+            <div className="flex items-center gap-2">
+              <input
+                id="publish-cover-color"
+                type="color"
+                value={coverColor}
+                onChange={(e) => setCoverColor(e.target.value)}
+                className="h-11 w-14 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] p-1 cursor-pointer"
+              />
+              <Input
+                value={coverColor}
+                onChange={(e) => setCoverColor(e.target.value)}
+                aria-label="Kode hex warna sampul"
+                className="min-h-11 font-mono text-xs bg-[var(--color-paper)]"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="publish-cover-url" className="text-xs font-semibold">
+            Sampul Buku (Unggah Gambar atau URL)
+          </Label>
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              id="publish-cover-url"
+              name="coverUrl"
+              value={coverUrl}
+              onChange={(e) => setCoverUrl(e.target.value)}
+              placeholder="https://... atau unggah berkas sampul"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              className="min-h-11 flex-1 font-mono text-xs bg-[var(--color-paper)]"
+            />
+            <input
+              ref={coverFileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleUploadCover(file);
+                e.target.value = "";
+              }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              disabled={uploadMutation.isPending}
+              onClick={() => coverFileInputRef.current?.click()}
+              className="min-h-11 px-3 text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
+            >
+              <Upload className="size-3.5" aria-hidden="true" />
+              <span>
+                {uploadMutation.isPending ? "Mengunggah..." : "Unggah Sampul"}
+              </span>
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
             <Label htmlFor="publish-policy" className="text-xs font-semibold">
-              Skema Distribusi Digital
+              Model Distribusi Buku
             </Label>
             <select
               id="publish-policy"
               name="digitalPolicy"
               value={digitalPolicy}
-              onChange={(e) =>
-                setDigitalPolicy(e.target.value as DigitalPolicy)
-              }
+              onChange={(e) => {
+                const next = e.target.value as BookDistributionModel;
+                setDigitalPolicy(next);
+                if (
+                  (next === "single_purchase" ||
+                    next === "nakama_or_purchase") &&
+                  !digitalPriceIdr.trim()
+                ) {
+                  setDigitalPriceIdr(String(DEFAULT_DIGITAL_BOOK_PRICE_IDR));
+                }
+                if (next === "print_code_only") {
+                  setHasPhysical(true);
+                }
+              }}
               className="w-full h-11 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 text-xs text-[var(--color-ink)]"
             >
-              {DIGITAL_POLICIES.map((policy) => (
+              {DISTRIBUTION_MODELS.map((policy) => (
                 <option key={policy} value={policy}>
                   {formatDigitalPolicy(policy)}
                 </option>
@@ -291,16 +476,16 @@ function PublishDialogFormContent({
 
           <div className="space-y-1.5">
             <Label htmlFor="publish-price" className="text-xs font-semibold">
-              Harga A La Carte (IDR)
+              Harga Beli Satuan Digital (IDR)
             </Label>
             <Input
               id="publish-price"
-              name="alacartePriceIdr"
+              name="digitalPriceIdr"
               type="text"
               inputMode="numeric"
-              value={alacartePriceIdr}
-              onChange={(e) => setAlacartePriceIdr(e.target.value)}
-              placeholder="Contoh: 49000"
+              value={digitalPriceIdr}
+              onChange={(e) => setDigitalPriceIdr(e.target.value)}
+              placeholder="Contoh: 45000"
               className="min-h-11 font-mono text-xs bg-[var(--color-paper)]"
             />
           </div>
@@ -320,13 +505,145 @@ function PublishDialogFormContent({
           />
         </div>
 
-        {digitalPolicy === "print_claim_only" && (
+        <details className="rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-3.5 text-xs">
+          <summary className="cursor-pointer font-semibold text-[var(--color-ink)] select-none py-1">
+            Metadata Bibliografi &amp; Edisi Cetak Fisik (Opsional)
+          </summary>
+          <div className="mt-3 space-y-3 border-t border-[var(--color-rule)] pt-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="publish-isbn" className="text-xs font-semibold">
+                  ISBN
+                </Label>
+                <Input
+                  id="publish-isbn"
+                  value={isbn}
+                  onChange={(e) => setIsbn(e.target.value)}
+                  placeholder="978-602-..."
+                  className="min-h-11 font-mono text-xs bg-[var(--color-paper-2)]"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="publish-year" className="text-xs font-semibold">
+                  Tahun Terbit
+                </Label>
+                <Input
+                  id="publish-year"
+                  type="number"
+                  value={publishedYear}
+                  onChange={(e) => setPublishedYear(e.target.value)}
+                  className="min-h-11 font-mono text-xs bg-[var(--color-paper-2)]"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label
+                  htmlFor="publish-orig-title"
+                  className="text-xs font-semibold"
+                >
+                  Judul Asli (jika terjemahan)
+                </Label>
+                <Input
+                  id="publish-orig-title"
+                  value={originalTitle}
+                  onChange={(e) => setOriginalTitle(e.target.value)}
+                  className="min-h-11 text-xs bg-[var(--color-paper-2)]"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label
+                  htmlFor="publish-translator"
+                  className="text-xs font-semibold"
+                >
+                  Penerjemah
+                </Label>
+                <Input
+                  id="publish-translator"
+                  value={translator}
+                  onChange={(e) => setTranslator(e.target.value)}
+                  className="min-h-11 text-xs bg-[var(--color-paper-2)]"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label
+                htmlFor="publish-collection"
+                className="text-xs font-semibold"
+              >
+                Seri / Koleksi Kurasi
+              </Label>
+              <Input
+                id="publish-collection"
+                value={collectionName}
+                onChange={(e) => setCollectionName(e.target.value)}
+                placeholder="Pustaka Klasik, Seri Esai Nusantara, dll."
+                className="min-h-11 text-xs bg-[var(--color-paper-2)]"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                id="publish-has-physical"
+                type="checkbox"
+                checked={hasPhysical}
+                onChange={(e) => setHasPhysical(e.target.checked)}
+                className="size-4 accent-[var(--color-accent)]"
+              />
+              <Label
+                htmlFor="publish-has-physical"
+                className="text-xs font-semibold cursor-pointer"
+              >
+                Terbitkan juga edisi cetak fisik (Rakyat &amp; Standar)
+              </Label>
+            </div>
+
+            {hasPhysical && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="publish-rakyat-price"
+                    className="text-xs font-semibold"
+                  >
+                    Harga Edisi Rakyat (IDR)
+                  </Label>
+                  <Input
+                    id="publish-rakyat-price"
+                    type="number"
+                    min={5000}
+                    value={rakyatPriceIdr}
+                    onChange={(e) => setRakyatPriceIdr(e.target.value)}
+                    className="min-h-11 font-mono text-xs bg-[var(--color-paper-2)]"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="publish-std-price"
+                    className="text-xs font-semibold"
+                  >
+                    Harga Edisi Standar (IDR)
+                  </Label>
+                  <Input
+                    id="publish-std-price"
+                    type="number"
+                    min={5000}
+                    value={standardPriceIdr}
+                    onChange={(e) => setStandardPriceIdr(e.target.value)}
+                    className="min-h-11 font-mono text-xs bg-[var(--color-paper-2)]"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </details>
+
+        {digitalPolicy === "print_code_only" && (
           <div
             role="status"
             className="rounded-xl border border-[var(--color-accent)]/40 bg-[var(--color-accent-soft)] p-3.5 text-xs leading-relaxed"
           >
-            Skema A Phygital aktif: sistem akan otomatis membuat batch{" "}
-            <strong>500 kode klaim cetak gratis</strong> saat buku diterbitkan.
+            Mode Eksklusif Pembeli Buku Cetak aktif: sistem akan otomatis
+            membuat batch <strong>500 kode klaim cetak gratis</strong> saat buku
+            diterbitkan.
           </div>
         )}
 

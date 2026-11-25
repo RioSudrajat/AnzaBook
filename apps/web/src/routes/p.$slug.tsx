@@ -16,6 +16,8 @@ import {
   PenTool,
   Send,
   ShieldCheck,
+  Sparkles,
+  Users,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -240,6 +242,12 @@ export default function PublisherPublicProfilePage() {
   const isAccepting =
     publisher.verificationStatus === "verified" &&
     publisher.isAcceptingSubmissions !== false;
+  const isApprovedWriterFastTrack =
+    publisher.verificationStatus === "verified" &&
+    !isAccepting &&
+    Boolean(publisher.isCurrentUserApprovedWriter);
+  const canSubmitToPublisher = isAccepting || isApprovedWriterFastTrack;
+  const approvedWritersShowcase = publisher.approvedWriters ?? [];
   const eligibleDraftCount = myManuscripts.filter(
     (item) => item.status === "draft" || item.status === "revision_requested",
   ).length;
@@ -251,7 +259,7 @@ export default function PublisherPublicProfilePage() {
         publisherId: publisher.id,
         title: `Draf untuk ${publisher.name}`,
         synopsis: "",
-        proposedDigitalPolicy: "hybrid_nakama_alacarte",
+        proposedDigitalPolicy: "nakama_or_purchase",
       });
       await navigate({
         to: "/read/$slug",
@@ -384,14 +392,23 @@ export default function PublisherPublicProfilePage() {
           )}
         </section>
 
-        {/* Path 1: Editorial Submission CTA Banner */}
-        {isAccepting ? (
+        {/* Path 1: Editorial Submission CTA Banner (Open or Approved Writer Fast-Track) */}
+        {canSubmitToPublisher ? (
           <section
             aria-labelledby="submit-to-publisher-heading"
             className="rounded-2xl border border-[var(--color-accent)]/50 bg-[var(--color-accent-soft)]/50 p-6 sm:p-7 space-y-4"
           >
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
               <div className="space-y-2 max-w-2xl">
+                {isApprovedWriterFastTrack && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-accent)] bg-[var(--color-paper)] px-3 py-1 text-[11px] font-semibold text-[var(--color-ink)]">
+                    <Sparkles
+                      className="size-3.5 text-[var(--color-accent)]"
+                      aria-hidden="true"
+                    />
+                    <span>Jalur Prioritas Penulis Rekanan</span>
+                  </span>
+                )}
                 <h2
                   id="submit-to-publisher-heading"
                   className="font-serif text-xl font-bold text-[var(--color-ink)]"
@@ -593,6 +610,50 @@ export default function PublisherPublicProfilePage() {
                 </div>
               )}
             </div>
+
+            {approvedWritersShowcase.length > 0 && (
+              <div className="space-y-3 border-t border-[var(--color-rule)] pt-5">
+                <div className="flex items-center gap-2">
+                  <Users
+                    className="size-4 text-[var(--color-accent)]"
+                    aria-hidden="true"
+                  />
+                  <h3 className="text-sm font-serif font-bold text-[var(--color-ink)]">
+                    Penulis Rekanan ({approvedWritersShowcase.length})
+                  </h3>
+                </div>
+                <ul className="grid gap-3 sm:grid-cols-2">
+                  {approvedWritersShowcase.map((writer) => (
+                    <li
+                      key={writer.id}
+                      className="flex items-start gap-3 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-3.5"
+                    >
+                      {writer.image ? (
+                        <img
+                          src={writer.image}
+                          alt={writer.name}
+                          className="size-10 rounded-full object-cover border border-[var(--color-rule)] shrink-0"
+                        />
+                      ) : (
+                        <div className="flex size-10 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-sm font-serif font-bold text-[var(--color-ink)] shrink-0">
+                          {writer.name.slice(0, 1).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0 space-y-0.5">
+                        <p className="font-semibold text-xs text-[var(--color-ink)] truncate">
+                          {writer.name}
+                        </p>
+                        {writer.username && (
+                          <p className="font-mono text-[11px] text-[var(--color-muted)] truncate">
+                            @{writer.username}
+                          </p>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </section>
         )}
       </div>

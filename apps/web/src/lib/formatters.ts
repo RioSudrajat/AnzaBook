@@ -1,3 +1,4 @@
+import type { BookDistributionModel } from "@starter/shared/types";
 import { getManuscriptStatusMeta } from "@/features/publisher/publisher-helpers";
 
 export function formatRoleName(role?: string | null): string {
@@ -24,21 +25,49 @@ export function formatManuscriptStatus(status?: string | null): string {
   return getManuscriptStatusMeta(status).label;
 }
 
-export function formatDigitalPolicy(policy?: string | null): string {
+export function formatDigitalPolicy(
+  policy?: BookDistributionModel | string | null,
+): string {
   if (!policy) return "Standar";
   switch (policy) {
-    case "hybrid_nakama_alacarte":
-      return "Hibrida (Nakama & Pembelian)";
-    case "alacarte_only":
-      return "Pembelian Satuan";
-    case "sample_only":
-      return "Koleksi Nakama";
-    case "print_claim_only":
-      return "Klaim Cetak Fisik";
+    case "nakama_or_purchase":
+      return "Nakama & Beli Satuan";
+    case "single_purchase":
+      return "Beli Satuan";
+    case "nakama_subscription":
+      return "Khusus Anggota Nakama";
+    case "print_code_only":
+      return "Eksklusif Pembeli Buku Cetak";
     case "free_open":
     case "free":
-      return "Akses Terbuka";
+      return "Gratis Terbuka";
     default:
       return policy.replace(/_/g, " ");
+  }
+}
+
+export const formatDistributionModel = formatDigitalPolicy;
+
+export function formatSourceLanguage(lang?: string | null): string {
+  switch (lang) {
+    case "id":
+      return "Bahasa Indonesia";
+    case "en":
+      return "Bahasa Inggris";
+    default:
+      return lang || "Bahasa Indonesia";
+  }
+}
+
+export function formatTargetAudience(audience?: string | null): string {
+  switch (audience) {
+    case "general":
+      return "Umum";
+    case "young_adult":
+      return "Remaja (13+)";
+    case "mature_academic":
+      return "Dewasa & Akademik";
+    default:
+      return audience || "Umum";
   }
 }

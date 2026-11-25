@@ -21,6 +21,7 @@ import {
   PenTool,
   Plus,
   Quote,
+  RotateCcw,
   Settings,
   Share2,
   TrendingUp,
@@ -42,6 +43,7 @@ import {
   useMyManuscripts,
   useMySocialProfile,
   useUnfollowUser,
+  useWithdrawManuscript,
 } from "@/features/social/hooks";
 import { useAllHighlights } from "@/features/books/hooks";
 import { BookCover } from "@/features/books/components/book-cover";
@@ -143,6 +145,13 @@ function DashboardProfileContent({
   const followMutation = useFollowUser();
   const unfollowMutation = useUnfollowUser();
   const createDraftMutation = useCreateManuscriptDraft();
+  const withdrawMutation = useWithdrawManuscript();
+  const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
+  const [withdrawFeedback, setWithdrawFeedback] = useState<{
+    id: string;
+    message: string;
+    isError?: boolean;
+  } | null>(null);
   const navigate = useNavigate();
 
   // Role checks for tabs
@@ -240,7 +249,7 @@ function DashboardProfileContent({
       const created = await createDraftMutation.mutateAsync({
         title: "Draf Naskah Baru",
         synopsis: "Sinopsis draf naskah awal.",
-        proposedDigitalPolicy: "hybrid_nakama_alacarte",
+        proposedDigitalPolicy: "nakama_or_purchase",
         chapters: [
           {
             chapterNumber: 1,
@@ -725,43 +734,41 @@ function DashboardProfileContent({
           )}
 
         {isVerifiedAuthor && (
-          <>
-            <button
-              type="button"
-              onClick={() => setActiveSubTab("works")}
-              className={`min-h-11 px-4 text-xs font-medium border-b-2 transition-all cursor-pointer whitespace-nowrap inline-flex items-center gap-2 ${
-                activeSubTab === "works"
-                  ? "border-[var(--color-accent)] text-[var(--color-accent)] font-bold"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <BookOpen className="size-4" />
-              <span>
-                Karya Penulis
-                {profile?.publishedBooks && profile.publishedBooks.length > 0
-                  ? ` (${profile.publishedBooks.length})`
-                  : ""}
-              </span>
-            </button>
+          <button
+            type="button"
+            onClick={() => setActiveSubTab("works")}
+            className={`min-h-11 px-4 text-xs font-medium border-b-2 transition-all cursor-pointer whitespace-nowrap inline-flex items-center gap-2 ${
+              activeSubTab === "works"
+                ? "border-[var(--color-accent)] text-[var(--color-accent)] font-bold"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <BookOpen className="size-4" />
+            <span>
+              Karya Penulis
+              {profile?.publishedBooks && profile.publishedBooks.length > 0
+                ? ` (${profile.publishedBooks.length})`
+                : ""}
+            </span>
+          </button>
+        )}
 
-            {isOwnProfile && (
-              <button
-                type="button"
-                onClick={() => setActiveSubTab("author_studio")}
-                className={`min-h-11 px-4 text-xs font-medium border-b-2 transition-all cursor-pointer whitespace-nowrap inline-flex items-center gap-2 ${
-                  activeSubTab === "author_studio"
-                    ? "border-[var(--color-accent)] text-[var(--color-accent)] font-bold"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <PenTool className="size-4" />
-                <span>
-                  Studio Penulis
-                  {manuscripts.length > 0 ? ` (${manuscripts.length})` : ""}
-                </span>
-              </button>
-            )}
-          </>
+        {isOwnProfile && (isVerifiedAuthor || manuscripts.length > 0) && (
+          <button
+            type="button"
+            onClick={() => setActiveSubTab("author_studio")}
+            className={`min-h-11 px-4 text-xs font-medium border-b-2 transition-all cursor-pointer whitespace-nowrap inline-flex items-center gap-2 ${
+              activeSubTab === "author_studio"
+                ? "border-[var(--color-accent)] text-[var(--color-accent)] font-bold"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <PenTool className="size-4" />
+            <span>
+              Studio Penulis
+              {manuscripts.length > 0 ? ` (${manuscripts.length})` : ""}
+            </span>
+          </button>
         )}
 
         {isOwnProfile &&
@@ -1452,7 +1459,50 @@ function DashboardProfileContent({
                           )}
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+                        <div className="flex flex-wrap items-center gap-2 shrink-0 self-start sm:self-auto">
+                          {item.status === "pending_review" && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={withdrawingId === item.id}
+                              onClick={async () => {
+                                setWithdrawFeedback(null);
+                                setWithdrawingId(item.id);
+                                try {
+                                  await withdrawMutation.mutateAsync(item.id);
+                                  setWithdrawFeedback({
+                                    id: item.id,
+                                    message:
+                                      "Naskah berhasil ditarik kembali ke draf.",
+                                  });
+                                } catch (error) {
+                                  setWithdrawFeedback({
+                                    id: item.id,
+                                    isError: true,
+                                    message:
+                                      error instanceof Error
+                                        ? error.message
+                                        : "Gagal menarik kembali naskah.",
+                                  });
+                                } finally {
+                                  setWithdrawingId(null);
+                                }
+                              }}
+                              className="min-h-11 text-xs font-medium cursor-pointer inline-flex items-center gap-1.5 rounded-xl border-border"
+                            >
+                              <RotateCcw
+                                className="size-3.5"
+                                aria-hidden="true"
+                              />
+                              <span>
+                                {withdrawingId === item.id
+                                  ? "Menarik..."
+                                  : "Tarik Kembali"}
+                              </span>
+                            </Button>
+                          )}
+
                           <Button
                             type="button"
                             size="sm"
@@ -1468,7 +1518,7 @@ function DashboardProfileContent({
                                 },
                               })
                             }
-                            className="bg-foreground text-background hover:opacity-90 text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5 rounded-xl"
+                            className="min-h-11 bg-foreground text-background hover:opacity-90 text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5 rounded-xl"
                           >
                             <PenTool className="size-3.5" />
                             <span>
@@ -1479,6 +1529,19 @@ function DashboardProfileContent({
                           </Button>
                         </div>
                       </div>
+
+                      {withdrawFeedback?.id === item.id && (
+                        <p
+                          role={withdrawFeedback.isError ? "alert" : "status"}
+                          className={`text-xs rounded-lg px-3 py-2 border ${
+                            withdrawFeedback.isError
+                              ? "border-destructive/40 bg-destructive/10 text-destructive"
+                              : "border-emerald-500/40 bg-emerald-500/10 text-foreground"
+                          }`}
+                        >
+                          {withdrawFeedback.message}
+                        </p>
+                      )}
 
                       <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
                         <div>

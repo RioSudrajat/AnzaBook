@@ -517,12 +517,17 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
                     }}
                   >
                     <option value="all">Semua Skema</option>
-                    <option value="print_claim_only">
-                      Phygital Cetak (Klaim Kode)
+                    <option value="print_code_only">
+                      Eksklusif Pembeli Buku Cetak
                     </option>
-                    <option value="sample_only">Nakama Pool Reader</option>
-                    <option value="alacarte_only">Ala Carte Digital</option>
-                    <option value="free_open">Pustaka Terbuka Gratis</option>
+                    <option value="nakama_subscription">
+                      Khusus Anggota Nakama
+                    </option>
+                    <option value="single_purchase">Beli Satuan</option>
+                    <option value="nakama_or_purchase">
+                      Nakama &amp; Beli Satuan
+                    </option>
+                    <option value="free_open">Gratis Terbuka</option>
                   </select>
                 </label>
 

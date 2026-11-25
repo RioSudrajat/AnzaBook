@@ -116,7 +116,12 @@ export function rankSubmissionTargets(
 
   const eligible = publishers.filter((pub) => {
     if (pub.verificationStatus !== "verified") return false;
-    if (pub.isAcceptingSubmissions === false) return false;
+    if (
+      pub.isAcceptingSubmissions === false &&
+      !pub.isCurrentUserApprovedWriter
+    ) {
+      return false;
+    }
     if (!q) return true;
 
     const haystack = [

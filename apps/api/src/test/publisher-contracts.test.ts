@@ -1,18 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_DIGITAL_BOOK_PRICE_IDR,
+  addApprovedWriterSchema,
   addPublisherMemberSchema,
   applyPublisherSchema,
   authorUpdateManuscriptSchema,
+  deriveAccessTier,
   listSubmissionTargetsQuerySchema,
   publishManuscriptSchema,
   publisherEditManuscriptSchema,
   publisherMemberRoleEnum,
   publisherReviewManuscriptSchema,
-  reviewManuscriptSchema,
-  updateManuscriptSchema,
+  updateBookInventorySchema,
   updatePublisherBookSchema,
   updatePublisherMemberSchema,
   updatePublisherSchema,
+  type AddApprovedWriterInput,
   type AddPublisherMemberInput,
   type AddPublisherMemberOutput,
   type AuthorUpdateManuscriptInput,
@@ -21,21 +24,19 @@ import {
   type PublishManuscriptInput,
   type PublisherEditManuscriptInput,
   type PublisherReviewManuscriptInput,
+  type UpdateBookInventoryInput,
   type UpdatePublisherBookInput,
   type UpdatePublisherMemberInput,
 } from "@starter/shared/validators/publisher";
-import {
-  adminEditManuscriptChapterSchema,
-  adminEditManuscriptSchema,
-  adminPublishManuscriptSchema,
-} from "@starter/shared/validators/admin";
 import type {
   AdminOverviewDto,
   BookSummaryDto,
   ManagedPublisherSummaryDto,
   PublishManuscriptResultDto,
+  PublisherApprovedWriterDto,
   PublisherDto,
   PublisherMemberDto,
+  StoreBranchDto,
 } from "@starter/shared/types";
 
 describe("Publisher & Manuscript Shared Contracts", () => {
@@ -139,8 +140,8 @@ describe("Publisher & Manuscript Shared Contracts", () => {
       slug: "draf-legal",
       category: "Fiksi",
       synopsis: "Sinopsis awal naskah.",
-      proposedDigitalPolicy: "hybrid_nakama_alacarte",
-      proposedAlacartePriceIdr: 49000,
+      proposedDigitalPolicy: "nakama_or_purchase",
+      proposedDigitalPriceIdr: 49000,
     };
     expect(authorUpdateManuscriptSchema.safeParse(valid).success).toBe(true);
     expect(
@@ -166,7 +167,7 @@ describe("Publisher & Manuscript Shared Contracts", () => {
     const valid: PublisherEditManuscriptInput = {
       title: "Judul Suntingan",
       editorialNotes: "Perlu perapian ejaan di bab 2.",
-      proposedAlacartePriceIdr: 55000,
+      proposedDigitalPriceIdr: 55000,
     };
     expect(publisherEditManuscriptSchema.safeParse(valid).success).toBe(true);
 
@@ -234,8 +235,8 @@ describe("Publisher & Manuscript Shared Contracts", () => {
 
     const parsed = publishManuscriptSchema.safeParse({
       author: "Pramoedya",
-      digitalPolicy: "alacarte_only",
-      alacartePriceIdr: 65000,
+      digitalPolicy: "single_purchase",
+      digitalPriceIdr: 65000,
       categories: ["  Sastra  ", "Sejarah"],
     });
     expect(parsed.success).toBe(true);
@@ -337,7 +338,7 @@ describe("Publisher & Manuscript Shared Contracts", () => {
       coverUrl: null,
       categories: ["  Sains  "],
       digitalPolicy: "free_open",
-      alacartePriceIdr: null,
+      digitalPriceIdr: null,
     };
     const bookResult = updatePublisherBookSchema.safeParse(parsedBookUpdate);
     expect(bookResult.success).toBe(true);
@@ -356,12 +357,33 @@ describe("Publisher & Manuscript Shared Contracts", () => {
     ).toBe(false);
   });
 
-  it("keeps deprecated Slice 1 legacy exports available and exposes updated DTO shapes", () => {
-    expect(adminEditManuscriptChapterSchema).toBeDefined();
-    expect(adminEditManuscriptSchema).toBeDefined();
-    expect(adminPublishManuscriptSchema).toBeDefined();
-    expect(updateManuscriptSchema).toBeDefined();
-    expect(reviewManuscriptSchema).toBeDefined();
+  it("validates Phase 1 distribution helper, approved writer, inventory, and DTO shapes", () => {
+    expect(DEFAULT_DIGITAL_BOOK_PRICE_IDR).toBe(45_000);
+    expect(deriveAccessTier("free_open", false)).toBe("free");
+    expect(deriveAccessTier("print_code_only", false)).toBe("premium_physical");
+    expect(deriveAccessTier("single_purchase", false)).toBe("premium");
+    expect(deriveAccessTier("nakama_subscription", false)).toBe("premium");
+    expect(deriveAccessTier("nakama_or_purchase", false)).toBe("premium");
+    expect(deriveAccessTier("nakama_or_purchase", true)).toBe(
+      "premium_physical",
+    );
+
+    const writerInput: AddApprovedWriterInput = { identifier: "@penulis" };
+    expect(addApprovedWriterSchema.parse(writerInput)).toEqual({
+      identifier: "@penulis",
+      canFastTrack: true,
+    });
+
+    const invInput: UpdateBookInventoryInput = {
+      items: [
+        {
+          branchId: "550e8400-e29b-41d4-a716-446655440000",
+          rakyatStock: 10,
+          standardStock: 5,
+        },
+      ],
+    };
+    expect(updateBookInventorySchema.safeParse(invInput).success).toBe(true);
 
     const publisherDtoCheck: Partial<PublisherDto> = {
       topics: ["Fiksi"],
@@ -369,6 +391,8 @@ describe("Publisher & Manuscript Shared Contracts", () => {
       submissionGuidelines: null,
       topicMatchScore: 2,
       matchedTopics: ["Fiksi"],
+      approvedWriters: [],
+      isCurrentUserApprovedWriter: false,
     };
     const managedSummaryWithoutRole: ManagedPublisherSummaryDto = {
       id: "p1",
@@ -387,6 +411,7 @@ describe("Publisher & Manuscript Shared Contracts", () => {
     const bookSummaryCheck: Partial<BookSummaryDto> = {
       publisherName: "Anza Press",
       publisherLogoUrl: null,
+      digitalPriceIdr: 45_000,
     };
     const memberCheck: PublisherMemberDto = {
       id: "m1",
@@ -399,6 +424,26 @@ describe("Publisher & Manuscript Shared Contracts", () => {
       image: null,
       createdAt: "2026-01-01T00:00:00.000Z",
     };
+    const approvedWriterCheck: PublisherApprovedWriterDto = {
+      id: "w1",
+      publisherId: "p1",
+      userId: "u2",
+      invitedEmail: "rekanan@anzabook.id",
+      name: "Penulis Rekanan",
+      username: "rekanan",
+      image: null,
+      status: "active",
+      canFastTrack: true,
+      acceptedAt: "2026-01-01T00:00:00.000Z",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    };
+    const branchCheck: StoreBranchDto = {
+      id: "b1",
+      chainName: "gramedia",
+      branchName: "Gramedia Matraman",
+      address: "Jl. Matraman Raya",
+      city: "Jakarta",
+    };
     const publishResultCheck: Pick<
       PublishManuscriptResultDto,
       "publishedBookId" | "claimBatch"
@@ -406,14 +451,17 @@ describe("Publisher & Manuscript Shared Contracts", () => {
       publishedBookId: "b1",
       claimBatch: null,
     };
-    const overviewCheck: Pick<AdminOverviewDto, "pendingManuscriptsCount"> = {};
+    const overviewCheck: Pick<AdminOverviewDto, "totalSinglePurchaseSalesIdr"> =
+      { totalSinglePurchaseSalesIdr: 50_000 };
 
     expect(publisherDtoCheck.topics).toEqual(["Fiksi"]);
     expect(managedSummaryWithoutRole.role).toBeUndefined();
     expect(managedSummaryWithNullRole.role).toBeNull();
     expect(bookSummaryCheck.publisherName).toBe("Anza Press");
     expect(memberCheck.role).toBe("editor");
+    expect(approvedWriterCheck.canFastTrack).toBe(true);
+    expect(branchCheck.city).toBe("Jakarta");
     expect(publishResultCheck.publishedBookId).toBe("b1");
-    expect(overviewCheck.pendingManuscriptsCount).toBeUndefined();
+    expect(overviewCheck.totalSinglePurchaseSalesIdr).toBe(50_000);
   });
 });

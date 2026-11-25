@@ -27,12 +27,15 @@ export type AdminNoteDto = NoteDto & { ownerName: string; ownerEmail: string };
 
 // ---------------- AnzaBook DTOs ---------------- //
 
-export type DigitalPolicy =
+export type BookDistributionModel =
   | "free_open"
-  | "print_claim_only"
-  | "sample_only"
-  | "alacarte_only"
-  | "hybrid_nakama_alacarte";
+  | "print_code_only"
+  | "nakama_subscription"
+  | "single_purchase"
+  | "nakama_or_purchase";
+export type ManuscriptSourceLanguage = "id" | "en";
+export type ManuscriptTargetAudience =
+  "general" | "young_adult" | "mature_academic";
 export type AuthorStatus = "none" | "pending" | "verified" | "rejected";
 export type AccessTier = "free" | "premium" | "premium_physical";
 export type EditionTier =
@@ -115,7 +118,7 @@ export type BookSummaryDto = {
   totalChapters: number;
   readingMinutes: number;
   audioDurationMinutes: number;
-  digitalPolicy: DigitalPolicy;
+  digitalPolicy: BookDistributionModel;
   accessTier: AccessTier;
   hasPhysical: boolean;
   isWeeklyBulletin: boolean;
@@ -132,7 +135,7 @@ export type BookSummaryDto = {
   publisherName?: string | null;
   publisherLogoUrl?: string | null;
   authorUserId?: string | null;
-  alacartePriceIdr?: number | null;
+  digitalPriceIdr?: number | null;
 };
 
 export type BookDetailDto = BookSummaryDto & {
@@ -625,6 +628,57 @@ export type UnifiedExploreResultDto = {
 export type PublisherVerificationStatus = "pending" | "verified" | "rejected";
 export type PublisherMemberRole = "owner" | "editor" | "finance";
 
+export type PublisherApprovedWriterStatus = "invited" | "active" | "revoked";
+
+export type PublisherApprovedWriterSummaryDto = {
+  id: string;
+  userId: string | null;
+  name: string;
+  username: string | null;
+  image: string | null;
+};
+
+export type PublisherApprovedWriterDto = {
+  id: string;
+  publisherId: string;
+  userId: string | null;
+  invitedEmail: string | null;
+  status: PublisherApprovedWriterStatus;
+  canFastTrack: boolean;
+  name: string | null;
+  username: string | null;
+  image: string | null;
+  acceptedAt: string | null;
+  createdAt: string;
+};
+
+export type StoreBranchDto = {
+  id: string;
+  chainName: PartnerType;
+  branchName: string;
+  city: string;
+  address: string;
+};
+
+export type PublisherBookInventoryItemDto = {
+  branchId: string;
+  branchName: string;
+  chainName: PartnerType;
+  city: string;
+  address: string;
+  rakyatStock: number;
+  standardStock: number;
+  stockStatus: string;
+  lastSyncedAt: string;
+};
+
+export type UploadedMediaDto = {
+  key: string;
+  url: string;
+  contentType: string;
+  bytes: number;
+};
+
 export type PublisherDto = {
   id: string;
   slug: string;
@@ -641,6 +695,8 @@ export type PublisherDto = {
   submissionGuidelines?: string | null;
   topicMatchScore?: number;
   matchedTopics?: string[];
+  approvedWriters?: PublisherApprovedWriterSummaryDto[];
+  isCurrentUserApprovedWriter?: boolean;
   verificationStatus: PublisherVerificationStatus;
   rejectionReason?: string | null;
   verificationDocuments?: VerificationDocumentDto[] | null;
@@ -702,15 +758,22 @@ export type ManuscriptSubmissionDto = {
   title: string;
   slug?: string | null;
   coverUrl?: string | null;
+  coverColor?: string | null;
   category?: string | null;
   synopsis: string;
+  sourceLanguage?: ManuscriptSourceLanguage;
+  targetAudience?: ManuscriptTargetAudience;
+  authorNotes?: string | null;
+  isbn?: string | null;
+  estimatedPages?: number | null;
   editorialNotes?: string | null;
-  proposedDigitalPolicy: DigitalPolicy;
-  proposedAlacartePriceIdr: number | null;
+  proposedDigitalPolicy: BookDistributionModel;
+  proposedDigitalPriceIdr: number | null;
   printSimJson: Record<string, unknown> | null;
   status: ManuscriptSubmissionStatus;
   rejectionReason: string | null;
   publishedBookId: string | null;
+  isApprovedWriter?: boolean;
   chapters?: ManuscriptChapterDto[];
   totalChapters?: number;
   createdAt: string;
@@ -783,11 +846,9 @@ export type AdminOverviewDto = {
   pendingCalendarsCount: number;
   pendingAuthorsCount: number;
   pendingPublishersCount: number;
-  /** @deprecated Removed across Issues #9 and #10 */
-  pendingManuscriptsCount?: number;
   highRiskDrmEvents24hCount: number;
   estimatedNakamaRoyaltyPoolIdr: number;
-  totalAlacarteSalesIdr: number;
+  totalSinglePurchaseSalesIdr: number;
   totalPublisherShareIdr: number;
   totalAffiliateCommissionsIdr: number;
   totalNetAnzabookIdr: number;

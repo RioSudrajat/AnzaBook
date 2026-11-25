@@ -11,6 +11,7 @@ import {
   manuscriptSubmissions,
   publisherMembers,
   publishers,
+  storeBranches,
   user,
 } from "../db/schema";
 import { ensureSeededCatalog } from "../services/seed.service";
@@ -311,7 +312,7 @@ describe("Publisher Publishing Workflow, Topic-Ranked Targets & Team RBAC (Issue
         publisherId: pubId,
         title: `Naskah Verified ${suffix}`,
         synopsis: "Sinopsis lengkap untuk uji isolasi RBAC.",
-        proposedDigitalPolicy: "hybrid_nakama_alacarte",
+        proposedDigitalPolicy: "nakama_or_purchase",
         chapters: [
           { chapterNumber: 1, titleId: "Bab 1", contentId: "Isi bab 1." },
         ],
@@ -508,7 +509,7 @@ describe("Publisher Publishing Workflow, Topic-Ranked Targets & Team RBAC (Issue
         title: `Hikayat Nusantara ${suffix}`,
         category: "Sastra Sejarah",
         synopsis: "Kisah epik lintas pulau dari penulis muda Indonesia.",
-        proposedDigitalPolicy: "print_claim_only",
+        proposedDigitalPolicy: "print_code_only",
         chapters: [
           {
             chapterNumber: 1,
@@ -817,5 +818,236 @@ describe("Publisher Publishing Workflow, Topic-Ranked Targets & Team RBAC (Issue
     expect(publishRejectedRes.body.error.code).toBe(
       "INVALID_MANUSCRIPT_STATUS",
     );
+  });
+
+  it("supports Phase 1: approved writers fast-track, withdraw, full metadata publish, inventory CRUD, and media upload", async () => {
+    const suffix = randomUUID().slice(0, 6);
+    const admin = agent();
+    const adminEmail = await signUp(admin, "Admin Phase 1");
+    await setRole(adminEmail, "admin");
+
+    const owner = agent();
+    await signUp(owner, "Owner Phase 1");
+    const approvedAuthor = agent();
+    const approvedEmail = await signUp(approvedAuthor, "Penulis Rekanan");
+    const outsiderAuthor = agent();
+    await signUp(outsiderAuthor, "Penulis Luar");
+
+    const pubSlug = `phase1-pub-${suffix}`;
+    const applyRes = await owner
+      .post("/api/publisher/apply")
+      .set(originHeader)
+      .send({
+        name: `Penerbit Phase Satu ${suffix}`,
+        slug: pubSlug,
+        city: "Bandung",
+        isAcceptingSubmissions: false,
+      });
+    expect(applyRes.status).toBe(201);
+    const pubId = applyRes.body.data.id as string;
+
+    await admin
+      .patch(`/api/admin/publishers/${pubId}/verify`)
+      .set(originHeader)
+      .send({ verificationStatus: "verified" });
+
+    // 1. Register Approved Writer -> visible on public detail & studio list
+    const addWriterRes = await owner
+      .post(`/api/publisher/${pubSlug}/approved-writers`)
+      .set(originHeader)
+      .send({ identifier: approvedEmail, canFastTrack: true });
+    expect(addWriterRes.status).toBe(201);
+    expect(addWriterRes.body.data.canFastTrack).toBe(true);
+
+    const listWritersRes = await owner.get(
+      `/api/publisher/${pubSlug}/approved-writers`,
+    );
+    expect(listWritersRes.status).toBe(200);
+    expect(listWritersRes.body.data).toHaveLength(1);
+    const writerRecordId = listWritersRes.body.data[0].id as string;
+
+    // Approved author sees isCurrentUserApprovedWriter=true; outsider sees false
+    const pubForApproved = await approvedAuthor.get(
+      `/api/publisher/${pubSlug}`,
+    );
+    expect(pubForApproved.status).toBe(200);
+    expect(pubForApproved.body.data.isCurrentUserApprovedWriter).toBe(true);
+    expect(pubForApproved.body.data.approvedWriters).toHaveLength(1);
+
+    const pubForOutsider = await outsiderAuthor.get(
+      `/api/publisher/${pubSlug}`,
+    );
+    expect(pubForOutsider.status).toBe(200);
+    expect(pubForOutsider.body.data.isCurrentUserApprovedWriter).toBe(false);
+
+    // 2. Outsider cannot submit when publisher is closed -> 403
+    const outsiderSubmitRes = await outsiderAuthor
+      .post("/api/publisher/manuscripts")
+      .set(originHeader)
+      .send({
+        publisherId: pubId,
+        title: `Naskah Ditolak Tutup ${suffix}`,
+        synopsis: "Sinopsis lengkap dari penulis luar.",
+        proposedDigitalPolicy: "free_open",
+        chapters: [{ chapterNumber: 1, titleId: "Bab 1", contentId: "Isi." }],
+      });
+    expect(outsiderSubmitRes.status).toBe(403);
+
+    // 3. Approved writer CAN fast-track submit even when isAcceptingSubmissions=false
+    const approvedSubmitRes = await approvedAuthor
+      .post("/api/publisher/manuscripts")
+      .set(originHeader)
+      .send({
+        publisherId: pubId,
+        title: `Naskah Prioritas ${suffix}`,
+        synopsis: "Sinopsis lengkap naskah jalur prioritas penulis rekanan.",
+        sourceLanguage: "en",
+        targetAudience: "mature_academic",
+        authorNotes: "Mohon pertimbangan khusus untuk edisi dwibahasa.",
+        isbn: `978-602-${suffix.slice(0, 4)}`,
+        estimatedPages: 240,
+        coverColor: "#1E3A5F",
+        proposedDigitalPolicy: "single_purchase",
+        chapters: [
+          {
+            chapterNumber: 1,
+            titleId: "Bab 1: Metodologi",
+            contentId: "Uraian lengkap bab pertama.",
+            contentEn: "Complete first chapter.",
+          },
+        ],
+      });
+    expect(approvedSubmitRes.status).toBe(201);
+    const manuscriptId = approvedSubmitRes.body.data.id as string;
+    expect(approvedSubmitRes.body.data.sourceLanguage).toBe("en");
+    expect(approvedSubmitRes.body.data.targetAudience).toBe("mature_academic");
+
+    // 4. Author can withdraw pending_review -> draft, non-owner rejected, and re-submit
+    const outsiderWithdrawRes = await outsiderAuthor
+      .post(`/api/publisher/manuscripts/${manuscriptId}/withdraw`)
+      .set(originHeader);
+    expect(outsiderWithdrawRes.status).toBe(403);
+
+    const withdrawRes = await approvedAuthor
+      .post(`/api/publisher/manuscripts/${manuscriptId}/withdraw`)
+      .set(originHeader);
+    expect(withdrawRes.status).toBe(200);
+    expect(withdrawRes.body.data.status).toBe("draft");
+
+    const resubmitRes = await approvedAuthor
+      .post(`/api/publisher/manuscripts/${manuscriptId}/submit`)
+      .set(originHeader)
+      .send({ publisherId: pubId });
+    expect(resubmitRes.status).toBe(200);
+    expect(resubmitRes.body.data.status).toBe("pending_review");
+
+    // Inbox displays isApprovedWriter: true
+    const inboxRes = await owner.get(`/api/publisher/${pubSlug}/manuscripts`);
+    expect(inboxRes.status).toBe(200);
+    const matchedInbox = inboxRes.body.data.find(
+      (m: { id: string }) => m.id === manuscriptId,
+    );
+    expect(matchedInbox?.isApprovedWriter).toBe(true);
+
+    // 5. Upload validated PNG image via /api/media/upload-image & fetch it back
+    // 1x1 transparent PNG
+    const validPng = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      "base64",
+    );
+    const badUploadRes = await owner
+      .post("/api/media/upload-image")
+      .set(originHeader)
+      .set("Content-Type", "image/png")
+      .send(Buffer.from("not-an-image"));
+    expect(badUploadRes.status).toBe(415);
+
+    const uploadRes = await owner
+      .post("/api/media/upload-image")
+      .set(originHeader)
+      .set("Content-Type", "image/png")
+      .send(validPng);
+    expect(uploadRes.status).toBe(201);
+    expect(uploadRes.body.data.url).toMatch(/\/api\/media\/images\/.+\.png$/);
+    const uploadedUrl = uploadRes.body.data.url as string;
+    const uploadedPath = new URL(uploadedUrl).pathname;
+
+    const getImageRes = await approvedAuthor.get(uploadedPath);
+    expect(getImageRes.status).toBe(200);
+    expect(getImageRes.headers["content-type"]).toContain("image/png");
+
+    // 6. Publish with full bibliography, physical edition, and default 45_000 digital price
+    const publishRes = await owner
+      .post(`/api/publisher/${pubSlug}/manuscripts/${manuscriptId}/publish`)
+      .set(originHeader)
+      .send({
+        title: `Edisi Terbit Lengkap ${suffix}`,
+        synopsis: "Sinopsis edisi terbit lengkap untuk katalog pembaca.",
+        coverUrl: uploadedPath,
+        coverColor: "#2C4A3E",
+        digitalPolicy: "nakama_or_purchase",
+        hasPhysical: true,
+        rakyatPriceIdr: 49_000,
+        standardPriceIdr: 89_000,
+        publishedYear: 2026,
+        originalTitle: "Original Discourse",
+        translator: "Tim Penerjemah Anza",
+        collectionName: "Seri Pemikiran",
+        isbn: `978-602-99-${suffix.slice(0, 2)}`,
+      });
+    expect(publishRes.status).toBe(200);
+    const bookId = publishRes.body.data.publishedBookId as string;
+    const bookSlug = publishRes.body.data.book.slug as string;
+    expect(publishRes.body.data.book.digitalPriceIdr).toBe(45_000);
+    expect(publishRes.body.data.book.accessTier).toBe("premium_physical");
+
+    const bookDetailRes = await approvedAuthor.get(`/api/books/${bookSlug}`);
+    expect(bookDetailRes.status).toBe(200);
+    expect(bookDetailRes.body.data.publishedYear).toBe(2026);
+    expect(bookDetailRes.body.data.originalTitle).toBe("Original Discourse");
+    expect(bookDetailRes.body.data.translator).toBe("Tim Penerjemah Anza");
+    expect(bookDetailRes.body.data.collectionName).toBe("Seri Pemikiran");
+
+    // 7. Store branches & inventory CRUD
+    const [seededBranch] = await db
+      .insert(storeBranches)
+      .values({
+        chainName: "gramedia",
+        branchName: `Toko Mitra ${suffix}`,
+        address: "Jl. Asia Afrika No. 10",
+        city: "Bandung",
+      })
+      .returning();
+
+    const branchesRes = await owner.get("/api/publisher/store-branches");
+    expect(branchesRes.status).toBe(200);
+    expect(branchesRes.body.data.length).toBeGreaterThanOrEqual(1);
+
+    const putInvRes = await owner
+      .put(`/api/publisher/${pubSlug}/books/${bookId}/inventory`)
+      .set(originHeader)
+      .send({
+        items: [
+          {
+            branchId: seededBranch.id,
+            rakyatStock: 12,
+            standardStock: 8,
+          },
+        ],
+      });
+    expect(putInvRes.status).toBe(200);
+    const updatedBranch = putInvRes.body.data.find(
+      (i: { branchId: string }) => i.branchId === seededBranch.id,
+    );
+    expect(updatedBranch?.rakyatStock).toBe(12);
+    expect(updatedBranch?.standardStock).toBe(8);
+    expect(updatedBranch?.stockStatus).toBe("available");
+
+    // Clean up approved writer record
+    const delWriterRes = await owner
+      .delete(`/api/publisher/${pubSlug}/approved-writers/${writerRecordId}`)
+      .set(originHeader);
+    expect(delWriterRes.status).toBe(200);
+    expect(delWriterRes.body.data.removed).toBe(true);
   });
 });

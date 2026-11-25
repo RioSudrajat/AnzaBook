@@ -8,9 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  useAddPublisherApprovedWriter,
   useAddPublisherMember,
   useApplyPublisher,
   useMySocialProfile,
+  useUploadMediaImage,
 } from "@/features/social/hooks";
 import {
   MAX_PUBLISHER_TOPICS,
@@ -71,6 +73,8 @@ export default function NewPublicationPage() {
   const { data: myProfile } = useMySocialProfile();
   const applyPublisherMutation = useApplyPublisher();
   const addMemberMutation = useAddPublisherMember();
+  const addApprovedWriterMutation = useAddPublisherApprovedWriter();
+  const uploadImageMutation = useUploadMediaImage();
 
   // General state
   const [name, setName] = useState("");
@@ -84,10 +88,9 @@ export default function NewPublicationPage() {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
-  const processImageFile = (
+  const processImageFile = async (
     file: File,
-    onSuccess: (dataUrl: string) => void,
-    maxDim: number = 1000,
+    onSuccess: (uploadedUrl: string) => void,
   ) => {
     if (!file.type.startsWith("image/")) {
       setFormError("Berkas harus berupa gambar (JPG, PNG, atau WebP).");
@@ -98,35 +101,16 @@ export default function NewPublicationPage() {
       return;
     }
     setFormError(null);
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        let width = img.width;
-        let height = img.height;
-        if (width > maxDim || height > maxDim) {
-          if (width > height) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          } else {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
-        }
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressed = canvas.toDataURL("image/jpeg", 0.9);
-          onSuccess(compressed);
-        }
-      };
-      img.src = e.target?.result as string;
-    };
-    reader.readAsDataURL(file);
+    try {
+      const uploaded = await uploadImageMutation.mutateAsync(file);
+      onSuccess(uploaded.url);
+    } catch (error) {
+      setFormError(
+        error instanceof Error
+          ? error.message
+          : "Gagal mengunggah gambar ke server media.",
+      );
+    }
   };
   const [ikapiNumber, setIkapiNumber] = useState("");
   const [city, setCity] = useState("");
@@ -289,6 +273,21 @@ export default function NewPublicationPage() {
         );
       }
 
+      const writerIdentifiers = approvedWriters
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length >= 2);
+
+      if (writerIdentifiers.length > 0) {
+        await Promise.allSettled(
+          writerIdentifiers.map((identifier) =>
+            addApprovedWriterMutation.mutateAsync({
+              slug: createdPub.slug,
+              input: { identifier, canFastTrack: true },
+            }),
+          ),
+        );
+      }
+
       if (createdPub.verificationStatus === "verified") {
         navigate({
           to: "/p/$slug/studio",
@@ -319,17 +318,21 @@ export default function NewPublicationPage() {
         <SmartBackButton fallbackTo="/partner-program" className="-ml-2" />
         <div className="flex items-center gap-3">
           <span className="text-xs font-mono text-muted-foreground">
-            Step 1 of 2
+            Tahap 1 dari 2
           </span>
           <Button
             type="button"
             onClick={handleSubmit}
-            disabled={applyPublisherMutation.isPending || !name.trim()}
-            className="bg-foreground text-background hover:opacity-90 text-xs px-4 py-2 h-9 rounded-full font-medium cursor-pointer"
+            disabled={
+              applyPublisherMutation.isPending ||
+              uploadImageMutation.isPending ||
+              !name.trim()
+            }
+            className="bg-foreground text-background hover:opacity-90 text-xs px-4 py-2 min-h-11 rounded-full font-medium cursor-pointer"
           >
             {applyPublisherMutation.isPending
               ? "Menyimpan..."
-              : "Lanjut (Next)"}
+              : "Daftarkan Penerbit"}
           </Button>
         </div>
       </div>
@@ -339,7 +342,7 @@ export default function NewPublicationPage() {
         {/* Title Heading */}
         <div className="space-y-1 border-b border-border/60 pb-6">
           <h1 className="font-serif text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
-            New publication
+            Daftarkan Penerbit Baru
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground">
             Daftarkan entitas penerbit mitra Anda untuk menerbitkan karya buku,
@@ -355,20 +358,20 @@ export default function NewPublicationPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-12">
-          {/* ================= SECTION 1: GENERAL ================= */}
+          {/* ================= SECTION 1: UMUM ================= */}
           <section className="space-y-8">
             <h2 className="font-serif text-xl font-bold text-foreground">
-              General
+              Identitas Penerbit
             </h2>
 
-            {/* Field: Name* */}
+            {/* Field: Nama* */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
               <div className="w-full sm:w-56 shrink-0 space-y-1">
                 <Label
                   htmlFor="pub-name"
                   className="text-sm font-semibold text-foreground"
                 >
-                  Name<span className="text-red-500">*</span>
+                  Nama Penerbit<span className="text-red-500">*</span>
                 </Label>
               </div>
 
@@ -377,12 +380,12 @@ export default function NewPublicationPage() {
                   id="pub-name"
                   value={name}
                   onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="Type your publication's name"
+                  placeholder="Ketik nama resmi penerbit..."
                   className="text-sm rounded-lg"
                   required
                 />
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
-                  <span>Link: anzabook.id/p/</span>
+                  <span>Tautan: anzabook.id/p/</span>
                   <input
                     type="text"
                     value={slug}
@@ -394,14 +397,14 @@ export default function NewPublicationPage() {
               </div>
             </div>
 
-            {/* Field: Description* */}
+            {/* Field: Deskripsi* */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
               <div className="w-full sm:w-56 shrink-0 space-y-1">
                 <Label
                   htmlFor="pub-desc"
                   className="text-sm font-semibold text-foreground"
                 >
-                  Description<span className="text-red-500">*</span>
+                  Deskripsi Singkat<span className="text-red-500">*</span>
                 </Label>
               </div>
 
@@ -411,15 +414,14 @@ export default function NewPublicationPage() {
                   rows={3}
                   value={description}
                   onChange={(e) => setDescription(e.target.value.slice(0, 280))}
-                  placeholder="Type a short description"
+                  placeholder="Tuliskan deskripsi singkat profil dan visi kurasi penerbit..."
                   className="text-sm rounded-lg leading-relaxed resize-none"
                   required
                 />
                 <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                   <p className="max-w-md leading-normal">
-                    The description is a quick way to tell readers about your
-                    publication. It's short and appears on search results and
-                    publication preview cards.
+                    Deskripsi ini tampil di kartu profil penerbit dan hasil
+                    pencarian AnzaBook.
                   </p>
                   <span className="font-mono ml-2 shrink-0">
                     {description.length}/280
@@ -428,26 +430,26 @@ export default function NewPublicationPage() {
               </div>
             </div>
 
-            {/* Field: Publication avatar* */}
+            {/* Field: Avatar Penerbit* */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
               <div className="w-full sm:w-56 shrink-0 space-y-1">
                 <Label className="text-sm font-semibold text-foreground">
-                  Publication avatar<span className="text-red-500">*</span>
+                  Avatar Penerbit<span className="text-red-500">*</span>
                 </Label>
                 <p className="text-[11px] text-muted-foreground">
-                  Items marked with * are required.
+                  Kolom bertanda * wajib diisi.
                 </p>
               </div>
 
               <div className="flex-1 max-w-xl flex flex-col sm:flex-row items-start justify-between gap-6">
                 <div className="space-y-1.5 flex-1">
                   <h4 className="font-semibold text-xs text-foreground">
-                    Add avatar
+                    Unggah Avatar
                   </h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    The avatar appears with your stories across AnzaBook. Seret
-                    dan letakkan gambar dari perangkat Anda atau klik kotak di
-                    samping.
+                    Avatar tampil di halaman publik penerbit dan setiap judul
+                    yang diterbitkan. Seret dan letakkan gambar atau klik kotak
+                    di samping.
                   </p>
                   <p className="text-[11px] font-mono text-muted-foreground">
                     Format: JPG, PNG, WebP • Maks. 5MB
@@ -467,11 +469,7 @@ export default function NewPublicationPage() {
                     setIsAvatarDragOver(false);
                     const file = e.dataTransfer.files?.[0];
                     if (file)
-                      processImageFile(
-                        file,
-                        (data) => setAvatarUrl(data),
-                        1000,
-                      );
+                      void processImageFile(file, (data) => setAvatarUrl(data));
                   }}
                   className={`size-28 sm:size-32 rounded-xl border border-dashed flex flex-col items-center justify-center text-muted-foreground shrink-0 overflow-hidden relative group cursor-pointer transition-colors ${
                     isAvatarDragOver
@@ -509,11 +507,7 @@ export default function NewPublicationPage() {
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file)
-                      processImageFile(
-                        file,
-                        (data) => setAvatarUrl(data),
-                        1000,
-                      );
+                      void processImageFile(file, (data) => setAvatarUrl(data));
                     e.target.value = "";
                   }}
                   className="hidden"
@@ -521,23 +515,23 @@ export default function NewPublicationPage() {
               </div>
             </div>
 
-            {/* Field: Publication logo */}
+            {/* Field: Logo Penerbit */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
               <div className="w-full sm:w-56 shrink-0 space-y-1">
                 <Label className="text-sm font-semibold text-foreground">
-                  Publication logo
+                  Logo Penerbit
                 </Label>
               </div>
 
               <div className="flex-1 max-w-xl flex flex-col sm:flex-row items-start justify-between gap-6">
                 <div className="space-y-1.5 flex-1">
                   <h4 className="font-semibold text-xs text-foreground">
-                    Add logo
+                    Unggah Logo
                   </h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    The logo is displayed at the top of your publication. Seret
-                    dan letakkan berkas logo atau klik kotak di samping untuk
-                    memilih dari perangkat lokal.
+                    Logo ditampilkan di bagian atas halaman penerbit dan studio
+                    redaksi. Seret dan letakkan berkas logo atau klik kotak di
+                    samping.
                   </p>
                   <p className="text-[11px] font-mono text-muted-foreground">
                     Format: JPG, PNG, WebP • Maks. 5MB
@@ -557,7 +551,7 @@ export default function NewPublicationPage() {
                     setIsLogoDragOver(false);
                     const file = e.dataTransfer.files?.[0];
                     if (file)
-                      processImageFile(file, (data) => setLogoUrl(data), 1200);
+                      void processImageFile(file, (data) => setLogoUrl(data));
                   }}
                   className={`size-28 sm:size-32 rounded-xl border border-dashed flex flex-col items-center justify-center text-muted-foreground shrink-0 overflow-hidden relative group cursor-pointer transition-colors ${
                     isLogoDragOver
@@ -595,7 +589,7 @@ export default function NewPublicationPage() {
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file)
-                      processImageFile(file, (data) => setLogoUrl(data), 1200);
+                      void processImageFile(file, (data) => setLogoUrl(data));
                     e.target.value = "";
                   }}
                   className="hidden"
@@ -1040,27 +1034,27 @@ export default function NewPublicationPage() {
                   <button
                     type="button"
                     onClick={() => setIsAddingEditor(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-border hover:border-foreground text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    className="inline-flex min-h-11 items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-border hover:border-foreground text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                   >
                     <Plus className="size-3.5" />
-                    <span>Add an editor...</span>
+                    <span>Tambah Editor Redaksi...</span>
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Row: Approved writers */}
+            {/* Row: Penulis Rekanan */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
               <div className="w-full sm:w-56 shrink-0 space-y-1">
                 <Label className="text-sm font-semibold text-foreground">
-                  Approved writers
+                  Penulis Rekanan
                 </Label>
               </div>
 
               <div className="flex-1 max-w-xl space-y-3">
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Approved writers can submit or remove their stories from this
-                  publication.
+                  Penulis rekanan tetap dapat mengirim naskah lewat jalur
+                  prioritas meskipun penerimaan publik sedang ditutup.
                 </p>
 
                 {approvedWriters.length > 0 && (
@@ -1124,10 +1118,10 @@ export default function NewPublicationPage() {
                   <button
                     type="button"
                     onClick={() => setIsAddingWriter(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-border hover:border-foreground text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    className="inline-flex min-h-11 items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-border hover:border-foreground text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                   >
                     <Plus className="size-3.5" />
-                    <span>Add a writer...</span>
+                    <span>Tambah Penulis Rekanan...</span>
                   </button>
                 )}
               </div>
@@ -1146,16 +1140,20 @@ export default function NewPublicationPage() {
 
             <div className="flex items-center gap-4">
               <span className="text-xs font-mono text-muted-foreground">
-                Step 1 of 2
+                Tahap 1 dari 2
               </span>
               <Button
                 type="submit"
-                disabled={applyPublisherMutation.isPending || !name.trim()}
-                className="bg-foreground text-background hover:opacity-90 text-xs px-6 py-2.5 h-10 rounded-full font-semibold cursor-pointer"
+                disabled={
+                  applyPublisherMutation.isPending ||
+                  uploadImageMutation.isPending ||
+                  !name.trim()
+                }
+                className="bg-foreground text-background hover:opacity-90 text-xs px-6 py-2.5 min-h-11 rounded-full font-semibold cursor-pointer"
               >
                 {applyPublisherMutation.isPending
                   ? "Mendaftarkan Penerbit..."
-                  : "Next (Daftarkan Penerbit)"}
+                  : "Daftarkan Penerbit"}
               </Button>
             </div>
           </div>

@@ -33,13 +33,13 @@ import {
   createChapterComment,
   createHighlight,
   deleteHighlight,
-  purchaseBookAlacarte,
+  purchaseDigitalBook,
   recordDrmEvent,
   restartBookReading,
   saveReadingProgress,
   submitReaderDrmAppeal,
 } from "./api";
-import type { PurchaseBookAlacarteInput } from "@starter/shared/validators/publisher";
+import type { PurchaseBookInput } from "@starter/shared/validators/publisher";
 import {
   allHighlightsQuery,
   authorsQuery,
@@ -247,11 +247,10 @@ export function useCreateBookReview(slug: string) {
   });
 }
 
-export function usePurchaseBookAlacarte(slug: string) {
+export function usePurchaseDigitalBook(slug: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input?: PurchaseBookAlacarteInput) =>
-      purchaseBookAlacarte(slug, input),
+    mutationFn: (input?: PurchaseBookInput) => purchaseDigitalBook(slug, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: booksKeys.detail(slug) });
       queryClient.invalidateQueries({

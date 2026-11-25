@@ -1,15 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
+  AddApprovedWriterInput,
   AddPublisherMemberInput,
   ApplyPublisherInput,
+  AuthorUpdateManuscriptInput,
   CreateManuscriptDraftInput,
   ListSubmissionTargetsInput,
   PublishManuscriptInput,
   PublisherEditManuscriptInput,
   PublisherReviewManuscriptInput,
-  ReviewManuscriptInput,
   SubmitManuscriptInput,
-  UpdateManuscriptInput,
+  UpdateBookInventoryInput,
   UpdatePublisherBookInput,
   UpdatePublisherInput,
   UpdatePublisherMemberInput,
@@ -25,6 +26,7 @@ import type { UpdateCalendarInput } from "@starter/shared/validators/community";
 import { booksKeys } from "@/features/books/queries";
 import { communityKeys } from "@/features/community/queries";
 import {
+  addPublisherApprovedWriter,
   addPublisherMember,
   applyAuthor,
   applyPublisher,
@@ -32,8 +34,8 @@ import {
   editPublisherManuscript,
   followUser,
   publishPublisherManuscript,
+  removePublisherApprovedWriter,
   removePublisherMember,
-  reviewManuscript,
   reviewPublisherManuscript,
   submitManuscript,
   submitManuscriptDraft,
@@ -43,9 +45,12 @@ import {
   updateCalendarProfile,
   updateManuscript,
   updatePublisherBook,
+  updatePublisherBookInventory,
   updatePublisherMember,
   updatePublisherProfile,
   updateSocialProfile,
+  uploadMediaImage,
+  withdrawManuscript,
 } from "./api";
 import {
   exploreAuthorsQuery,
@@ -55,12 +60,15 @@ import {
   myManuscriptsQuery,
   mySocialProfileQuery,
   publicSocialPostQuery,
+  publisherApprovedWritersQuery,
+  publisherBookInventoryQuery,
   publisherBooksQuery,
   publisherDetailQuery,
   publisherKeys,
   publisherManuscriptsQuery,
   publisherMembersQuery,
   socialKeys,
+  storeBranchesQuery,
   submissionTargetsQuery,
   unifiedExploreQuery,
   userFollowersQuery,
@@ -196,12 +204,107 @@ export function usePublisher(slug: string) {
   return useQuery(publisherDetailQuery(slug));
 }
 
-export function usePublisherBooks(slug: string) {
-  return useQuery(publisherBooksQuery(slug));
+export function usePublisherBooks(slug: string, enabled = true) {
+  return useQuery({
+    ...publisherBooksQuery(slug),
+    enabled: Boolean(slug) && enabled,
+  });
 }
 
-export function usePublisherMembers(slug: string) {
-  return useQuery(publisherMembersQuery(slug));
+export function usePublisherMembers(slug: string, enabled = true) {
+  return useQuery({
+    ...publisherMembersQuery(slug),
+    enabled: Boolean(slug) && enabled,
+  });
+}
+
+export function usePublisherApprovedWriters(slug: string, enabled = true) {
+  return useQuery({
+    ...publisherApprovedWritersQuery(slug),
+    enabled: Boolean(slug) && enabled,
+  });
+}
+
+export function useAddPublisherApprovedWriter() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      slug,
+      input,
+    }: {
+      slug: string;
+      input: AddApprovedWriterInput;
+    }) => addPublisherApprovedWriter(slug, input),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.approvedWriters(variables.slug),
+      });
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.detail(variables.slug),
+      });
+    },
+  });
+}
+
+export function useRemovePublisherApprovedWriter() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ slug, writerId }: { slug: string; writerId: string }) =>
+      removePublisherApprovedWriter(slug, writerId),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.approvedWriters(variables.slug),
+      });
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.detail(variables.slug),
+      });
+    },
+  });
+}
+
+export function useStoreBranches(enabled = true) {
+  return useQuery({
+    ...storeBranchesQuery(),
+    enabled,
+  });
+}
+
+export function usePublisherBookInventory(
+  slug: string,
+  bookId: string,
+  enabled = true,
+) {
+  return useQuery({
+    ...publisherBookInventoryQuery(slug, bookId),
+    enabled: Boolean(slug && bookId) && enabled,
+  });
+}
+
+export function useUpdatePublisherBookInventory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      slug,
+      bookId,
+      input,
+    }: {
+      slug: string;
+      bookId: string;
+      input: UpdateBookInventoryInput;
+    }) => updatePublisherBookInventory(slug, bookId, input),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.bookInventory(variables.slug, variables.bookId),
+      });
+      queryClient.invalidateQueries({ queryKey: booksKeys.all });
+    },
+  });
+}
+
+export function useUploadMediaImage() {
+  return useMutation({
+    mutationFn: (file: File) => uploadMediaImage(file),
+  });
 }
 
 export function useUpdatePublisherBook() {
@@ -384,8 +487,11 @@ export function useManuscript(idOrSlug: string) {
   return useQuery(manuscriptDetailQuery(idOrSlug));
 }
 
-export function usePublisherManuscripts(slug: string) {
-  return useQuery(publisherManuscriptsQuery(slug));
+export function usePublisherManuscripts(slug: string, enabled = true) {
+  return useQuery({
+    ...publisherManuscriptsQuery(slug),
+    enabled: Boolean(slug) && enabled,
+  });
 }
 
 export function useCreateManuscriptDraft() {
@@ -409,7 +515,7 @@ export function useUpdateManuscript() {
       input,
     }: {
       idOrSlug: string;
-      input: UpdateManuscriptInput;
+      input: AuthorUpdateManuscriptInput;
     }) => updateManuscript(idOrSlug, input),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({
@@ -443,22 +549,16 @@ export function useSubmitManuscriptDraft() {
   });
 }
 
-export function useReviewManuscript() {
+export function useWithdrawManuscript() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({
-      idOrSlug,
-      input,
-    }: {
-      idOrSlug: string;
-      input: ReviewManuscriptInput;
-    }) => reviewManuscript(idOrSlug, input),
-    onSuccess: (_data, variables) => {
+    mutationFn: (idOrSlug: string) => withdrawManuscript(idOrSlug),
+    onSuccess: (_data, idOrSlug) => {
       queryClient.invalidateQueries({
-        queryKey: publisherKeys.manuscriptDetail(variables.idOrSlug),
+        queryKey: publisherKeys.manuscriptDetail(idOrSlug),
       });
       queryClient.invalidateQueries({
-        queryKey: publisherKeys.all,
+        queryKey: publisherKeys.myManuscripts(),
       });
     },
   });
