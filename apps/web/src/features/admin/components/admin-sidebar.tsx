@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import {
   ArrowLeft,
-  BookOpen,
   Calendar,
   Coins,
   FileCode,
@@ -15,7 +14,6 @@ import { SidebarToggleIcon } from "@/features/dashboard/components/app-sidebar";
 export type AdminTab =
   | "calendars"
   | "partners"
-  | "manuscripts"
   | "claim-batches"
   | "financials"
   | "drm-security"
@@ -36,7 +34,6 @@ type AdminSidebarProps = {
   pendingCounts?: {
     calendars: number;
     partners: number;
-    manuscripts: number;
     drmHighRisk?: number;
   };
 };
@@ -47,7 +44,7 @@ export function AdminSidebar({
   user,
   isCollapsed,
   onToggleCollapse,
-  pendingCounts = { calendars: 0, partners: 0, manuscripts: 0 },
+  pendingCounts = { calendars: 0, partners: 0 },
 }: AdminSidebarProps) {
   const navItems = [
     {
@@ -61,12 +58,6 @@ export function AdminSidebar({
       label: "Penulis & Penerbit",
       icon: UserCheck,
       badge: pendingCounts.partners,
-    },
-    {
-      id: "manuscripts" as const,
-      label: "Kurasi Naskah",
-      icon: BookOpen,
-      badge: pendingCounts.manuscripts,
     },
     {
       id: "claim-batches" as const,

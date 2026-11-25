@@ -7,7 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useApplyPublisher, useMySocialProfile } from "@/features/social/hooks";
+import {
+  useAddPublisherMember,
+  useApplyPublisher,
+  useMySocialProfile,
+} from "@/features/social/hooks";
+import {
+  MAX_PUBLISHER_TOPICS,
+  normalizePublisherTopics,
+  normalizeSocialLinks,
+} from "@/features/publisher/publisher-helpers";
 import { ApiError } from "@/lib/api/client";
 
 export const Route = createFileRoute("/_protected/publishers/new")({
@@ -61,6 +70,7 @@ export default function NewPublicationPage() {
   const navigate = useNavigate();
   const { data: myProfile } = useMySocialProfile();
   const applyPublisherMutation = useApplyPublisher();
+  const addMemberMutation = useAddPublisherMember();
 
   // General state
   const [name, setName] = useState("");
@@ -130,13 +140,15 @@ export default function NewPublicationPage() {
   const [instagramHandle, setInstagramHandle] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
 
-  // Topics state
+  // Topics & Editorial submissions state
   const [topics, setTopics] = useState<string[]>([
     "Sastra & Fiksi",
     "Filsafat & Pemikiran",
   ]);
   const [newTopicInput, setNewTopicInput] = useState("");
   const [isAddingTopic, setIsAddingTopic] = useState(false);
+  const [isAcceptingSubmissions, setIsAcceptingSubmissions] = useState(true);
+  const [submissionGuidelines, setSubmissionGuidelines] = useState("");
 
   // People state (Editorial team)
   const [editors, setEditors] = useState<string[]>([]);
@@ -175,9 +187,14 @@ export default function NewPublicationPage() {
   };
 
   const handleAddTopic = (topic: string) => {
-    const trimmed = topic.trim();
-    if (trimmed && !topics.includes(trimmed) && topics.length < 10) {
-      setTopics([...topics, trimmed]);
+    const cleaned = topic.trim();
+    if (!cleaned) return;
+    const nextTopics = normalizePublisherTopics([...topics, cleaned]);
+    if (
+      nextTopics.length > topics.length &&
+      nextTopics.length <= MAX_PUBLISHER_TOPICS
+    ) {
+      setTopics(nextTopics);
       setNewTopicInput("");
       setIsAddingTopic(false);
     }
@@ -225,6 +242,13 @@ export default function NewPublicationPage() {
     }
 
     try {
+      const normalizedTopics = normalizePublisherTopics(topics);
+      const normalizedLinks = normalizeSocialLinks({
+        website: websiteUrl,
+        instagram: instagramHandle,
+        twitter: twitterHandle,
+      });
+
       const createdPub = await applyPublisherMutation.mutateAsync({
         name: cleanName,
         slug: cleanSlug,
@@ -234,6 +258,10 @@ export default function NewPublicationPage() {
         city: city.trim() || undefined,
         address: address.trim() || undefined,
         contactEmail: contactEmail.trim() || undefined,
+        socialLinks: normalizedLinks,
+        topics: normalizedTopics.length > 0 ? normalizedTopics : undefined,
+        isAcceptingSubmissions,
+        submissionGuidelines: submissionGuidelines.trim() || undefined,
         verificationDocuments:
           docTitle.trim() && docUrl.trim()
             ? [
@@ -246,11 +274,32 @@ export default function NewPublicationPage() {
             : undefined,
       });
 
-      // Redirect directly to the newly created publisher page
-      navigate({
-        to: "/p/$slug",
-        params: { slug: createdPub.slug },
-      });
+      const editorEmails = editors
+        .map((entry) => entry.trim())
+        .filter((entry) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry));
+
+      if (editorEmails.length > 0) {
+        await Promise.allSettled(
+          editorEmails.map((email) =>
+            addMemberMutation.mutateAsync({
+              slug: createdPub.slug,
+              input: { email, role: "editor" },
+            }),
+          ),
+        );
+      }
+
+      if (createdPub.verificationStatus === "verified") {
+        navigate({
+          to: "/p/$slug/studio",
+          params: { slug: createdPub.slug },
+        });
+      } else {
+        navigate({
+          to: "/p/$slug",
+          params: { slug: createdPub.slug },
+        });
+      }
     } catch (err: unknown) {
       if (err instanceof ApiError) {
         setFormError(err.message);
@@ -793,7 +842,7 @@ export default function NewPublicationPage() {
                       </button>
                     </div>
                   ) : (
-                    topics.length < 10 && (
+                    topics.length < MAX_PUBLISHER_TOPICS && (
                       <button
                         type="button"
                         onClick={() => setIsAddingTopic(true)}
@@ -828,10 +877,43 @@ export default function NewPublicationPage() {
                 </div>
 
                 <p className="text-[11px] text-muted-foreground leading-relaxed pt-1">
-                  Adding topics (up to 10) allows people to search for and
-                  discover your publication. These topics affect which stories
-                  show up in readers' recommendations.
+                  Topik kurasi ({topics.length} / {MAX_PUBLISHER_TOPICS})
+                  membantu penulis menemukan penerbit yang sesuai dengan
+                  kategori naskahnya.
                 </p>
+
+                <div className="pt-3 space-y-3 border-t border-border/60">
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isAcceptingSubmissions}
+                      onChange={(e) =>
+                        setIsAcceptingSubmissions(e.target.checked)
+                      }
+                      className="mt-0.5 size-4 cursor-pointer accent-[var(--color-accent)]"
+                    />
+                    <span className="text-xs leading-relaxed text-foreground">
+                      Buka penerimaan naskah dari penulis independen
+                    </span>
+                  </label>
+
+                  <div className="space-y-1.5">
+                    <Label
+                      htmlFor="pub-submission-guidelines"
+                      className="text-xs font-medium text-foreground"
+                    >
+                      Panduan Kirim Naskah (Opsional)
+                    </Label>
+                    <Textarea
+                      id="pub-submission-guidelines"
+                      rows={3}
+                      value={submissionGuidelines}
+                      onChange={(e) => setSubmissionGuidelines(e.target.value)}
+                      placeholder="Contoh: Sertakan sinopsis utuh dan 3 bab awal berbahasa Indonesia..."
+                      className="text-xs"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </section>

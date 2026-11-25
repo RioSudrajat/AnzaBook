@@ -5,9 +5,7 @@ import {
   useSuspenseQuery,
 } from "@tanstack/react-query";
 import type {
-  AdminEditManuscriptInput,
   AdminListQueryInput,
-  AdminPublishManuscriptInput,
   AdminReviewAuthorApplicationInput,
   AdminVerifyCalendarInput,
   AdminVerifyPublisherInput,
@@ -24,10 +22,8 @@ import { notesKeys } from "@/features/notes/queries";
 import {
   createClaimBatch,
   deleteAnyNote,
-  publishAdminManuscript,
   reviewAdminDrmSuspension,
   reviewAuthorApplication,
-  updateAdminManuscript,
   verifyCalendar,
   verifyPublisher,
 } from "./api";
@@ -39,8 +35,6 @@ import {
   adminDrmSuspensionsQuery,
   adminDrmTraceQuery,
   adminKeys,
-  adminManuscriptDetailQuery,
-  adminManuscriptsQuery,
   adminNotesQuery,
   adminOverviewQuery,
   adminPublishersQuery,
@@ -124,56 +118,6 @@ export function useVerifyPublisher() {
       return Promise.all([
         queryClient.invalidateQueries({ queryKey: adminKeys.all }),
         queryClient.invalidateQueries({ queryKey: ["publisher"] }),
-      ]);
-    },
-  });
-}
-
-// ---------------- Manuscripts & Curation Editor ---------------- //
-
-export function useAdminManuscripts(params?: AdminListQueryInput) {
-  return useQuery(adminManuscriptsQuery(params));
-}
-
-export function useAdminManuscriptDetail(id: string) {
-  return useQuery(adminManuscriptDetailQuery(id));
-}
-
-export function useUpdateAdminManuscript() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({
-      id,
-      input,
-    }: {
-      id: string;
-      input: AdminEditManuscriptInput;
-    }) => updateAdminManuscript(id, input),
-    onSettled: (_data, _error, variables) => {
-      return Promise.all([
-        queryClient.invalidateQueries({ queryKey: adminKeys.all }),
-        queryClient.invalidateQueries({
-          queryKey: adminKeys.manuscriptDetail(variables.id),
-        }),
-      ]);
-    },
-  });
-}
-
-export function usePublishAdminManuscript() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({
-      id,
-      overrides,
-    }: {
-      id: string;
-      overrides?: AdminPublishManuscriptInput;
-    }) => publishAdminManuscript(id, overrides),
-    onSettled: () => {
-      return Promise.all([
-        queryClient.invalidateQueries({ queryKey: adminKeys.all }),
-        queryClient.invalidateQueries({ queryKey: ["books"] }),
       ]);
     },
   });

@@ -7,11 +7,9 @@ import type {
   AdminDrmSuspensionsListResponse,
   AdminNoteDto,
   AdminOverviewDto,
-  AdminPublishManuscriptResultDto,
   DataResponse,
   DrmReaderSuspensionDto,
   DrmWatermarkTraceDto,
-  ManuscriptSubmissionDto,
   Paginated,
   PublisherDto,
 } from "@starter/shared/types";
@@ -21,9 +19,7 @@ import type {
   AdminReviewDrmAppealInput,
 } from "@starter/shared/validators/drm";
 import type {
-  AdminEditManuscriptInput,
   AdminListQueryInput,
-  AdminPublishManuscriptInput,
   AdminReviewAuthorApplicationInput,
   AdminVerifyCalendarInput,
   AdminVerifyPublisherInput,
@@ -147,60 +143,6 @@ export async function verifyPublisher(
       body: input,
     },
   );
-  return data;
-}
-
-// ---------------- Manuscripts & Curation Editor ---------------- //
-
-export async function getAdminManuscripts(
-  params?: AdminListQueryInput,
-  signal?: AbortSignal,
-): Promise<ManuscriptSubmissionDto[]> {
-  const { data } = await apiFetch<DataResponse<ManuscriptSubmissionDto[]>>(
-    "/api/admin/manuscripts",
-    {
-      query: params,
-      signal,
-    },
-  );
-  return data;
-}
-
-export async function getAdminManuscriptDetail(
-  id: string,
-  signal?: AbortSignal,
-): Promise<ManuscriptSubmissionDto> {
-  const { data } = await apiFetch<DataResponse<ManuscriptSubmissionDto>>(
-    `/api/admin/manuscripts/${encodeURIComponent(id)}`,
-    { signal },
-  );
-  return data;
-}
-
-export async function updateAdminManuscript(
-  id: string,
-  input: AdminEditManuscriptInput,
-): Promise<ManuscriptSubmissionDto> {
-  const { data } = await apiFetch<DataResponse<ManuscriptSubmissionDto>>(
-    `/api/admin/manuscripts/${encodeURIComponent(id)}`,
-    {
-      method: "PATCH",
-      body: input,
-    },
-  );
-  return data;
-}
-
-export async function publishAdminManuscript(
-  id: string,
-  overrides?: AdminPublishManuscriptInput,
-): Promise<AdminPublishManuscriptResultDto> {
-  const { data } = await apiFetch<
-    DataResponse<AdminPublishManuscriptResultDto>
-  >(`/api/admin/manuscripts/${encodeURIComponent(id)}/publish`, {
-    method: "POST",
-    body: overrides ?? {},
-  });
   return data;
 }
 

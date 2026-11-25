@@ -39,6 +39,7 @@ function ProtectedLayout() {
   const isStandalone =
     isReader ||
     isApp ||
+    location.pathname.startsWith("/p/") ||
     location.pathname.startsWith("/publishers/new") ||
     location.pathname.startsWith("/authors/new") ||
     location.pathname.startsWith("/communities/new");

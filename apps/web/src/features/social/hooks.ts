@@ -1,11 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
+  AddPublisherMemberInput,
   ApplyPublisherInput,
   CreateManuscriptDraftInput,
+  ListSubmissionTargetsInput,
+  PublishManuscriptInput,
+  PublisherEditManuscriptInput,
+  PublisherReviewManuscriptInput,
   ReviewManuscriptInput,
   SubmitManuscriptInput,
   UpdateManuscriptInput,
+  UpdatePublisherBookInput,
   UpdatePublisherInput,
+  UpdatePublisherMemberInput,
 } from "@starter/shared/validators/publisher";
 import type {
   ApplyAuthorInput,
@@ -15,13 +22,19 @@ import type {
   UpdateProfileBioInput,
 } from "@starter/shared/validators/social";
 import type { UpdateCalendarInput } from "@starter/shared/validators/community";
+import { booksKeys } from "@/features/books/queries";
 import { communityKeys } from "@/features/community/queries";
 import {
+  addPublisherMember,
   applyAuthor,
   applyPublisher,
   createManuscriptDraft,
+  editPublisherManuscript,
   followUser,
+  publishPublisherManuscript,
+  removePublisherMember,
   reviewManuscript,
+  reviewPublisherManuscript,
   submitManuscript,
   submitManuscriptDraft,
   togglePostHighlight,
@@ -29,6 +42,8 @@ import {
   unfollowUser,
   updateCalendarProfile,
   updateManuscript,
+  updatePublisherBook,
+  updatePublisherMember,
   updatePublisherProfile,
   updateSocialProfile,
 } from "./api";
@@ -36,13 +51,17 @@ import {
   exploreAuthorsQuery,
   exploreReadersQuery,
   manuscriptDetailQuery,
+  myManagedPublishersQuery,
   myManuscriptsQuery,
   mySocialProfileQuery,
   publicSocialPostQuery,
+  publisherBooksQuery,
   publisherDetailQuery,
   publisherKeys,
   publisherManuscriptsQuery,
+  publisherMembersQuery,
   socialKeys,
+  submissionTargetsQuery,
   unifiedExploreQuery,
   userFollowersQuery,
   userFollowingQuery,
@@ -156,8 +175,190 @@ export function useVerifiedPublishers() {
   return useQuery(verifiedPublishersQuery());
 }
 
+export function useSubmissionTargets(
+  params?: ListSubmissionTargetsInput,
+  enabled = true,
+) {
+  return useQuery({
+    ...submissionTargetsQuery(params),
+    enabled,
+  });
+}
+
+export function useMyManagedPublishers(enabled = true) {
+  return useQuery({
+    ...myManagedPublishersQuery(),
+    enabled,
+  });
+}
+
 export function usePublisher(slug: string) {
   return useQuery(publisherDetailQuery(slug));
+}
+
+export function usePublisherBooks(slug: string) {
+  return useQuery(publisherBooksQuery(slug));
+}
+
+export function usePublisherMembers(slug: string) {
+  return useQuery(publisherMembersQuery(slug));
+}
+
+export function useUpdatePublisherBook() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      slug,
+      bookId,
+      input,
+    }: {
+      slug: string;
+      bookId: string;
+      input: UpdatePublisherBookInput;
+    }) => updatePublisherBook(slug, bookId, input),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.books(variables.slug),
+      });
+      queryClient.invalidateQueries({ queryKey: booksKeys.all });
+    },
+  });
+}
+
+export function useAddPublisherMember() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      slug,
+      input,
+    }: {
+      slug: string;
+      input: AddPublisherMemberInput;
+    }) => addPublisherMember(slug, input),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.members(variables.slug),
+      });
+    },
+  });
+}
+
+export function useUpdatePublisherMember() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      slug,
+      memberId,
+      input,
+    }: {
+      slug: string;
+      memberId: string;
+      input: UpdatePublisherMemberInput;
+    }) => updatePublisherMember(slug, memberId, input),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.members(variables.slug),
+      });
+    },
+  });
+}
+
+export function useRemovePublisherMember() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ slug, memberId }: { slug: string; memberId: string }) =>
+      removePublisherMember(slug, memberId),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.members(variables.slug),
+      });
+    },
+  });
+}
+
+export function useEditPublisherManuscript() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      slug,
+      idOrSlug,
+      input,
+    }: {
+      slug: string;
+      idOrSlug: string;
+      input: PublisherEditManuscriptInput;
+    }) => editPublisherManuscript(slug, idOrSlug, input),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.manuscriptDetail(variables.idOrSlug),
+      });
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.publisherManuscripts(variables.slug),
+      });
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.myManuscripts(),
+      });
+    },
+  });
+}
+
+export function useReviewPublisherManuscript() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      slug,
+      idOrSlug,
+      input,
+    }: {
+      slug: string;
+      idOrSlug: string;
+      input: PublisherReviewManuscriptInput;
+    }) => reviewPublisherManuscript(slug, idOrSlug, input),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.manuscriptDetail(variables.idOrSlug),
+      });
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.publisherManuscripts(variables.slug),
+      });
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.myManuscripts(),
+      });
+    },
+  });
+}
+
+export function usePublishPublisherManuscript() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      slug,
+      idOrSlug,
+      input,
+    }: {
+      slug: string;
+      idOrSlug: string;
+      input?: PublishManuscriptInput;
+    }) => publishPublisherManuscript(slug, idOrSlug, input),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.manuscriptDetail(variables.idOrSlug),
+      });
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.publisherManuscripts(variables.slug),
+      });
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.books(variables.slug),
+      });
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.detail(variables.slug),
+      });
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.myManuscripts(),
+      });
+      queryClient.invalidateQueries({ queryKey: booksKeys.all });
+    },
+  });
 }
 
 export function useSubmitManuscript() {
@@ -172,8 +373,11 @@ export function useSubmitManuscript() {
   });
 }
 
-export function useMyManuscripts() {
-  return useQuery(myManuscriptsQuery());
+export function useMyManuscripts(enabled = true) {
+  return useQuery({
+    ...myManuscriptsQuery(),
+    enabled,
+  });
 }
 
 export function useManuscript(idOrSlug: string) {

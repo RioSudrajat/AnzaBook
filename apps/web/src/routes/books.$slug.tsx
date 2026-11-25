@@ -681,23 +681,31 @@ export default function BookDetailPage() {
                       className="flex items-center gap-2 hover:underline group cursor-pointer"
                     >
                       <img
-                        src={book.editorAvatar || "/icon.svg"}
-                        alt={book.editor || "Anza Book"}
+                        src={
+                          book.publisherLogoUrl ||
+                          book.editorAvatar ||
+                          "/icon.svg"
+                        }
+                        alt={book.publisherName || book.editor || "AnzaBook"}
                         className="size-6 rounded-[5px] object-contain border border-border/40 shadow-xs"
                       />
                       <span className="font-semibold text-foreground/90 group-hover:text-[var(--color-accent)]">
-                        {book.editor || "Anza Book"}
+                        {book.publisherName || book.editor || "AnzaBook"}
                       </span>
                     </Link>
                   ) : (
                     <div className="flex items-center gap-2">
                       <img
-                        src={book.editorAvatar || "/icon.svg"}
-                        alt={book.editor || "Anza Book"}
+                        src={
+                          book.publisherLogoUrl ||
+                          book.editorAvatar ||
+                          "/icon.svg"
+                        }
+                        alt={book.publisherName || book.editor || "AnzaBook"}
                         className="size-6 rounded-[5px] object-contain border border-border/40 shadow-xs"
                       />
                       <span className="font-semibold text-foreground/90">
-                        {book.editor || "Anza Book"}
+                        {book.publisherName || book.editor || "AnzaBook"}
                       </span>
                     </div>
                   )}

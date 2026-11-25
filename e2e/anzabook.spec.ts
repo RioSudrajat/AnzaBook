@@ -240,9 +240,7 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
       }),
     ).toBeVisible();
     await expect(page.getByText(/Zenius/i).first()).toBeVisible();
-    await expect(
-      page.getByRole("img", { name: "Anza Book", exact: true }),
-    ).toBeVisible();
+    await expect(page.getByRole("img", { name: /^Anza ?Book$/ })).toBeVisible();
     await expect(
       page.locator("[data-book-cover]:visible").first(),
     ).toBeVisible();

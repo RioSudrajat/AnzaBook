@@ -137,7 +137,7 @@ export function BookCatalogCard({ book }: BookCatalogCardProps) {
               {/* Publisher */}
               <div className="text-[11px] text-muted-foreground/80 mt-1 truncate">
                 <span className="font-mono text-[10px]">Penerbit:</span>{" "}
-                {book.editor || "Anza Book"}
+                {book.publisherName || book.editor || "AnzaBook"}
               </div>
             </div>
 
