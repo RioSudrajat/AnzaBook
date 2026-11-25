@@ -183,6 +183,7 @@ describe("Social Profile, 4D Explore, Community Membership & Manuscript Studio A
       name: "Penerbit Bentang Aksara",
       slug: pubSlug,
       city: "Bandung",
+      topics: ["Arsitektur Nusantara", "Sastra"],
       verificationStatus: "verified",
     });
 
@@ -248,6 +249,21 @@ describe("Social Profile, 4D Explore, Community Membership & Manuscript Studio A
     expect(
       pubs.some((p: { slug: string }) => p.slug === unverifiedPubSlug),
     ).toBe(false);
+
+    // 4b. Unified explore matches publishers.topics, exposes topics, and sets role: null (never "editor")
+    const explorePubRes = await viewer.get(
+      "/api/social/explore?q=Arsitektur+Nusantara",
+    );
+    expect(explorePubRes.status).toBe(200);
+    const matchedExplorePub = explorePubRes.body.data.publishers.find(
+      (p: { slug: string }) => p.slug === pubSlug,
+    );
+    expect(matchedExplorePub).toBeDefined();
+    expect(matchedExplorePub.topics).toEqual([
+      "Arsitektur Nusantara",
+      "Sastra",
+    ]);
+    expect(matchedExplorePub.role).toBeNull();
 
     // 5. Admin accounts must be excluded from explore endpoints
     const adminAgent = agent();

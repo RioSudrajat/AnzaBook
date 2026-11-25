@@ -1,5 +1,22 @@
 import { randomBytes } from "node:crypto";
-import { and, desc, eq, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
+import type {
+  ManagedPublisherSummaryDto,
+  ManuscriptChapterDto,
+  ManuscriptSubmissionDto,
+  PublisherDto,
+  PublisherMemberRole,
+} from "@starter/shared/types";
+import type {
+  ApplyPublisherInput,
+  AuthorUpdateManuscriptInput,
+  CreateManuscriptDraftInput,
+  ListSubmissionTargetsQuery,
+  PublisherEditManuscriptInput,
+  PublisherReviewManuscriptInput,
+  SubmitManuscriptInput,
+  UpdatePublisherInput,
+} from "@starter/shared/validators/publisher";
 import { db } from "../db";
 import {
   books,
@@ -10,24 +27,37 @@ import {
   user,
 } from "../db/schema";
 import { HttpError } from "../lib/http-error";
-import type {
-  ApplyPublisherInput,
-  CreateManuscriptDraftInput,
-  ReviewManuscriptInput,
-  SubmitManuscriptInput,
-  UpdateManuscriptInput,
-  UpdatePublisherInput,
-} from "@starter/shared/validators/publisher";
-import type {
-  ManuscriptChapterDto,
-  ManuscriptSubmissionDto,
-  PublisherDto,
-} from "@starter/shared/types";
+import {
+  UUID_REGEX,
+  requirePublisherMember,
+  resolvePublisherBySlugOrId,
+} from "./publisher-publishing.service";
+
+const OFFICIAL_ANZABOOK_SLUG = "anzabook";
+const MAX_PUBLISHER_TOPICS = 15;
+
+function normalizeTopics(topics: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const raw of topics) {
+    const cleaned = raw.trim().replace(/\s+/g, " ").slice(0, 60);
+    if (!cleaned) continue;
+    const key = cleaned.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(cleaned);
+    if (result.length >= MAX_PUBLISHER_TOPICS) break;
+  }
+
+  return result;
+}
 
 function toPublisherDto(
   pub: typeof publishers.$inferSelect,
   totalBooks = 0,
-  currentUserRole?: (typeof publisherMembers.$inferSelect)["role"] | null,
+  currentUserRole?: PublisherMemberRole | null,
+  extras?: { topicMatchScore?: number; matchedTopics?: string[] },
 ): PublisherDto {
   return {
     id: pub.id,
@@ -40,6 +70,15 @@ function toPublisherDto(
     city: pub.city,
     address: pub.address,
     contactEmail: pub.contactEmail,
+    topics: pub.topics ?? [],
+    isAcceptingSubmissions: pub.isAcceptingSubmissions,
+    submissionGuidelines: pub.submissionGuidelines ?? null,
+    ...(extras?.topicMatchScore !== undefined
+      ? { topicMatchScore: extras.topicMatchScore }
+      : {}),
+    ...(extras?.matchedTopics !== undefined
+      ? { matchedTopics: extras.matchedTopics }
+      : {}),
     socialLinks: pub.socialLinks || null,
     verificationStatus: pub.verificationStatus,
     rejectionReason: pub.rejectionReason,
@@ -99,6 +138,67 @@ function formatManuscriptDto(
   };
 }
 
+async function resolveDefaultAnzaBookPublisher(): Promise<{
+  id: string;
+  name: string;
+} | null> {
+  const [anzabook] = await db
+    .select({ id: publishers.id, name: publishers.name })
+    .from(publishers)
+    .where(eq(publishers.slug, OFFICIAL_ANZABOOK_SLUG))
+    .limit(1);
+  return anzabook ?? null;
+}
+
+async function loadBookCountsMap(
+  publisherIds: readonly string[],
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (publisherIds.length === 0) return map;
+
+  const rows = await db
+    .select({
+      publisherId: books.publisherId,
+      count: sql<number>`count(*)`,
+    })
+    .from(books)
+    .where(inArray(books.publisherId, [...publisherIds]))
+    .groupBy(books.publisherId);
+
+  for (const row of rows) {
+    if (row.publisherId) {
+      map.set(row.publisherId, Number(row.count || 0));
+    }
+  }
+  return map;
+}
+
+async function loadUserRolesMap(
+  userId?: string,
+  publisherIds: readonly string[] = [],
+): Promise<Map<string, PublisherMemberRole>> {
+  const map = new Map<string, PublisherMemberRole>();
+  if (!userId || publisherIds.length === 0) return map;
+
+  const rows = await db
+    .select({
+      publisherId: publisherMembers.publisherId,
+      role: publisherMembers.role,
+    })
+    .from(publisherMembers)
+    .where(
+      and(
+        eq(publisherMembers.userId, userId),
+        inArray(publisherMembers.publisherId, [...publisherIds]),
+      ),
+    );
+
+  for (const row of rows) {
+    map.set(row.publisherId, row.role);
+  }
+  return map;
+}
+
 export async function applyPublisher(
   userId: string,
   input: ApplyPublisherInput,
@@ -117,6 +217,8 @@ export async function applyPublisher(
     );
   }
 
+  const normalizedTopics = input.topics ? normalizeTopics(input.topics) : [];
+
   const { pub, member } = await db.transaction(async (tx) => {
     const [insertedPub] = await tx
       .insert(publishers)
@@ -132,6 +234,9 @@ export async function applyPublisher(
         contactEmail: input.contactEmail || null,
         socialLinks: input.socialLinks || null,
         verificationDocuments: input.verificationDocuments || null,
+        topics: normalizedTopics,
+        isAcceptingSubmissions: input.isAcceptingSubmissions ?? true,
+        submissionGuidelines: input.submissionGuidelines || null,
         verificationStatus: "pending",
       })
       .returning();
@@ -151,63 +256,40 @@ export async function applyPublisher(
   return toPublisherDto(pub, 0, member.role);
 }
 
+/**
+ * Updates publisher profile and curation configuration.
+ * Strictly requires `owner` membership — no platform admin bypass.
+ */
 export async function updatePublisher(
   userId: string,
   slug: string,
   input: UpdatePublisherInput,
-  userRole?: string,
 ): Promise<PublisherDto> {
-  const [pub] = await db
-    .select()
-    .from(publishers)
-    .where(or(eq(publishers.slug, slug), sql`${publishers.id}::text = ${slug}`))
-    .limit(1);
-
-  if (!pub) {
-    throw new HttpError(
-      404,
-      "PUBLISHER_NOT_FOUND",
-      "Penerbit tidak ditemukan.",
-    );
-  }
-
-  const isSysAdmin = userRole === "admin";
-  let memberRole: (typeof publisherMembers.$inferSelect)["role"] | null = null;
-  if (!isSysAdmin) {
-    const [member] = await db
-      .select({ role: publisherMembers.role })
-      .from(publisherMembers)
-      .where(
-        and(
-          eq(publisherMembers.publisherId, pub.id),
-          eq(publisherMembers.userId, userId),
-        ),
-      )
-      .limit(1);
-
-    if (!member || (member.role !== "owner" && member.role !== "editor")) {
-      throw new HttpError(
-        403,
-        "FORBIDDEN",
-        "Hanya pemilik atau editor penerbit yang dapat mengubah profil penerbit.",
-      );
-    }
-    memberRole = member.role;
-  }
+  const pub = await resolvePublisherBySlugOrId(slug);
+  const member = await requirePublisherMember(pub.id, userId, ["owner"]);
 
   const patch: Partial<typeof publishers.$inferInsert> = {
     updatedAt: new Date(),
   };
   if (input.name !== undefined) patch.name = input.name;
   if (input.description !== undefined) patch.description = input.description;
-  if (input.logoUrl !== undefined) patch.logoUrl = input.logoUrl;
+  if (input.logoUrl !== undefined) patch.logoUrl = input.logoUrl || null;
   if (input.headerImageUrl !== undefined)
-    patch.headerImageUrl = input.headerImageUrl;
+    patch.headerImageUrl = input.headerImageUrl || null;
   if (input.city !== undefined) patch.city = input.city;
   if (input.address !== undefined) patch.address = input.address;
   if (input.contactEmail !== undefined) patch.contactEmail = input.contactEmail;
   if (input.socialLinks !== undefined) patch.socialLinks = input.socialLinks;
   if (input.ikapiNumber !== undefined) patch.ikapiNumber = input.ikapiNumber;
+  if (input.topics !== undefined) {
+    patch.topics = normalizeTopics(input.topics);
+  }
+  if (input.isAcceptingSubmissions !== undefined) {
+    patch.isAcceptingSubmissions = input.isAcceptingSubmissions;
+  }
+  if (input.submissionGuidelines !== undefined) {
+    patch.submissionGuidelines = input.submissionGuidelines || null;
+  }
 
   const [updated] = await db
     .update(publishers)
@@ -220,7 +302,7 @@ export async function updatePublisher(
     .from(books)
     .where(eq(books.publisherId, pub.id));
 
-  return toPublisherDto(updated, Number(bookCountRow?.count || 0), memberRole);
+  return toPublisherDto(updated, Number(bookCountRow?.count || 0), member.role);
 }
 
 export async function listVerifiedPublishers(
@@ -232,45 +314,165 @@ export async function listVerifiedPublishers(
     .where(eq(publishers.verificationStatus, "verified"))
     .orderBy(publishers.name);
 
-  const results: PublisherDto[] = [];
+  const pubIds = pubRows.map((p) => p.id);
+  const [countsMap, rolesMap] = await Promise.all([
+    loadBookCountsMap(pubIds),
+    loadUserRolesMap(currentUserId, pubIds),
+  ]);
 
-  for (const pub of pubRows) {
-    const [bookCountRow] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(books)
-      .where(eq(books.publisherId, pub.id));
+  return pubRows.map((pub) =>
+    toPublisherDto(
+      pub,
+      countsMap.get(pub.id) ?? 0,
+      rolesMap.get(pub.id) ?? null,
+    ),
+  );
+}
 
-    let currentUserRole = null;
-    if (currentUserId) {
-      const [member] = await db
-        .select({ role: publisherMembers.role })
-        .from(publisherMembers)
-        .where(
-          and(
-            eq(publisherMembers.publisherId, pub.id),
-            eq(publisherMembers.userId, currentUserId),
-          ),
-        )
-        .limit(1);
-      if (member) currentUserRole = member.role;
-    }
+/**
+ * Lists all publishers managed by the authenticated user (including pending & rejected).
+ */
+export async function listMyManagedPublishers(
+  userId: string,
+): Promise<ManagedPublisherSummaryDto[]> {
+  const rows = await db
+    .select({
+      id: publishers.id,
+      name: publishers.name,
+      slug: publishers.slug,
+      logoUrl: publishers.logoUrl,
+      headerImageUrl: publishers.headerImageUrl,
+      city: publishers.city,
+      topics: publishers.topics,
+      verificationStatus: publishers.verificationStatus,
+      rejectionReason: publishers.rejectionReason,
+      role: publisherMembers.role,
+    })
+    .from(publisherMembers)
+    .innerJoin(publishers, eq(publisherMembers.publisherId, publishers.id))
+    .where(eq(publisherMembers.userId, userId))
+    .orderBy(desc(publishers.updatedAt), asc(publishers.name));
 
-    results.push(
-      toPublisherDto(pub, Number(bookCountRow?.count || 0), currentUserRole),
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    logoUrl: row.logoUrl,
+    headerImageUrl: row.headerImageUrl,
+    city: row.city,
+    topics: row.topics ?? [],
+    verificationStatus: row.verificationStatus,
+    rejectionReason: row.rejectionReason,
+    role: row.role,
+  }));
+}
+
+/**
+ * Lists verified, submission-accepting publishers for author manuscript routing.
+ * Always pins `anzabook` at index 0 when it matches `q`, then sorts by descending
+ * topic overlap score -> descending totalBooks -> ascending name.
+ */
+export async function listSubmissionTargets(
+  query: ListSubmissionTargetsQuery,
+  currentUserId?: string,
+): Promise<PublisherDto[]> {
+  const pubRows = await db
+    .select()
+    .from(publishers)
+    .where(
+      and(
+        eq(publishers.verificationStatus, "verified"),
+        eq(publishers.isAcceptingSubmissions, true),
+      ),
     );
-  }
 
-  return results;
+  const pubIds = pubRows.map((p) => p.id);
+  const [countsMap, rolesMap] = await Promise.all([
+    loadBookCountsMap(pubIds),
+    loadUserRolesMap(currentUserId, pubIds),
+  ]);
+
+  const q = query.q?.trim().toLowerCase() ?? "";
+  const topicQuery = query.topic?.trim() ?? "";
+  const topicQueryLower = topicQuery.toLowerCase();
+  const topicTokens = topicQueryLower
+    .split(/[^a-z0-9]+/i)
+    .map((part) => part.trim())
+    .filter((part) => part.length >= 2);
+
+  const eligible = q
+    ? pubRows.filter((pub) => {
+        const haystack = [
+          pub.name,
+          pub.slug,
+          pub.city ?? "",
+          pub.description ?? "",
+          pub.submissionGuidelines ?? "",
+          ...(pub.topics ?? []),
+        ]
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(q);
+      })
+    : pubRows;
+
+  const dtos = eligible.map((pub) => {
+    const pubTopics = pub.topics ?? [];
+    const matchedTopics = topicQuery
+      ? pubTopics.filter((t) => {
+          const lower = t.toLowerCase();
+          if (
+            lower.includes(topicQueryLower) ||
+            topicQueryLower.includes(lower)
+          ) {
+            return true;
+          }
+          return topicTokens.some((tok) => lower.includes(tok));
+        })
+      : [];
+
+    const topicMatchScore = matchedTopics.reduce((score, topic) => {
+      return score + (topic.toLowerCase() === topicQueryLower ? 15 : 10);
+    }, 0);
+
+    return toPublisherDto(
+      pub,
+      countsMap.get(pub.id) ?? 0,
+      rolesMap.get(pub.id) ?? null,
+      topicQuery ? { topicMatchScore, matchedTopics } : undefined,
+    );
+  });
+
+  dtos.sort((a, b) => {
+    const aOfficial = a.slug === OFFICIAL_ANZABOOK_SLUG ? 1 : 0;
+    const bOfficial = b.slug === OFFICIAL_ANZABOOK_SLUG ? 1 : 0;
+    if (aOfficial !== bOfficial) return bOfficial - aOfficial;
+
+    const scoreDiff = (b.topicMatchScore ?? 0) - (a.topicMatchScore ?? 0);
+    if (scoreDiff !== 0) return scoreDiff;
+
+    const booksDiff = (b.totalBooks ?? 0) - (a.totalBooks ?? 0);
+    if (booksDiff !== 0) return booksDiff;
+
+    return a.name.localeCompare(b.name, "id");
+  });
+
+  return dtos.slice(0, query.limit);
 }
 
 export async function getPublisherBySlug(
   slug: string,
   currentUserId?: string,
 ): Promise<PublisherDto | null> {
+  const isUuid = UUID_REGEX.test(slug);
   const [pub] = await db
     .select()
     .from(publishers)
-    .where(or(eq(publishers.slug, slug), sql`${publishers.id}::text = ${slug}`))
+    .where(
+      isUuid
+        ? or(eq(publishers.slug, slug), eq(publishers.id, slug))
+        : eq(publishers.slug, slug),
+    )
     .limit(1);
 
   if (!pub) return null;
@@ -280,7 +482,7 @@ export async function getPublisherBySlug(
     .from(books)
     .where(eq(books.publisherId, pub.id));
 
-  let currentUserRole = null;
+  let currentUserRole: PublisherMemberRole | null = null;
   if (currentUserId) {
     const [member] = await db
       .select({ role: publisherMembers.role })
@@ -302,6 +504,23 @@ export async function createManuscriptDraft(
   authorUserId: string,
   input: CreateManuscriptDraftInput,
 ): Promise<ManuscriptSubmissionDto> {
+  let publisherName: string | null = null;
+  if (input.publisherId) {
+    const [pub] = await db
+      .select({ name: publishers.name })
+      .from(publishers)
+      .where(eq(publishers.id, input.publisherId))
+      .limit(1);
+    if (!pub) {
+      throw new HttpError(
+        404,
+        "PUBLISHER_NOT_FOUND",
+        "Penerbit tidak ditemukan.",
+      );
+    }
+    publisherName = pub.name;
+  }
+
   const [author] = await db
     .select({ name: user.name, authorPenName: user.authorPenName })
     .from(user)
@@ -365,18 +584,18 @@ export async function createManuscriptDraft(
     return { submission: sub, chapters: createdChapters };
   });
 
-  return formatManuscriptDto(submission, author, null, chapters);
+  return formatManuscriptDto(submission, author, publisherName, chapters);
 }
 
+/**
+ * Loads a manuscript by UUID or slug.
+ * Strictly checks actor access: only the author OR an owner/editor member of the target publisher.
+ */
 export async function getManuscript(
   userId: string,
   idOrSlug: string,
-  userRole?: string,
 ): Promise<ManuscriptSubmissionDto> {
-  const isUuid =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      idOrSlug,
-    );
+  const isUuid = UUID_REGEX.test(idOrSlug);
 
   const [sub] = await db
     .select({
@@ -403,7 +622,6 @@ export async function getManuscript(
   }
 
   const isAuthor = sub.submission.authorUserId === userId;
-  const isSysAdmin = userRole === "admin";
   let isPublisherEditor = false;
 
   if (sub.submission.publisherId) {
@@ -425,7 +643,7 @@ export async function getManuscript(
     }
   }
 
-  if (!isAuthor && !isSysAdmin && !isPublisherEditor) {
+  if (!isAuthor && !isPublisherEditor) {
     throw new HttpError(
       403,
       "FORBIDDEN",
@@ -437,7 +655,7 @@ export async function getManuscript(
     .select()
     .from(manuscriptChapters)
     .where(eq(manuscriptChapters.manuscriptId, sub.submission.id))
-    .orderBy(manuscriptChapters.chapterNumber);
+    .orderBy(asc(manuscriptChapters.chapterNumber));
 
   return formatManuscriptDto(
     sub.submission,
@@ -447,19 +665,71 @@ export async function getManuscript(
   );
 }
 
+/**
+ * Updates a manuscript by its author while it is in `draft` or `revision_requested` status.
+ * Enforces author ownership and rejects updates when locked by curation/publication.
+ */
 export async function updateManuscript(
   userId: string,
   idOrSlug: string,
-  input: UpdateManuscriptInput,
-  userRole?: string,
+  input: AuthorUpdateManuscriptInput,
 ): Promise<ManuscriptSubmissionDto> {
-  const current = await getManuscript(userId, idOrSlug, userRole);
+  const isUuid = UUID_REGEX.test(idOrSlug);
+  const [existing] = await db
+    .select()
+    .from(manuscriptSubmissions)
+    .where(
+      isUuid
+        ? or(
+            eq(manuscriptSubmissions.id, idOrSlug),
+            eq(manuscriptSubmissions.slug, idOrSlug),
+          )
+        : eq(manuscriptSubmissions.slug, idOrSlug),
+    )
+    .limit(1);
+
+  if (!existing) {
+    throw new HttpError(404, "MANUSCRIPT_NOT_FOUND", "Naskah tidak ditemukan.");
+  }
+
+  if (existing.authorUserId !== userId) {
+    throw new HttpError(
+      403,
+      "FORBIDDEN",
+      "Hanya penulis pemilik naskah yang dapat mengubah naskah ini.",
+    );
+  }
+
+  if (existing.status !== "draft" && existing.status !== "revision_requested") {
+    throw new HttpError(
+      409,
+      "MANUSCRIPT_LOCKED",
+      "Naskah tidak dapat diubah oleh penulis saat sedang dikurasi atau sudah diterbitkan.",
+    );
+  }
+
+  if (input.publisherId) {
+    const [pub] = await db
+      .select({ id: publishers.id })
+      .from(publishers)
+      .where(eq(publishers.id, input.publisherId))
+      .limit(1);
+    if (!pub) {
+      throw new HttpError(
+        404,
+        "PUBLISHER_NOT_FOUND",
+        "Penerbit tujuan tidak ditemukan.",
+      );
+    }
+  }
 
   await db.transaction(async (tx) => {
     const patch: Partial<typeof manuscriptSubmissions.$inferInsert> = {
       updatedAt: new Date(),
     };
+    if (input.publisherId !== undefined) patch.publisherId = input.publisherId;
     if (input.title !== undefined) patch.title = input.title;
+    if (input.slug !== undefined) patch.slug = input.slug || existing.slug;
     if (input.synopsis !== undefined) patch.synopsis = input.synopsis;
     if (input.coverUrl !== undefined) patch.coverUrl = input.coverUrl;
     if (input.category !== undefined) patch.category = input.category;
@@ -469,64 +739,148 @@ export async function updateManuscript(
       patch.proposedAlacartePriceIdr = input.proposedAlacartePriceIdr;
     if (input.printSimJson !== undefined)
       patch.printSimJson = input.printSimJson;
-    if (input.editorialNotes !== undefined)
-      patch.editorialNotes = input.editorialNotes;
-    if (input.status !== undefined) patch.status = input.status;
-    if (input.rejectionReason !== undefined)
-      patch.rejectionReason = input.rejectionReason;
 
-    const [updatedSub] = await tx
+    await tx
       .update(manuscriptSubmissions)
       .set(patch)
-      .where(eq(manuscriptSubmissions.id, current.id))
-      .returning();
+      .where(eq(manuscriptSubmissions.id, existing.id));
 
     if (input.chapters) {
       await tx
         .delete(manuscriptChapters)
-        .where(eq(manuscriptChapters.manuscriptId, current.id));
+        .where(eq(manuscriptChapters.manuscriptId, existing.id));
 
-      const newChapters: (typeof manuscriptChapters.$inferSelect)[] = [];
-      for (const ch of input.chapters) {
-        const [insertedCh] = await tx
-          .insert(manuscriptChapters)
-          .values({
-            manuscriptId: current.id,
+      if (input.chapters.length > 0) {
+        await tx.insert(manuscriptChapters).values(
+          input.chapters.map((ch) => ({
+            manuscriptId: existing.id,
             chapterNumber: ch.chapterNumber,
             titleId: ch.titleId,
             contentId: ch.contentId,
             contentEn: ch.contentEn || null,
             blueprintContent: ch.blueprintContent || null,
             estimatedMinutes: ch.estimatedMinutes ?? 5,
-          })
-          .returning();
-        newChapters.push(insertedCh);
+          })),
+        );
       }
-      return { submission: updatedSub, chapters: newChapters };
     }
-
-    const existingChapters = await tx
-      .select()
-      .from(manuscriptChapters)
-      .where(eq(manuscriptChapters.manuscriptId, current.id))
-      .orderBy(manuscriptChapters.chapterNumber);
-
-    return { submission: updatedSub, chapters: existingChapters };
   });
 
-  return await getManuscript(userId, current.id, userRole);
+  return await getManuscript(userId, existing.id);
 }
 
+/**
+ * Edits manuscript content and editorial notes inside a publisher studio.
+ * Strictly requires `owner` or `editor` membership for the target publisher.
+ */
+export async function editPublisherManuscript(
+  userId: string,
+  publisherSlug: string,
+  idOrSlug: string,
+  input: PublisherEditManuscriptInput,
+): Promise<ManuscriptSubmissionDto> {
+  const pub = await resolvePublisherBySlugOrId(publisherSlug);
+  await requirePublisherMember(pub.id, userId, ["owner", "editor"]);
+
+  const isUuid = UUID_REGEX.test(idOrSlug);
+  const [existing] = await db
+    .select()
+    .from(manuscriptSubmissions)
+    .where(
+      isUuid
+        ? or(
+            eq(manuscriptSubmissions.id, idOrSlug),
+            eq(manuscriptSubmissions.slug, idOrSlug),
+          )
+        : eq(manuscriptSubmissions.slug, idOrSlug),
+    )
+    .limit(1);
+
+  if (!existing) {
+    throw new HttpError(404, "MANUSCRIPT_NOT_FOUND", "Naskah tidak ditemukan.");
+  }
+
+  if (existing.publisherId !== pub.id) {
+    throw new HttpError(
+      403,
+      "FORBIDDEN",
+      "Naskah ini tidak ditujukan ke penerbit Anda.",
+    );
+  }
+
+  if (
+    existing.status !== "pending_review" &&
+    existing.status !== "in_editing"
+  ) {
+    throw new HttpError(
+      409,
+      "MANUSCRIPT_LOCKED",
+      "Naskah hanya dapat disunting saat menunggu kurasi atau sedang disunting.",
+    );
+  }
+
+  await db.transaction(async (tx) => {
+    const patch: Partial<typeof manuscriptSubmissions.$inferInsert> = {
+      updatedAt: new Date(),
+    };
+    if (input.title !== undefined) patch.title = input.title;
+    if (input.slug !== undefined) patch.slug = input.slug || existing.slug;
+    if (input.coverUrl !== undefined) patch.coverUrl = input.coverUrl;
+    if (input.category !== undefined) patch.category = input.category;
+    if (input.synopsis !== undefined) patch.synopsis = input.synopsis;
+    if (input.proposedDigitalPolicy !== undefined)
+      patch.proposedDigitalPolicy = input.proposedDigitalPolicy;
+    if (input.proposedAlacartePriceIdr !== undefined)
+      patch.proposedAlacartePriceIdr = input.proposedAlacartePriceIdr;
+    if (input.printSimJson !== undefined)
+      patch.printSimJson = input.printSimJson;
+    if (input.editorialNotes !== undefined)
+      patch.editorialNotes = input.editorialNotes;
+
+    await tx
+      .update(manuscriptSubmissions)
+      .set(patch)
+      .where(eq(manuscriptSubmissions.id, existing.id));
+
+    if (input.chapters) {
+      await tx
+        .delete(manuscriptChapters)
+        .where(eq(manuscriptChapters.manuscriptId, existing.id));
+
+      if (input.chapters.length > 0) {
+        await tx.insert(manuscriptChapters).values(
+          input.chapters.map((ch) => ({
+            manuscriptId: existing.id,
+            chapterNumber: ch.chapterNumber,
+            titleId: ch.titleId,
+            contentId: ch.contentId,
+            contentEn: ch.contentEn || null,
+            blueprintContent: ch.blueprintContent || null,
+            estimatedMinutes: ch.estimatedMinutes ?? 5,
+          })),
+        );
+      }
+    }
+  });
+
+  return await getManuscript(userId, existing.id);
+}
+
+/**
+ * Submits a manuscript directly to a publisher (auto-assigns `anzabook` if omitted).
+ */
 export async function submitManuscript(
   authorUserId: string,
   input: SubmitManuscriptInput,
 ): Promise<ManuscriptSubmissionDto> {
+  let finalPublisherId: string | null = input.publisherId || null;
   let publisherName: string | null = null;
-  if (input.publisherId) {
+
+  if (finalPublisherId) {
     const [pub] = await db
-      .select({ name: publishers.name })
+      .select({ id: publishers.id, name: publishers.name })
       .from(publishers)
-      .where(eq(publishers.id, input.publisherId))
+      .where(eq(publishers.id, finalPublisherId))
       .limit(1);
 
     if (!pub) {
@@ -537,6 +891,12 @@ export async function submitManuscript(
       );
     }
     publisherName = pub.name;
+  } else {
+    const defaultPub = await resolveDefaultAnzaBookPublisher();
+    if (defaultPub) {
+      finalPublisherId = defaultPub.id;
+      publisherName = defaultPub.name;
+    }
   }
 
   const [author] = await db
@@ -557,7 +917,7 @@ export async function submitManuscript(
       .insert(manuscriptSubmissions)
       .values({
         authorUserId,
-        publisherId: input.publisherId || null,
+        publisherId: finalPublisherId,
         slug,
         title: input.title,
         coverUrl: input.coverUrl || null,
@@ -596,12 +956,33 @@ export async function submitManuscript(
   return formatManuscriptDto(submission, author, publisherName, chapters);
 }
 
+/**
+ * Submits an author's draft or revised manuscript to a publisher.
+ * Auto-assigns `anzabook` if no publisherId is given on either the draft or the request.
+ */
 export async function submitManuscriptDraft(
   authorUserId: string,
   idOrSlug: string,
   publisherId?: string | null,
 ): Promise<ManuscriptSubmissionDto> {
-  const current = await getManuscript(authorUserId, idOrSlug);
+  const isUuid = UUID_REGEX.test(idOrSlug);
+  const [current] = await db
+    .select()
+    .from(manuscriptSubmissions)
+    .where(
+      isUuid
+        ? or(
+            eq(manuscriptSubmissions.id, idOrSlug),
+            eq(manuscriptSubmissions.slug, idOrSlug),
+          )
+        : eq(manuscriptSubmissions.slug, idOrSlug),
+    )
+    .limit(1);
+
+  if (!current) {
+    throw new HttpError(404, "MANUSCRIPT_NOT_FOUND", "Naskah tidak ditemukan.");
+  }
+
   if (current.authorUserId !== authorUserId) {
     throw new HttpError(
       403,
@@ -610,7 +991,15 @@ export async function submitManuscriptDraft(
     );
   }
 
-  const finalPublisherId = publisherId || current.publisherId;
+  if (current.status !== "draft" && current.status !== "revision_requested") {
+    throw new HttpError(
+      409,
+      "MANUSCRIPT_LOCKED",
+      "Naskah sudah diajukan atau telah diterbitkan.",
+    );
+  }
+
+  let finalPublisherId = publisherId || current.publisherId || null;
   if (finalPublisherId) {
     const [pub] = await db
       .select({ id: publishers.id })
@@ -624,12 +1013,17 @@ export async function submitManuscriptDraft(
         "Penerbit tujuan tidak ditemukan.",
       );
     }
+  } else {
+    const defaultPub = await resolveDefaultAnzaBookPublisher();
+    if (defaultPub) {
+      finalPublisherId = defaultPub.id;
+    }
   }
 
   await db
     .update(manuscriptSubmissions)
     .set({
-      publisherId: finalPublisherId || null,
+      publisherId: finalPublisherId,
       status: "pending_review",
       updatedAt: new Date(),
     })
@@ -638,51 +1032,15 @@ export async function submitManuscriptDraft(
   return await getManuscript(authorUserId, current.id);
 }
 
+/**
+ * Lists incoming manuscripts for a publisher (owner or editor only — no system admin bypass).
+ */
 export async function listPublisherManuscripts(
   userId: string,
   publisherSlug: string,
-  userRole?: string,
 ): Promise<ManuscriptSubmissionDto[]> {
-  const [pub] = await db
-    .select({ id: publishers.id, name: publishers.name })
-    .from(publishers)
-    .where(
-      or(
-        eq(publishers.slug, publisherSlug),
-        sql`${publishers.id}::text = ${publisherSlug}`,
-      ),
-    )
-    .limit(1);
-
-  if (!pub) {
-    throw new HttpError(
-      404,
-      "PUBLISHER_NOT_FOUND",
-      "Penerbit tidak ditemukan.",
-    );
-  }
-
-  const isSysAdmin = userRole === "admin";
-  if (!isSysAdmin) {
-    const [member] = await db
-      .select({ role: publisherMembers.role })
-      .from(publisherMembers)
-      .where(
-        and(
-          eq(publisherMembers.publisherId, pub.id),
-          eq(publisherMembers.userId, userId),
-        ),
-      )
-      .limit(1);
-
-    if (!member || (member.role !== "owner" && member.role !== "editor")) {
-      throw new HttpError(
-        403,
-        "FORBIDDEN",
-        "Hanya pemilik atau editor penerbit yang dapat melihat daftar naskah masuk.",
-      );
-    }
-  }
+  const pub = await resolvePublisherBySlugOrId(publisherSlug);
+  await requirePublisherMember(pub.id, userId, ["owner", "editor"]);
 
   const submissions = await db
     .select({
@@ -701,7 +1059,7 @@ export async function listPublisherManuscripts(
       .select()
       .from(manuscriptChapters)
       .where(eq(manuscriptChapters.manuscriptId, s.submission.id))
-      .orderBy(manuscriptChapters.chapterNumber);
+      .orderBy(asc(manuscriptChapters.chapterNumber));
 
     results.push(
       formatManuscriptDto(
@@ -716,49 +1074,70 @@ export async function listPublisherManuscripts(
   return results;
 }
 
-export async function reviewManuscript(
+/**
+ * Applies an editorial review transition (`start_editing`, `request_revision`, `reject`)
+ * strictly scoped to an owner or editor of the receiving publisher.
+ */
+export async function reviewPublisherManuscript(
   userId: string,
+  publisherSlug: string,
   idOrSlug: string,
-  input: ReviewManuscriptInput,
-  userRole?: string,
+  input: PublisherReviewManuscriptInput,
 ): Promise<ManuscriptSubmissionDto> {
-  const current = await getManuscript(userId, idOrSlug, userRole);
-  const isSysAdmin = userRole === "admin";
+  const pub = await resolvePublisherBySlugOrId(publisherSlug);
+  await requirePublisherMember(pub.id, userId, ["owner", "editor"]);
 
-  if (!isSysAdmin && current.publisherId) {
-    const [member] = await db
-      .select({ role: publisherMembers.role })
-      .from(publisherMembers)
-      .where(
-        and(
-          eq(publisherMembers.publisherId, current.publisherId),
-          eq(publisherMembers.userId, userId),
-        ),
-      )
-      .limit(1);
+  const isUuid = UUID_REGEX.test(idOrSlug);
+  const [current] = await db
+    .select()
+    .from(manuscriptSubmissions)
+    .where(
+      isUuid
+        ? or(
+            eq(manuscriptSubmissions.id, idOrSlug),
+            eq(manuscriptSubmissions.slug, idOrSlug),
+          )
+        : eq(manuscriptSubmissions.slug, idOrSlug),
+    )
+    .limit(1);
 
-    if (!member || (member.role !== "owner" && member.role !== "editor")) {
-      throw new HttpError(
-        403,
-        "FORBIDDEN",
-        "Hanya editor penerbit yang dapat meninjau naskah ini.",
-      );
-    }
+  if (!current) {
+    throw new HttpError(404, "MANUSCRIPT_NOT_FOUND", "Naskah tidak ditemukan.");
+  }
+
+  if (current.publisherId !== pub.id) {
+    throw new HttpError(
+      403,
+      "FORBIDDEN",
+      "Naskah ini tidak ditujukan ke penerbit Anda.",
+    );
+  }
+
+  if (current.status !== "pending_review" && current.status !== "in_editing") {
+    throw new HttpError(
+      409,
+      "INVALID_MANUSCRIPT_STATUS",
+      "Transisi tinjauan hanya diizinkan pada naskah berstatus menunggu kurasi atau sedang disunting.",
+    );
   }
 
   const patch: Partial<typeof manuscriptSubmissions.$inferInsert> = {
     updatedAt: new Date(),
   };
 
-  if (input.action === "approve") {
-    patch.status = "published";
+  if (input.action === "start_editing") {
+    patch.status = "in_editing";
+    if (input.notes?.trim()) {
+      patch.editorialNotes = input.notes.trim();
+    }
   } else if (input.action === "request_revision") {
     patch.status = "revision_requested";
-    patch.editorialNotes = input.notes || "Mohon periksa catatan editor.";
+    patch.editorialNotes =
+      input.notes?.trim() || "Mohon periksa catatan editor.";
   } else if (input.action === "reject") {
     patch.status = "rejected";
     patch.rejectionReason =
-      input.notes || "Naskah belum memenuhi kriteria penerbitan.";
+      input.notes?.trim() || "Naskah belum memenuhi kriteria penerbitan.";
   }
 
   await db
@@ -766,7 +1145,7 @@ export async function reviewManuscript(
     .set(patch)
     .where(eq(manuscriptSubmissions.id, current.id));
 
-  return await getManuscript(userId, current.id, userRole);
+  return await getManuscript(userId, current.id);
 }
 
 export async function listMyManuscripts(
@@ -792,7 +1171,7 @@ export async function listMyManuscripts(
       .select()
       .from(manuscriptChapters)
       .where(eq(manuscriptChapters.manuscriptId, row.submission.id))
-      .orderBy(manuscriptChapters.chapterNumber);
+      .orderBy(asc(manuscriptChapters.chapterNumber));
 
     results.push(
       formatManuscriptDto(

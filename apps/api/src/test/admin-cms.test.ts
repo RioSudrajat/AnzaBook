@@ -5,14 +5,10 @@ import { agent, originHeader, setRole, signUp } from "./helpers";
 import { db } from "../db";
 import {
   authorApplications,
-  bookChapters,
-  bookClaimBatches,
-  bookClaimCodes,
   bookPurchases,
   books,
   communityCalendars,
   communityWalletLedgers,
-  manuscriptChapters,
   manuscriptSubmissions,
   membershipOrders,
   publishers,
@@ -193,7 +189,7 @@ describe("Admin Internal CMS API (/api/admin/*)", () => {
     expect(res.body.data.pendingCalendarsCount).toBeGreaterThanOrEqual(1);
     expect(res.body.data.pendingAuthorsCount).toBeGreaterThanOrEqual(1);
     expect(res.body.data.pendingPublishersCount).toBeGreaterThanOrEqual(1);
-    expect(res.body.data.pendingManuscriptsCount).toBeGreaterThanOrEqual(1);
+    expect(res.body.data.pendingManuscriptsCount).toBeUndefined();
     expect(res.body.data.totalAlacarteSalesIdr).toBeGreaterThanOrEqual(50_000);
     expect(res.body.data.totalPublisherShareIdr).toBeGreaterThanOrEqual(37_500);
     expect(res.body.data.totalAffiliateCommissionsIdr).toBeGreaterThanOrEqual(
@@ -356,134 +352,30 @@ describe("Admin Internal CMS API (/api/admin/*)", () => {
     expect(found.verificationStatus).toBe("verified");
   });
 
-  it("edits manuscript and publishes it atomically to production catalog, generating 500 initial claim codes for print_claim_only", async () => {
+  it("returns 404 for removed admin manuscript curation and publishing endpoints (/api/admin/manuscripts*)", async () => {
     const admin = agent();
-    const adminEmail = await signUp(admin, "Admin Chief Editor");
+    const adminEmail = await signUp(admin, "Admin Boundary Check");
     await setRole(adminEmail, "admin");
 
-    const authorClient = agent();
-    const authorEmail = await signUp(authorClient, "Novelis Cetak");
-    const [dbAuthor] = await db
-      .select({ id: user.id })
-      .from(user)
-      .where(eq(user.email, authorEmail));
+    const missingId = randomUUID();
 
-    const [pub] = await db
-      .insert(publishers)
-      .values({
-        slug: `pub-manuscript-${randomUUID().slice(0, 6)}`,
-        name: "Penerbit Lentera Kata",
-        verificationStatus: "verified",
-      })
-      .returning();
+    const listRes = await admin.get("/api/admin/manuscripts");
+    expect(listRes.status).toBe(404);
 
-    // Seed manuscript submission with 2 chapters
-    const [manuscript] = await db
-      .insert(manuscriptSubmissions)
-      .values({
-        authorUserId: dbAuthor.id,
-        publisherId: pub.id,
-        title: "Buku Phygital Nusantara",
-        synopsis: "Buku edisi cetak eksklusif dengan kode klaim digital.",
-        proposedDigitalPolicy: "print_claim_only",
-        proposedAlacartePriceIdr: 0,
-        status: "pending_review",
-      })
-      .returning();
+    const detailRes = await admin.get(`/api/admin/manuscripts/${missingId}`);
+    expect(detailRes.status).toBe(404);
 
-    await db.insert(manuscriptChapters).values([
-      {
-        manuscriptId: manuscript.id,
-        chapterNumber: 1,
-        titleId: "Bab 1: Awal Mula Cetak",
-        contentId: "Isi bab 1 pratinjau buku cetak...",
-        estimatedMinutes: 6,
-      },
-      {
-        manuscriptId: manuscript.id,
-        chapterNumber: 2,
-        titleId: "Bab 2: Kunci Digital Tersembunyi",
-        contentId: "Isi bab 2 rahasia yang hanya terbuka dengan kode klaim...",
-        estimatedMinutes: 8,
-      },
-    ]);
-
-    // Admin views manuscript detail
-    const detailRes = await admin.get(
-      `/api/admin/manuscripts/${manuscript.id}`,
-    );
-    expect(detailRes.status).toBe(200);
-    expect(detailRes.body.data.title).toBe("Buku Phygital Nusantara");
-    expect(detailRes.body.data.chapters).toHaveLength(2);
-
-    // Admin edits manuscript metadata & chapter
     const patchRes = await admin
-      .patch(`/api/admin/manuscripts/${manuscript.id}`)
+      .patch(`/api/admin/manuscripts/${missingId}`)
       .set(originHeader)
-      .send({
-        synopsis:
-          "Sinopsis hasil revisi editor redaksi: Buku edisi cetak phygital premium.",
-        status: "in_editing",
-      });
-    expect(patchRes.status).toBe(200);
-    expect(patchRes.body.data.status).toBe("in_editing");
+      .send({ title: "Should Not Work" });
+    expect(patchRes.status).toBe(404);
 
-    // Admin publishes manuscript
     const publishRes = await admin
-      .post(`/api/admin/manuscripts/${manuscript.id}/publish`)
+      .post(`/api/admin/manuscripts/${missingId}/publish`)
       .set(originHeader)
-      .send({
-        coverUrl: "/covers/phygital-exclusive.jpg",
-      });
-
-    expect(publishRes.status).toBe(200);
-    expect(publishRes.body.data.publishedBookId).toBeDefined();
-
-    const bookId = publishRes.body.data.publishedBookId;
-
-    // Verify book created in `books`
-    const [publishedBook] = await db
-      .select()
-      .from(books)
-      .where(eq(books.id, bookId));
-    expect(publishedBook).toBeDefined();
-    expect(publishedBook.title).toBe("Buku Phygital Nusantara");
-    expect(publishedBook.digitalPolicy).toBe("print_claim_only");
-    expect(publishedBook.coverUrl).toBe("/covers/phygital-exclusive.jpg");
-    expect(publishedBook.totalChapters).toBe(2);
-    expect(publishedBook.authorUserId).toBe(dbAuthor.id);
-
-    // Verify chapters copied to `bookChapters`
-    const chapters = await db
-      .select()
-      .from(bookChapters)
-      .where(eq(bookChapters.bookId, bookId));
-    expect(chapters).toHaveLength(2);
-
-    // Verify initial batch of 500 free claim codes generated
-    const [initialBatch] = await db
-      .select()
-      .from(bookClaimBatches)
-      .where(eq(bookClaimBatches.bookId, bookId));
-    expect(initialBatch).toBeDefined();
-    expect(initialBatch.billingStatus).toBe("free_tier");
-    expect(initialBatch.unitFeeIdr).toBe(0);
-    expect(initialBatch.totalCodes).toBe(500);
-
-    const codes = await db
-      .select()
-      .from(bookClaimCodes)
-      .where(eq(bookClaimCodes.batchId, initialBatch.id));
-    expect(codes).toHaveLength(500);
-    expect(codes[0].code.length).toBe(16);
-
-    // Verify manuscript status updated to "published"
-    const [updatedManuscript] = await db
-      .select()
-      .from(manuscriptSubmissions)
-      .where(eq(manuscriptSubmissions.id, manuscript.id));
-    expect(updatedManuscript.status).toBe("published");
-    expect(updatedManuscript.publishedBookId).toBe(bookId);
+      .send({ coverUrl: "/covers/default-book.jpg" });
+    expect(publishRes.status).toBe(404);
   });
 
   it("generates subsequent claim batch (billed at Rp2.000/code) and exports codes (POST & GET /api/admin/claim-batches)", async () => {
