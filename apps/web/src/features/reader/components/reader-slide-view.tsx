@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/ios-icons";
 import { pageFold } from "../page-fold";
 import {
+  computeSpreadLeafPageNumbers,
   computeStableBookSlideMeta,
   type SlideFragment,
   type SlideLeaf,
@@ -57,6 +58,7 @@ function Leaf({
   renderFragment,
   side,
   turning,
+  pageNumber,
 }: {
   leaf?: SlideLeaf;
   spread: SlideSpread;
@@ -64,6 +66,7 @@ function Leaf({
   renderFragment: ReaderSlideViewProps["renderFragment"];
   side: "left" | "right";
   turning?: boolean;
+  pageNumber?: number;
 }) {
   return (
     <section
@@ -93,6 +96,9 @@ function Leaf({
           {renderFragment(fragment, spread.chapter.chapterNumber)}
         </p>
       ))}
+      {pageNumber !== undefined && (
+        <span className="reader-leaf-number">{pageNumber}</span>
+      )}
     </section>
   );
 }
@@ -151,9 +157,22 @@ export function ReaderSlideView({
   const [turn, setTurn] = useState<Turn | null>(null);
   const spread = spreads[index];
   const visible = turn?.to ?? spread;
+  const visibleIndex = turn ? spreads.indexOf(turn.to) : index;
   const pageMeta = computeStableBookSlideMeta({
     spreads,
     index,
+    allChapterNumbers,
+    hasFullAccess,
+  });
+  const currentLeafNumbers = computeSpreadLeafPageNumbers({
+    spreads,
+    spreadIndex: index,
+    allChapterNumbers,
+    hasFullAccess,
+  });
+  const visibleLeafNumbers = computeSpreadLeafPageNumbers({
+    spreads,
+    spreadIndex: visibleIndex,
     allChapterNumbers,
     hasFullAccess,
   });
@@ -336,7 +355,7 @@ export function ReaderSlideView({
   const backSide = !isSpread || turn.step === 1 ? "left" : "right";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="reader-slide-shell relative flex min-h-0 flex-1 flex-col">
       <div
         ref={book}
         className={`reader-book ${fontClass}`}
@@ -361,6 +380,7 @@ export function ReaderSlideView({
               side="left"
               leaf={visible.leaves[0]}
               spread={visible}
+              pageNumber={visibleLeafNumbers.left}
               fade={previewFade && visible.leaves.length === 1}
               renderFragment={renderFragment}
             />
@@ -369,6 +389,7 @@ export function ReaderSlideView({
                 side="right"
                 leaf={visible.leaves[1]}
                 spread={visible}
+                pageNumber={visibleLeafNumbers.right}
                 fade={previewFade}
                 renderFragment={renderFragment}
               />
@@ -387,6 +408,7 @@ export function ReaderSlideView({
                 side="left"
                 leaf={spread.leaves[0]}
                 spread={spread}
+                pageNumber={currentLeafNumbers.left}
                 turning={!isSpread || turn.step < 0}
                 fade={
                   isPremiumPreview && !canNext && spread.leaves.length === 1
@@ -399,6 +421,7 @@ export function ReaderSlideView({
                     side="right"
                     leaf={spread.leaves[1]}
                     spread={spread}
+                    pageNumber={currentLeafNumbers.right}
                     turning={turn.step > 0}
                     fade={isPremiumPreview && !canNext}
                     renderFragment={renderFragment}
@@ -415,6 +438,11 @@ export function ReaderSlideView({
                   side={backSide}
                   leaf={turn.to.leaves[backSide === "left" ? 0 : 1]}
                   spread={turn.to}
+                  pageNumber={
+                    backSide === "left"
+                      ? visibleLeafNumbers.left
+                      : visibleLeafNumbers.right
+                  }
                   fade={previewFade && turn.to.leaves.length === 1}
                   renderFragment={renderFragment}
                 />
@@ -479,30 +507,30 @@ export function ReaderSlideView({
         )}
       </div>
 
-      <footer className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-1 py-1 font-sans sm:px-4">
+      <footer className="pointer-events-none absolute inset-x-0 bottom-0 z-20 grid grid-cols-[1fr_auto_1fr] items-center gap-1 px-12 py-1.5 font-sans sm:px-16">
         <Button
           variant="ghost"
           onClick={onOpenRating}
           aria-label="Beri Rating"
-          className="min-h-11 min-w-11 justify-self-start px-2"
+          className="pointer-events-auto min-h-10 min-w-10 justify-self-start rounded-full px-2.5 text-foreground/80 hover:bg-muted/70 hover:text-foreground"
         >
           <IosStar filled className="size-4 text-primary" />
           <span className="hidden sm:inline">Beri Rating</span>
         </Button>
-        <div className="flex items-center">
+        <div className="pointer-events-auto flex items-center rounded-full bg-card/75 px-1 backdrop-blur-md border border-border/30 shadow-xs">
           <Button
             variant="ghost"
             size="icon"
             aria-label="Halaman sebelumnya"
             disabled={!canPrev}
             onClick={() => turnPage(-1)}
-            className="size-11"
+            className="size-10 rounded-full"
           >
             <IosChevronLeft className="size-4" />
           </Button>
           <span
             aria-live="polite"
-            className="whitespace-nowrap px-1 font-mono text-xs tabular-nums"
+            className="whitespace-nowrap px-1.5 font-mono text-xs tabular-nums text-foreground/85"
           >
             {spread &&
               `Page ${pageMeta.displayPage} of ${pageMeta.displayTotal}`}
@@ -513,7 +541,7 @@ export function ReaderSlideView({
             aria-label="Halaman selanjutnya"
             disabled={!canNext}
             onClick={() => turnPage(1)}
-            className="size-11"
+            className="size-10 rounded-full"
           >
             <IosChevronRight className="size-4" />
           </Button>
@@ -521,7 +549,7 @@ export function ReaderSlideView({
         <Button
           onClick={onFinishSession}
           aria-label="Selesai Baca"
-          className="min-h-11 min-w-11 justify-self-end px-2 sm:px-3"
+          className="pointer-events-auto min-h-10 min-w-10 justify-self-end rounded-full px-2.5 sm:px-3.5 shadow-xs"
         >
           <IosCheckmark className="size-4" />
           <span className="hidden sm:inline">Selesai Baca</span>

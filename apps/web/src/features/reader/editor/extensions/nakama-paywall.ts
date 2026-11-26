@@ -29,7 +29,7 @@ export const NakamaPaywall = Node.create({
       mergeAttributes(HTMLAttributes, {
         "data-type": "nakama-paywall",
         class:
-          "tiptap-nakama-paywall my-10 p-5 rounded-2xl border-2 border-dashed border-amber-500/50 bg-amber-500/10 dark:bg-amber-500/5 flex flex-col items-center justify-center text-center select-none shadow-xs",
+          "tiptap-nakama-paywall my-10 p-5 rounded-2xl border-2 border-dashed border-amber-500/50 bg-amber-500/10 dark:bg-amber-500/5 flex flex-col items-center justify-center text-center select-text cursor-pointer shadow-xs",
       }),
       [
         "div",

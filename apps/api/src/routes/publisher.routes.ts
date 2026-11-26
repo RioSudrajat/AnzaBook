@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { calculatePrintEconomics } from "@starter/shared/print-economics";
 import {
+  addApprovedWriterSchema,
   addPublisherMemberSchema,
   applyPublisherSchema,
   authorUpdateManuscriptSchema,
@@ -12,6 +13,7 @@ import {
   publisherReviewManuscriptSchema,
   simulatePrintSchema,
   submitManuscriptSchema,
+  updateBookInventorySchema,
   updatePublisherBookSchema,
   updatePublisherMemberSchema,
   updatePublisherSchema,
@@ -24,6 +26,7 @@ import {
   applyPublisher,
   createManuscriptDraft,
   editPublisherManuscript,
+  followPublisher,
   getManuscript,
   getPublisherBySlug,
   listMyManagedPublishers,
@@ -34,16 +37,24 @@ import {
   reviewPublisherManuscript,
   submitManuscript,
   submitManuscriptDraft,
+  unfollowPublisher,
   updateManuscript,
   updatePublisher,
+  withdrawManuscript,
 } from "../services/publisher.service";
 import {
+  addPublisherApprovedWriter,
   addPublisherMember,
+  listPublisherApprovedWriters,
+  listPublisherBookInventory,
   listPublisherBooks,
   listPublisherMembers,
+  listStoreBranches,
   publishPublisherManuscript,
+  removePublisherApprovedWriter,
   removePublisherMember,
   updatePublisherBook,
+  updatePublisherBookInventory,
   updatePublisherMember,
 } from "../services/publisher-publishing.service";
 
@@ -87,6 +98,12 @@ publisherRouter.get("/mine", requireAuth, async (req, res) => {
   const userId = getAuth(req).user.id;
   const managed = await listMyManagedPublishers(userId);
   res.json({ data: managed });
+});
+
+// List available store branches for physical book stock management
+publisherRouter.get("/store-branches", requireAuth, async (_req, res) => {
+  const branches = await listStoreBranches();
+  res.json({ data: branches });
 });
 
 // Apply to become partner publisher
@@ -176,6 +193,19 @@ publisherRouter.post(
       idOrSlug,
       body?.publisherId ?? null,
     );
+    res.json({ data: manuscript });
+  },
+);
+
+// Withdraw submitted manuscript back to draft (author only, pending_review only)
+publisherRouter.post(
+  "/manuscripts/:idOrSlug/withdraw",
+  requireAuth,
+  requireTrustedOrigin,
+  async (req, res) => {
+    const userId = getAuth(req).user.id;
+    const idOrSlug = String(req.params.idOrSlug);
+    const manuscript = await withdrawManuscript(userId, idOrSlug);
     res.json({ data: manuscript });
   },
 );
@@ -275,6 +305,78 @@ publisherRouter.patch(
   },
 );
 
+// Publisher Studio: Physical store inventory management per book (owner/editor)
+publisherRouter.get(
+  "/:slug/books/:bookId/inventory",
+  requireAuth,
+  async (req, res) => {
+    const userId = getAuth(req).user.id;
+    const slug = String(req.params.slug);
+    const bookId = String(req.params.bookId);
+    const inventory = await listPublisherBookInventory(userId, slug, bookId);
+    res.json({ data: inventory });
+  },
+);
+
+publisherRouter.put(
+  "/:slug/books/:bookId/inventory",
+  requireAuth,
+  requireTrustedOrigin,
+  jsonBody,
+  async (req, res) => {
+    const userId = getAuth(req).user.id;
+    const slug = String(req.params.slug);
+    const bookId = String(req.params.bookId);
+    const input = updateBookInventorySchema.parse(req.body);
+    const inventory = await updatePublisherBookInventory(
+      userId,
+      slug,
+      bookId,
+      input,
+    );
+    res.json({ data: inventory });
+  },
+);
+
+// Publisher Studio: Approved writers management (owner/editor)
+publisherRouter.get(
+  "/:slug/approved-writers",
+  requireAuth,
+  async (req, res) => {
+    const userId = getAuth(req).user.id;
+    const slug = String(req.params.slug);
+    const writers = await listPublisherApprovedWriters(userId, slug);
+    res.json({ data: writers });
+  },
+);
+
+publisherRouter.post(
+  "/:slug/approved-writers",
+  requireAuth,
+  requireTrustedOrigin,
+  jsonBody,
+  async (req, res) => {
+    const userId = getAuth(req).user.id;
+    const slug = String(req.params.slug);
+    const input = addApprovedWriterSchema.parse(req.body);
+    const created = await addPublisherApprovedWriter(userId, slug, input);
+    res.status(201).json({ data: created });
+  },
+);
+
+publisherRouter.delete(
+  "/:slug/approved-writers/:writerId",
+  requireAuth,
+  requireTrustedOrigin,
+  async (req, res) => {
+    const userId = getAuth(req).user.id;
+    const slug = String(req.params.slug);
+    const writerId = String(req.params.writerId);
+    const result = await removePublisherApprovedWriter(userId, slug, writerId);
+    res.json({ data: result });
+  },
+);
+
 // Publisher Studio: Team member management (owner only)
 publisherRouter.get("/:slug/members", requireAuth, async (req, res) => {
   const userId = getAuth(req).user.id;
@@ -337,6 +439,31 @@ publisherRouter.patch(
     const input = updatePublisherSchema.parse(req.body);
     const publisher = await updatePublisher(userId, slug, input);
     res.json({ data: publisher });
+  },
+);
+
+// Follow / Unfollow verified publisher
+publisherRouter.post(
+  "/:slug/follow",
+  requireAuth,
+  requireTrustedOrigin,
+  async (req, res) => {
+    const userId = getAuth(req).user.id;
+    const slug = String(req.params.slug);
+    const result = await followPublisher(userId, slug);
+    res.json({ data: result });
+  },
+);
+
+publisherRouter.delete(
+  "/:slug/follow",
+  requireAuth,
+  requireTrustedOrigin,
+  async (req, res) => {
+    const userId = getAuth(req).user.id;
+    const slug = String(req.params.slug);
+    const result = await unfollowPublisher(userId, slug);
+    res.json({ data: result });
   },
 );
 

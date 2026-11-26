@@ -2,10 +2,15 @@ import {
   classifyReadingTempo,
   computeReadingWpm,
   computeWordWeightedProgress,
+  countContentWords,
+  countWords,
+  extractPlainParagraphs,
   STANDARD_WORDS_PER_PAGE,
   wordsToStandardPages,
   type ReadingTempo,
 } from "@starter/shared/reading-progress";
+
+export { countWords, extractPlainParagraphs };
 
 export const EXIT_PROMPT_MIN_ACTIVE_SECONDS = 15;
 export const MIN_API_WPM = 30;
@@ -18,6 +23,25 @@ export type ChapterTextSource = {
   chapterNumber: number;
   contentId?: string | null;
   contentEn?: string | null;
+  fullWordCount?: number | null;
+  isPreviewTruncated?: boolean;
+};
+
+export type ChapterWeightSource = {
+  chapterNumber: number;
+  wordCount?: number | null;
+};
+
+export type ReaderProgressSegment = {
+  chapterNumber: number;
+  weight: number;
+  fillPercent: number;
+};
+
+export type ReaderProgressBarState = {
+  overallPercent: number;
+  formattedPercent: string;
+  segments: ReaderProgressSegment[];
 };
 
 export type ChapterWordInfo = {
@@ -56,105 +80,6 @@ export type SessionMetricsResult = {
   endChapterNumber: number;
   hasForwardProgress: boolean;
 };
-
-type TiptapNode = {
-  type?: string;
-  text?: string;
-  content?: TiptapNode[];
-};
-
-const SKIPPED_TIPTAP_NODES = new Set([
-  "chapterBreak",
-  "pageBreak",
-  "thinDivider",
-  "mediumDivider",
-]);
-
-function collectTiptapText(node: TiptapNode): string {
-  if (node.type === "text") return node.text ?? "";
-  if (node.type === "hardBreak") return " ";
-  if (!Array.isArray(node.content)) return "";
-  return node.content.map(collectTiptapText).join("");
-}
-
-function extractTiptapParagraphs(parsed: TiptapNode): string[] {
-  const blocks: string[] = [];
-  const visit = (node: TiptapNode) => {
-    if (!node || (node.type && SKIPPED_TIPTAP_NODES.has(node.type))) return;
-    if (
-      node.type === "paragraph" ||
-      node.type === "heading" ||
-      node.type === "codeBlock"
-    ) {
-      const text = collectTiptapText(node).trim();
-      if (text) blocks.push(text);
-      return;
-    }
-    if (Array.isArray(node.content)) {
-      node.content.forEach(visit);
-    }
-  };
-  visit(parsed);
-  return blocks;
-}
-
-function decodeHtmlEntities(text: string): string {
-  return text
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'");
-}
-
-function stripHtmlTags(raw: string): string {
-  return decodeHtmlEntities(
-    raw.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]*>/g, ""),
-  )
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-export function extractPlainParagraphs(content?: string | null): string[] {
-  if (!content) return [];
-  const trimmed = content.trim();
-  if (!trimmed) return [];
-
-  if (trimmed.startsWith("{") && trimmed.includes('"type"')) {
-    try {
-      const parsed = JSON.parse(trimmed) as TiptapNode;
-      const blocks = extractTiptapParagraphs(parsed);
-      if (blocks.length > 0) return blocks;
-    } catch {
-      // Fall through to HTML/plain parsing if JSON is malformed.
-    }
-  }
-
-  if (trimmed.includes("<")) {
-    const cleaned = trimmed
-      .replace(
-        /<div[^>]*(?:data-type="(?:chapter-break|page-break)"|class="[^"]*tiptap-(?:chapter|page)-break[^"]*")[^>]*>[\s\S]*?<\/div>/gi,
-        "\n\n",
-      )
-      .replace(/<!--[\s\S]*?-->/g, "\n\n")
-      .replace(/<\/(?:p|h[1-6]|blockquote|li|div)>/gi, "\n\n");
-
-    return cleaned.split(/\n\n+/).map(stripHtmlTags).filter(Boolean);
-  }
-
-  return trimmed
-    .replace(/<!--\s*pagebreak\s*-->|---pagebreak---/gi, "\n\n")
-    .split(/\n\n+/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-}
-
-export function countWords(text: string): number {
-  const trimmed = text.trim();
-  if (!trimmed) return 0;
-  return trimmed.split(/\s+/).filter(Boolean).length;
-}
 
 function selectChapterContent(
   chapter: ChapterTextSource,
@@ -503,4 +428,147 @@ export function tempoLabelId(tempo: ReadingTempo): {
         description: "Ritme cepat di atas 280 KPM",
       };
   }
+}
+
+export function formatReaderProgressPercent(percent: number): string {
+  const clamped = Math.min(100, Math.max(0, percent));
+  const rounded = Math.round(clamped * 10) / 10;
+  if (rounded <= 0) return "0%";
+  if (rounded >= 100) return "100%";
+  return Number.isInteger(rounded) ? `${rounded}%` : `${rounded.toFixed(1)}%`;
+}
+
+export function computeReaderProgressBarState(params: {
+  chapters: readonly ChapterTextSource[];
+  languageView: "id" | "en" | "split";
+  allChapters?: readonly ChapterWeightSource[];
+  activeChapterNumber: number;
+  chapterPercent: number;
+}): ReaderProgressBarState {
+  const {
+    chapters,
+    languageView,
+    allChapters,
+    activeChapterNumber,
+    chapterPercent,
+  } = params;
+
+  const loadedByNumber = new Map<number, ChapterTextSource>();
+  for (const ch of chapters) {
+    loadedByNumber.set(ch.chapterNumber, ch);
+  }
+
+  const metaByNumber = new Map<number, ChapterWeightSource>();
+  if (allChapters) {
+    for (const meta of allChapters) {
+      metaByNumber.set(meta.chapterNumber, meta);
+    }
+  }
+
+  const orderedNumbers =
+    allChapters && allChapters.length > 0
+      ? allChapters.map((c) => c.chapterNumber).sort((a, b) => a - b)
+      : Array.from(loadedByNumber.keys()).sort((a, b) => a - b);
+
+  if (orderedNumbers.length === 0) {
+    return { overallPercent: 0, formattedPercent: "0%", segments: [] };
+  }
+
+  const knownWordCounts: number[] = [];
+  const rawEntries = orderedNumbers.map((chapterNumber) => {
+    const source = loadedByNumber.get(chapterNumber);
+    const meta = metaByNumber.get(chapterNumber);
+    const accessibleWords = source
+      ? countContentWords(selectChapterContent(source, languageView))
+      : 0;
+
+    // Prefer full word count when preview-truncated; else loaded words, then summary wordCount.
+    const explicitFullWords =
+      typeof source?.fullWordCount === "number" && source.fullWordCount > 0
+        ? source.fullWordCount
+        : typeof meta?.wordCount === "number" && meta.wordCount > 0
+          ? meta.wordCount
+          : 0;
+
+    const fullWords = source?.isPreviewTruncated
+      ? Math.max(explicitFullWords, accessibleWords)
+      : source
+        ? accessibleWords > 0
+          ? accessibleWords
+          : explicitFullWords
+        : explicitFullWords;
+
+    if (fullWords > 0) knownWordCounts.push(fullWords);
+
+    return {
+      chapterNumber,
+      source,
+      accessibleWords,
+      fullWords,
+      hasKnownWeight: fullWords > 0,
+    };
+  });
+
+  const avgKnownWords =
+    knownWordCounts.length > 0
+      ? Math.round(
+          knownWordCounts.reduce((sum, val) => sum + val, 0) /
+            knownWordCounts.length,
+        )
+      : DEFAULT_UNLOADED_CHAPTER_WORDS;
+
+  const resolvedEntries = rawEntries.map((entry) => ({
+    ...entry,
+    weight: entry.hasKnownWeight ? entry.fullWords : Math.max(1, avgKnownWords),
+  }));
+
+  const activeIndex = resolvedEntries.findIndex(
+    (entry) => entry.chapterNumber === activeChapterNumber,
+  );
+  const clampedChapterFraction = Math.min(1, Math.max(0, chapterPercent / 100));
+
+  let totalBookWords = 0;
+  let readBookWords = 0;
+
+  const segments: ReaderProgressSegment[] = resolvedEntries.map(
+    (entry, idx) => {
+      const accessibleRatio = entry.source?.isPreviewTruncated
+        ? entry.weight > 0
+          ? Math.min(1, entry.accessibleWords / entry.weight)
+          : 0
+        : 1;
+
+      let fillFraction = 0;
+      if (activeIndex >= 0) {
+        if (idx < activeIndex) {
+          fillFraction = accessibleRatio;
+        } else if (idx === activeIndex) {
+          fillFraction = clampedChapterFraction * accessibleRatio;
+        }
+      }
+
+      totalBookWords += entry.weight;
+      readBookWords += entry.weight * fillFraction;
+
+      return {
+        chapterNumber: entry.chapterNumber,
+        weight: entry.weight,
+        fillPercent:
+          Math.round(Math.min(100, Math.max(0, fillFraction * 100)) * 100) /
+          100,
+      };
+    },
+  );
+
+  const rawOverall =
+    totalBookWords > 0
+      ? Math.min(100, Math.max(0, (readBookWords / totalBookWords) * 100))
+      : 0;
+  const overallPercent = Math.round(rawOverall * 10) / 10;
+
+  return {
+    overallPercent,
+    formattedPercent: formatReaderProgressPercent(overallPercent),
+    segments,
+  };
 }

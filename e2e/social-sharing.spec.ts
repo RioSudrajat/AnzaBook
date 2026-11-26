@@ -61,7 +61,7 @@ test.describe("Social Sharing, Styled Feed Cards & Public OG Previews (Issue #14
 
       // Publish via real Quote Post Composer UI from Profile -> Ulasan & Kutipan
       await page.goto("/app?tab=profile");
-      await page.getByRole("button", { name: /Ulasan & Kutipan/i }).click();
+      await page.getByRole("tab", { name: /Ulasan & Kutipan/i }).click();
       await expect(page.getByText(quoteText)).toBeVisible();
 
       await page
@@ -190,14 +190,14 @@ test.describe("Social Sharing, Styled Feed Cards & Public OG Previews (Issue #14
       page.getByRole("dialog", { name: "Prapemuat Literasi AnzaBook" }),
     ).toHaveCount(0, { timeout: 10_000 });
     await expect(page.locator("#chapter-sec-1")).toBeVisible();
-    await expect(page.getByText(/Bab 1\//)).toBeVisible();
+    await expect(page.getByText(/^1\/\d+$/)).toBeVisible();
 
     const secondChapter = page.locator("#chapter-sec-2");
     await expect(secondChapter).toBeVisible();
     await secondChapter.evaluate((section) =>
       section.scrollIntoView({ block: "start" }),
     );
-    await expect(page.getByText(/Bab 2\//)).toBeVisible();
+    await expect(page.getByText(/^2\/\d+$/)).toBeVisible();
 
     await page.getByRole("button", { name: "Keluar ke Home" }).click();
     const exitDialog = page.getByRole("dialog", {

@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -22,11 +23,11 @@ import {
 import { resolveReaderDrmPolicy } from "@starter/shared/validators/drm";
 import type {
   BookChapterSummaryDto,
+  BookDistributionModel,
   BookHighlightDto,
   BookReaderChapterDto,
   BookReaderPayloadDto,
   BookSummaryDto,
-  DigitalPolicy,
   HighlightColor,
   ManuscriptChapterDto,
   ReadingSessionDto,
@@ -92,7 +93,7 @@ import {
 import { useActiveReadingTimer } from "@/features/reader/hooks/use-active-reading-timer";
 import {
   buildBookWordMap,
-  computeBookWordWeightedPercent,
+  computeReaderProgressBarState,
   computeSessionMetrics,
   computeStandardPageForPosition,
   shouldShowExitPrompt,
@@ -137,10 +138,12 @@ import {
   extractChaptersFromJson,
   type ExtractedChapter,
 } from "@/features/reader/editor/manuscript-json";
+import { computeProseMirrorPageContext } from "@/features/reader/editor/page-limit";
 import {
   useEditPublisherManuscript,
   useManuscript,
   useMyManagedPublishers,
+  useMySocialProfile,
   useReviewPublisherManuscript,
   useSubmitManuscriptDraft,
   useTogglePostSession,
@@ -213,7 +216,7 @@ function DrmStegoFingerprint({ fingerprint }: { fingerprint: string }) {
 function renderHighlightedText(
   text: string,
   highlights: BookHighlightDto[],
-  onFlexHighlight: (h: BookHighlightDto) => void,
+  onHighlightClick: (h: BookHighlightDto) => void,
   range?: { start: number; end: number },
 ) {
   const start = range?.start ?? 0;
@@ -298,11 +301,11 @@ function renderHighlightedText(
         id={`highlight-${h.id}`}
         onClick={(e) => {
           e.stopPropagation();
-          onFlexHighlight(h);
+          onHighlightClick(h);
         }}
         className={`rounded-xs cursor-pointer transition-all hover:brightness-105 active:scale-98 ${colorBg}`}
         style={range ? { paddingInline: 0, fontWeight: "inherit" } : undefined}
-        title="Stabilo AnzaBook: Klik untuk Flex kutipan ini ke Instagram Story atau WhatsApp"
+        title="Stabilo AnzaBook: Klik untuk membuka di sidebar Highlights"
       >
         {text.slice(matchStart, matchEnd)}
       </mark>,
@@ -366,6 +369,8 @@ function ReaderBook() {
   const reviewPublisherMutation = useReviewPublisherManuscript();
   const { data: myManagedPublishers = [] } =
     useMyManagedPublishers(isManuscript);
+  const { data: myProfile, isLoading: isMyProfileLoading } =
+    useMySocialProfile(isManuscript);
 
   const {
     data: bookPayload,
@@ -418,8 +423,8 @@ function ReaderBook() {
         totalChapters: chaps.length,
         accessTier: "free" as const,
         digitalPolicy:
-          (manuscript.proposedDigitalPolicy as DigitalPolicy) ||
-          "hybrid_nakama_alacarte",
+          (manuscript.proposedDigitalPolicy as BookDistributionModel) ||
+          "nakama_or_purchase",
         authorUserId: manuscript.authorUserId,
         publisherId: manuscript.publisherId,
       } as unknown as BookSummaryDto,
@@ -464,12 +469,8 @@ function ReaderBook() {
   const error = isManuscript ? null : bookError;
   const refetch = isManuscript ? refetchManuscript : refetchBook;
 
-  const bookAuthorUserId = (
-    payload?.book as { authorUserId?: string | null } | undefined
-  )?.authorUserId;
   const isAuthorOwner = Boolean(
-    (isManuscript && manuscript?.authorUserId === user.id) ||
-    (!isManuscript && bookAuthorUserId && bookAuthorUserId === user.id),
+    isManuscript && manuscript?.authorUserId === user.id,
   );
   const managedTargetPublisher = manuscript?.publisherId
     ? myManagedPublishers.find((pub) => pub.id === manuscript.publisherId)
@@ -481,13 +482,20 @@ function ReaderBook() {
   );
   const activePublisherSlug =
     search.publisherSlug || managedTargetPublisher?.slug || "";
-  const isAuthorOrPublisher = Boolean(isAuthorOwner || isPublisherCurator);
+  const canAuthorWriteManuscript = Boolean(
+    myProfile?.authorStatus === "verified" || myProfile?.isApprovedWriter,
+  );
+  const isAuthorOrPublisher = Boolean(
+    isManuscript &&
+    (isPublisherCurator || (isAuthorOwner && canAuthorWriteManuscript)),
+  );
 
   const [editMode, setEditMode] = useState<"preview" | "edit">(
     search.editorial ??
       (isManuscript && manuscript?.status === "draft" ? "edit" : "preview"),
   );
   const [editorialTitle, setEditorialTitle] = useState("");
+  const [editorialSynopsis, setEditorialSynopsis] = useState("");
   const [editorialCoverUrl, setEditorialCoverUrl] = useState<string | null>(
     null,
   );
@@ -500,25 +508,34 @@ function ReaderBook() {
   const [isSavingDraft, setIsSavingDraft] = useState(false);
 
   const coverInitializedRef = useRef(false);
+  const titleInitializedRef = useRef(false);
+  const synopsisInitializedRef = useRef(false);
 
   useEffect(() => {
     if (!payload?.book) return;
     const book = payload.book;
     queueMicrotask(() => {
-      if (book.title && !editorialTitle) {
+      if (!titleInitializedRef.current && book.title) {
         setEditorialTitle(book.title);
+        titleInitializedRef.current = true;
+      }
+      if (!synopsisInitializedRef.current) {
+        setEditorialSynopsis(manuscript?.synopsis ?? book.synopsis ?? "");
+        synopsisInitializedRef.current = true;
       }
       if (!coverInitializedRef.current) {
         if (book.coverUrl) {
           setEditorialCoverUrl(book.coverUrl);
         }
-        if (book.coverColor) {
-          setEditorialCoverColor(book.coverColor);
+        if (manuscript?.coverColor || book.coverColor) {
+          setEditorialCoverColor(
+            manuscript?.coverColor || book.coverColor || "#181614",
+          );
         }
         coverInitializedRef.current = true;
       }
     });
-  }, [payload?.book, editorialTitle]);
+  }, [payload?.book, manuscript?.synopsis, manuscript?.coverColor]);
 
   const bookId = payload?.book?.id || "";
   const scope = payload?.hasFullAccess ? "full" : "preview";
@@ -569,12 +586,18 @@ function ReaderBook() {
   const [liveChapters, setLiveChapters] = useState<ExtractedChapter[]>(() => {
     return extractChaptersFromJson(initialEditorContent);
   });
+  const [currentEditorPage, setCurrentEditorPage] = useState(1);
 
   const syncLiveChaptersFromEditor = useCallback((ed: Editor | null) => {
     if (!ed) return;
     const json = ed.getJSON();
     const chaps = extractChaptersFromJson(json);
     setLiveChapters(chaps);
+    const pageCtx = computeProseMirrorPageContext(
+      ed.state.doc,
+      ed.state.selection.from,
+    );
+    setCurrentEditorPage(pageCtx.pageNumber);
   }, []);
 
   const editor = useEditor({
@@ -624,7 +647,39 @@ function ReaderBook() {
         syncLiveChaptersFromEditor(currentEditor);
       }
     },
+    onSelectionUpdate({ editor: currentEditor }) {
+      if (isAuthorOrPublisher) {
+        const pageCtx = computeProseMirrorPageContext(
+          currentEditor.state.doc,
+          currentEditor.state.selection.from,
+        );
+        setCurrentEditorPage(pageCtx.pageNumber);
+      }
+    },
   });
+
+  const manuscriptHydratedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!isManuscript || !manuscript || !editor || !isAuthorOrPublisher) return;
+    if (manuscriptHydratedRef.current === manuscript.id) return;
+    manuscriptHydratedRef.current = manuscript.id;
+    const doc = buildUnifiedDocFromChapters(
+      manuscriptPayload?.chapters || [],
+      manuscript.title || "Bab 1: Permulaan",
+    );
+    queueMicrotask(() => {
+      editor.commands.setContent(doc);
+      syncLiveChaptersFromEditor(editor);
+    });
+  }, [
+    editor,
+    isAuthorOrPublisher,
+    isManuscript,
+    manuscript,
+    manuscriptPayload?.chapters,
+    syncLiveChaptersFromEditor,
+  ]);
 
   useEffect(() => {
     if (editor && isAuthorOrPublisher) {
@@ -682,12 +737,14 @@ function ReaderBook() {
       }));
       const baseFields = {
         title: editorialTitle.trim() || undefined,
+        synopsis: editorialSynopsis.trim(),
         coverUrl:
           editorialCoverUrl === "template"
             ? null
             : editorialCoverUrl !== undefined
               ? editorialCoverUrl
               : undefined,
+        coverColor: editorialCoverColor || undefined,
         chapters: chapterPayload,
       };
 
@@ -740,6 +797,9 @@ function ReaderBook() {
   const [suspendedNow, setSuspendedNow] = useState(false);
   const lastDrmLogRef = useRef<Map<string, number>>(new Map());
   const [isHighlightsOpen, setIsHighlightsOpen] = useState(false);
+  const [focusedHighlightId, setFocusedHighlightId] = useState<string | null>(
+    null,
+  );
   const [isRatingOpen, setIsRatingOpen] = useState(false);
   const [share, setShare] = useState<{
     url: string;
@@ -793,6 +853,7 @@ function ReaderBook() {
   );
   const createSessionMutation = useCreateReadingSession();
   const hasRestoredRef = useRef(false);
+  const pendingLayoutRestoreRef = useRef<SaveReadingProgressInput | null>(null);
   const { mutate: saveProgress, mutateAsync: saveProgressAsync } =
     saveProgressMutation;
 
@@ -888,11 +949,6 @@ function ReaderBook() {
   const allChapterNumbers = useMemo(
     () => displayChapters.map((c) => c.chapterNumber),
     [displayChapters],
-  );
-
-  const bookWordMap = useMemo(
-    () => buildBookWordMap(accessibleChapters, languageView, allChapterNumbers),
-    [accessibleChapters, languageView, allChapterNumbers],
   );
 
   const prefetchChapter = useCallback(
@@ -1095,6 +1151,10 @@ function ReaderBook() {
           paragraph: restoredParagraph,
           offset: 0,
         });
+        setScrollPosition({
+          chapter: savedChapter.chapterNumber,
+          percent: checkpoint?.lastScrollPercent ?? 0,
+        });
         finalizeSessionRestore({
           chapterNumber: savedChapter.chapterNumber,
           paragraphIndex: Math.max(0, restoredParagraph),
@@ -1151,24 +1211,41 @@ function ReaderBook() {
         window.scrollTo({ top: document.documentElement.scrollHeight });
         return;
       }
-      const marker = section.querySelector(
-        `[data-reader-paragraph="${checkpoint?.lastParagraphIndex}"]`,
-      );
-      if (marker && (checkpoint?.lastScrollPercent ?? 0) > 0) {
-        marker.scrollIntoView({ block: "start" });
-      } else if (
-        savedChapter &&
-        checkpoint?.layout === "scroll" &&
-        checkpoint.lastScrollPercent > 0
-      ) {
-        const top = section.getBoundingClientRect().top + window.scrollY;
-        const length = Math.max(
-          0,
-          section.clientHeight - window.innerHeight * 0.6,
-        );
-        window.scrollTo({
-          top: top + (length * checkpoint.lastScrollPercent) / 100,
-        });
+      const savedPercent = checkpoint?.lastScrollPercent ?? 0;
+      const isFinalTarget =
+        !payload.hasFullAccess ||
+        target === payload.allChapters.at(-1)?.chapterNumber;
+
+      if (savedPercent > 0) {
+        const scrollRoot = document.scrollingElement;
+        const maxScroll = scrollRoot
+          ? Math.max(0, scrollRoot.scrollHeight - scrollRoot.clientHeight)
+          : 0;
+        const sectionDocTop =
+          section.getBoundingClientRect().top + window.scrollY;
+        const viewportMarker = window.innerHeight * 0.36;
+
+        let targetTop: number;
+        if (isFinalTarget) {
+          const scrollMargin =
+            parseFloat(getComputedStyle(section).scrollMarginTop) || 0;
+          const chapterStart = Math.max(0, sectionDocTop - scrollMargin);
+          const range = Math.max(1, maxScroll - chapterStart);
+          targetTop =
+            savedPercent >= 100
+              ? maxScroll
+              : Math.min(
+                  maxScroll,
+                  chapterStart + (range * (savedPercent + 0.2)) / 100,
+                );
+        } else {
+          const range = Math.max(1, section.offsetHeight - viewportMarker);
+          targetTop = Math.min(
+            maxScroll,
+            sectionDocTop + (range * savedPercent) / 100,
+          );
+        }
+        window.scrollTo({ top: Math.max(0, targetTop) });
       } else if (
         target !== loadedChapters[0]?.chapterNumber ||
         window.scrollY < 80
@@ -1215,30 +1292,6 @@ function ReaderBook() {
       );
     }
   }, [activeSpread, hasRestoredSessionAnchor, readingLayout, slideIndex]);
-
-  useEffect(() => {
-    const pending = pendingChapterNavRef.current;
-    if (!pending) return;
-    const isLoaded = loadedChapters.some(
-      (item: BookReaderChapterDto) => item.chapterNumber === pending.chapter,
-    );
-    if (!isLoaded) return;
-
-    const targetChapter = pending.chapter;
-    const targetLayout = pending.layout;
-    const frame = requestAnimationFrame(() => {
-      pendingChapterNavRef.current = null;
-      hasRestoredRef.current = true;
-      if (targetLayout === "slide") {
-        setSlidePosition({ chapter: targetChapter, paragraph: -1, offset: 0 });
-        window.scrollTo({ top: 0 });
-        return;
-      }
-      setScrollPosition({ chapter: targetChapter, percent: 0 });
-      chapterSection(targetChapter)?.scrollIntoView({ block: "start" });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [loadedChapters]);
 
   useEffect(() => {
     const deadline = payload?.accessExpiresAt;
@@ -1316,18 +1369,17 @@ function ReaderBook() {
     const maxScroll = scrollRoot
       ? scrollRoot.scrollHeight - scrollRoot.clientHeight
       : 0;
-    const atBookEnd =
-      Boolean(payload?.hasFullAccess) &&
-      isRenderedFinalChapter &&
+    const atRenderedEnd =
+      (payload?.hasFullAccess ? isRenderedFinalChapter : true) &&
       maxScroll > 0 &&
       scrollTop > 0 &&
-      maxScroll - scrollTop <= 1;
+      maxScroll - scrollTop <= 2;
     let body = sections[0];
     for (const section of sections) {
       if (section.getBoundingClientRect().top > viewportMarker) break;
       body = section;
     }
-    if (atBookEnd) body = finalSection;
+    if (atRenderedEnd) body = finalSection;
     const visibleChapter = loadedChapters.find(
       (item: BookReaderChapterDto) =>
         item.chapterNumber === Number(body.dataset.chapterNumber),
@@ -1338,14 +1390,13 @@ function ReaderBook() {
         paragraphCount = splitParagraphs(visibleChapter.contentId).length;
     }
     const rect = body.getBoundingClientRect();
-    if (atBookEnd) {
+    if (atRenderedEnd) {
       percent = 100;
     } else if (
-      payload?.hasFullAccess &&
       body === finalSection &&
-      isRenderedFinalChapter
+      (isRenderedFinalChapter || !payload?.hasFullAccess)
     ) {
-      // A short final chapter may never reach the top before scrolling ends.
+      // A short final chapter or truncated preview ends before reaching the top of viewport.
       const chapterStart = Math.max(
         0,
         scrollTop +
@@ -1368,7 +1419,10 @@ function ReaderBook() {
     for (const marker of body.querySelectorAll<HTMLElement>(
       "[data-reader-paragraph]",
     )) {
-      if (atBookEnd || marker.getBoundingClientRect().top <= viewportMarker) {
+      if (
+        atRenderedEnd ||
+        marker.getBoundingClientRect().top <= viewportMarker
+      ) {
         paragraph = Number(marker.dataset.readerParagraph);
       }
     }
@@ -1395,6 +1449,43 @@ function ReaderBook() {
     readingLayout,
     activeSpread,
   ]);
+
+  useLayoutEffect(() => {
+    const pending = pendingChapterNavRef.current;
+    if (!pending) return;
+    const isLoaded = loadedChapters.some(
+      (item: BookReaderChapterDto) => item.chapterNumber === pending.chapter,
+    );
+    if (!isLoaded) return;
+
+    const targetChapter = pending.chapter;
+    const targetLayout = pending.layout;
+    pendingChapterNavRef.current = null;
+    hasRestoredRef.current = true;
+
+    if (targetLayout === "slide") {
+      window.scrollTo({ top: 0 });
+    } else {
+      chapterSection(targetChapter)?.scrollIntoView({ block: "start" });
+    }
+
+    const frame = requestAnimationFrame(() => {
+      if (targetLayout === "slide") {
+        setSlidePosition({ chapter: targetChapter, paragraph: -1, offset: 0 });
+        return;
+      }
+      const position = capturePosition();
+      setScrollPosition(
+        position
+          ? {
+              chapter: position.lastChapterNumber,
+              percent: position.lastScrollPercent,
+            }
+          : { chapter: targetChapter, percent: 0 },
+      );
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [loadedChapters, capturePosition]);
 
   const queueCheckpoint = useCallback(
     (position: SaveReadingProgressInput) => {
@@ -1434,6 +1525,7 @@ function ReaderBook() {
       const position = capturePosition();
       if (
         !position ||
+        pendingLayoutRestoreRef.current ||
         savingRef.current ||
         (expiredAccess !== null && expiredAccess === payload?.accessExpiresAt)
       )
@@ -1516,10 +1608,65 @@ function ReaderBook() {
     }
   }
 
+  useEffect(() => {
+    if (readingLayout !== "scroll") return;
+    const pending = pendingLayoutRestoreRef.current;
+    if (!pending) return;
+
+    let cancelled = false;
+    let innerFrame = 0;
+    const outerFrame = requestAnimationFrame(() => {
+      if (cancelled) return;
+      const section = chapterSection(pending.lastChapterNumber);
+      if (!section) return;
+
+      const paraIdx = pending.lastParagraphIndex ?? -1;
+      const marker =
+        paraIdx > 0
+          ? section.querySelector(`[data-reader-paragraph="${paraIdx}"]`)
+          : null;
+
+      if (marker) {
+        marker.scrollIntoView({ block: "start" });
+      } else if (pending.lastScrollPercent > 0) {
+        const top = section.getBoundingClientRect().top + window.scrollY;
+        const length = Math.max(
+          0,
+          section.clientHeight - window.innerHeight * 0.6,
+        );
+        window.scrollTo({
+          top: top + (length * pending.lastScrollPercent) / 100,
+        });
+      } else {
+        section.scrollIntoView({ block: "start" });
+      }
+
+      innerFrame = requestAnimationFrame(() => {
+        if (cancelled) return;
+        pendingLayoutRestoreRef.current = null;
+        const synced = capturePosition();
+        if (synced) {
+          setScrollPosition({
+            chapter: synced.lastChapterNumber,
+            percent: synced.lastScrollPercent,
+          });
+        }
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(outerFrame);
+      cancelAnimationFrame(innerFrame);
+    };
+  }, [readingLayout, loadedChapters, capturePosition]);
+
   function changeReadingLayout(layout: ReadingLayout) {
     if (layout === readingLayout) return;
+    clearTimeout(pendingCheckpoint.current);
     const position = capturePosition();
     if (layout === "slide") {
+      pendingLayoutRestoreRef.current = null;
       setSlidePosition({
         chapter: position?.lastChapterNumber ?? activeChapterNum,
         paragraph: position?.lastParagraphIndex ?? -1,
@@ -1529,20 +1676,13 @@ function ReaderBook() {
       window.scrollTo({ top: 0 });
       return;
     }
-    setScrollPosition({ chapter: activeChapterNum, percent: 0 });
-    setReadingLayout(layout);
-    requestAnimationFrame(() => {
-      const section = chapterSection(activeChapterNum);
-      const marker = section?.querySelector(
-        `[data-reader-paragraph="${position?.lastParagraphIndex}"]`,
-      );
-      ((position?.lastParagraphIndex ?? 0) > 0
-        ? (marker ?? section)
-        : section
-      )?.scrollIntoView({
-        block: "start",
-      });
+    const targetChapter = position?.lastChapterNumber ?? activeChapterNum;
+    pendingLayoutRestoreRef.current = position;
+    setScrollPosition({
+      chapter: targetChapter,
+      percent: position?.lastScrollPercent ?? 0,
     });
+    setReadingLayout(layout);
   }
 
   async function handleSelectChapter(ch: number) {
@@ -1618,6 +1758,12 @@ function ReaderBook() {
       setAnchorChapter(ch);
     }
   }
+
+  // Clicking highlighted text opens the Highlights sidebar focused on that quote.
+  const handleInspectHighlight = (h: BookHighlightDto) => {
+    setFocusedHighlightId(h.id);
+    setIsHighlightsOpen(true);
+  };
 
   // Handle opening unified Quote Composer for a highlight
   const handleFlexHighlight = (h: BookHighlightDto) => {
@@ -1777,7 +1923,9 @@ function ReaderBook() {
           slideIndex: readingLayout === "slide" ? slideIndex : undefined,
         };
         const startAnchor: ReadingAnchor = sessionStartAnchorRef.current ?? {
-          ...endAnchor,
+          chapterNumber: progress?.lastChapterNumber ?? requestedChapter,
+          paragraphIndex: progress?.lastParagraphIndex ?? 0,
+          scrollPercent: progress?.lastScrollPercent ?? 0,
         };
         const metrics = computeSessionMetrics({
           map: sessionWordMap,
@@ -1786,6 +1934,29 @@ function ReaderBook() {
           activeSeconds,
           hasFullAccess: Boolean(payload?.hasFullAccess),
         });
+        const cachedChapterList = Array.from(chapterCacheRef.current.values());
+        const resolvedStartProgress = payload?.hasFullAccess
+          ? metrics.startProgressPercent
+          : Math.round(
+              computeReaderProgressBarState({
+                chapters: cachedChapterList,
+                languageView,
+                allChapters: displayChapters,
+                activeChapterNumber: startAnchor.chapterNumber,
+                chapterPercent: startAnchor.scrollPercent,
+              }).overallPercent,
+            );
+        const resolvedEndProgress = payload?.hasFullAccess
+          ? metrics.endProgressPercent
+          : Math.round(
+              computeReaderProgressBarState({
+                chapters: cachedChapterList,
+                languageView,
+                allChapters: displayChapters,
+                activeChapterNumber: endAnchor.chapterNumber,
+                chapterPercent: endAnchor.scrollPercent,
+              }).overallPercent,
+            );
 
         const hasMeaningfulSession = shouldShowExitPrompt({
           activeSeconds: metrics.activeSeconds,
@@ -1809,8 +1980,8 @@ function ReaderBook() {
             pagesRead: metrics.pagesRead,
             durationSeconds: Math.max(1, metrics.activeSeconds),
             avgWpm: metrics.apiAvgWpm,
-            startProgressPercent: metrics.startProgressPercent,
-            endProgressPercent: metrics.endProgressPercent,
+            startProgressPercent: resolvedStartProgress,
+            endProgressPercent: resolvedEndProgress,
             startChapterNumber: metrics.startChapterNumber,
             endChapterNumber: metrics.endChapterNumber,
             highlightsCount: sessionHighlightsCountRef.current,
@@ -1833,11 +2004,9 @@ function ReaderBook() {
               endChapterNumber:
                 persistedSession.endChapterNumber ?? metrics.endChapterNumber,
               startProgressPercent:
-                persistedSession.startProgressPercent ??
-                metrics.startProgressPercent,
+                persistedSession.startProgressPercent ?? resolvedStartProgress,
               endProgressPercent:
-                persistedSession.endProgressPercent ??
-                metrics.endProgressPercent,
+                persistedSession.endProgressPercent ?? resolvedEndProgress,
             });
             setIsSessionPosted(Boolean(persistedSession.isPosted));
           }
@@ -1856,8 +2025,8 @@ function ReaderBook() {
           pagesRead: metrics.pagesRead,
           rawWpm: metrics.rawWpm,
           tempo: metrics.tempo,
-          startProgressPercent: metrics.startProgressPercent,
-          endProgressPercent: metrics.endProgressPercent,
+          startProgressPercent: resolvedStartProgress,
+          endProgressPercent: resolvedEndProgress,
           startChapterNumber: metrics.startChapterNumber,
           endChapterNumber: metrics.endChapterNumber,
           highlightsCount: sessionHighlightsCountRef.current,
@@ -2209,6 +2378,46 @@ function ReaderBook() {
   }
 
   const { book, allChapters, watermark } = payload;
+
+  if (
+    isManuscript &&
+    isAuthorOwner &&
+    !isPublisherCurator &&
+    !isMyProfileLoading &&
+    !canAuthorWriteManuscript
+  ) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--color-paper)] px-6 py-12 text-[var(--color-ink)]">
+        <div className="max-w-md w-full rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-6 sm:p-8 text-center space-y-4">
+          <h1 className="font-serif text-xl font-bold">
+            Akses Studio Penulis Terbatas
+          </h1>
+          <p className="text-xs sm:text-sm text-[var(--color-ink-2)] leading-relaxed">
+            {myProfile?.authorStatus === "pending"
+              ? "Pengajuan Penulis Resmi Anda sedang ditinjau tim AnzaBook. Anda dapat menyunting dan mengajukan naskah setelah akun disetujui."
+              : "Anda perlu mendaftar dan terverifikasi sebagai Penulis Resmi AnzaBook atau penulis rekanan penerbit sebelum mengakses Studio Penulis."}
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
+            {myProfile?.authorStatus !== "pending" && (
+              <Link
+                to="/authors/new"
+                className="inline-flex min-h-11 items-center rounded-xl bg-[var(--color-accent)] px-4 text-xs font-semibold text-[var(--color-accent-ink)] hover:brightness-95"
+              >
+                Daftar Penulis Resmi
+              </Link>
+            )}
+            <Link
+              to="/app"
+              search={{ tab: "profile" }}
+              className="inline-flex min-h-11 items-center rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-4 text-xs font-medium hover:bg-[var(--color-paper-3)]"
+            >
+              Kembali ke Profil
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
   const currentChapter = chapter ?? payload.currentChapter;
   const chaptersList =
     loadedChapters.length > 0 ? loadedChapters : [currentChapter];
@@ -2220,12 +2429,13 @@ function ReaderBook() {
   const nextChapter = payload.hasFullAccess
     ? allChapters[chapterIndex + 1]?.chapterNumber
     : undefined;
-  const currentPercent = computeBookWordWeightedPercent(
-    bookWordMap,
-    activeChapterNum,
-    scrollPosition.percent,
-    Boolean(payload.hasFullAccess),
-  );
+  const progressBarState = computeReaderProgressBarState({
+    chapters: accessibleChapters,
+    languageView,
+    allChapters: displayChapters,
+    activeChapterNumber: activeChapterNum,
+    chapterPercent: scrollPosition.percent,
+  });
 
   return (
     <DrmShield
@@ -2238,12 +2448,18 @@ function ReaderBook() {
         data-theme={theme}
         className={`${
           readingLayout === "slide"
-            ? "h-dvh min-h-[26rem] overflow-clip"
+            ? "relative h-dvh min-h-[26rem] overflow-clip"
             : "min-h-screen"
         } flex flex-col bg-background text-foreground transition-colors duration-300`}
       >
-        {/* Sticky Header: Reader Toolbar + Audio Player (stacked in single sticky container so they NEVER overlap) */}
-        <div className="sticky top-0 z-40 w-full bg-background/95 backdrop-blur-md border-b border-border/40 transition-colors">
+        {/* Top Controls: floating borderless overlay in Slide mode; sticky bar in Scroll mode */}
+        <div
+          className={
+            readingLayout === "slide"
+              ? "pointer-events-none absolute inset-x-0 top-0 z-40 w-full"
+              : "sticky top-0 z-40 w-full bg-background/95 backdrop-blur-md border-b border-border/40 transition-colors"
+          }
+        >
           <ReaderToolbar
             bookTitle={editorialTitle || book.title}
             readingLayout={readingLayout}
@@ -2257,6 +2473,11 @@ function ReaderBook() {
             fontSize={fontSize}
             onFontSizeChange={setFontSize}
             currentChapter={activeChapterNum}
+            currentPage={
+              isAuthorOrPublisher && editMode === "edit"
+                ? currentEditorPage
+                : undefined
+            }
             allChapters={displayChapters}
             onSelectChapter={handleSelectChapter}
             onFinishSession={() => void saveSession("summary")}
@@ -2303,12 +2524,20 @@ function ReaderBook() {
 
           {/* Substack-Style Rich Formatting Toolbar (Active when in Edit Mode) */}
           {isAuthorOrPublisher && editMode === "edit" && (
-            <SubstackEditorToolbar editor={editor} />
+            <div
+              className={readingLayout === "slide" ? "pointer-events-auto" : ""}
+            >
+              <SubstackEditorToolbar editor={editor} />
+            </div>
           )}
 
           {/* Floating Audio Player when Opened */}
           {isAudioOpen && currentChapter.audioUrl && (
-            <div className="border-t border-border/70 bg-card/60 backdrop-blur-md animate-in fade-in slide-in-from-top-1 duration-150">
+            <div
+              className={`border-t border-border/70 bg-card/85 backdrop-blur-md animate-in fade-in slide-in-from-top-1 duration-150 ${
+                readingLayout === "slide" ? "pointer-events-auto" : ""
+              }`}
+            >
               <AudiobookBar
                 key={currentChapter.id}
                 audioUrl={currentChapter.audioUrl}
@@ -2347,10 +2576,10 @@ function ReaderBook() {
         <main
           id="main-content"
           ref={readerCanvasRef}
-          className={`w-full mx-auto ${
+          className={`w-full ${
             readingLayout === "slide"
-              ? "max-w-[1440px] px-4 sm:px-6 lg:px-8 py-1 sm:py-2 flex min-h-0 flex-1 flex-col"
-              : "max-w-2xl sm:max-w-[700px] px-4 sm:px-6 py-10 pb-40"
+              ? "px-0 py-0 flex min-h-0 flex-1 flex-col"
+              : "mx-auto max-w-2xl sm:max-w-[700px] px-4 sm:px-6 py-10 pb-40"
           }`}
         >
           {saveError && (
@@ -2363,11 +2592,13 @@ function ReaderBook() {
           )}
           {readingLayout === "scroll" ? (
             /* Continuous Scroll Mode Across All Accessible Chapters */
-            <div className="space-y-16">
+            <div className={isAuthorOrPublisher ? "space-y-6" : "space-y-16"}>
               {/* Header Buku (Author, Judul Besar Serif, Bab, Cover) - Sesuai SS 2 */}
               <ReaderBookHeader
                 authorOrPublisher={book.author || user.name || "Penulis"}
                 title={editorialTitle || book.title}
+                synopsis={isManuscript ? editorialSynopsis : book.synopsis}
+                canEditSynopsis={isManuscript && isAuthorOrPublisher}
                 totalChapters={displayChapters.length}
                 coverUrl={
                   editorialCoverUrl !== undefined
@@ -2380,6 +2611,7 @@ function ReaderBook() {
                 pageCount={book.pageCount}
                 isEditMode={isAuthorOrPublisher && editMode === "edit"}
                 onTitleChange={setEditorialTitle}
+                onSynopsisChange={setEditorialSynopsis}
                 onCoverUrlChange={setEditorialCoverUrl}
                 onCoverColorChange={setEditorialCoverColor}
               />
@@ -2488,7 +2720,7 @@ function ReaderBook() {
                                       {renderHighlightedText(
                                         idText,
                                         highlights,
-                                        handleFlexHighlight,
+                                        handleInspectHighlight,
                                       )}
                                       <DrmStegoFingerprint
                                         fingerprint={hiddenFingerprint}
@@ -2567,7 +2799,7 @@ function ReaderBook() {
                                           {renderHighlightedText(
                                             text,
                                             highlights,
-                                            handleFlexHighlight,
+                                            handleInspectHighlight,
                                           )}
                                           <DrmStegoFingerprint
                                             fingerprint={hiddenFingerprint}
@@ -2659,7 +2891,7 @@ function ReaderBook() {
                     allHighlights.filter(
                       (item) => item.chapterNumber === chapterNumber,
                     ),
-                    handleFlexHighlight,
+                    handleInspectHighlight,
                     fragment,
                   )}
                   <DrmStegoFingerprint fingerprint={hiddenFingerprint} />
@@ -2684,12 +2916,12 @@ function ReaderBook() {
                 Akhir cuplikan
               </h2>
               <p className="mx-auto max-w-sm text-base leading-relaxed">
-                {book.digitalPolicy === "print_claim_only"
+                {book.digitalPolicy === "print_code_only"
                   ? "Klaim kode dari buku cetak untuk membuka naskah lengkap."
                   : "Jadi Nakama untuk melanjutkan buku ini dan membuka koleksi Premium."}
               </p>
               <Button asChild size="lg" className="min-h-11">
-                {book.digitalPolicy === "print_claim_only" ? (
+                {book.digitalPolicy === "print_code_only" ? (
                   <Link to="/books/$slug" params={{ slug }}>
                     Buka detail dan klaim kode
                   </Link>
@@ -2712,7 +2944,9 @@ function ReaderBook() {
           <GlossyProgressBar
             currentChapter={activeChapterNum}
             totalChapters={displayChapters.length}
-            currentPercent={currentPercent}
+            currentPercent={progressBarState.overallPercent}
+            formattedPercent={progressBarState.formattedPercent}
+            segments={progressBarState.segments}
             onOpenRating={() => setIsRatingOpen(true)}
           />
         )}
@@ -2735,12 +2969,16 @@ function ReaderBook() {
         {/* Highlights Notes Sidebar Drawer (Matches SS 5) */}
         <HighlightsSidebar
           isOpen={isHighlightsOpen}
-          onClose={() => setIsHighlightsOpen(false)}
+          onClose={() => {
+            setIsHighlightsOpen(false);
+            setFocusedHighlightId(null);
+          }}
           highlights={allHighlights}
           allChapters={allChapters}
           onSelectHighlight={handleSelectHighlight}
           onFlexHighlight={handleFlexHighlight}
           onDeleteHighlight={handleDeleteHighlight}
+          focusedHighlightId={focusedHighlightId}
         />
 
         {share && (
@@ -2895,13 +3133,26 @@ function ReaderBook() {
             onClose={() => setIsConfigDialogOpen(false)}
             initialData={{
               title: editorialTitle || book.title,
-              synopsis: book.synopsis || "",
+              synopsis:
+                editorialSynopsis ||
+                manuscript?.synopsis ||
+                book.synopsis ||
+                "",
               category: manuscript?.category || "",
+              sourceLanguage: manuscript?.sourceLanguage || "id",
+              targetAudience: manuscript?.targetAudience || "general",
+              authorNotes: manuscript?.authorNotes || "",
+              isbn: manuscript?.isbn || "",
+              estimatedPages: manuscript?.estimatedPages || 180,
               publisherId:
                 search.targetPublisherId || manuscript?.publisherId || "",
               digitalPolicy: book.digitalPolicy,
+              proposedDigitalPriceIdr:
+                manuscript?.proposedDigitalPriceIdr ?? 45_000,
             }}
             onSubmit={async (config) => {
+              setEditorialTitle(config.title);
+              setEditorialSynopsis(config.synopsis);
               await handleSaveDraft();
               if (isManuscript && manuscriptId) {
                 await updateManuscriptMutation.mutateAsync({
@@ -2910,7 +3161,14 @@ function ReaderBook() {
                     title: config.title,
                     synopsis: config.synopsis,
                     category: config.category,
+                    sourceLanguage: config.sourceLanguage,
+                    targetAudience: config.targetAudience,
+                    authorNotes: config.authorNotes || null,
+                    isbn: config.isbn || null,
+                    estimatedPages: config.estimatedPages,
                     proposedDigitalPolicy: config.digitalPolicy,
+                    proposedDigitalPriceIdr:
+                      config.proposedDigitalPriceIdr ?? null,
                   },
                 });
                 await submitDraftMutation.mutateAsync({
@@ -2927,7 +3185,7 @@ function ReaderBook() {
         )}
 
         {/* Publisher Atomic Catalog Publish Dialog */}
-        {isPublisherReview &&
+        {(isPublisherReview || isPublishDialogOpen) &&
           isManuscript &&
           manuscript &&
           activePublisherSlug && (
@@ -2940,7 +3198,9 @@ function ReaderBook() {
               }
               manuscript={manuscript}
               initialTitle={editorialTitle || manuscript.title}
+              initialSynopsis={editorialSynopsis || manuscript.synopsis}
               initialCoverUrl={editorialCoverUrl}
+              initialCoverColor={editorialCoverColor}
             />
           )}
 

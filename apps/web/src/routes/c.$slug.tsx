@@ -28,7 +28,7 @@ export const Route = createFileRoute("/c/$slug")({
   component: CalendarHubPage,
 });
 
-export default function CalendarHubPage() {
+function CalendarHubPage() {
   const { slug } = Route.useParams();
   const sessionUser = Route.useRouteContext().session?.user;
 
@@ -39,6 +39,7 @@ export default function CalendarHubPage() {
       title="Komunitas Literasi"
       showBack={false}
       backLabel="Kembali"
+      wide
     >
       <CommunityHubView slug={slug} isInsideApp={Boolean(sessionUser)} />
     </PageFrame>

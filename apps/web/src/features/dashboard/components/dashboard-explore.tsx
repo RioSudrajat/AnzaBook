@@ -1,12 +1,11 @@
 import { useState, useTransition } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
+  ArrowRight,
   BookOpen,
-  Building2,
   CheckCircle,
   ExternalLink,
   Heart,
-  MapPin,
   MessageSquare,
   Search,
   Share2,
@@ -20,6 +19,7 @@ import type {
   ManagedCommunitySummaryDto,
   ManagedPublisherSummaryDto,
 } from "@starter/shared/types";
+import { EntityDirectoryCard } from "@/components/profile/entity-directory-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BookCatalogCard } from "@/features/books/components/book-catalog-card";
@@ -29,6 +29,7 @@ import { QuotePostCard } from "@/features/share/components/quote-post-card";
 import { SessionPostCard } from "@/features/share/components/session-post-card";
 import {
   useFollowUser,
+  useMySocialProfile,
   useUnfollowUser,
   useUnifiedExplore,
   useVerifiedPublishers,
@@ -65,6 +66,8 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
 
   const categories = useCategories();
   const publishers = useVerifiedPublishers();
+  const { data: myProfile } = useMySocialProfile();
+  const currentUserId = myProfile?.id;
 
   // Unified Explore Hook
   const exploreQuery = useUnifiedExplore({
@@ -132,11 +135,13 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
         <div className="relative flex items-center">
           <Search className="absolute left-4 size-5 text-muted-foreground pointer-events-none" />
           <Input
+            id="explore-search-input"
+            name="exploreSearch"
             type="search"
             value={searchInput}
             onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="Cari buku, penulis, @username, kutipan, penerbit..."
-            className="w-full h-12 pl-12 pr-11 rounded-full bg-muted/50 border border-border/80 text-sm focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:border-orange-500 transition-all shadow-xs"
+            className="w-full h-12 pl-12 pr-11 rounded-full bg-muted/50 border border-border/80 text-sm focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] focus-visible:border-[var(--color-accent)] transition-colors shadow-xs"
             aria-label="Cari di AnzaBook"
           />
           {searchInput && (
@@ -168,7 +173,7 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
         >
           Teratas
           {activeTab === "teratas" && (
-            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-600 dark:bg-orange-500 rounded-full" />
+            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--color-accent)] rounded-full" />
           )}
         </button>
 
@@ -183,7 +188,7 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
         >
           Terbaru
           {activeTab === "terbaru" && (
-            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-600 dark:bg-orange-500 rounded-full" />
+            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--color-accent)] rounded-full" />
           )}
         </button>
 
@@ -196,9 +201,9 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          Kutipan & Ulasan
+          Kutipan &amp; Ulasan
           {activeTab === "postingan" && (
-            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-600 dark:bg-orange-500 rounded-full" />
+            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--color-accent)] rounded-full" />
           )}
         </button>
 
@@ -213,7 +218,7 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
         >
           Buku
           {activeTab === "buku" && (
-            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-600 dark:bg-orange-500 rounded-full" />
+            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--color-accent)] rounded-full" />
           )}
         </button>
 
@@ -228,7 +233,7 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
         >
           Orang
           {activeTab === "orang" && (
-            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-600 dark:bg-orange-500 rounded-full" />
+            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--color-accent)] rounded-full" />
           )}
         </button>
 
@@ -241,9 +246,9 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          Komunitas & Penerbit
+          Komunitas &amp; Penerbit
           {activeTab === "komunitas" && (
-            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-600 dark:bg-orange-500 rounded-full" />
+            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--color-accent)] rounded-full" />
           )}
         </button>
       </nav>
@@ -322,6 +327,9 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
                       <UserSearchRow
                         key={user.id}
                         user={user}
+                        isSelf={Boolean(
+                          currentUserId && currentUserId === user.id,
+                        )}
                         onFollowToggle={() => handleFollowToggle(user)}
                         isMutationPending={
                           followUserMutation.isPending ||
@@ -517,12 +525,17 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
                     }}
                   >
                     <option value="all">Semua Skema</option>
-                    <option value="print_claim_only">
-                      Phygital Cetak (Klaim Kode)
+                    <option value="print_code_only">
+                      Eksklusif Pembeli Buku Cetak
                     </option>
-                    <option value="sample_only">Nakama Pool Reader</option>
-                    <option value="alacarte_only">Ala Carte Digital</option>
-                    <option value="free_open">Pustaka Terbuka Gratis</option>
+                    <option value="nakama_subscription">
+                      Khusus Anggota Nakama
+                    </option>
+                    <option value="single_purchase">Beli Satuan</option>
+                    <option value="nakama_or_purchase">
+                      Nakama &amp; Beli Satuan
+                    </option>
+                    <option value="free_open">Gratis Terbuka</option>
                   </select>
                 </label>
 
@@ -623,6 +636,9 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
                     <UserSearchRow
                       key={user.id}
                       user={user}
+                      isSelf={Boolean(
+                        currentUserId && currentUserId === user.id,
+                      )}
                       onFollowToggle={() => handleFollowToggle(user)}
                       isMutationPending={
                         followUserMutation.isPending ||
@@ -684,10 +700,12 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
 // Sub-component: UserSearchRow (Instagram-style user item with orange button)
 function UserSearchRow({
   user,
+  isSelf = false,
   onFollowToggle,
   isMutationPending,
 }: {
   user: ExploreUserItemDto;
+  isSelf?: boolean;
   onFollowToggle: () => void;
   isMutationPending: boolean;
 }) {
@@ -707,31 +725,31 @@ function UserSearchRow({
             className="size-12 rounded-full object-cover border border-border shrink-0"
           />
         ) : (
-          <div className="size-12 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 font-bold text-base flex items-center justify-center shrink-0 border border-orange-500/20">
+          <div className="size-12 rounded-full bg-[var(--color-accent-soft)] text-[var(--color-ink)] font-serif font-bold text-base flex items-center justify-center shrink-0 border border-[var(--color-accent)]/30">
             {user.name.slice(0, 1).toUpperCase()}
           </div>
         )}
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <span className="font-medium text-sm text-foreground group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors truncate">
+            <span className="font-medium text-sm text-foreground group-hover:text-[var(--color-accent)] transition-colors truncate">
               {user.name}
             </span>
             {isAuthor && (
               <span
-                className="inline-flex items-center gap-0.5 text-[10px] font-mono font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full shrink-0"
+                className="inline-flex items-center gap-1 text-[10px] font-mono font-medium text-[var(--color-ink)] bg-[var(--color-green-soft)] px-1.5 py-0.5 rounded shrink-0"
                 title="Penulis Resmi AnzaBook"
               >
-                <CheckCircle className="size-3 text-emerald-600 shrink-0" />
+                <CheckCircle className="size-3 shrink-0" aria-hidden="true" />
                 Penulis
               </span>
             )}
           </div>
 
-          <p className="text-xs font-mono text-muted-foreground truncate">
-            @{user.username || "reader"}
-            {user.locationCity && ` · ${user.locationCity}`}
-          </p>
+          <div className="flex flex-wrap items-center gap-x-2 text-xs font-mono text-muted-foreground truncate">
+            <span>@{user.username || "reader"}</span>
+            {user.locationCity && <span>{user.locationCity}</span>}
+          </div>
 
           {user.bio && (
             <p className="text-xs text-muted-foreground/80 line-clamp-1 mt-0.5">
@@ -739,31 +757,37 @@ function UserSearchRow({
             </p>
           )}
 
-          <div className="flex items-center gap-3 text-[11px] text-muted-foreground/70 mt-1">
+          <div className="flex flex-wrap items-center gap-x-3 text-[11px] text-muted-foreground/70 mt-1">
             <span>{user.followerCount ?? 0} pengikut</span>
             {(user.booksReadCount ?? 0) > 0 && (
-              <span>· {user.booksReadCount} tamat</span>
+              <span>{user.booksReadCount} tamat</span>
             )}
             {(user.bookCount ?? 0) > 0 && (
-              <span>· {user.bookCount} buku terbit</span>
+              <span>{user.bookCount} buku terbit</span>
             )}
           </div>
         </div>
       </Link>
 
       <div className="shrink-0">
-        <button
-          type="button"
-          onClick={onFollowToggle}
-          disabled={isMutationPending}
-          className={`px-5 py-1.5 rounded-full text-xs font-medium transition-all shadow-xs disabled:opacity-50 ${
-            user.isFollowing
-              ? "border border-border text-foreground hover:bg-muted font-normal"
-              : "bg-orange-600 hover:bg-orange-700 text-white font-medium"
-          }`}
-        >
-          {user.isFollowing ? "Mengikuti" : "Ikuti"}
-        </button>
+        {isSelf ? (
+          <span className="inline-flex min-h-9 items-center rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 text-[11px] font-mono text-[var(--color-muted)]">
+            Akun Anda
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={onFollowToggle}
+            disabled={isMutationPending}
+            className={`min-h-10 px-4 rounded-xl text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer ${
+              user.isFollowing
+                ? "border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] font-medium"
+                : "bg-[var(--color-accent)] hover:brightness-95 text-[var(--color-accent-ink)]"
+            }`}
+          >
+            {user.isFollowing ? "Mengikuti" : "Ikuti"}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -804,8 +828,8 @@ function PostFeedItem({ post }: { post: ExplorePostItemDto }) {
             <span className="text-xs font-semibold text-foreground group-hover:underline truncate block">
               {post.author.name}
             </span>
-            <span className="text-[11px] font-mono text-muted-foreground">
-              @{post.author.username || "reader"} · {formattedDate}
+            <span className="text-[11px] font-mono text-[var(--color-muted)]">
+              @{post.author.username || "reader"} — {formattedDate}
             </span>
           </div>
         </Link>
@@ -912,92 +936,67 @@ function PostFeedItem({ post }: { post: ExplorePostItemDto }) {
   );
 }
 
-// Sub-component: CommunityCard linking to /c/$slug
+// Sub-component: CommunityCard linking to /c/$slug (unified EntityDirectoryCard)
 function CommunityCard({
   community,
 }: {
   community: ManagedCommunitySummaryDto;
 }) {
   return (
-    <article className="flex flex-col justify-between rounded-xl border border-border/80 bg-card p-4 space-y-3 hover:border-foreground/30 transition-colors shadow-xs">
-      <div className="flex items-center gap-3">
-        <div className="flex size-11 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold text-base border border-amber-500/30 shrink-0">
-          {community.name[0]}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1">
-            <h3 className="font-serif font-bold text-sm truncate">
-              {community.name}
-            </h3>
-            {community.verificationStatus === "verified" && (
-              <CheckCircle className="size-3.5 text-amber-500 shrink-0" />
-            )}
-          </div>
-          <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
-            <MapPin className="size-3 shrink-0" />
-            <span className="truncate">{community.city || "Indonesia"}</span>
-          </p>
-        </div>
-      </div>
-
-      <div className="pt-2 border-t border-border/60 flex items-center justify-between gap-2">
-        <span className="text-[10px] font-mono text-muted-foreground">
-          Klub Komunitas
-        </span>
-        <Button asChild variant="outline" size="sm" className="h-8 text-xs">
-          <Link to="/c/$slug" params={{ slug: community.slug }}>
-            Lihat Komunitas
-          </Link>
-        </Button>
-      </div>
-    </article>
+    <EntityDirectoryCard
+      kind="community"
+      name={community.name}
+      to="/c/$slug"
+      params={{ slug: community.slug }}
+      avatarUrl={community.avatarUrl}
+      bannerUrl={community.coverUrl}
+      city={community.city}
+      description={community.description}
+      verificationStatus={community.verificationStatus}
+      footerMeta={`${community.followerCount ?? 0} pengikut · Komunitas Literasi`}
+      actions={
+        <Link
+          to="/c/$slug"
+          params={{ slug: community.slug }}
+          className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-3.5 text-xs font-semibold hover:bg-[var(--color-paper-3)]"
+        >
+          <span>Lihat Komunitas</span>
+          <ArrowRight className="size-3.5" aria-hidden="true" />
+        </Link>
+      }
+    />
   );
 }
 
-// Sub-component: PublisherCard linking to /p/$slug
+// Sub-component: PublisherCard linking to /p/$slug (unified EntityDirectoryCard)
 function PublisherCard({
   publisher,
 }: {
   publisher: ManagedPublisherSummaryDto;
 }) {
   return (
-    <article className="flex flex-col justify-between rounded-xl border border-border/80 bg-card p-4 space-y-3 hover:border-foreground/30 transition-colors shadow-xs">
-      <div className="flex items-center gap-3">
-        {publisher.logoUrl ? (
-          <img
-            src={publisher.logoUrl}
-            alt={publisher.name}
-            className="size-11 rounded-xl object-cover border border-border shrink-0"
-          />
-        ) : (
-          <div className="flex size-11 items-center justify-center rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 font-bold text-base border border-orange-500/20 shrink-0">
-            {publisher.name[0]}
-          </div>
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1">
-            <h3 className="font-serif font-bold text-sm truncate">
-              {publisher.name}
-            </h3>
-            <CheckCircle className="size-3.5 text-emerald-600 shrink-0" />
-          </div>
-          <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
-            <Building2 className="size-3 shrink-0" />
-            <span className="truncate">{publisher.city || "Mitra IKAPI"}</span>
-          </p>
-        </div>
-      </div>
-
-      <div className="pt-2 border-t border-border/60 flex items-center justify-between gap-2">
-        <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">
-          Penerbit Resmi
-        </span>
-        <Button asChild variant="outline" size="sm" className="h-8 text-xs">
-          <Link to="/p/$slug" params={{ slug: publisher.slug }}>
-            Katalog Penerbit
-          </Link>
-        </Button>
-      </div>
-    </article>
+    <EntityDirectoryCard
+      kind="publisher"
+      name={publisher.name}
+      to="/p/$slug"
+      params={{ slug: publisher.slug }}
+      avatarUrl={publisher.logoUrl}
+      bannerUrl={publisher.headerImageUrl}
+      city={publisher.city}
+      description={publisher.description}
+      topics={publisher.topics}
+      verificationStatus={publisher.verificationStatus}
+      footerMeta={`${publisher.followerCount ?? 0} pengikut · Mitra Penerbit`}
+      actions={
+        <Link
+          to="/p/$slug"
+          params={{ slug: publisher.slug }}
+          className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[var(--color-accent)] px-3.5 text-xs font-semibold text-[var(--color-accent-ink)] hover:brightness-95"
+        >
+          <span>Katalog Penerbit</span>
+          <ArrowRight className="size-3.5" aria-hidden="true" />
+        </Link>
+      }
+    />
   );
 }

@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   authorApplications,
@@ -8,6 +8,8 @@ import {
   communityCalendarFollowers,
   communityCalendarMembers,
   communityCalendars,
+  publisherApprovedWriters,
+  publisherFollowers,
   publisherMembers,
   publishers,
   readingSessions,
@@ -66,6 +68,9 @@ type PublicBookPreview = {
   author: string;
   coverColor: string | null;
   coverUrl: string | null;
+  publishedYear?: number | null;
+  genres?: string[];
+  pageCount?: number | null;
 };
 
 function parseQuotePostConfig(raw: unknown): QuotePostConfig | null {
@@ -281,11 +286,29 @@ export async function getSocialProfile(
     .from(userFollows)
     .where(eq(userFollows.followingUserId, targetUser.id));
 
-  // Count following
-  const [followingCountRow] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(userFollows)
-    .where(eq(userFollows.followerUserId, targetUser.id));
+  // Count following (users + communities + publishers)
+  const [
+    [userFollowingCountRow],
+    [commFollowingCountRow],
+    [pubFollowingCountRow],
+  ] = await Promise.all([
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(userFollows)
+      .where(eq(userFollows.followerUserId, targetUser.id)),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(communityCalendarFollowers)
+      .where(eq(communityCalendarFollowers.userId, targetUser.id)),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(publisherFollowers)
+      .where(eq(publisherFollowers.userId, targetUser.id)),
+  ]);
+  const totalFollowingCount =
+    Number(userFollowingCountRow?.count || 0) +
+    Number(commFollowingCountRow?.count || 0) +
+    Number(pubFollowingCountRow?.count || 0);
 
   // Count books published
   const [booksPublishedRow] = await db
@@ -337,6 +360,7 @@ export async function getSocialProfile(
       id: publishers.id,
       name: publishers.name,
       slug: publishers.slug,
+      description: publishers.description,
       logoUrl: publishers.logoUrl,
       headerImageUrl: publishers.headerImageUrl,
       city: publishers.city,
@@ -358,6 +382,7 @@ export async function getSocialProfile(
       id: p.id,
       name: p.name,
       slug: p.slug,
+      description: p.description,
       logoUrl: p.logoUrl,
       headerImageUrl: p.headerImageUrl,
       city: p.city,
@@ -376,6 +401,7 @@ export async function getSocialProfile(
       id: communityCalendars.id,
       name: communityCalendars.name,
       slug: communityCalendars.slug,
+      description: communityCalendars.description,
       avatarUrl: communityCalendars.avatarUrl,
       coverUrl: communityCalendars.coverUrl,
       city: communityCalendars.city,
@@ -403,6 +429,7 @@ export async function getSocialProfile(
       id: c.id,
       name: c.name,
       slug: c.slug,
+      description: c.description,
       avatarUrl: c.avatarUrl,
       coverUrl: c.coverUrl,
       city: c.city,
@@ -536,6 +563,9 @@ export async function getSocialProfile(
         author: book.author,
         coverColor: book.coverColor,
         coverUrl: book.coverUrl,
+        publishedYear: book.publishedYear,
+        genres: (book.genres as string[]) || [],
+        pageCount: book.pageCount,
       },
       rating: review.ratingHalfSteps / 2,
     })),
@@ -559,6 +589,9 @@ export async function getSocialProfile(
           author: book.author,
           coverColor: book.coverColor,
           coverUrl: book.coverUrl,
+          publishedYear: book.publishedYear,
+          genres: (book.genres as string[]) || [],
+          pageCount: book.pageCount,
         },
       }),
     ),
@@ -587,6 +620,9 @@ export async function getSocialProfile(
           author: book.author,
           coverColor: book.coverColor,
           coverUrl: book.coverUrl,
+          publishedYear: book.publishedYear,
+          genres: (book.genres as string[]) || [],
+          pageCount: book.pageCount,
         },
       }),
     ),
@@ -600,6 +636,27 @@ export async function getSocialProfile(
     (item) => item.shelfStatus === "finished",
   ).length;
 
+  let isApprovedWriter = false;
+  if (isSelf) {
+    const callerEmail = targetUser.email.trim().toLowerCase();
+    const [approvedRow] = await db
+      .select({ id: publisherApprovedWriters.id })
+      .from(publisherApprovedWriters)
+      .where(
+        and(
+          ne(publisherApprovedWriters.status, "revoked"),
+          callerEmail
+            ? or(
+                eq(publisherApprovedWriters.userId, targetUser.id),
+                ilike(publisherApprovedWriters.invitedEmail, callerEmail),
+              )
+            : eq(publisherApprovedWriters.userId, targetUser.id),
+        ),
+      )
+      .limit(1);
+    isApprovedWriter = Boolean(approvedRow);
+  }
+
   return {
     id: targetUser.id,
     name: targetUser.name,
@@ -612,9 +669,10 @@ export async function getSocialProfile(
     authorStatus: targetUser.authorStatus,
     authorPenName: targetUser.authorPenName,
     followersCount: Number(followerCountRow?.count || 0),
-    followingCount: Number(followingCountRow?.count || 0),
+    followingCount: totalFollowingCount,
     isFollowing,
     isSubscribedUpdates,
+    ...(isSelf ? { isApprovedWriter } : {}),
     booksPublishedCount: Number(booksPublishedRow?.count || 0),
     totalReadingMinutes,
     isPublisher: !!pubMember,
@@ -1177,6 +1235,53 @@ export async function getUserFollowing(
     });
   }
 
+  // 3. Followed publishers (from publisherFollowers)
+  const pubRows = await db
+    .select({
+      id: publishers.id,
+      name: publishers.name,
+      slug: publishers.slug,
+      logoUrl: publishers.logoUrl,
+      description: publishers.description,
+      city: publishers.city,
+    })
+    .from(publisherFollowers)
+    .innerJoin(publishers, eq(publisherFollowers.publisherId, publishers.id))
+    .where(eq(publisherFollowers.userId, profile.id))
+    .orderBy(desc(publisherFollowers.createdAt))
+    .limit(50);
+
+  for (const p of pubRows) {
+    let isFollowing = true;
+    if (currentUserId) {
+      const [f] = await db
+        .select({ id: publisherFollowers.id })
+        .from(publisherFollowers)
+        .where(
+          and(
+            eq(publisherFollowers.publisherId, p.id),
+            eq(publisherFollowers.userId, currentUserId),
+          ),
+        )
+        .limit(1);
+      isFollowing = !!f;
+    }
+
+    results.push({
+      id: p.id,
+      name: p.name,
+      username: p.slug,
+      image: p.logoUrl,
+      bio:
+        p.description ||
+        (p.city ? `Mitra Penerbit ${p.city}` : "Mitra Penerbit Resmi"),
+      role: "Mitra Penerbit Resmi",
+      type: "publisher",
+      href: `/p/${p.slug}`,
+      isFollowing,
+    });
+  }
+
   return results;
 }
 
@@ -1342,6 +1447,7 @@ export async function unifiedExplore(
       id: communityCalendars.id,
       name: communityCalendars.name,
       slug: communityCalendars.slug,
+      description: communityCalendars.description,
       avatarUrl: communityCalendars.avatarUrl,
       coverUrl: communityCalendars.coverUrl,
       city: communityCalendars.city,
@@ -1351,16 +1457,34 @@ export async function unifiedExplore(
     .where(and(...commConditions))
     .limit(10);
 
+  const commIds = commRows.map((c) => c.id);
+  const commFollowerMap = new Map<string, number>();
+  if (commIds.length > 0) {
+    const commFollowerCounts = await db
+      .select({
+        calendarId: communityCalendarFollowers.calendarId,
+        count: sql<number>`count(*)`,
+      })
+      .from(communityCalendarFollowers)
+      .where(inArray(communityCalendarFollowers.calendarId, commIds))
+      .groupBy(communityCalendarFollowers.calendarId);
+    for (const row of commFollowerCounts) {
+      commFollowerMap.set(row.calendarId, Number(row.count || 0));
+    }
+  }
+
   const communities: ManagedCommunitySummaryDto[] = commRows.map((c) => ({
     id: c.id,
     name: c.name,
     slug: c.slug,
+    description: c.description,
     avatarUrl: c.avatarUrl,
     coverUrl: c.coverUrl,
     city: c.city,
     verificationStatus:
       c.verificationStatus as ManagedCommunitySummaryDto["verificationStatus"],
     role: "member",
+    followerCount: commFollowerMap.get(c.id) ?? 0,
   }));
 
   // 4. Publishers
@@ -1382,6 +1506,7 @@ export async function unifiedExplore(
       id: publishers.id,
       name: publishers.name,
       slug: publishers.slug,
+      description: publishers.description,
       logoUrl: publishers.logoUrl,
       headerImageUrl: publishers.headerImageUrl,
       city: publishers.city,
@@ -1392,16 +1517,52 @@ export async function unifiedExplore(
     .where(and(...pubConditions))
     .limit(10);
 
+  const pubIds = pubRows.map((p) => p.id);
+  const pubFollowerMap = new Map<string, number>();
+  const pubFollowingSet = new Set<string>();
+  if (pubIds.length > 0) {
+    const [pubFollowerCounts, viewerPubFollows] = await Promise.all([
+      db
+        .select({
+          publisherId: publisherFollowers.publisherId,
+          count: sql<number>`count(*)`,
+        })
+        .from(publisherFollowers)
+        .where(inArray(publisherFollowers.publisherId, pubIds))
+        .groupBy(publisherFollowers.publisherId),
+      currentUserId
+        ? db
+            .select({ publisherId: publisherFollowers.publisherId })
+            .from(publisherFollowers)
+            .where(
+              and(
+                eq(publisherFollowers.userId, currentUserId),
+                inArray(publisherFollowers.publisherId, pubIds),
+              ),
+            )
+        : Promise.resolve([]),
+    ]);
+    for (const row of pubFollowerCounts) {
+      pubFollowerMap.set(row.publisherId, Number(row.count || 0));
+    }
+    for (const row of viewerPubFollows) {
+      pubFollowingSet.add(row.publisherId);
+    }
+  }
+
   const publishersList: ManagedPublisherSummaryDto[] = pubRows.map((p) => ({
     id: p.id,
     name: p.name,
     slug: p.slug,
+    description: p.description,
     logoUrl: p.logoUrl,
     headerImageUrl: p.headerImageUrl,
     city: p.city,
     topics: p.topics ?? [],
     verificationStatus: p.verificationStatus,
     role: null,
+    followerCount: pubFollowerMap.get(p.id) ?? 0,
+    isFollowing: currentUserId ? pubFollowingSet.has(p.id) : false,
   }));
 
   // 5. Posts (Reviews, Posted Quotes & Posted Sessions)
@@ -1434,6 +1595,9 @@ export async function unifiedExplore(
         author: books.author,
         coverColor: books.coverColor,
         coverUrl: books.coverUrl,
+        publishedYear: books.publishedYear,
+        genres: books.genres,
+        pageCount: books.pageCount,
       },
     })
     .from(bookReviews)
@@ -1484,6 +1648,9 @@ export async function unifiedExplore(
         author: books.author,
         coverColor: books.coverColor,
         coverUrl: books.coverUrl,
+        publishedYear: books.publishedYear,
+        genres: books.genres,
+        pageCount: books.pageCount,
       },
     })
     .from(bookHighlights)
@@ -1535,6 +1702,9 @@ export async function unifiedExplore(
         author: books.author,
         coverColor: books.coverColor,
         coverUrl: books.coverUrl,
+        publishedYear: books.publishedYear,
+        genres: books.genres,
+        pageCount: books.pageCount,
       },
     })
     .from(readingSessions)
@@ -1782,6 +1952,9 @@ export async function getPublicSocialPost(
           author: books.author,
           coverColor: books.coverColor,
           coverUrl: books.coverUrl,
+          publishedYear: books.publishedYear,
+          genres: books.genres,
+          pageCount: books.pageCount,
         },
       })
       .from(bookHighlights)
@@ -1844,6 +2017,9 @@ export async function getPublicSocialPost(
         author: books.author,
         coverColor: books.coverColor,
         coverUrl: books.coverUrl,
+        publishedYear: books.publishedYear,
+        genres: books.genres,
+        pageCount: books.pageCount,
       },
     })
     .from(readingSessions)

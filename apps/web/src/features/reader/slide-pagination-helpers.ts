@@ -169,3 +169,42 @@ export function computeStableBookSlideMeta(params: {
     displayTotal: Math.max(displayPage, spreads.length, estimatedTotal),
   };
 }
+
+export function computeSpreadLeafPageNumbers(params: {
+  spreads: readonly SlideSpread[];
+  spreadIndex: number;
+  allChapterNumbers?: readonly number[];
+  hasFullAccess?: boolean;
+}): { left?: number; right?: number } {
+  const { spreads, spreadIndex, allChapterNumbers, hasFullAccess } = params;
+  if (
+    spreads.length === 0 ||
+    spreadIndex < 0 ||
+    spreadIndex >= spreads.length
+  ) {
+    return {};
+  }
+
+  const targetSpread = spreads[spreadIndex];
+  const { displayPage } = computeStableBookSlideMeta({
+    spreads,
+    index: spreadIndex,
+    allChapterNumbers,
+    hasFullAccess,
+  });
+  const estimatedSpreadsBefore = Math.max(0, displayPage - (spreadIndex + 1));
+  const leavesPerSpread = Math.max(
+    1,
+    spreads.reduce((max, item) => Math.max(max, item.leaves.length), 1),
+  );
+
+  let leavesBefore = estimatedSpreadsBefore * leavesPerSpread;
+  for (let i = 0; i < spreadIndex; i++) {
+    leavesBefore += spreads[i].leaves.length;
+  }
+
+  return {
+    left: targetSpread.leaves[0] ? leavesBefore + 1 : undefined,
+    right: targetSpread.leaves[1] ? leavesBefore + 2 : undefined,
+  };
+}

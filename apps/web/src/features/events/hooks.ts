@@ -40,7 +40,10 @@ export function useEvents(params?: ListEventsInput) {
 }
 
 export function useEvent(slug: string) {
-  return useQuery(eventDetailQuery(slug));
+  return useQuery({
+    ...eventDetailQuery(slug),
+    enabled: Boolean(slug),
+  });
 }
 
 export const useEventDetail = useEvent;
@@ -50,7 +53,10 @@ export function useCalendars() {
 }
 
 export function useCalendar(slug: string) {
-  return useQuery(calendarDetailQuery(slug));
+  return useQuery({
+    ...calendarDetailQuery(slug),
+    enabled: Boolean(slug),
+  });
 }
 
 export function useLocationSuggestions() {
@@ -91,7 +97,10 @@ export function useCancelRsvp(slug: string) {
 }
 
 export function useEventAttendees(slug: string) {
-  return useQuery(eventAttendeesQuery(slug));
+  return useQuery({
+    ...eventAttendeesQuery(slug),
+    enabled: Boolean(slug),
+  });
 }
 
 export function useUpdateEvent(slug: string) {
@@ -179,11 +188,17 @@ export function useToggleFollowCalendar(slug: string) {
 }
 
 export function useCalendarMembers(slug: string) {
-  return useQuery(calendarMembersQuery(slug));
+  return useQuery({
+    ...calendarMembersQuery(slug),
+    enabled: Boolean(slug),
+  });
 }
 
 export function useCommunityWallet(slug: string) {
-  return useQuery(communityWalletQuery(slug));
+  return useQuery({
+    ...communityWalletQuery(slug),
+    enabled: Boolean(slug),
+  });
 }
 
 export function useJoinCalendar(slug: string) {

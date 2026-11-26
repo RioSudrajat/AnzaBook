@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { agent, originHeader, signUp } from "./helpers";
+import { agent, originHeader, setAuthorStatus, signUp } from "./helpers";
 import { db } from "../db";
 import {
   bookHighlights,
@@ -355,7 +355,7 @@ describe("Social Profile, 4D Explore, Community Membership & Manuscript Studio A
         calendarId,
         entryType: "affiliate_book_purchase",
         amountIdr: 15_000,
-        description: "Komisi penjualan buku alacarte",
+        description: "Komisi penjualan buku satuan",
       },
     ]);
 
@@ -430,7 +430,8 @@ describe("Social Profile, 4D Explore, Community Membership & Manuscript Studio A
 
     // Submit manuscript with multi-chapters
     const authorClient = agent();
-    await signUp(authorClient, "Penulis Fantasi");
+    const authorEmail = await signUp(authorClient, "Penulis Fantasi");
+    await setAuthorStatus(authorEmail, "verified");
 
     const submitRes = await authorClient
       .post("/api/publisher/manuscripts")
@@ -440,8 +441,8 @@ describe("Social Profile, 4D Explore, Community Membership & Manuscript Studio A
         title: "Kronik Menara Embun",
         synopsis:
           "Di dunia di mana kabut menyembunyikan masa lalu, seorang penenun waktu mencari kebenaran tentang kota yang hilang di atas awan.",
-        proposedDigitalPolicy: "hybrid_nakama_alacarte",
-        proposedAlacartePriceIdr: 45_000,
+        proposedDigitalPolicy: "nakama_or_purchase",
+        proposedDigitalPriceIdr: 45_000,
         chapters: [
           {
             chapterNumber: 1,

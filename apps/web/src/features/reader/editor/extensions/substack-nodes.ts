@@ -43,7 +43,7 @@ export const SubstackButton = Node.create({
         "data-text": HTMLAttributes.text,
         "data-variant": HTMLAttributes.variant,
         "data-url": HTMLAttributes.url,
-        class: "my-6 flex justify-center items-center select-none",
+        class: "my-6 flex justify-center items-center select-text",
       }),
       [
         "a",
@@ -100,7 +100,7 @@ export const AudioEmbed = Node.create({
         "data-title": HTMLAttributes.title,
         "data-src": HTMLAttributes.src,
         class:
-          "my-6 p-4 rounded-2xl border border-border/80 bg-muted/30 flex flex-col sm:flex-row items-center gap-3 shadow-2xs select-none",
+          "my-6 p-4 rounded-2xl border border-border/80 bg-muted/30 flex flex-col sm:flex-row items-center gap-3 shadow-2xs select-text",
       }),
       [
         "div",
@@ -276,7 +276,7 @@ export const FinancialChart = Node.create({
       mergeAttributes(HTMLAttributes, {
         "data-type": "financial-chart",
         class:
-          "my-8 p-5 rounded-2xl border border-border/80 bg-muted/20 font-mono text-xs shadow-2xs select-none",
+          "my-8 p-5 rounded-2xl border border-border/80 bg-muted/20 font-mono text-xs shadow-2xs select-text",
       }),
       [
         "div",
@@ -388,7 +388,7 @@ export const LatexBlock = Node.create({
       mergeAttributes(HTMLAttributes, {
         "data-type": "latex-block",
         class:
-          "my-6 p-4 rounded-xl border border-border/70 bg-muted/30 text-center font-mono text-sm shadow-2xs select-none",
+          "my-6 p-4 rounded-xl border border-border/70 bg-muted/30 text-center font-mono text-sm shadow-2xs select-text",
       }),
       [
         "div",
@@ -439,7 +439,7 @@ export const Collapsible = Node.create({
         "summary",
         {
           class:
-            "font-semibold text-foreground cursor-pointer select-none hover:text-[var(--color-accent)]",
+            "font-semibold text-foreground cursor-pointer select-text hover:text-[var(--color-accent)]",
         },
         HTMLAttributes.summary,
       ],
@@ -504,7 +504,7 @@ export const PollBlock = Node.create({
       mergeAttributes(HTMLAttributes, {
         "data-type": "poll-block",
         class:
-          "my-8 p-5 rounded-2xl border border-border/80 bg-background shadow-xs select-none",
+          "my-8 p-5 rounded-2xl border border-border/80 bg-background shadow-xs select-text",
       }),
       [
         "div",
@@ -579,7 +579,7 @@ export const PredictionMarket = Node.create({
       mergeAttributes(HTMLAttributes, {
         "data-type": "prediction-market",
         class:
-          "my-6 p-4 rounded-xl border border-border/80 bg-muted/20 shadow-2xs select-none flex items-center justify-between gap-3",
+          "my-6 p-4 rounded-xl border border-border/80 bg-muted/20 shadow-2xs select-text flex items-center justify-between gap-3",
       }),
       [
         "div",
@@ -752,7 +752,7 @@ export const ThinDivider = Node.create({
       "div",
       mergeAttributes(HTMLAttributes, {
         "data-type": "divider-thin",
-        class: "my-8 border-t border-current/15 w-full select-none",
+        class: "my-8 border-t border-current/15 w-full select-text",
       }),
     ];
   },
@@ -777,7 +777,7 @@ export const MediumDivider = Node.create({
       "div",
       mergeAttributes(HTMLAttributes, {
         "data-type": "divider-medium",
-        class: "my-8 border-t-2 border-current/30 w-full select-none",
+        class: "my-8 border-t-2 border-current/30 w-full select-text",
       }),
     ];
   },

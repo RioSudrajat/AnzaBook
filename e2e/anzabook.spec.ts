@@ -73,8 +73,8 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     await secondChapter.evaluate((section) =>
       section.scrollIntoView({ block: "start" }),
     );
-    await expect(page.getByText("Bab 2/8", { exact: true })).toBeVisible();
-    await expect(page.getByText(/^\d+%$/)).toBeVisible();
+    await expect(page.getByText("2/8", { exact: true })).toBeVisible();
+    await expect(page.getByText(/^\d+(?:\.\d)?%$/)).toBeVisible();
 
     await page.getByRole("button", { name: "Keluar ke Home" }).click();
     const exitDialog = page.getByRole("dialog", {
@@ -92,8 +92,8 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
       .first()
       .click();
     await expect(secondChapter.getByRole("heading")).toBeInViewport();
-    await expect(page.getByText("Bab 2/8", { exact: true })).toBeVisible();
-    await expect(page.getByText(/^\d+%$/)).toBeVisible();
+    await expect(page.getByText("2/8", { exact: true })).toBeVisible();
+    await expect(page.getByText(/^\d+(?:\.\d)?%$/)).toBeVisible();
 
     const detail = await page.request.get(`${API_URL}/api/books/${slug}`);
     const { data: book } = await detail.json();
@@ -128,7 +128,7 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     await expect(
       page.getByRole("dialog", { name: "Prapemuat Literasi AnzaBook" }),
     ).toHaveCount(0);
-    await expect(page.getByText("Bab 1/8", { exact: true })).toBeVisible();
+    await expect(page.getByText("1/8", { exact: true })).toBeVisible();
     // Bounded DRM-02 sliding window: initially [1, 2], later chapters not dumped upfront
     await expect(page.locator("#chapter-sec-8")).toHaveCount(0);
     await page
@@ -149,7 +149,7 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
         behavior: "instant",
       }),
     );
-    await expect(page.getByText("Bab 8/8", { exact: true })).toBeVisible();
+    await expect(page.getByText("8/8", { exact: true })).toBeVisible();
     await expect(page.getByText("100%", { exact: true })).toBeVisible();
     await expect
       .poll(async () => {
@@ -239,7 +239,12 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
         level: 1,
       }),
     ).toBeVisible();
-    await expect(page.getByText(/Zenius/i).first()).toBeVisible();
+    await expect(
+      page
+        .getByText(/AnzaBook/i)
+        .locator(":visible")
+        .first(),
+    ).toBeVisible();
     await expect(page.getByRole("img", { name: /^Anza ?Book$/ })).toBeVisible();
     await expect(
       page.locator("[data-book-cover]:visible").first(),
@@ -270,7 +275,7 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     ).toBeVisible();
     await expect(
       page
-        .getByRole("button", { name: /Save to Library/i })
+        .getByRole("button", { name: /Simpan ke Rak Baca/i })
         .locator(":visible")
         .first(),
     ).toBeVisible();
@@ -354,7 +359,7 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     expect(watermarkCode).not.toContain("@");
 
     // Glossy progress bar at bottom
-    await expect(page.getByText(/Bab 1\//i).first()).toBeVisible();
+    await expect(page.getByText(/^1\/\d+$/).first()).toBeVisible();
 
     // 1. Trigger DRM shield via PrintScreen (verifies synchronous curtain + alertdialog lock)
     await page.keyboard.press("PrintScreen");

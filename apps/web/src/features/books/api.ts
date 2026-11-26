@@ -31,7 +31,7 @@ import type {
   CreateHighlightInput,
   SaveReadingProgressInput,
 } from "@starter/shared/validators/reading";
-import type { PurchaseBookAlacarteInput } from "@starter/shared/validators/publisher";
+import type { PurchaseBookInput } from "@starter/shared/validators/publisher";
 import type {
   RecordDrmEventInput,
   SubmitDrmAppealInput,
@@ -240,9 +240,9 @@ export async function restartBookReading(bookId: string) {
   return data;
 }
 
-export async function purchaseBookAlacarte(
+export async function purchaseDigitalBook(
   slug: string,
-  input?: PurchaseBookAlacarteInput,
+  input?: PurchaseBookInput,
 ) {
   const { data } = await apiFetch<DataResponse<BookPurchaseDto>>(
     `/api/books/${encodeURIComponent(slug)}/purchase`,

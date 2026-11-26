@@ -88,6 +88,8 @@ const schema = z
     GMAIL_CLIENT_SECRET: z.string().min(1).optional(),
     GMAIL_REFRESH_TOKEN: z.string().min(1).optional(),
     GMAIL_FROM: z.email().optional(),
+    STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
+    STORAGE_LOCAL_DIR: z.string().trim().optional(),
   })
   .superRefine((values, ctx) => {
     if (

@@ -12,7 +12,9 @@ import {
   Sun,
   User,
 } from "lucide-react";
+import { AnzaLogoMark } from "@/components/brand";
 import { SiteFooter } from "@/components/site-footer";
+import { useLocalStorageFlag } from "@/lib/use-local-storage-flag";
 import { AppDownloadDialog } from "@/features/dashboard/components/app-download-dialog";
 import {
   AppSidebar,
@@ -57,14 +59,12 @@ export function AppShell({
   const navigate = useNavigate();
   const { data: membership } = useMembershipSummary();
 
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("anzabook_sidebar_collapsed") === "true";
-  });
-  const [isDark, setIsDark] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("anzabook-theme") === "dark";
-  });
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useLocalStorageFlag(
+    "anzabook_sidebar_collapsed",
+    "true",
+  );
+  const [isDark, setIsDark] = useLocalStorageFlag("anzabook-theme", "dark");
+
   const [isVoucherOpen, setIsVoucherOpen] = useState(false);
   const [appDownloadPlatform, setAppDownloadPlatform] = useState<
     "android" | "ios" | null
@@ -79,19 +79,11 @@ export function AppShell({
   }, [isDark]);
 
   const handleToggleSidebar = () => {
-    setIsSidebarCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem("anzabook_sidebar_collapsed", String(next));
-      return next;
-    });
+    setIsSidebarCollapsed((prev) => !prev);
   };
 
   const handleToggleTheme = () => {
-    setIsDark((prev) => {
-      const next = !prev;
-      localStorage.setItem("anzabook-theme", next ? "dark" : "light");
-      return next;
-    });
+    setIsDark((prev) => !prev);
   };
 
   const handleTabChange = (tab: SidebarTab) => {
@@ -121,11 +113,7 @@ export function AppShell({
       <div className="flex-1 flex flex-col min-w-0">
         <header className="sticky top-0 z-30 border-b border-border/80 bg-background/95 backdrop-blur-md px-6 py-3.5 flex items-center justify-between select-none">
           <div className="flex items-center gap-3">
-            <img
-              src="/icon.svg"
-              alt="AnzaBook"
-              className="size-6 rounded-[5px] object-contain md:hidden border border-border/40 shadow-xs"
-            />
+            <AnzaLogoMark className="size-6 text-foreground md:hidden shrink-0" />
             <h1 className="font-serif text-xl sm:text-2xl font-bold">
               {title}
             </h1>

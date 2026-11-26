@@ -37,12 +37,12 @@ async function createTestBook(params: {
   title: string;
   digitalPolicy:
     | "free_open"
-    | "print_claim_only"
-    | "sample_only"
-    | "alacarte_only"
-    | "hybrid_nakama_alacarte";
+    | "print_code_only"
+    | "nakama_subscription"
+    | "single_purchase"
+    | "nakama_or_purchase";
   publisherId?: string;
-  alacartePriceIdr?: number | null;
+  digitalPriceIdr?: number | null;
 }) {
   const [book] = await db
     .insert(books)
@@ -56,7 +56,7 @@ async function createTestBook(params: {
       totalChapters: 3,
       digitalPolicy: params.digitalPolicy,
       publisherId: params.publisherId,
-      alacartePriceIdr: params.alacartePriceIdr ?? null,
+      digitalPriceIdr: params.digitalPriceIdr ?? null,
     })
     .returning();
 
@@ -86,7 +86,7 @@ async function createTestBook(params: {
 }
 
 describe("B2B2C Monetization & DRM Engine", () => {
-  it("denies chapter 2 of print_claim_only book to Nakama member without claimed code", async () => {
+  it("denies chapter 2 of print_code_only book to Nakama member without claimed code", async () => {
     const client = agent();
     const email = await signUp(client, "Nakama Member Only");
     const [usr] = await db
@@ -104,7 +104,7 @@ describe("B2B2C Monetization & DRM Engine", () => {
     await createTestBook({
       slug,
       title: "Buku Khusus Fisik",
-      digitalPolicy: "print_claim_only",
+      digitalPolicy: "print_code_only",
     });
 
     // Chapter 1 is allowed as preview
@@ -118,7 +118,7 @@ describe("B2B2C Monetization & DRM Engine", () => {
     expect(ch2.body.error.code).toBe("FORBIDDEN_DIGITAL_ACCESS");
   });
 
-  it("unlocks full access when physical claim code is redeemed on print_claim_only book", async () => {
+  it("unlocks full access when physical claim code is redeemed on print_code_only book", async () => {
     const client = agent();
     await signUp(client, "Claimer Reader");
 
@@ -126,7 +126,7 @@ describe("B2B2C Monetization & DRM Engine", () => {
     const book = await createTestBook({
       slug,
       title: "Buku Cetak Berkode",
-      digitalPolicy: "print_claim_only",
+      digitalPolicy: "print_code_only",
     });
 
     const claimCode = `PHY-${randomUUID().slice(0, 8).toUpperCase()}`;
@@ -151,9 +151,9 @@ describe("B2B2C Monetization & DRM Engine", () => {
     expect(ch2.body.data.currentChapter.chapterNumber).toBe(2);
   });
 
-  it("handles ala carte purchase (75:10:15 split), credits community wallet, and unlocks full access", async () => {
+  it("handles single purchase (75:10:15 split), credits community wallet, and unlocks full access", async () => {
     const client = agent();
-    const email = await signUp(client, "Ala Carte Buyer");
+    const email = await signUp(client, "Direct Digital Buyer");
     const [usr] = await db
       .select({ id: user.id })
       .from(user)
@@ -172,13 +172,13 @@ describe("B2B2C Monetization & DRM Engine", () => {
       })
       .returning();
 
-    const bookSlug = `alacarte-book-${randomUUID().slice(0, 8)}`;
+    const bookSlug = `single-book-${randomUUID().slice(0, 8)}`;
     const book = await createTestBook({
       slug: bookSlug,
-      title: "Buku Ala Carte Eksklusif",
-      digitalPolicy: "alacarte_only",
+      title: "Buku Beli Satuan Eksklusif",
+      digitalPolicy: "single_purchase",
       publisherId: publisher.id,
-      alacartePriceIdr: 50_000,
+      digitalPriceIdr: 50_000,
     });
 
     // Before purchase: Chapter 2 is locked
@@ -289,9 +289,9 @@ describe("B2B2C Monetization & DRM Engine", () => {
     await createTestBook({
       slug: bookSlug,
       title: "Buku Pembelajaran Mandiri",
-      digitalPolicy: "alacarte_only",
+      digitalPolicy: "single_purchase",
       publisherId: publisher.id,
-      alacartePriceIdr: 40_000,
+      digitalPriceIdr: 40_000,
     });
 
     // Purchase WITHOUT passing affiliateCalendarSlug or affiliateCalendarId
@@ -314,7 +314,7 @@ describe("B2B2C Monetization & DRM Engine", () => {
     expect(ledger.amountIdr).toBe(4_000);
   });
 
-  it("supports hybrid_nakama_alacarte for both Nakama members and ala carte buyers", async () => {
+  it("supports nakama_or_purchase for both Nakama members and single purchase buyers", async () => {
     const nakamaClient = agent();
     const nakamaEmail = await signUp(nakamaClient, "Hybrid Nakama Member");
     const [nakamaUser] = await db
@@ -335,9 +335,9 @@ describe("B2B2C Monetization & DRM Engine", () => {
     await createTestBook({
       slug: bookSlug,
       title: "Buku Hibrida Terpadu",
-      digitalPolicy: "hybrid_nakama_alacarte",
+      digitalPolicy: "nakama_or_purchase",
       publisherId: publisher.id,
-      alacartePriceIdr: 30_000,
+      digitalPriceIdr: 30_000,
     });
 
     // 1. Nakama member can read chapter 2 directly via subscription
@@ -353,7 +353,7 @@ describe("B2B2C Monetization & DRM Engine", () => {
     );
     expect(buyerLocked.status).toBe(403);
 
-    // 3. Buyer purchases ala carte -> unlocks chapter 2
+    // 3. Buyer purchases digitally -> unlocks chapter 2
     const buyRes = await buyerClient
       .post(`/api/books/${bookSlug}/purchase`)
       .set(originHeader)
@@ -472,7 +472,7 @@ describe("B2B2C Monetization & DRM Engine", () => {
     const book = await createTestBook({
       slug: bookSlug,
       title: "Buku Royalti Nakama Pool",
-      digitalPolicy: "sample_only",
+      digitalPolicy: "nakama_subscription",
     });
 
     // 1. Bot speed: avgWpm = 1200 -> isValidForRoyalty = false

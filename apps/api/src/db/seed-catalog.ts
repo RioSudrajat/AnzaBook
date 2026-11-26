@@ -4,6 +4,7 @@ import { and, asc, eq, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "./schema";
 import { allBooksData } from "./seeds/books-data";
+import type { SeedAuthorUsername } from "./seeds/types";
 
 const ANZABOOK_PUBLISHER_SEED = {
   slug: "anzabook",
@@ -268,14 +269,289 @@ export async function ensureAnzaBookPublisher(
   return anzabookPublisher;
 }
 
+type SeedAuthorsMap = Record<
+  SeedAuthorUsername,
+  typeof schema.user.$inferSelect
+>;
+
+async function ensureCredentialPasswordForNonProd(
+  db: NodePgDatabase<typeof schema>,
+  userId: string,
+  fallbackPassword: string,
+): Promise<void> {
+  if (process.env.NODE_ENV === "production") return;
+  const [existingCredential] = await db
+    .select({ id: schema.account.id })
+    .from(schema.account)
+    .where(
+      and(
+        eq(schema.account.userId, userId),
+        eq(schema.account.providerId, "credential"),
+      ),
+    )
+    .limit(1);
+
+  if (!existingCredential) {
+    const passwordHash = await hashPassword(fallbackPassword);
+    await db.insert(schema.account).values({
+      id: randomUUID(),
+      accountId: userId,
+      providerId: "credential",
+      userId,
+      password: passwordHash,
+    });
+  }
+}
+
+async function upsertSeedAuthorAccount(
+  db: NodePgDatabase<typeof schema>,
+  config: {
+    email: string;
+    username: SeedAuthorUsername;
+    name: string;
+    authorPenName: string;
+    bio: string;
+    locationCity: string;
+    preserveExistingIdentity?: boolean;
+  },
+): Promise<typeof schema.user.$inferSelect> {
+  const [existingByEmail] = await db
+    .select()
+    .from(schema.user)
+    .where(eq(sql`lower(${schema.user.email})`, config.email.toLowerCase()))
+    .limit(1);
+
+  const [existingByUsername] =
+    !existingByEmail && process.env.NODE_ENV !== "production"
+      ? await db
+          .select()
+          .from(schema.user)
+          .where(eq(sql`lower(${schema.user.username})`, config.username))
+          .orderBy(asc(schema.user.createdAt), asc(schema.user.id))
+          .limit(1)
+      : [undefined];
+
+  const existing = existingByEmail ?? existingByUsername;
+  const [usernameHolder] = await db
+    .select({ id: schema.user.id })
+    .from(schema.user)
+    .where(eq(sql`lower(${schema.user.username})`, config.username))
+    .limit(1);
+
+  let authorUser: typeof schema.user.$inferSelect;
+
+  if (existing) {
+    const canClaimUsername =
+      !usernameHolder || usernameHolder.id === existing.id;
+    const [updated] = await db
+      .update(schema.user)
+      .set({
+        ...(config.preserveExistingIdentity
+          ? {
+              authorPenName: existing.authorPenName || config.authorPenName,
+              bio: existing.bio || config.bio,
+              locationCity: existing.locationCity || config.locationCity,
+            }
+          : {
+              name: config.name,
+              authorPenName: config.authorPenName,
+              bio: existing.bio || config.bio,
+              locationCity: existing.locationCity || config.locationCity,
+            }),
+        ...(canClaimUsername && !existing.username
+          ? { username: config.username }
+          : {}),
+        role: existing.role || "user",
+        emailVerified: true,
+        authorStatus: "verified",
+      })
+      .where(eq(schema.user.id, existing.id))
+      .returning();
+    authorUser = updated;
+  } else {
+    const userId = randomUUID();
+    const [inserted] = await db
+      .insert(schema.user)
+      .values({
+        id: userId,
+        email: config.email,
+        username: usernameHolder ? null : config.username,
+        name: config.name,
+        authorPenName: config.authorPenName,
+        bio: config.bio,
+        locationCity: config.locationCity,
+        role: "user",
+        emailVerified: true,
+        authorStatus: "verified",
+      })
+      .returning();
+    authorUser = inserted;
+  }
+
+  const devPassword =
+    process.env.ANZABOOK_DEV_AUTHOR_PASSWORD || "PenulisAnza123!";
+  await ensureCredentialPasswordForNonProd(db, authorUser.id, devPassword);
+  return authorUser;
+}
+
+async function upsertSeedAuthors(
+  db: NodePgDatabase<typeof schema>,
+): Promise<SeedAuthorsMap> {
+  const anzabookUser = await upsertAnzaBookEditorialUser(db);
+  const selembarEmail =
+    process.env.ANZABOOK_SELEMBARAWAN_EMAIL?.trim().toLowerCase() ||
+    "selembarawan@anzabook.id";
+
+  const selembarawanUser = await upsertSeedAuthorAccount(db, {
+    email: selembarEmail,
+    username: "selembarawan",
+    name: "Selembar Awan",
+    authorPenName: "Selembar Awan",
+    bio: "Penulis esai filsafat, budaya literasi, dan penerbitan independen.",
+    locationCity: "Jakarta",
+    preserveExistingIdentity: true,
+  });
+
+  const okesudrajatUser = await upsertSeedAuthorAccount(db, {
+    email: "okesudrajat@anzabook.id",
+    username: "okesudrajat",
+    name: "Oke Sudrajat",
+    authorPenName: "Oke Sudrajat",
+    bio: "Penulis fiksi horor psikologis, misteri kampus, dan esai antropologi di AnzaBook.",
+    locationCity: "Bandung",
+  });
+
+  return {
+    anzabook: anzabookUser,
+    selembarawan: selembarawanUser,
+    okesudrajat: okesudrajatUser,
+  };
+}
+
+const COMMUNITY_SEEDS: ReadonlyArray<{
+  slug: string;
+  name: string;
+  type: "community";
+  city: string;
+  contactEmail: string;
+  description: string;
+  ownerUsername: SeedAuthorUsername;
+}> = [
+  {
+    slug: "klub-baca-anzabook",
+    name: "Klub Baca & Diskusi AnzaBook",
+    type: "community",
+    city: "Jakarta",
+    contactEmail: "komunitas@anzabook.id",
+    description:
+      "Ruang diskusi buku bulanan, bedah karya klasik Nusantara, dan temu pembaca resmi AnzaBook di Jakarta & daring.",
+    ownerUsername: "anzabook",
+  },
+  {
+    slug: "lingkar-aksara-bandung",
+    name: "Lingkar Aksara & Fiksi Spekulatif",
+    type: "community",
+    city: "Bandung",
+    contactEmail: "bandung@anzabook.id",
+    description:
+      "Komunitas penulis dan pembaca fiksi misteri, horor psikologis, serta lokakarya penulisan kreatif di Bandung.",
+    ownerUsername: "okesudrajat",
+  },
+  {
+    slug: "kolektif-literasi-merdeka",
+    name: "Kolektif Literasi & Filsafat Populer",
+    type: "community",
+    city: "Yogyakarta",
+    contactEmail: "kolektif@anzabook.id",
+    description:
+      "Lingkar baca buku filsafat, sejarah pemikiran, dan esai kebudayaan untuk pembaca independen.",
+    ownerUsername: "selembarawan",
+  },
+];
+
+async function ensureSeededCommunities(
+  db: NodePgDatabase<typeof schema>,
+  authorsByUsername: SeedAuthorsMap,
+): Promise<void> {
+  for (const item of COMMUNITY_SEEDS) {
+    const ownerUser = authorsByUsername[item.ownerUsername];
+    const [existing] = await db
+      .select()
+      .from(schema.communityCalendars)
+      .where(eq(schema.communityCalendars.slug, item.slug))
+      .limit(1);
+
+    let calendarId: string;
+    if (existing) {
+      calendarId = existing.id;
+      const nextStatus =
+        existing.verificationStatus === "trusted" ? "trusted" : "verified";
+      await db
+        .update(schema.communityCalendars)
+        .set({
+          name: item.name,
+          type: item.type,
+          city: item.city,
+          contactEmail: item.contactEmail,
+          description: existing.description || item.description,
+          verificationStatus: nextStatus,
+          createdByUserId: existing.createdByUserId ?? ownerUser.id,
+        })
+        .where(eq(schema.communityCalendars.id, existing.id));
+    } else {
+      const [inserted] = await db
+        .insert(schema.communityCalendars)
+        .values({
+          slug: item.slug,
+          name: item.name,
+          type: item.type,
+          city: item.city,
+          contactEmail: item.contactEmail,
+          description: item.description,
+          verificationStatus: "verified",
+          createdByUserId: ownerUser.id,
+        })
+        .onConflictDoNothing({ target: schema.communityCalendars.slug })
+        .returning();
+
+      if (inserted) {
+        calendarId = inserted.id;
+      } else {
+        const [concurrent] = await db
+          .select({ id: schema.communityCalendars.id })
+          .from(schema.communityCalendars)
+          .where(eq(schema.communityCalendars.slug, item.slug))
+          .limit(1);
+        calendarId = concurrent.id;
+      }
+    }
+
+    await db
+      .insert(schema.communityCalendarMembers)
+      .values({
+        calendarId,
+        userId: ownerUser.id,
+        role: "owner",
+      })
+      .onConflictDoNothing({
+        target: [
+          schema.communityCalendarMembers.calendarId,
+          schema.communityCalendarMembers.userId,
+        ],
+      });
+  }
+}
+
 export async function seedCatalog(
   db: NodePgDatabase<typeof schema>,
 ): Promise<void> {
   console.log(
-    "Menyelaraskan data katalog AnzaBook, toko rekanan, dan bab buku...",
+    "Menyelaraskan data katalog AnzaBook, toko rekanan, penulis resmi, komunitas, dan bab buku...",
   );
 
   const anzabookPublisher = await ensureAnzaBookPublisher(db);
+  const authorsByUsername = await upsertSeedAuthors(db);
+  await ensureSeededCommunities(db, authorsByUsername);
 
   // 1. Cabang Toko Mitra & Titik GPS Peta
   const branchSeeds = [
@@ -382,7 +658,20 @@ export async function seedCatalog(
 
   // 2. Masukkan atau Perbarui 13 Buku ke Database
   for (const bookItem of allBooksData) {
-    const { chapters, editions, claimCodes, ...bookRow } = bookItem;
+    const {
+      chapters,
+      editions,
+      claimCodes,
+      authorUsername,
+      preserveDisplayAuthor,
+      ...bookRow
+    } = bookItem;
+    const linkedAuthor = authorsByUsername[authorUsername];
+    const resolvedAuthorName = preserveDisplayAuthor
+      ? bookRow.author
+      : linkedAuthor.name;
+    const resolvedAuthorAvatar =
+      linkedAuthor.image ?? bookRow.authorAvatar ?? null;
 
     const [existingBook] = await db
       .select({
@@ -401,13 +690,12 @@ export async function seedCatalog(
         .update(schema.books)
         .set({
           publisherId: existingBook.publisherId ?? anzabookPublisher.id,
+          authorUserId: linkedAuthor.id,
           title: bookRow.title,
-          originalTitle: bookRow.originalTitle,
-          author: bookRow.author,
-          authorAvatar: bookRow.authorAvatar,
+          author: resolvedAuthorName,
+          authorAvatar: resolvedAuthorAvatar,
           editor: bookRow.editor,
           editorAvatar: bookRow.editorAvatar,
-          translator: bookRow.translator,
           coverUrl: bookRow.coverUrl,
           coverColor: bookRow.coverColor,
           synopsis: bookRow.synopsis,
@@ -437,6 +725,9 @@ export async function seedCatalog(
         .insert(schema.books)
         .values({
           ...bookRow,
+          author: resolvedAuthorName,
+          authorAvatar: resolvedAuthorAvatar,
+          authorUserId: linkedAuthor.id,
           publisherId: anzabookPublisher.id,
         })
         .returning();

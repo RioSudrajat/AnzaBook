@@ -23,7 +23,10 @@ export function useNotes(params?: ListNotesInput) {
 }
 
 export function useNote(id: string) {
-  return useQuery(noteQuery(id));
+  return useQuery({
+    ...noteQuery(id),
+    enabled: Boolean(id),
+  });
 }
 
 export function useCreateNote() {

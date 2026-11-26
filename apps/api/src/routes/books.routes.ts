@@ -11,7 +11,7 @@ import {
   createReviewSchema,
   listParagraphCommentsQuerySchema,
 } from "@starter/shared/validators/community";
-import { purchaseBookAlacarteSchema } from "@starter/shared/validators/publisher";
+import { purchaseBookSchema } from "@starter/shared/validators/publisher";
 import { HttpError } from "../lib/http-error";
 import {
   getAuth,
@@ -31,7 +31,7 @@ import {
   listCategories,
   listCollections,
   listBooks,
-  purchaseBookAlacarte,
+  purchaseDigitalBook,
 } from "../services/books.service";
 import {
   createComment,
@@ -119,7 +119,7 @@ booksRouter.post(
   },
 );
 
-// Protected: Purchase book ala carte (75% publisher, 10% community affiliate, 15% AnzaBook)
+// Protected: Purchase single book permanently (75% publisher, 10% community affiliate, 15% AnzaBook)
 booksRouter.post(
   "/:slug/purchase",
   requireAuth,
@@ -128,7 +128,7 @@ booksRouter.post(
   async (req, res) => {
     const { slug } = bookSlugSchema.parse({ slug: req.params.slug });
     const auth = getAuth(req);
-    const input = purchaseBookAlacarteSchema.parse({
+    const input = purchaseBookSchema.parse({
       ...req.body,
       affiliateCalendarSlug:
         req.body?.affiliateCalendarSlug ??
@@ -141,7 +141,7 @@ booksRouter.post(
           ? req.query.affiliateCalendarId
           : undefined),
     });
-    const result = await purchaseBookAlacarte(auth.user.id, slug, input);
+    const result = await purchaseDigitalBook(auth.user.id, slug, input);
     res.status(201).json({ data: result });
   },
 );

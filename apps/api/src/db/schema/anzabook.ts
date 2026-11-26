@@ -12,7 +12,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import type {
-  DigitalPolicy,
+  BookDistributionModel,
   QuotePostConfig,
   SessionPostConfig,
 } from "@starter/shared/types";
@@ -25,12 +25,10 @@ export const books = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     slug: varchar("slug", { length: 120 }).notNull().unique(),
     title: varchar("title", { length: 255 }).notNull(),
-    originalTitle: varchar("original_title", { length: 255 }),
     author: varchar("author", { length: 255 }).notNull(),
     authorAvatar: text("author_avatar"),
     editor: varchar("editor", { length: 255 }),
     editorAvatar: text("editor_avatar"),
-    translator: varchar("translator", { length: 255 }),
     coverUrl: text("cover_url").notNull(),
     coverColor: varchar("cover_color", { length: 32 })
       .notNull()
@@ -45,16 +43,16 @@ export const books = pgTable(
       .notNull()
       .default(0),
     digitalPolicy: varchar("digital_policy", { length: 32 })
-      .$type<DigitalPolicy>()
+      .$type<BookDistributionModel>()
       .notNull()
-      .default("sample_only"),
+      .default("nakama_subscription"),
     publisherId: uuid("publisher_id").references(() => publishers.id, {
       onDelete: "set null",
     }),
     authorUserId: text("author_user_id").references(() => user.id, {
       onDelete: "set null",
     }),
-    alacartePriceIdr: integer("alacarte_price_idr"),
+    digitalPriceIdr: integer("digital_price_idr"),
     accessTier: varchar("access_tier", { length: 32 })
       .$type<"free" | "premium" | "premium_physical">()
       .notNull()

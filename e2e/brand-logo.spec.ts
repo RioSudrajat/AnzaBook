@@ -48,15 +48,8 @@ test.describe("AnzaBook Open-Page Arch Brand Assets", () => {
       name: "Prapemuat Literasi AnzaBook",
     });
     if (await preloader.isVisible()) {
-      const preloaderImg = preloader.locator('img[src="/icon.svg"]');
-      await expect(preloaderImg).toBeVisible();
-      await expect
-        .poll(() =>
-          preloaderImg.evaluate(
-            (img: HTMLImageElement) => img.complete && img.naturalWidth > 0,
-          ),
-        )
-        .toBe(true);
+      const preloaderMark = preloader.locator('[data-brand-mark="anza-arch"]');
+      await expect(preloaderMark).toBeVisible();
       await page.getByTestId("skip-preloader").click();
       await expect(preloader).toHaveCount(0);
     }
@@ -65,15 +58,10 @@ test.describe("AnzaBook Open-Page Arch Brand Assets", () => {
       page.getByRole("heading", { name: /Aksara Tanpa Penjara Pikiran/i }),
     ).toBeVisible();
 
-    const headerLogo = page.locator('header img[src="/icon.svg"]').first();
+    const headerLogo = page
+      .locator('header [data-brand-mark="anza-arch"]')
+      .first();
     await expect(headerLogo).toBeVisible();
-    await expect
-      .poll(() =>
-        headerLogo.evaluate(
-          (img: HTMLImageElement) => img.complete && img.naturalWidth > 0,
-        ),
-      )
-      .toBe(true);
 
     const coverMark = page
       .locator('[data-book-cover] [data-brand-mark="anza-arch"]')

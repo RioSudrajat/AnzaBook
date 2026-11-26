@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocalStorageFlag } from "@/lib/use-local-storage-flag";
 import { Link } from "@tanstack/react-router";
 import {
   ArrowLeft,
@@ -33,11 +34,13 @@ import type {
   PublisherDto,
 } from "@starter/shared/types";
 import { roleHasPermission } from "@starter/shared/permissions";
+import { formatDigitalPolicy } from "@/lib/formatters";
 import { ApiError } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { AnzaLogoMark } from "@/components/brand";
 import { SiteFooter } from "@/components/site-footer";
 import { useCatalogBooks } from "@/features/books/hooks";
 import { AdminSidebar, type AdminTab } from "./admin-sidebar";
@@ -148,26 +151,16 @@ export function AdminCmsDashboard({
 
   const { data: overview } = useAdminOverview();
 
-  // Sidebar collapse state
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("anzabook_sidebar_collapsed") === "true";
-  });
+  // Sidebar collapse & theme state
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useLocalStorageFlag(
+    "anzabook_sidebar_collapsed",
+    "true",
+  );
+  const [isDark, setIsDark] = useLocalStorageFlag("anzabook-theme", "dark");
 
   const handleToggleSidebar = () => {
-    setIsSidebarCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem("anzabook_sidebar_collapsed", String(next));
-      return next;
-    });
+    setIsSidebarCollapsed((prev) => !prev);
   };
-
-  // Theme dark mode state: default is LIGHT!
-  const [isDark, setIsDark] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const savedTheme = localStorage.getItem("anzabook-theme");
-    return savedTheme === "dark";
-  });
 
   useEffect(() => {
     if (isDark) {
@@ -178,11 +171,7 @@ export function AdminCmsDashboard({
   }, [isDark]);
 
   const handleToggleTheme = () => {
-    setIsDark((prev) => {
-      const next = !prev;
-      localStorage.setItem("anzabook-theme", next ? "dark" : "light");
-      return next;
-    });
+    setIsDark((prev) => !prev);
   };
 
   const pendingCalendars = overview?.pendingCalendarsCount ?? 0;
@@ -220,11 +209,7 @@ export function AdminCmsDashboard({
         {/* Top Header Bar per App Layout */}
         <header className="sticky top-0 z-30 border-b border-border/80 bg-background/95 backdrop-blur-md px-6 py-3.5 flex items-center justify-between select-none">
           <div className="flex items-center gap-3 min-w-0">
-            <img
-              src="/icon.svg"
-              alt="AnzaBook"
-              className="size-6 rounded-[5px] object-contain md:hidden border border-border/40 shadow-xs shrink-0"
-            />
+            <AnzaLogoMark className="size-6 text-foreground md:hidden shrink-0" />
             <div className="min-w-0">
               <h1 className="font-serif text-xl sm:text-2xl font-bold truncate">
                 {tabTitles[activeTab]}
@@ -1796,7 +1781,7 @@ function TabClaimBatches() {
               <option value="">-- Pilih Judul Buku --</option>
               {booksList.map((b) => (
                 <option key={b.id} value={b.id}>
-                  {b.title} ({b.digitalPolicy})
+                  {b.title} ({formatDigitalPolicy(b.digitalPolicy)})
                 </option>
               ))}
             </select>
@@ -2013,7 +1998,7 @@ function TabFinancials({
   overview: AdminOverviewDto | undefined;
 }) {
   const nakamaPool = overview?.estimatedNakamaRoyaltyPoolIdr ?? 0;
-  const alacarteSales = overview?.totalAlacarteSalesIdr ?? 0;
+  const singlePurchaseSales = overview?.totalSinglePurchaseSalesIdr ?? 0;
   const publisherShare = overview?.totalPublisherShareIdr ?? 0;
   const anzabookNet = overview?.totalNetAnzabookIdr ?? 0;
   const affiliateCommissions = overview?.totalAffiliateCommissionsIdr ?? 0;
@@ -2026,7 +2011,7 @@ function TabFinancials({
         </h2>
         <p className="text-sm text-muted-foreground">
           Transparansi pembagian pendapatan ekosistem AnzaBook: 55% Nakama Pool
-          untuk penulis/penerbit, 75% omzet buku satuan, dan 10% komisi kas
+          untuk penulis/penerbit, 75% omzet pembelian satuan, dan 10% komisi kas
           komunitas.
         </p>
       </div>
@@ -2049,14 +2034,14 @@ function TabFinancials({
           </p>
         </div>
 
-        {/* Card 2: Ala Carte Sales */}
+        {/* Card 2: Single Purchase Sales */}
         <div className="rounded-xl border border-border bg-card p-6 space-y-3 shadow-xs">
           <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             <span>Buku Satuan (75% : 25%)</span>
             <BookOpen className="size-4" aria-hidden="true" />
           </div>
           <div className="text-3xl font-extrabold text-foreground">
-            {formatIdr(alacarteSales)}
+            {formatIdr(singlePurchaseSales)}
           </div>
           <div className="space-y-1 text-xs text-muted-foreground">
             <div className="flex justify-between">

@@ -1,95 +1,120 @@
-import { ChevronLeft, ChevronRight, Star } from "lucide-react";
+import { Star } from "lucide-react";
+import {
+  formatReaderProgressPercent,
+  type ReaderProgressSegment,
+} from "@/features/reader/session-metrics";
 
 type GlossyProgressBarProps = {
   currentChapter: number;
   totalChapters: number;
   currentPercent: number; // 0 to 100
-  onPrevChapter?: () => void;
-  onNextChapter?: () => void;
-  hasPrev?: boolean;
-  hasNext?: boolean;
+  formattedPercent?: string;
+  segments?: readonly ReaderProgressSegment[];
   onOpenRating?: () => void;
 };
+
+function buildFallbackSegments(
+  currentChapter: number,
+  totalChapters: number,
+  currentPercent: number,
+): ReaderProgressSegment[] {
+  const safeTotal = Math.max(1, totalChapters);
+  const clampedChapter = Math.min(safeTotal, Math.max(1, currentChapter));
+  const clampedPercent = Math.min(100, Math.max(0, currentPercent));
+
+  // Derive fill for the active chapter when callers omit explicit chapter segments.
+  const exactChaptersRead = (clampedPercent / 100) * safeTotal;
+  return Array.from({ length: safeTotal }, (_, index) => {
+    const chapterNumber = index + 1;
+    let fillPercent = 0;
+    if (chapterNumber < clampedChapter) {
+      fillPercent = 100;
+    } else if (chapterNumber === clampedChapter) {
+      fillPercent = Math.min(
+        100,
+        Math.max(0, (exactChaptersRead - index) * 100),
+      );
+    }
+    return {
+      chapterNumber,
+      weight: 1,
+      fillPercent,
+    };
+  });
+}
 
 export function GlossyProgressBar({
   currentChapter,
   totalChapters,
   currentPercent,
-  onPrevChapter,
-  onNextChapter,
-  hasPrev,
-  hasNext,
+  formattedPercent,
+  segments,
   onOpenRating,
 }: GlossyProgressBarProps) {
-  const safePercent = Math.min(100, Math.max(0, Math.round(currentPercent)));
+  const safeTotal = Math.max(1, totalChapters);
+  const displayPercent =
+    formattedPercent ?? formatReaderProgressPercent(currentPercent);
+  const resolvedSegments =
+    segments && segments.length > 0
+      ? segments
+      : buildFallbackSegments(currentChapter, safeTotal, currentPercent);
 
   return (
-    <div className="fixed bottom-6 inset-x-0 z-40 flex justify-center px-4 pointer-events-none select-none">
-      <div className="pointer-events-auto flex items-center gap-3 px-4 py-2 rounded-full bg-black/75 backdrop-blur-md border border-white/20 shadow-2xl text-white font-mono tabular-nums text-xs transition-colors hover:bg-black/85">
-        {/* Previous Chapter button */}
-        {onPrevChapter && (
-          <button
-            type="button"
-            onClick={onPrevChapter}
-            disabled={!hasPrev}
-            aria-label="Bab Sebelumnya"
-            className={`min-h-9 min-w-9 flex items-center justify-center rounded-full hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white transition-colors ${
-              !hasPrev ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
-            }`}
-            title="Bab Sebelumnya"
-          >
-            <ChevronLeft className="size-4" aria-hidden="true" />
-          </button>
-        )}
-
-        {/* Dynamic Chapter Indicator */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className="font-semibold text-white">
-            Bab {currentChapter}/{totalChapters}
+    <div
+      className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-[min(92vw,30rem)] select-none pointer-events-auto"
+      role="region"
+      aria-label={`Progres membaca bab ${currentChapter} dari ${safeTotal}, ${displayPercent}`}
+    >
+      <div className="rounded-full px-5 py-2.5 bg-card/85 text-foreground backdrop-blur-xl border border-border/70 shadow-[0_12px_32px_-10px_color-mix(in_oklab,var(--color-ink)_16%,transparent)] transition-colors duration-200">
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <span className="text-xs font-medium tracking-tight text-foreground/90 tabular-nums">
+            {currentChapter}/{safeTotal}
           </span>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xs font-medium text-foreground/90 tabular-nums">
+              {displayPercent}
+            </span>
+            {onOpenRating && (
+              <button
+                type="button"
+                onClick={onOpenRating}
+                aria-label="Ulas & Beri Rating Buku"
+                title="Ulas & Beri Rating"
+                className="relative inline-flex items-center justify-center rounded-full p-0.5 text-[var(--color-accent)] hover:bg-foreground/10 transition-colors cursor-pointer after:absolute after:-inset-2.5 after:content-['']"
+              >
+                <Star className="w-3.5 h-3.5 fill-[var(--color-accent)]/25" />
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Progress Bar Track */}
-        <div className="w-28 sm:w-48 h-1.5 bg-white/20 rounded-full overflow-hidden relative">
-          <div
-            className="h-full bg-gradient-to-r from-[var(--color-accent)] to-amber-400 rounded-full transition-all duration-300"
-            style={{ width: `${safePercent}%` }}
-          />
+        <div
+          className="flex items-center gap-1 w-full"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(currentPercent * 10) / 10}
+          aria-label="Progres baca per bab"
+        >
+          {resolvedSegments.map((segment) => (
+            <div
+              key={segment.chapterNumber}
+              style={{
+                flexGrow: Math.max(1, segment.weight),
+                flexBasis: 0,
+              }}
+              className="min-w-[6px] h-[3.5px] rounded-full bg-foreground/15 overflow-hidden"
+            >
+              <div
+                className="h-full rounded-full bg-[var(--color-accent)] transition-[width] duration-200 ease-out motion-reduce:transition-none"
+                style={{
+                  width: `${Math.min(100, Math.max(0, segment.fillPercent))}%`,
+                }}
+              />
+            </div>
+          ))}
         </div>
-
-        {/* Progress Percentage */}
-        <div className="text-[11px] font-bold text-white/90 shrink-0 w-9 text-right">
-          {safePercent}%
-        </div>
-
-        {/* Optional Rating Button */}
-        {onOpenRating && (
-          <button
-            type="button"
-            onClick={onOpenRating}
-            className="min-h-9 min-w-9 flex items-center justify-center rounded-full hover:bg-white/15 text-amber-400 hover:text-amber-300 focus-visible:outline-2 focus-visible:outline-white transition-colors cursor-pointer"
-            title="Beri Rating Naskah"
-            aria-label="Beri Rating"
-          >
-            <Star className="size-3.5 fill-amber-400/40" aria-hidden="true" />
-          </button>
-        )}
-
-        {/* Next Chapter button */}
-        {onNextChapter && (
-          <button
-            type="button"
-            onClick={onNextChapter}
-            disabled={!hasNext}
-            aria-label="Bab Berikutnya"
-            className={`min-h-9 min-w-9 flex items-center justify-center rounded-full hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white transition-colors ${
-              !hasNext ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
-            }`}
-            title="Bab Berikutnya"
-          >
-            <ChevronRight className="size-4" aria-hidden="true" />
-          </button>
-        )}
       </div>
     </div>
   );

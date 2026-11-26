@@ -46,3 +46,19 @@ export async function setRole(email: string, role: string | null) {
     await pool.end();
   }
 }
+
+export async function setAuthorStatus(
+  email: string,
+  authorStatus: "none" | "pending" | "verified" | "rejected",
+) {
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
+  try {
+    const { rowCount } = await pool.query(
+      'UPDATE "user" SET author_status = $1 WHERE email = $2',
+      [authorStatus, email],
+    );
+    if (rowCount !== 1) throw new Error(`No user ${email}`);
+  } finally {
+    await pool.end();
+  }
+}

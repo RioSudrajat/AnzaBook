@@ -60,7 +60,7 @@ const AUTHOR_TOPICS = [
   "Kajian Budaya",
 ];
 
-export default function NewAuthorPage() {
+function NewAuthorPage() {
   const sessionUser = Route.useRouteContext().session.user;
   const { data: myProfile } = useMySocialProfile();
   const applyAuthorMutation = useApplyAuthor();
@@ -377,6 +377,9 @@ export default function NewAuthorPage() {
                 </div>
 
                 <input
+                  id="author-avatar-upload"
+                  name="authorAvatarFile"
+                  aria-label="Unggah foto profil penulis"
                   ref={fileInputRef}
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/gif"

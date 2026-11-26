@@ -80,7 +80,13 @@ export function DashboardLibrary({
         ) : (
           <ul className="divide-y divide-border rounded-lg border border-border">
             {currentlyReading.map(
-              ({ book, bookId, progressPercent, previewProgressPercent }) => {
+              ({
+                book,
+                bookId,
+                progressPercent,
+                previewProgressPercent,
+                previewBookPercent,
+              }) => {
                 const expanded = selectedBookId === bookId;
                 const historyId = `reading-history-${bookId}`;
                 return (
@@ -124,7 +130,7 @@ export function DashboardLibrary({
                         <span className="text-sm tabular-nums text-muted-foreground">
                           {previewProgressPercent == null
                             ? `${progressPercent}%`
-                            : `Cuplikan ${previewProgressPercent}%`}
+                            : `Cuplikan ${previewBookPercent ?? previewProgressPercent}%`}
                         </span>
                         <Button asChild variant="outline" className="min-h-11">
                           <Link to="/read/$slug" params={{ slug: book.slug }}>

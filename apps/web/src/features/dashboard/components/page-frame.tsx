@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
+import { AnzaLogoMark } from "@/components/brand";
 import { SiteFooter } from "@/components/site-footer";
 import { SmartBackButton } from "@/components/smart-back-button";
 import { AppShell } from "@/features/dashboard/components/app-shell";
@@ -19,6 +20,7 @@ type PageFrameProps = {
   backLabel?: string;
   backFallback?: string;
   showBack?: boolean;
+  wide?: boolean;
   children: ReactNode;
 };
 
@@ -33,11 +35,12 @@ export function PageFrame({
   backLabel = "Kembali",
   backFallback = "/app",
   showBack = true,
+  wide = true,
   children,
 }: PageFrameProps) {
   if (user) {
     return (
-      <AppShell user={user} activeTab={activeTab} title={title}>
+      <AppShell user={user} activeTab={activeTab} title={title} wide={wide}>
         {showBack && (
           <SmartBackButton
             fallbackTo={backFallback}
@@ -59,17 +62,15 @@ export function PageFrame({
           <span />
         )}
         <Link to="/" className="flex items-center gap-2">
-          <img
-            src="/icon.svg"
-            alt=""
-            className="size-6 rounded-[5px] object-contain border border-border/40 shadow-xs"
-          />
+          <AnzaLogoMark className="size-5 text-foreground shrink-0" />
           <span className="font-serif font-bold text-sm">AnzaBook</span>
         </Link>
       </header>
       <main
         id="main-content"
-        className="max-w-5xl w-full mx-auto px-4 sm:px-8 py-8 flex-1"
+        className={`w-full mx-auto px-4 sm:px-8 py-8 flex-1 ${
+          wide ? "max-w-6xl" : "max-w-5xl"
+        }`}
       >
         {children}
       </main>

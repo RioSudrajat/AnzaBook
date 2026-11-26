@@ -108,12 +108,31 @@ describe("reading checkpoints and history", () => {
       (await reader.get(`${endpoint}?scope=preview`)).body.data
         .lastScrollPercent,
     ).toBe(30);
-    expect((await reader.get("/api/shelves")).body.data[0]).toMatchObject({
+    const previewShelf = (await reader.get("/api/shelves")).body.data[0];
+    expect(previewShelf).toMatchObject({
       bookId: id,
       shelfStatus: "reading",
       progressPercent: 0,
       previewProgressPercent: 30,
     });
+    expect(previewShelf.previewBookPercent).toBeGreaterThan(0);
+    expect(previewShelf.previewBookPercent).toBeLessThan(15);
+
+    // Reaching 100% of preview text ("Akhir cuplikan") yields whole-book preview %, never 100%
+    const endPreview = await reader
+      .put(`${endpoint}?scope=preview`)
+      .set(originHeader)
+      .send({
+        lastChapterNumber: 1,
+        lastParagraphIndex: 0,
+        lastScrollPercent: 100,
+        layout: "scroll",
+      });
+    expect(endPreview.status).toBe(200);
+    const endedShelf = (await reader.get("/api/shelves")).body.data[0];
+    expect(endedShelf.previewProgressPercent).toBe(100);
+    expect(endedShelf.previewBookPercent).toBeGreaterThan(0);
+    expect(endedShelf.previewBookPercent).toBeLessThan(20);
     const inaccessibleChapter = await reader
       .put(`${endpoint}?scope=preview`)
       .set(originHeader)

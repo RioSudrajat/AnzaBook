@@ -14,6 +14,7 @@ import {
   publishers,
   storeBranches,
   storeInventories,
+  user,
   userShelves,
 } from "../db/schema";
 import { HttpError } from "../lib/http-error";
@@ -23,21 +24,22 @@ import {
   issueOrGetDrmWatermarkSession,
 } from "./drm.service";
 import { getActiveMembership } from "./membership.service";
+import { countContentWords } from "@starter/shared/reading-progress";
 import type {
   ListBooksQuery,
   ReadBookQuery,
   StockQuery,
 } from "@starter/shared/validators/books";
-import type { PurchaseBookAlacarteInput } from "@starter/shared/validators/publisher";
+import type { PurchaseBookInput } from "@starter/shared/validators/publisher";
 import type {
   AccessTier,
   BookChapterSummaryDto,
   BookDetailDto,
+  BookDistributionModel,
   BookPurchaseDto,
   BookReaderPayloadDto,
   BookSummaryDto,
   CommunityEventSummaryDto,
-  DigitalPolicy,
   EditionTier,
   PartnerType,
   StoreStockItemDto,
@@ -52,6 +54,7 @@ export async function listBookChapters(
       id: bookChapters.id,
       chapterNumber: bookChapters.chapterNumber,
       title: bookChapters.titleId,
+      contentId: bookChapters.contentId,
     })
     .from(bookChapters)
     .where(eq(bookChapters.bookId, bookId))
@@ -61,11 +64,12 @@ export async function listBookChapters(
     ? await hasActiveEventBookSampleAccess(bookId, userId)
     : false;
 
-  return chapters.map((chapter) => ({
+  return chapters.map(({ contentId, ...chapter }) => ({
     ...chapter,
     isSample:
       chapter.chapterNumber === 1 ||
       (hasEventAccess && chapter.chapterNumber === 2),
+    wordCount: countContentWords(contentId),
   }));
 }
 
@@ -149,8 +153,8 @@ export async function getBookReadAccess(
     return { hasFullAccess: true, accessExpiresAt: null, hasEventSampleAccess };
   }
 
-  // 3. Skema A: print_claim_only requires physical claim code redemption. Nakama does not unlock.
-  if (book.digitalPolicy === "print_claim_only") {
+  // 3. Print code only: requires physical claim code redemption. Nakama does not unlock.
+  if (book.digitalPolicy === "print_code_only") {
     return {
       hasFullAccess: false,
       accessExpiresAt: null,
@@ -158,10 +162,10 @@ export async function getBookReadAccess(
     };
   }
 
-  // 4. Check ala carte purchase for alacarte_only and hybrid_nakama_alacarte
+  // 4. Check single purchase for single_purchase and nakama_or_purchase
   const isPurchased =
-    book.digitalPolicy === "alacarte_only" ||
-    book.digitalPolicy === "hybrid_nakama_alacarte"
+    book.digitalPolicy === "single_purchase" ||
+    book.digitalPolicy === "nakama_or_purchase"
       ? await hasPurchasedBook(book.id, userId)
       : false;
 
@@ -169,8 +173,8 @@ export async function getBookReadAccess(
     return { hasFullAccess: true, accessExpiresAt: null, hasEventSampleAccess };
   }
 
-  // 5. Skema C: alacarte_only requires purchase or physical claim. Nakama does not unlock.
-  if (book.digitalPolicy === "alacarte_only") {
+  // 5. Single purchase only: requires purchase or physical claim. Nakama does not unlock.
+  if (book.digitalPolicy === "single_purchase") {
     return {
       hasFullAccess: false,
       accessExpiresAt: null,
@@ -178,10 +182,10 @@ export async function getBookReadAccess(
     };
   }
 
-  // 6. Skema B (sample_only) and Skema Hibrida (hybrid_nakama_alacarte) check active Nakama membership
+  // 6. Nakama subscription and hybrid check active Nakama membership
   const membership =
-    book.digitalPolicy === "sample_only" ||
-    book.digitalPolicy === "hybrid_nakama_alacarte"
+    book.digitalPolicy === "nakama_subscription" ||
+    book.digitalPolicy === "nakama_or_purchase"
       ? await getActiveMembership(userId)
       : null;
 
@@ -267,10 +271,10 @@ function toBookPurchaseDto(
   };
 }
 
-export async function purchaseBookAlacarte(
+export async function purchaseDigitalBook(
   userId: string,
   slug: string,
-  input?: PurchaseBookAlacarteInput,
+  input?: PurchaseBookInput,
 ): Promise<BookPurchaseDto> {
   const [book] = await db
     .select()
@@ -283,15 +287,15 @@ export async function purchaseBookAlacarte(
   }
 
   if (
-    book.alacartePriceIdr === null ||
-    book.alacartePriceIdr <= 0 ||
-    (book.digitalPolicy !== "alacarte_only" &&
-      book.digitalPolicy !== "hybrid_nakama_alacarte")
+    book.digitalPriceIdr === null ||
+    book.digitalPriceIdr <= 0 ||
+    (book.digitalPolicy !== "single_purchase" &&
+      book.digitalPolicy !== "nakama_or_purchase")
   ) {
     throw new HttpError(
       400,
-      "BOOK_NOT_ALACARTE",
-      "Buku ini tidak tersedia untuk pembelian satuan ala carte.",
+      "BOOK_NOT_PURCHASABLE",
+      "Buku ini tidak tersedia untuk pembelian satuan digital.",
     );
   }
 
@@ -313,7 +317,7 @@ export async function purchaseBookAlacarte(
     );
   }
 
-  const priceIdr = book.alacartePriceIdr;
+  const priceIdr = book.digitalPriceIdr;
   const publisherShareIdr = Math.round(priceIdr * 0.75);
   const affiliateCalendarId = await resolveCommunityAffiliateAttribution(
     userId,
@@ -386,7 +390,7 @@ export function getPreviewParagraphCount(text: string): number {
   return Math.min(3, Math.max(1, splitParagraphs(text).length - 1));
 }
 
-function previewText(text: string | null, count: number): string | null {
+export function previewText(text: string | null, count: number): string | null {
   if (text === null) return null;
   const paragraphs = splitParagraphs(text);
   if (paragraphs.length === 1) {
@@ -451,17 +455,17 @@ export type BookSummaryPublisher = {
 export function toBookSummary(
   row: typeof books.$inferSelect,
   publisher?: BookSummaryPublisher | null,
+  authorAvatarFallback?: string | null,
+  authorUsername?: string | null,
 ): BookSummaryDto {
   return {
     id: row.id,
     slug: row.slug,
     title: row.title,
-    originalTitle: row.originalTitle,
     author: row.author,
-    authorAvatar: row.authorAvatar,
+    authorAvatar: row.authorAvatar ?? authorAvatarFallback ?? null,
     editor: row.editor,
     editorAvatar: row.editorAvatar,
-    translator: row.translator,
     coverUrl: row.coverUrl,
     coverColor: row.coverColor,
     synopsis: row.synopsis,
@@ -471,7 +475,7 @@ export function toBookSummary(
     totalChapters: row.totalChapters,
     readingMinutes: row.readingMinutes,
     audioDurationMinutes: row.audioDurationMinutes,
-    digitalPolicy: row.digitalPolicy as DigitalPolicy,
+    digitalPolicy: row.digitalPolicy as BookDistributionModel,
     accessTier: (row.accessTier as AccessTier) || "free",
     hasPhysical: row.hasPhysical,
     isWeeklyBulletin: row.isWeeklyBulletin,
@@ -488,7 +492,8 @@ export function toBookSummary(
     publisherName: publisher?.name ?? null,
     publisherLogoUrl: publisher?.logoUrl ?? null,
     authorUserId: row.authorUserId,
-    alacartePriceIdr: row.alacartePriceIdr,
+    authorUsername: authorUsername ?? null,
+    digitalPriceIdr: row.digitalPriceIdr,
   };
 }
 
@@ -551,9 +556,12 @@ export async function listBooks(query: ListBooksQuery) {
         slug: publishers.slug,
         logoUrl: publishers.logoUrl,
       },
+      authorUserImage: user.image,
+      authorUsername: user.username,
     })
     .from(books)
     .leftJoin(publishers, eq(books.publisherId, publishers.id))
+    .leftJoin(user, eq(books.authorUserId, user.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(books.isWeeklyBulletin), desc(books.createdAt), books.id)
     .limit(query.limit + 1)
@@ -561,7 +569,9 @@ export async function listBooks(query: ListBooksQuery) {
 
   const data = rows
     .slice(0, query.limit)
-    .map(({ book, publisher }) => toBookSummary(book, publisher));
+    .map(({ book, publisher, authorUserImage, authorUsername }) =>
+      toBookSummary(book, publisher, authorUserImage, authorUsername),
+    );
 
   const [bulletinRow] = await db
     .select({
@@ -571,16 +581,24 @@ export async function listBooks(query: ListBooksQuery) {
         slug: publishers.slug,
         logoUrl: publishers.logoUrl,
       },
+      authorUserImage: user.image,
+      authorUsername: user.username,
     })
     .from(books)
     .leftJoin(publishers, eq(books.publisherId, publishers.id))
+    .leftJoin(user, eq(books.authorUserId, user.id))
     .where(eq(books.isWeeklyBulletin, true))
     .limit(1);
 
   return {
     data,
     bulletin: bulletinRow
-      ? toBookSummary(bulletinRow.book, bulletinRow.publisher)
+      ? toBookSummary(
+          bulletinRow.book,
+          bulletinRow.publisher,
+          bulletinRow.authorUserImage,
+          bulletinRow.authorUsername,
+        )
       : null,
     meta: {
       limit: query.limit,
@@ -602,14 +620,17 @@ export async function getBookBySlug(
         slug: publishers.slug,
         logoUrl: publishers.logoUrl,
       },
+      authorUserImage: user.image,
+      authorUsername: user.username,
     })
     .from(books)
     .leftJoin(publishers, eq(books.publisherId, publishers.id))
+    .leftJoin(user, eq(books.authorUserId, user.id))
     .where(eq(books.slug, slug))
     .limit(1);
 
   if (!bookRow) return null;
-  const { book, publisher } = bookRow;
+  const { book, publisher, authorUserImage, authorUsername } = bookRow;
 
   const editions = await db
     .select()
@@ -714,7 +735,7 @@ export async function getBookBySlug(
   );
 
   return {
-    ...toBookSummary(book, publisher),
+    ...toBookSummary(book, publisher, authorUserImage, authorUsername),
     chapters,
     editions: editions.map((e) => ({
       id: e.id,
@@ -936,6 +957,7 @@ export async function getBookReaderPayload(
     const previewCount = isFullChapter
       ? 0
       : getPreviewParagraphCount(row.contentId);
+    const fullWordCount = countContentWords(row.contentId || row.contentEn);
     const contentId = isFullChapter
       ? row.contentId
       : (previewText(row.contentId, previewCount) ?? "");
@@ -952,6 +974,8 @@ export async function getBookReaderPayload(
       blueprintContent: query.mode === "blueprint" ? row.blueprintContent : "",
       audioUrl: canPlayAudio ? row.audioUrl : null,
       audioDurationSeconds: canPlayAudio ? row.audioDurationSec : null,
+      fullWordCount,
+      isPreviewTruncated: !isFullChapter,
     };
   });
   const currentChapter = chapters.find(

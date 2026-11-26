@@ -70,6 +70,8 @@ export function LiveStockTracker({
           <div className="flex items-center gap-1.5 bg-muted/40 border border-border rounded-[6px] px-2.5 py-1 text-xs">
             <MapPin className="size-3.5 text-muted-foreground" />
             <select
+              id="stock-city-filter"
+              name="city"
               value={selectedCity}
               onChange={(e) => setSelectedCity(e.target.value)}
               className="bg-transparent text-foreground font-medium text-xs focus:outline-none cursor-pointer"
@@ -91,6 +93,8 @@ export function LiveStockTracker({
           <div className="flex items-center gap-1.5 bg-muted/40 border border-border rounded-[6px] px-2.5 py-1 text-xs">
             <Filter className="size-3.5 text-muted-foreground" />
             <select
+              id="stock-partner-filter"
+              name="partner"
               value={selectedPartner}
               onChange={(e) =>
                 setSelectedPartner(e.target.value as "all" | PartnerType)

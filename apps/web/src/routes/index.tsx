@@ -170,11 +170,6 @@ function LandingPage() {
                     <h3 className="font-serif text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">
                       {bulletin.title}
                     </h3>
-                    {bulletin.originalTitle && (
-                      <p className="text-sm font-mono text-muted-foreground mt-0.5">
-                        Judul Asli: {bulletin.originalTitle}
-                      </p>
-                    )}
 
                     <blockquote className="mt-4 p-4 rounded-[6px] bg-muted/40 border-l-3 border-[var(--color-accent)] text-sm md:text-base font-serif italic text-foreground/90 leading-relaxed">
                       &ldquo;{bulletin.bulletinExcerpt || bulletin.synopsis}
@@ -342,7 +337,10 @@ function LandingPage() {
               <div className="w-full md:w-72 relative">
                 <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                 <input
+                  id="catalog-search-input"
+                  name="catalogSearch"
                   type="text"
+                  aria-label="Cari judul, penulis, atau tema buku"
                   placeholder="Cari judul, penulis, tema..."
                   value={searchQuery}
                   onChange={(e) => {

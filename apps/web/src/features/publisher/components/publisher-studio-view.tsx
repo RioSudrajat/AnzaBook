@@ -1,12 +1,7 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type FormEvent,
-  type KeyboardEvent,
-} from "react";
+import { useState, useRef, type FormEvent } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
+  Award,
   BookOpen,
   CheckCircle2,
   ExternalLink,
@@ -17,36 +12,50 @@ import {
   Search,
   Settings2,
   ShieldCheck,
+  Store,
   Trash2,
+  Upload,
   Users,
   X,
 } from "lucide-react";
+import { EntityProfileHeader } from "@/components/profile/entity-profile-header";
+import { ProfileTabs } from "@/components/profile/profile-tabs";
+import { StudioDrawer } from "@/components/profile/studio-drawer";
 import type {
+  BookDistributionModel,
   BookSummaryDto,
-  DigitalPolicy,
   PublisherDto,
   PublisherMemberRole,
 } from "@starter/shared/types";
+import { DEFAULT_DIGITAL_BOOK_PRICE_IDR } from "@starter/shared/validators/publisher";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { BookCover } from "@/features/books/components/book-cover";
 import {
+  useAddPublisherApprovedWriter,
   useAddPublisherMember,
+  usePublisherApprovedWriters,
+  usePublisherBookInventory,
   usePublisherBooks,
   usePublisherManuscripts,
   usePublisherMembers,
+  useRemovePublisherApprovedWriter,
   useRemovePublisherMember,
   useUpdatePublisherBook,
+  useUpdatePublisherBookInventory,
   useUpdatePublisherMember,
   useUpdatePublisherProfile,
+  useUploadMediaImage,
 } from "@/features/social/hooks";
 import { ApiError } from "@/lib/api/client";
 import {
   formatDigitalPolicy,
   formatManuscriptStatus,
   formatRoleName,
+  formatSourceLanguage,
+  formatTargetAudience,
 } from "@/lib/formatters";
 import {
   MAX_PUBLISHER_TOPICS,
@@ -67,7 +76,7 @@ const STUDIO_TABS: ReadonlyArray<{
 }> = [
   { id: "inbox", label: "Inbox Naskah" },
   { id: "catalog", label: "Katalog Terbit" },
-  { id: "team", label: "Tim Redaksi" },
+  { id: "team", label: "Tim & Penulis" },
   { id: "profile", label: "Profil & Topik Kurasi" },
 ];
 
@@ -93,11 +102,11 @@ const SUGGESTED_TOPICS = [
   "Kajian Agraria",
 ];
 
-const DIGITAL_POLICIES: DigitalPolicy[] = [
-  "hybrid_nakama_alacarte",
-  "sample_only",
-  "alacarte_only",
-  "print_claim_only",
+const DISTRIBUTION_MODELS: BookDistributionModel[] = [
+  "nakama_or_purchase",
+  "nakama_subscription",
+  "single_purchase",
+  "print_code_only",
   "free_open",
 ];
 
@@ -134,20 +143,55 @@ function EditPublishedBookForm({
   onClose: () => void;
 }) {
   const updateBookMutation = useUpdatePublisherBook();
+  const uploadMutation = useUploadMediaImage();
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   const [title, setTitle] = useState(book.title);
   const [synopsis, setSynopsis] = useState(book.synopsis || "");
   const [coverUrl, setCoverUrl] = useState(book.coverUrl || "");
-  const [digitalPolicy, setDigitalPolicy] = useState<DigitalPolicy>(
+  const [coverColor, setCoverColor] = useState(book.coverColor || "#3D2B1F");
+  const [digitalPolicy, setDigitalPolicy] = useState<BookDistributionModel>(
     book.digitalPolicy,
   );
-  const [alacartePriceIdr, setAlacartePriceIdr] = useState(
-    book.alacartePriceIdr != null ? String(book.alacartePriceIdr) : "",
+  const [digitalPriceIdr, setDigitalPriceIdr] = useState(
+    book.digitalPriceIdr != null ? String(book.digitalPriceIdr) : "",
   );
   const [categoriesText, setCategoriesText] = useState(
     (book.categories ?? []).join(", "),
   );
+  const [publishedYear, setPublishedYear] = useState(
+    book.publishedYear ? String(book.publishedYear) : "",
+  );
+  const [collectionName, setCollectionName] = useState(
+    book.collectionName || "",
+  );
+  const [hasPhysical, setHasPhysical] = useState(Boolean(book.hasPhysical));
+  const [rakyatPriceIdr, setRakyatPriceIdr] = useState("45000");
+  const [standardPriceIdr, setStandardPriceIdr] = useState("75000");
   const [formError, setFormError] = useState<string | null>(null);
+
+  const isDirty =
+    title !== book.title ||
+    synopsis !== (book.synopsis || "") ||
+    coverUrl !== (book.coverUrl || "") ||
+    coverColor !== (book.coverColor || "#3D2B1F") ||
+    digitalPolicy !== book.digitalPolicy ||
+    digitalPriceIdr !==
+      (book.digitalPriceIdr != null ? String(book.digitalPriceIdr) : "") ||
+    categoriesText !== (book.categories ?? []).join(", ") ||
+    publishedYear !== (book.publishedYear ? String(book.publishedYear) : "") ||
+    collectionName !== (book.collectionName || "") ||
+    hasPhysical !== Boolean(book.hasPhysical);
+
+  const handleCoverUpload = async (file: File) => {
+    setFormError(null);
+    try {
+      const uploaded = await uploadMutation.mutateAsync(file);
+      setCoverUrl(uploaded.url);
+    } catch (error) {
+      setFormError(extractErrorMessage(error, "Gagal mengunggah sampul buku."));
+    }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -162,9 +206,14 @@ function EditPublishedBookForm({
       return;
     }
 
-    const parsedPrice = alacartePriceIdr.trim()
-      ? Number.parseInt(alacartePriceIdr.trim(), 10)
-      : null;
+    const requiresPrice =
+      digitalPolicy === "single_purchase" ||
+      digitalPolicy === "nakama_or_purchase";
+    const parsedPrice = digitalPriceIdr.trim()
+      ? Number.parseInt(digitalPriceIdr.trim(), 10)
+      : requiresPrice
+        ? DEFAULT_DIGITAL_BOOK_PRICE_IDR
+        : null;
 
     if (
       parsedPrice !== null &&
@@ -172,9 +221,21 @@ function EditPublishedBookForm({
         parsedPrice < 0 ||
         parsedPrice > 10_000_000)
     ) {
-      setFormError("Harga a la carte harus antara 0 hingga 10.000.000.");
+      setFormError("Harga beli satuan harus antara 0 hingga 10.000.000.");
       return;
     }
+
+    const parsedYear = publishedYear.trim()
+      ? Number.parseInt(publishedYear.trim(), 10)
+      : undefined;
+    const parsedRakyat =
+      hasPhysical && rakyatPriceIdr.trim()
+        ? Number.parseInt(rakyatPriceIdr.trim(), 10)
+        : undefined;
+    const parsedStandard =
+      hasPhysical && standardPriceIdr.trim()
+        ? Number.parseInt(standardPriceIdr.trim(), 10)
+        : undefined;
 
     const categories = categoriesText
       .split(",")
@@ -190,9 +251,24 @@ function EditPublishedBookForm({
           title: title.trim(),
           synopsis: synopsis.trim(),
           coverUrl: coverUrl.trim() || null,
+          coverColor: /^#[0-9a-f]{3,8}$/i.test(coverColor.trim())
+            ? coverColor.trim()
+            : undefined,
           digitalPolicy,
-          alacartePriceIdr: parsedPrice,
+          digitalPriceIdr: parsedPrice,
           categories,
+          publishedYear:
+            parsedYear && Number.isFinite(parsedYear) ? parsedYear : undefined,
+          collectionName: collectionName.trim() || null,
+          hasPhysical,
+          rakyatPriceIdr:
+            parsedRakyat && Number.isFinite(parsedRakyat)
+              ? parsedRakyat
+              : undefined,
+          standardPriceIdr:
+            parsedStandard && Number.isFinite(parsedStandard)
+              ? parsedStandard
+              : undefined,
         },
       });
       onClose();
@@ -203,160 +279,351 @@ function EditPublishedBookForm({
     }
   };
 
+  const previewCategories = categoriesText
+    .split(",")
+    .map((c) => c.trim())
+    .filter(Boolean);
+
   return (
-    <div className="space-y-5 p-6 text-[var(--color-ink)]">
-      <div className="flex items-start justify-between gap-4 border-b border-[var(--color-rule)] pb-4">
-        <div className="space-y-1">
-          <h1
-            id="edit-book-dialog-title"
-            className="font-serif text-lg font-bold"
-          >
-            Edit Metadata Buku Terbit
-          </h1>
-          <p className="text-xs text-[var(--color-muted)]">{book.title}</p>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Tutup editor metadata buku"
-          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-[var(--color-muted)] hover:bg-[var(--color-paper-3)] hover:text-[var(--color-ink)] cursor-pointer shrink-0"
-        >
-          <X className="size-4" aria-hidden="true" />
-        </button>
-      </div>
-
-      {formError && (
-        <div
-          role="alert"
-          className="rounded-xl border border-[var(--color-error)]/40 bg-[var(--color-error-soft)] p-3 text-xs text-[var(--color-ink)]"
-        >
-          {formError}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="edit-book-title" className="text-xs font-semibold">
-            Judul Buku
-          </Label>
-          <Input
-            id="edit-book-title"
-            name="title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-            className="min-h-11 bg-[var(--color-paper)]"
-            autoFocus
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="edit-book-synopsis" className="text-xs font-semibold">
-            Sinopsis
-          </Label>
-          <Textarea
-            id="edit-book-synopsis"
-            name="synopsis"
-            rows={4}
-            value={synopsis}
-            onChange={(e) => setSynopsis(e.target.value)}
-            required
-            className="text-sm bg-[var(--color-paper)]"
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="edit-book-cover" className="text-xs font-semibold">
-            URL Sampul Buku
-          </Label>
-          <Input
-            id="edit-book-cover"
-            name="coverUrl"
-            value={coverUrl}
-            onChange={(e) => setCoverUrl(e.target.value)}
-            autoCorrect="off"
-            autoCapitalize="none"
-            spellCheck={false}
-            placeholder="https://... atau /covers/sampul.jpg"
-            className="min-h-11 font-mono text-xs bg-[var(--color-paper)]"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-book-policy" className="text-xs font-semibold">
-              Skema Distribusi
-            </Label>
-            <select
-              id="edit-book-policy"
-              name="digitalPolicy"
-              value={digitalPolicy}
-              onChange={(e) =>
-                setDigitalPolicy(e.target.value as DigitalPolicy)
-              }
-              className="w-full h-11 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 text-xs text-[var(--color-ink)]"
-            >
-              {DIGITAL_POLICIES.map((policy) => (
-                <option key={policy} value={policy}>
-                  {formatDigitalPolicy(policy)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-book-price" className="text-xs font-semibold">
-              Harga A La Carte (IDR)
-            </Label>
-            <Input
-              id="edit-book-price"
-              name="alacartePriceIdr"
-              type="text"
-              inputMode="numeric"
-              value={alacartePriceIdr}
-              onChange={(e) => setAlacartePriceIdr(e.target.value)}
-              placeholder="49000"
-              className="min-h-11 font-mono text-xs bg-[var(--color-paper)]"
+    <StudioDrawer
+      isOpen
+      onClose={onClose}
+      title="Edit Metadata Buku Terbit"
+      subtitle={book.title}
+      titleId="edit-book-dialog-title"
+      widthClass="max-w-2xl"
+      isDirty={isDirty}
+    >
+      <div className="space-y-5 text-[var(--color-ink)]">
+        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-4">
+          <div className="w-20 shrink-0">
+            <BookCover
+              book={{
+                title: title.trim() || book.title,
+                author: book.author,
+                coverUrl: coverUrl.trim() || null,
+                coverColor,
+                genres:
+                  previewCategories.length > 0
+                    ? previewCategories
+                    : book.genres,
+                pageCount: book.pageCount,
+                publishedYear:
+                  Number.parseInt(publishedYear, 10) || book.publishedYear,
+              }}
+              decorative
             />
           </div>
+          <div className="min-w-0 flex-1 space-y-1 text-center sm:text-left">
+            <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--color-muted)]">
+              Pratinjau Katalog
+            </p>
+            <p className="font-serif text-base font-bold text-[var(--color-ink)] break-words">
+              {title.trim() || book.title}
+            </p>
+            <p className="text-xs text-[var(--color-muted)]">{book.author}</p>
+            <p className="text-xs font-mono text-[var(--color-ink-2)]">
+              {formatDigitalPolicy(digitalPolicy)}
+              {digitalPriceIdr.trim()
+                ? ` — Rp ${Number.parseInt(digitalPriceIdr, 10).toLocaleString("id-ID")}`
+                : ""}
+            </p>
+          </div>
         </div>
 
-        <div className="space-y-1.5">
-          <Label
-            htmlFor="edit-book-categories"
-            className="text-xs font-semibold"
+        {formError && (
+          <div
+            role="alert"
+            className="rounded-xl border border-[var(--color-error)]/40 bg-[var(--color-error-soft)] p-3 text-xs text-[var(--color-ink)]"
           >
-            Kategori (pisahkan dengan koma)
-          </Label>
-          <Input
-            id="edit-book-categories"
-            name="categories"
-            value={categoriesText}
-            onChange={(e) => setCategoriesText(e.target.value)}
-            placeholder="Sastra & Fiksi, Filsafat"
-            className="min-h-11 text-xs bg-[var(--color-paper)]"
-          />
-        </div>
+            {formError}
+          </div>
+        )}
 
-        <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[var(--color-rule)]">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-            className="min-h-11 px-4 text-xs cursor-pointer"
-          >
-            Batal
-          </Button>
-          <Button
-            type="submit"
-            disabled={updateBookMutation.isPending}
-            className="min-h-11 px-5 text-xs font-semibold bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:brightness-95 cursor-pointer"
-          >
-            {updateBookMutation.isPending ? "Menyimpan..." : "Simpan Metadata"}
-          </Button>
-        </div>
-      </form>
-    </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-book-title" className="text-xs font-semibold">
+              Judul Buku
+            </Label>
+            <Input
+              id="edit-book-title"
+              name="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+              className="min-h-11 bg-[var(--color-paper)]"
+              autoFocus
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="edit-book-synopsis"
+              className="text-xs font-semibold"
+            >
+              Sinopsis
+            </Label>
+            <Textarea
+              id="edit-book-synopsis"
+              name="synopsis"
+              rows={4}
+              value={synopsis}
+              onChange={(e) => setSynopsis(e.target.value)}
+              required
+              className="text-sm bg-[var(--color-paper)]"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-book-cover" className="text-xs font-semibold">
+              Sampul Buku (URL atau Unggah Berkas)
+            </Label>
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                id="edit-book-cover"
+                name="coverUrl"
+                value={coverUrl}
+                onChange={(e) => setCoverUrl(e.target.value)}
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                placeholder="https://... atau unggah sampul"
+                className="min-h-11 flex-1 font-mono text-xs bg-[var(--color-paper)]"
+              />
+              <input
+                ref={coverInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void handleCoverUpload(file);
+                  e.target.value = "";
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={uploadMutation.isPending}
+                onClick={() => coverInputRef.current?.click()}
+                className="min-h-11 px-3 text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
+              >
+                <Upload className="size-3.5" aria-hidden="true" />
+                <span>
+                  {uploadMutation.isPending ? "Mengunggah..." : "Unggah"}
+                </span>
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="edit-book-policy"
+                className="text-xs font-semibold"
+              >
+                Model Distribusi
+              </Label>
+              <select
+                id="edit-book-policy"
+                name="digitalPolicy"
+                value={digitalPolicy}
+                onChange={(e) => {
+                  const next = e.target.value as BookDistributionModel;
+                  setDigitalPolicy(next);
+                  if (
+                    (next === "single_purchase" ||
+                      next === "nakama_or_purchase") &&
+                    !digitalPriceIdr.trim()
+                  ) {
+                    setDigitalPriceIdr(String(DEFAULT_DIGITAL_BOOK_PRICE_IDR));
+                  }
+                }}
+                className="w-full h-11 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 text-xs text-[var(--color-ink)]"
+              >
+                {DISTRIBUTION_MODELS.map((policy) => (
+                  <option key={policy} value={policy}>
+                    {formatDigitalPolicy(policy)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="edit-book-price"
+                className="text-xs font-semibold"
+              >
+                Harga Beli Satuan (IDR)
+              </Label>
+              <Input
+                id="edit-book-price"
+                name="digitalPriceIdr"
+                type="text"
+                inputMode="numeric"
+                value={digitalPriceIdr}
+                onChange={(e) => setDigitalPriceIdr(e.target.value)}
+                placeholder="45000"
+                className="min-h-11 font-mono text-xs bg-[var(--color-paper)]"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="edit-book-categories"
+                className="text-xs font-semibold"
+              >
+                Kategori (pisahkan dengan koma)
+              </Label>
+              <Input
+                id="edit-book-categories"
+                name="categories"
+                value={categoriesText}
+                onChange={(e) => setCategoriesText(e.target.value)}
+                placeholder="Sastra & Fiksi, Filsafat"
+                className="min-h-11 text-xs bg-[var(--color-paper)]"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="edit-book-color"
+                className="text-xs font-semibold"
+              >
+                Warna Sampul
+              </Label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="edit-book-color"
+                  type="color"
+                  value={coverColor}
+                  onChange={(e) => setCoverColor(e.target.value)}
+                  className="h-11 w-14 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] p-1 cursor-pointer"
+                />
+                <Input
+                  value={coverColor}
+                  onChange={(e) => setCoverColor(e.target.value)}
+                  className="min-h-11 font-mono text-xs bg-[var(--color-paper)]"
+                />
+              </div>
+            </div>
+          </div>
+
+          <details className="editorial-disclosure rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-3.5 text-xs">
+            <summary className="cursor-pointer font-semibold text-[var(--color-ink)] select-none py-1">
+              Bibliografi &amp; Edisi Cetak Fisik
+            </summary>
+            <div className="mt-3 space-y-3 border-t border-[var(--color-rule)] pt-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="edit-book-year"
+                    className="text-xs font-semibold"
+                  >
+                    Tahun Terbit
+                  </Label>
+                  <Input
+                    id="edit-book-year"
+                    type="number"
+                    value={publishedYear}
+                    onChange={(e) => setPublishedYear(e.target.value)}
+                    className="min-h-11 font-mono text-xs bg-[var(--color-paper-2)]"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="edit-book-coll"
+                    className="text-xs font-semibold"
+                  >
+                    Seri / Koleksi
+                  </Label>
+                  <Input
+                    id="edit-book-coll"
+                    value={collectionName}
+                    onChange={(e) => setCollectionName(e.target.value)}
+                    className="min-h-11 text-xs bg-[var(--color-paper-2)]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  id="edit-book-physical"
+                  type="checkbox"
+                  checked={hasPhysical}
+                  onChange={(e) => setHasPhysical(e.target.checked)}
+                  className="size-4 accent-[var(--color-accent)]"
+                />
+                <Label
+                  htmlFor="edit-book-physical"
+                  className="text-xs font-semibold cursor-pointer"
+                >
+                  Tersedia dalam edisi cetak fisik
+                </Label>
+              </div>
+              {hasPhysical && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="edit-book-rakyat"
+                      className="text-xs font-semibold"
+                    >
+                      Harga Edisi Rakyat (IDR)
+                    </Label>
+                    <Input
+                      id="edit-book-rakyat"
+                      type="number"
+                      min={5000}
+                      value={rakyatPriceIdr}
+                      onChange={(e) => setRakyatPriceIdr(e.target.value)}
+                      className="min-h-11 font-mono text-xs bg-[var(--color-paper-2)]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="edit-book-std"
+                      className="text-xs font-semibold"
+                    >
+                      Harga Edisi Standar (IDR)
+                    </Label>
+                    <Input
+                      id="edit-book-std"
+                      type="number"
+                      min={5000}
+                      value={standardPriceIdr}
+                      onChange={(e) => setStandardPriceIdr(e.target.value)}
+                      className="min-h-11 font-mono text-xs bg-[var(--color-paper-2)]"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </details>
+
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[var(--color-rule)]">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="min-h-11 px-4 text-xs cursor-pointer"
+            >
+              Batal
+            </Button>
+            <Button
+              type="submit"
+              disabled={updateBookMutation.isPending}
+              className="min-h-11 px-5 text-xs font-semibold bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:brightness-95 cursor-pointer"
+            >
+              {updateBookMutation.isPending
+                ? "Menyimpan..."
+                : "Simpan Metadata"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </StudioDrawer>
   );
 }
 
@@ -369,45 +636,258 @@ function EditPublishedBookDialog({
   book: BookSummaryDto | null;
   onClose: () => void;
 }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  if (!book) return null;
+  return (
+    <EditPublishedBookForm
+      key={book.id}
+      publisherSlug={publisherSlug}
+      book={book}
+      onClose={onClose}
+    />
+  );
+}
 
-  useEffect(() => {
-    const el = dialogRef.current;
-    if (!el) return;
-    if (book && !el.open) {
-      el.showModal();
-    } else if (!book && el.open) {
-      el.close();
+function BookInventoryForm({
+  publisherSlug,
+  book,
+  onClose,
+}: {
+  publisherSlug: string;
+  book: BookSummaryDto;
+  onClose: () => void;
+}) {
+  const { data: branches = [], isLoading } = usePublisherBookInventory(
+    publisherSlug,
+    book.id,
+    true,
+  );
+  const saveInventoryMutation = useUpdatePublisherBookInventory();
+  const [draftCounts, setDraftCounts] = useState<
+    Record<string, { rakyatStock: number; standardStock: number }>
+  >({});
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const getCounts = (
+    branchId: string,
+    fallbackRakyat: number,
+    fallbackStd: number,
+  ) =>
+    draftCounts[branchId] ?? {
+      rakyatStock: fallbackRakyat,
+      standardStock: fallbackStd,
+    };
+
+  const handleSave = async (e: FormEvent) => {
+    e.preventDefault();
+    setFeedback(null);
+    setErrorMsg(null);
+    try {
+      await saveInventoryMutation.mutateAsync({
+        slug: publisherSlug,
+        bookId: book.id,
+        input: {
+          items: branches.map((b) => {
+            const counts = getCounts(
+              b.branchId,
+              b.rakyatStock,
+              b.standardStock,
+            );
+            return {
+              branchId: b.branchId,
+              rakyatStock: Math.max(0, Number(counts.rakyatStock) || 0),
+              standardStock: Math.max(0, Number(counts.standardStock) || 0),
+            };
+          }),
+        },
+      });
+      setFeedback("Stok buku fisik di seluruh cabang berhasil diperbarui.");
+    } catch (error) {
+      setErrorMsg(extractErrorMessage(error, "Gagal menyimpan stok toko."));
     }
-  }, [book]);
+  };
+
+  const isDirty = Object.keys(draftCounts).length > 0;
 
   return (
-    <dialog
-      ref={dialogRef}
-      aria-labelledby="edit-book-dialog-title"
-      onClose={() => {
-        if (dialogRef.current) dialogRef.current.returnValue = "";
-        if (book) onClose();
-      }}
-      className="m-auto w-[min(94vw,34rem)] max-h-[90vh] overflow-y-auto overscroll-contain rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-0 shadow-2xl backdrop:bg-black/65 backdrop:overflow-hidden backdrop:overscroll-contain"
+    <StudioDrawer
+      isOpen
+      onClose={onClose}
+      title="Stok Buku Cetak di Toko Mitra"
+      subtitle={book.title}
+      titleId="inventory-dialog-title"
+      widthClass="max-w-xl"
+      isDirty={isDirty}
     >
-      {book && (
-        <EditPublishedBookForm
-          key={book.id}
-          publisherSlug={publisherSlug}
-          book={book}
-          onClose={onClose}
-        />
-      )}
-    </dialog>
+      <div className="space-y-5 text-[var(--color-ink)]">
+        {errorMsg && (
+          <div
+            role="alert"
+            className="rounded-xl border border-[var(--color-error)]/40 bg-[var(--color-error-soft)] p-3 text-xs"
+          >
+            {errorMsg}
+          </div>
+        )}
+        {feedback && (
+          <div
+            role="status"
+            className="rounded-xl border border-[var(--color-green)]/40 bg-[var(--color-green-soft)] p-3 text-xs"
+          >
+            {feedback}
+          </div>
+        )}
+
+        {isLoading ? (
+          <div className="flex min-h-36 items-center justify-center">
+            <LoaderCircle className="size-6 animate-spin text-[var(--color-muted)]" />
+          </div>
+        ) : branches.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-[var(--color-rule)] p-6 text-center text-xs text-[var(--color-muted)]">
+            Belum ada cabang toko fisik terdaftar dalam sistem.
+          </p>
+        ) : (
+          <form onSubmit={handleSave} className="space-y-4">
+            <ul className="space-y-3">
+              {branches.map((branch) => {
+                const counts = getCounts(
+                  branch.branchId,
+                  branch.rakyatStock,
+                  branch.standardStock,
+                );
+                return (
+                  <li
+                    key={branch.branchId}
+                    className="rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-3.5 space-y-2.5"
+                  >
+                    <div>
+                      <p className="font-semibold text-xs text-[var(--color-ink)]">
+                        {branch.branchName} — {branch.city}
+                      </p>
+                      <p className="text-[11px] text-[var(--color-muted)]">
+                        {branch.address}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor={`inv-rakyat-${branch.branchId}`}
+                          className="text-[11px] font-semibold"
+                        >
+                          Stok Edisi Rakyat
+                        </Label>
+                        <Input
+                          id={`inv-rakyat-${branch.branchId}`}
+                          type="number"
+                          min={0}
+                          max={100000}
+                          value={counts.rakyatStock}
+                          onChange={(e) =>
+                            setDraftCounts((prev) => ({
+                              ...prev,
+                              [branch.branchId]: {
+                                rakyatStock: Number.parseInt(
+                                  e.target.value || "0",
+                                  10,
+                                ),
+                                standardStock: counts.standardStock,
+                              },
+                            }))
+                          }
+                          className="min-h-11 font-mono text-xs bg-[var(--color-paper-2)]"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor={`inv-std-${branch.branchId}`}
+                          className="text-[11px] font-semibold"
+                        >
+                          Stok Edisi Standar
+                        </Label>
+                        <Input
+                          id={`inv-std-${branch.branchId}`}
+                          type="number"
+                          min={0}
+                          max={100000}
+                          value={counts.standardStock}
+                          onChange={(e) =>
+                            setDraftCounts((prev) => ({
+                              ...prev,
+                              [branch.branchId]: {
+                                rakyatStock: counts.rakyatStock,
+                                standardStock: Number.parseInt(
+                                  e.target.value || "0",
+                                  10,
+                                ),
+                              },
+                            }))
+                          }
+                          className="min-h-11 font-mono text-xs bg-[var(--color-paper-2)]"
+                        />
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[var(--color-rule)]">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                className="min-h-11 px-4 text-xs cursor-pointer"
+              >
+                Tutup
+              </Button>
+              <Button
+                type="submit"
+                disabled={saveInventoryMutation.isPending}
+                className="min-h-11 px-5 text-xs font-semibold bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:brightness-95 cursor-pointer"
+              >
+                {saveInventoryMutation.isPending
+                  ? "Menyimpan..."
+                  : "Simpan Stok"}
+              </Button>
+            </div>
+          </form>
+        )}
+      </div>
+    </StudioDrawer>
+  );
+}
+
+function BookInventoryDialog({
+  publisherSlug,
+  book,
+  onClose,
+}: {
+  publisherSlug: string;
+  book: BookSummaryDto | null;
+  onClose: () => void;
+}) {
+  if (!book) return null;
+  return (
+    <BookInventoryForm
+      key={book.id}
+      publisherSlug={publisherSlug}
+      book={book}
+      onClose={onClose}
+    />
   );
 }
 
 function PublisherProfileForm({ publisher }: { publisher: PublisherDto }) {
   const updateMutation = useUpdatePublisherProfile();
+  const uploadMutation = useUploadMediaImage();
+  const logoFileRef = useRef<HTMLInputElement>(null);
+  const headerFileRef = useRef<HTMLInputElement>(null);
   const canEdit = canManagePublisherProfile(publisher.currentUserRole);
 
   const [name, setName] = useState(publisher.name);
+  const [logoUrl, setLogoUrl] = useState(publisher.logoUrl || "");
+  const [headerImageUrl, setHeaderImageUrl] = useState(
+    publisher.headerImageUrl || "",
+  );
   const [city, setCity] = useState(publisher.city || "");
   const [address, setAddress] = useState(publisher.address || "");
   const [contactEmail, setContactEmail] = useState(
@@ -464,6 +944,8 @@ function PublisherProfileForm({ publisher }: { publisher: PublisherDto }) {
         slug: publisher.slug,
         input: {
           name: name.trim(),
+          logoUrl: logoUrl.trim() || null,
+          headerImageUrl: headerImageUrl.trim() || null,
           city: city.trim() || null,
           address: address.trim() || null,
           contactEmail: contactEmail.trim() || null,
@@ -583,6 +1065,109 @@ function PublisherProfileForm({ publisher }: { publisher: PublisherDto }) {
               placeholder="Alamat lengkap penerbit"
               className="min-h-11 bg-[var(--color-paper)]"
             />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="studio-pub-logo" className="text-xs font-semibold">
+              Logo Penerbit
+            </Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="studio-pub-logo"
+                value={logoUrl}
+                onChange={(e) => setLogoUrl(e.target.value)}
+                placeholder="https://... atau unggah berkas"
+                className="min-h-11 flex-1 font-mono text-xs bg-[var(--color-paper)]"
+              />
+              <input
+                ref={logoFileRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    try {
+                      const uploaded = await uploadMutation.mutateAsync(file);
+                      setLogoUrl(uploaded.url);
+                    } catch (err) {
+                      setFeedback({
+                        type: "error",
+                        text: extractErrorMessage(
+                          err,
+                          "Gagal mengunggah logo.",
+                        ),
+                      });
+                    }
+                  }
+                  e.target.value = "";
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!canEdit || uploadMutation.isPending}
+                onClick={() => logoFileRef.current?.click()}
+                className="min-h-11 px-3 text-xs font-semibold cursor-pointer"
+              >
+                <Upload className="size-3.5 mr-1" aria-hidden="true" />
+                Unggah
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="studio-pub-header"
+              className="text-xs font-semibold"
+            >
+              Gambar Banner Profil
+            </Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="studio-pub-header"
+                value={headerImageUrl}
+                onChange={(e) => setHeaderImageUrl(e.target.value)}
+                placeholder="https://... atau unggah berkas"
+                className="min-h-11 flex-1 font-mono text-xs bg-[var(--color-paper)]"
+              />
+              <input
+                ref={headerFileRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    try {
+                      const uploaded = await uploadMutation.mutateAsync(file);
+                      setHeaderImageUrl(uploaded.url);
+                    } catch (err) {
+                      setFeedback({
+                        type: "error",
+                        text: extractErrorMessage(
+                          err,
+                          "Gagal mengunggah banner.",
+                        ),
+                      });
+                    }
+                  }
+                  e.target.value = "";
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!canEdit || uploadMutation.isPending}
+                onClick={() => headerFileRef.current?.click()}
+                className="min-h-11 px-3 text-xs font-semibold cursor-pointer"
+              >
+                <Upload className="size-3.5 mr-1" aria-hidden="true" />
+                Unggah
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -848,40 +1433,50 @@ export function PublisherStudioView({
     }
   };
 
-  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-
   // Inbox filters
   const [inboxQuery, setInboxQuery] = useState("");
   const [inboxStatus, setInboxStatus] = useState<string>("all");
 
-  // Catalog edit modal
+  // Catalog edit & inventory modals
   const [editingBook, setEditingBook] = useState<BookSummaryDto | null>(null);
+  const [inventoryBook, setInventoryBook] = useState<BookSummaryDto | null>(
+    null,
+  );
 
-  // Team management state
+  // Team & approved writers state
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<PublisherMemberRole>("editor");
+  const [writerIdentifier, setWriterIdentifier] = useState("");
+  const [writerFastTrack, setWriterFastTrack] = useState(true);
   const [teamFeedback, setTeamFeedback] = useState<{
     type: "success" | "error";
     text: string;
   } | null>(null);
 
-  const { data: manuscripts = [], isLoading: isInboxLoading } =
-    usePublisherManuscripts(publisher.slug);
-  const { data: books = [], isLoading: isCatalogLoading } = usePublisherBooks(
-    publisher.slug,
-  );
-  const { data: members = [], isLoading: isTeamLoading } = usePublisherMembers(
-    publisher.slug,
-  );
-
-  const addMemberMutation = useAddPublisherMember();
-  const updateMemberMutation = useUpdatePublisherMember();
-  const removeMemberMutation = useRemovePublisherMember();
-
   const role = publisher.currentUserRole ?? null;
   const canReview = canReviewManuscripts(role);
   const canEditBooks = canEditPublishedBooks(role);
   const canManageTeam = canManagePublisherTeam(role);
+
+  // Role-gated queries so editor/finance trigger zero unauthorized background requests.
+  const { data: manuscripts = [], isLoading: isInboxLoading } =
+    usePublisherManuscripts(publisher.slug, canReview);
+  const { data: books = [], isLoading: isCatalogLoading } = usePublisherBooks(
+    publisher.slug,
+    canEditBooks,
+  );
+  const { data: members = [], isLoading: isTeamLoading } = usePublisherMembers(
+    publisher.slug,
+    canManageTeam,
+  );
+  const { data: approvedWriters = [], isLoading: isWritersLoading } =
+    usePublisherApprovedWriters(publisher.slug, canReview);
+
+  const addMemberMutation = useAddPublisherMember();
+  const updateMemberMutation = useUpdatePublisherMember();
+  const removeMemberMutation = useRemovePublisherMember();
+  const addWriterMutation = useAddPublisherApprovedWriter();
+  const removeWriterMutation = useRemovePublisherApprovedWriter();
 
   const filteredManuscripts = manuscripts.filter((item) => {
     const matchesStatus = inboxStatus === "all" || item.status === inboxStatus;
@@ -900,29 +1495,37 @@ export function PublisherStudioView({
       .includes(q);
   });
 
-  const handleTabKeyDown = (
-    e: KeyboardEvent<HTMLButtonElement>,
-    index: number,
-  ) => {
-    let nextIndex: number | null = null;
-    if (e.key === "ArrowRight") nextIndex = (index + 1) % STUDIO_TABS.length;
-    if (e.key === "ArrowLeft")
-      nextIndex = (index - 1 + STUDIO_TABS.length) % STUDIO_TABS.length;
-    if (e.key === "Home") nextIndex = 0;
-    if (e.key === "End") nextIndex = STUDIO_TABS.length - 1;
+  const studioTabs = STUDIO_TABS.map((tab) => {
+    const count =
+      tab.id === "inbox"
+        ? canReview
+          ? manuscripts.length
+          : null
+        : tab.id === "catalog"
+          ? canEditBooks
+            ? books.length
+            : null
+          : tab.id === "team"
+            ? canManageTeam
+              ? members.length + approvedWriters.length
+              : canReview
+                ? approvedWriters.length
+                : null
+            : null;
 
-    if (nextIndex !== null) {
-      e.preventDefault();
-      const targetTab = STUDIO_TABS[nextIndex];
-      setActiveTab(targetTab.id);
-      const btn = tabRefs.current[targetTab.id];
-      btn?.focus();
-      btn?.scrollIntoView({
-        block: "nearest",
-        inline: "nearest",
-      });
-    }
-  };
+    const icon =
+      tab.id === "inbox" ? (
+        <Inbox className="size-4" aria-hidden="true" />
+      ) : tab.id === "catalog" ? (
+        <BookOpen className="size-4" aria-hidden="true" />
+      ) : tab.id === "team" ? (
+        <Users className="size-4" aria-hidden="true" />
+      ) : (
+        <Settings2 className="size-4" aria-hidden="true" />
+      );
+
+    return { ...tab, count, icon };
+  });
 
   const handleAddMember = async (e: FormEvent) => {
     e.preventDefault();
@@ -954,115 +1557,121 @@ export function PublisherStudioView({
     }
   };
 
+  const handleAddApprovedWriter = async (e: FormEvent) => {
+    e.preventDefault();
+    setTeamFeedback(null);
+    const cleaned = writerIdentifier.trim();
+    if (cleaned.length < 2) {
+      setTeamFeedback({
+        type: "error",
+        text: "Masukkan email atau username penulis rekanan yang valid.",
+      });
+      return;
+    }
+
+    try {
+      await addWriterMutation.mutateAsync({
+        slug: publisher.slug,
+        input: { identifier: cleaned, canFastTrack: writerFastTrack },
+      });
+      setWriterIdentifier("");
+      setTeamFeedback({
+        type: "success",
+        text: `Penulis rekanan ${cleaned} berhasil ditambahkan.`,
+      });
+    } catch (error) {
+      setTeamFeedback({
+        type: "error",
+        text: extractErrorMessage(error, "Gagal menambahkan penulis rekanan."),
+      });
+    }
+  };
+
   return (
     <div className="space-y-6 pb-12 text-[var(--color-ink)]">
       {/* Studio Identity Header */}
-      <header className="rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-5 sm:p-7 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-        <div className="flex items-start sm:items-center gap-4 min-w-0">
-          {publisher.logoUrl ? (
-            <img
-              src={publisher.logoUrl}
-              alt={publisher.name}
-              className="size-16 rounded-xl object-contain border border-[var(--color-rule)] bg-[var(--color-paper)] p-1.5 shrink-0"
-            />
-          ) : (
-            <div className="size-16 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper-3)] flex items-center justify-center font-serif text-2xl font-bold shrink-0">
-              {publisher.name.slice(0, 1).toUpperCase()}
-            </div>
-          )}
-
-          <div className="space-y-1.5 min-w-0">
-            <h2 className="font-serif text-2xl sm:text-3xl font-bold tracking-tight truncate">
-              {publisher.name}
-            </h2>
-            <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
-              <span className="inline-flex items-center gap-1 rounded-md border border-[var(--color-rule)] bg-[var(--color-paper)] px-2.5 py-0.5 text-[var(--color-ink-2)]">
-                <ShieldCheck
-                  className="size-3.5 text-[var(--color-green)]"
-                  aria-hidden="true"
-                />
-                {publisher.verificationStatus === "verified"
-                  ? "Terverifikasi IKAPI"
-                  : publisher.verificationStatus}
-              </span>
-              <span className="inline-flex items-center rounded-md border border-[var(--color-accent)]/40 bg-[var(--color-accent-soft)] px-2.5 py-0.5 font-semibold text-[var(--color-ink)]">
-                Peran Anda: {formatRoleName(role)}
-              </span>
-              <span className="text-[var(--color-muted)]">
-                /p/{publisher.slug}
-              </span>
-            </div>
+      <EntityProfileHeader
+        kind="publisher"
+        headingLevel="h2"
+        logoFit="contain"
+        name={publisher.name}
+        handleOrSlug={`/p/${publisher.slug}`}
+        handleHref={`/p/${publisher.slug}`}
+        avatarUrl={publisher.logoUrl}
+        bannerUrl={publisher.headerImageUrl}
+        bio={publisher.description}
+        topics={publisher.topics ?? undefined}
+        socialLinks={normalizeSocialLinks(publisher.socialLinks)}
+        ariaLabel="Identitas Studio Penerbit"
+        badges={[
+          {
+            label:
+              publisher.verificationStatus === "verified"
+                ? "Terverifikasi IKAPI"
+                : publisher.verificationStatus,
+            tone:
+              publisher.verificationStatus === "verified"
+                ? "success"
+                : "neutral",
+            icon: <ShieldCheck className="size-3.5" aria-hidden="true" />,
+          },
+          {
+            label: `Peran Anda: ${formatRoleName(role)}`,
+            tone: "accent",
+          },
+        ]}
+        modeSwitcher={
+          <div className="inline-flex items-center rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-1 text-xs">
+            <Link
+              to="/p/$slug"
+              params={{ slug: publisher.slug }}
+              className="inline-flex min-h-9 items-center rounded-lg px-3 font-medium text-[var(--color-muted)] hover:text-[var(--color-ink)]"
+            >
+              Halaman Publik
+            </Link>
+            <span className="inline-flex min-h-9 items-center rounded-lg bg-[var(--color-accent)] px-3 font-semibold text-[var(--color-accent-ink)]">
+              Studio Redaksi
+            </span>
           </div>
-        </div>
-
-        <Link
-          to="/p/$slug"
-          params={{ slug: publisher.slug }}
-          className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-4 text-xs font-semibold text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
-        >
-          <span>Lihat Halaman Publik</span>
-          <ExternalLink className="size-3.5" aria-hidden="true" />
-        </Link>
-      </header>
+        }
+        actions={
+          <Link
+            to="/p/$slug"
+            params={{ slug: publisher.slug }}
+            className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-4 text-xs font-semibold text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+          >
+            <span>Lihat Halaman Publik</span>
+            <ExternalLink className="size-3.5" aria-hidden="true" />
+          </Link>
+        }
+        metrics={[
+          {
+            label: "Naskah Masuk",
+            value: canReview ? manuscripts.length : "—",
+          },
+          {
+            label: "Buku Terbit",
+            value: canEditBooks ? books.length : "—",
+          },
+          {
+            label: "Penulis Rekanan",
+            value: canReview ? approvedWriters.length : "—",
+          },
+          {
+            label: "Anggota Tim",
+            value: canManageTeam ? members.length : "—",
+          },
+        ]}
+      />
 
       {/* Accessible Single-Row Horizontal Scrollable Tablist */}
-      <div
-        role="tablist"
-        aria-label="Navigasi Studio Penerbit"
-        className="flex items-center gap-1 overflow-x-auto border-b border-[var(--color-rule)]"
-      >
-        {STUDIO_TABS.map((tab, index) => {
-          const isSelected = activeTab === tab.id;
-          const countBadge =
-            tab.id === "inbox"
-              ? manuscripts.length
-              : tab.id === "catalog"
-                ? books.length
-                : tab.id === "team"
-                  ? members.length
-                  : null;
-
-          return (
-            <button
-              key={tab.id}
-              ref={(el) => {
-                tabRefs.current[tab.id] = el;
-              }}
-              id={`studio-tab-${tab.id}`}
-              type="button"
-              role="tab"
-              aria-selected={isSelected}
-              tabIndex={isSelected ? 0 : -1}
-              onClick={() => setActiveTab(tab.id)}
-              onKeyDown={(e) => handleTabKeyDown(e, index)}
-              className={`relative flex-none min-h-11 px-4 text-xs sm:text-sm font-medium whitespace-nowrap cursor-pointer inline-flex items-center gap-2 focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] ${
-                isSelected
-                  ? "text-[var(--color-ink)] font-semibold after:content-[''] after:absolute after:inset-x-0 after:bottom-0 after:border-b-3 after:border-[var(--color-accent)]"
-                  : "text-[var(--color-muted)] hover:text-[var(--color-ink)]"
-              }`}
-            >
-              {tab.id === "inbox" && (
-                <Inbox className="size-4" aria-hidden="true" />
-              )}
-              {tab.id === "catalog" && (
-                <BookOpen className="size-4" aria-hidden="true" />
-              )}
-              {tab.id === "team" && (
-                <Users className="size-4" aria-hidden="true" />
-              )}
-              {tab.id === "profile" && (
-                <Settings2 className="size-4" aria-hidden="true" />
-              )}
-              <span>{tab.label}</span>
-              {countBadge !== null && (
-                <span className="rounded-md bg-[var(--color-paper-3)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--color-ink-2)]">
-                  {countBadge}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      <ProfileTabs
+        tabs={studioTabs}
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        ariaLabel="Navigasi Studio Penerbit"
+        idPrefix="studio"
+      />
 
       {/* Tab 1: Inbox Naskah */}
       {activeTab === "inbox" && (
@@ -1156,19 +1765,46 @@ export function PublisherStudioView({
                         >
                           {formatManuscriptStatus(item.status)}
                         </span>
+                        {item.isApprovedWriter && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-[var(--color-accent)]/50 bg-[var(--color-accent-soft)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--color-ink)]">
+                            <Award className="size-3" aria-hidden="true" />
+                            Penulis Rekanan
+                          </span>
+                        )}
                       </div>
 
-                      <p className="text-xs text-[var(--color-muted)] font-mono">
-                        Penulis:{" "}
-                        <strong className="text-[var(--color-ink)]">
-                          {item.authorPenName || item.authorName || "Anonim"}
-                        </strong>
-                        {item.category ? ` · ${item.category}` : ""}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[var(--color-muted)] font-mono">
+                        <span>
+                          Penulis:{" "}
+                          <strong className="text-[var(--color-ink)]">
+                            {item.authorPenName || item.authorName || "Anonim"}
+                          </strong>
+                        </span>
+                        {item.category && <span>{item.category}</span>}
+                        {item.sourceLanguage && (
+                          <span>
+                            {formatSourceLanguage(item.sourceLanguage)}
+                          </span>
+                        )}
+                        {item.targetAudience && (
+                          <span>
+                            {formatTargetAudience(item.targetAudience)}
+                          </span>
+                        )}
+                      </div>
 
                       <p className="text-xs text-[var(--color-ink-2)] line-clamp-2 leading-relaxed">
                         {item.synopsis || "Belum ada sinopsis naskah."}
                       </p>
+
+                      {item.authorNotes && (
+                        <p className="rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 py-2 text-xs text-[var(--color-ink-2)]">
+                          <strong className="text-[var(--color-ink)]">
+                            Catatan penulis:
+                          </strong>{" "}
+                          {item.authorNotes}
+                        </p>
+                      )}
 
                       {item.editorialNotes && (
                         <p className="rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 py-2 text-xs text-[var(--color-ink-2)]">
@@ -1203,8 +1839,8 @@ export function PublisherStudioView({
 
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--color-rule)] pt-2.5 text-xs text-[var(--color-muted)] font-mono">
                     <span>
-                      {item.chapters?.length || item.totalChapters || 1} bab ·
-                      Diperbarui{" "}
+                      {item.chapters?.length || item.totalChapters || 1} bab,
+                      diperbarui{" "}
                       {new Date(item.updatedAt).toLocaleDateString("id-ID")}
                     </span>
                     <span>
@@ -1265,14 +1901,14 @@ export function PublisherStudioView({
                         {book.title}
                       </h2>
                       <p className="text-xs text-[var(--color-muted)]">
-                        {book.author} · {book.totalChapters} bab
+                        {book.author} — {book.totalChapters} bab
                       </p>
                       <div className="flex flex-wrap items-center gap-2 pt-1 text-xs font-mono">
                         <span className="rounded border border-[var(--color-rule)] bg-[var(--color-paper)] px-2 py-0.5 text-[var(--color-ink-2)]">
                           {formatDigitalPolicy(book.digitalPolicy)}
                         </span>
                         <span className="text-[var(--color-muted)]">
-                          {formatPriceIdr(book.alacartePriceIdr)}
+                          {formatPriceIdr(book.digitalPriceIdr)}
                         </span>
                       </div>
                     </div>
@@ -1287,13 +1923,24 @@ export function PublisherStudioView({
                       Halaman Buku
                     </Link>
                     {canEditBooks && (
-                      <Button
-                        type="button"
-                        onClick={() => setEditingBook(book)}
-                        className="min-h-11 rounded-xl bg-[var(--color-accent)] px-4 text-xs font-semibold text-[var(--color-accent-ink)] hover:brightness-95 cursor-pointer"
-                      >
-                        Edit Metadata
-                      </Button>
+                      <>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setInventoryBook(book)}
+                          className="min-h-11 rounded-xl border-[var(--color-rule)] bg-[var(--color-paper)] px-3.5 text-xs font-semibold text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] cursor-pointer inline-flex items-center gap-1.5"
+                        >
+                          <Store className="size-3.5" aria-hidden="true" />
+                          <span>Stok Toko</span>
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => setEditingBook(book)}
+                          className="min-h-11 rounded-xl bg-[var(--color-accent)] px-4 text-xs font-semibold text-[var(--color-accent-ink)] hover:brightness-95 cursor-pointer"
+                        >
+                          Edit Metadata
+                        </Button>
+                      </>
                     )}
                   </div>
                 </li>
@@ -1305,6 +1952,11 @@ export function PublisherStudioView({
             publisherSlug={publisher.slug}
             book={editingBook}
             onClose={() => setEditingBook(null)}
+          />
+          <BookInventoryDialog
+            publisherSlug={publisher.slug}
+            book={inventoryBook}
+            onClose={() => setInventoryBook(null)}
           />
         </section>
       )}
@@ -1544,6 +2196,162 @@ export function PublisherStudioView({
                 );
               })}
             </ul>
+          )}
+
+          {/* Section B: Penulis Rekanan (Owner & Editor) */}
+          {canReview && (
+            <div className="space-y-4 border-t border-[var(--color-rule)] pt-6">
+              <form
+                onSubmit={handleAddApprovedWriter}
+                className="rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-5 space-y-4"
+              >
+                <div className="space-y-1">
+                  <h2 className="font-serif text-lg font-bold flex items-center gap-2">
+                    <Award
+                      className="size-4 text-[var(--color-accent)]"
+                      aria-hidden="true"
+                    />
+                    <span>Penulis Rekanan ({approvedWriters.length})</span>
+                  </h2>
+                  <p className="text-xs text-[var(--color-muted)] leading-relaxed">
+                    Penulis rekanan tetap dapat mengajukan naskah lewat jalur
+                    prioritas meskipun penerimaan publik sedang ditutup, serta
+                    ditampilkan di halaman profil penerbit.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-3 items-end">
+                  <div className="space-y-1.5">
+                    <Label
+                      htmlFor="approved-writer-identifier"
+                      className="text-xs font-semibold"
+                    >
+                      Email atau Username Penulis
+                    </Label>
+                    <Input
+                      id="approved-writer-identifier"
+                      name="identifier"
+                      value={writerIdentifier}
+                      onChange={(e) => setWriterIdentifier(e.target.value)}
+                      placeholder="penulis@domain.id atau @username"
+                      autoCorrect="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      className="min-h-11 bg-[var(--color-paper)] text-xs"
+                    />
+                  </div>
+
+                  <label className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={writerFastTrack}
+                      onChange={(e) => setWriterFastTrack(e.target.checked)}
+                      className="size-4 accent-[var(--color-accent)]"
+                    />
+                    <span>Jalur Prioritas</span>
+                  </label>
+
+                  <Button
+                    type="submit"
+                    disabled={addWriterMutation.isPending}
+                    className="min-h-11 px-5 text-xs font-semibold bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:brightness-95 cursor-pointer"
+                  >
+                    {addWriterMutation.isPending
+                      ? "Menambahkan..."
+                      : "Tambah Penulis"}
+                  </Button>
+                </div>
+              </form>
+
+              {isWritersLoading ? (
+                <div className="flex min-h-32 items-center justify-center rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-2)]">
+                  <LoaderCircle
+                    className="size-5 animate-spin text-[var(--color-muted)]"
+                    aria-hidden="true"
+                  />
+                </div>
+              ) : approvedWriters.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-[var(--color-rule)] bg-[var(--color-paper-2)] p-8 text-center text-xs text-[var(--color-muted)]">
+                  Belum ada penulis rekanan terdaftar.
+                </div>
+              ) : (
+                <ul className="divide-y divide-[var(--color-rule)] rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-2)]">
+                  {approvedWriters.map((writer) => {
+                    const displayName =
+                      writer.name || writer.invitedEmail || "Penulis Rekanan";
+                    return (
+                      <li
+                        key={writer.id}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:px-5"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          {writer.image ? (
+                            <img
+                              src={writer.image}
+                              alt={displayName}
+                              className="size-10 rounded-full object-cover border border-[var(--color-rule)] shrink-0"
+                            />
+                          ) : (
+                            <div className="size-10 rounded-full border border-[var(--color-rule)] bg-[var(--color-paper-3)] flex items-center justify-center font-serif font-bold text-sm shrink-0">
+                              {displayName.slice(0, 1).toUpperCase()}
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-semibold truncate">
+                                {displayName}
+                              </p>
+                              {writer.canFastTrack && (
+                                <span className="rounded-full border border-[var(--color-accent)]/50 bg-[var(--color-accent-soft)] px-2 py-0.5 text-[10px] font-semibold">
+                                  Jalur Prioritas
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-muted)] font-mono truncate">
+                              <span>{writer.invitedEmail || "Terdaftar"}</span>
+                              {writer.username && (
+                                <span>@{writer.username}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={removeWriterMutation.isPending}
+                          aria-label={`Hapus ${displayName} dari penulis rekanan`}
+                          onClick={async () => {
+                            setTeamFeedback(null);
+                            try {
+                              await removeWriterMutation.mutateAsync({
+                                slug: publisher.slug,
+                                writerId: writer.id,
+                              });
+                              setTeamFeedback({
+                                type: "success",
+                                text: `${displayName} dihapus dari daftar penulis rekanan.`,
+                              });
+                            } catch (error) {
+                              setTeamFeedback({
+                                type: "error",
+                                text: extractErrorMessage(
+                                  error,
+                                  "Gagal menghapus penulis rekanan.",
+                                ),
+                              });
+                            }
+                          }}
+                          className="min-h-11 min-w-11 px-3 text-xs text-[var(--color-error)] hover:bg-[var(--color-error-soft)] cursor-pointer self-end sm:self-auto"
+                        >
+                          <Trash2 className="size-4" aria-hidden="true" />
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
           )}
         </section>
       )}

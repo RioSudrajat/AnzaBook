@@ -133,7 +133,9 @@ export async function loadCanvasImage(
     trimmed.startsWith("blob:") || trimmed.startsWith("data:");
   const isRemoteUrl =
     trimmed.startsWith("https://") || trimmed.startsWith("http://");
-  if (!isLocalBlobOrData && !isRemoteUrl) {
+  const isUploadedRootRelative =
+    /^\/(?!\/)[^\s]*$/.test(trimmed) && !trimmed.startsWith("/covers/");
+  if (!isLocalBlobOrData && !isRemoteUrl && !isUploadedRootRelative) {
     // Legacy relative paths like /covers/*.svg are procedural fallback covers, not static files.
     return null;
   }

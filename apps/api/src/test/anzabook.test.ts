@@ -79,7 +79,7 @@ describe("AnzaBook Core API", () => {
     const client = agent();
     await signUp(client, "Pembaca Rakyat");
 
-    // Book with sample_only / print_claim policy: sains-logika-seni-hidup-bermutu
+    // Book with nakama_subscription / print_code policy: sains-logika-seni-hidup-bermutu
     const slug = "sains-logika-seni-hidup-bermutu";
 
     // Chapter 1 (sample) is permitted

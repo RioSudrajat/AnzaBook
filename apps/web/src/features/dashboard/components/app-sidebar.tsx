@@ -9,6 +9,7 @@ import {
   User,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import { AnzaLogoMark } from "@/components/brand";
 
 export type AppTab =
   "home" | "explore" | "events" | "library" | "profile" | "settings";
@@ -115,11 +116,7 @@ export function AppSidebar({
                   className="flex items-center gap-2.5 group cursor-pointer focus-visible:outline-2 focus-visible:outline-ring rounded-lg p-1 min-w-0"
                   title="AnzaBook"
                 >
-                  <img
-                    src="/icon.svg"
-                    alt="AnzaBook"
-                    className="size-8 rounded-[7px] object-contain shadow-xs border border-border/40 shrink-0 transition-transform group-hover:scale-105"
-                  />
+                  <AnzaLogoMark className="size-7 text-foreground shrink-0 transition-transform group-hover:scale-105" />
                   <div className="flex flex-col items-start leading-tight min-w-0">
                     <span className="font-serif font-bold tracking-tight text-base text-foreground truncate">
                       AnzaBook
@@ -159,11 +156,7 @@ export function AppSidebar({
                   aria-label="Buka Sidebar"
                 >
                   {/* Default State: AnzaBook Logo */}
-                  <img
-                    src="/icon.svg"
-                    alt="AnzaBook"
-                    className="size-7 rounded-[6px] object-contain shadow-xs transition-all duration-200 group-hover:opacity-0 group-hover:scale-75 group-focus-visible:opacity-0 group-focus-visible:scale-75 absolute pointer-events-none"
-                  />
+                  <AnzaLogoMark className="size-6 text-foreground transition-all duration-200 group-hover:opacity-0 group-hover:scale-75 group-focus-visible:opacity-0 group-focus-visible:scale-75 absolute pointer-events-none" />
                   {/* Hover State: Sidebar Toggle Icon */}
                   <div className="opacity-0 scale-75 group-hover:opacity-100 group-hover:scale-100 group-focus-visible:opacity-100 group-focus-visible:scale-100 transition-all duration-200 flex items-center justify-center text-foreground">
                     <SidebarToggleIcon className="size-5" />

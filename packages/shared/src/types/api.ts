@@ -27,12 +27,15 @@ export type AdminNoteDto = NoteDto & { ownerName: string; ownerEmail: string };
 
 // ---------------- AnzaBook DTOs ---------------- //
 
-export type DigitalPolicy =
+export type BookDistributionModel =
   | "free_open"
-  | "print_claim_only"
-  | "sample_only"
-  | "alacarte_only"
-  | "hybrid_nakama_alacarte";
+  | "print_code_only"
+  | "nakama_subscription"
+  | "single_purchase"
+  | "nakama_or_purchase";
+export type ManuscriptSourceLanguage = "id" | "en";
+export type ManuscriptTargetAudience =
+  "general" | "young_adult" | "mature_academic";
 export type AuthorStatus = "none" | "pending" | "verified" | "rejected";
 export type AccessTier = "free" | "premium" | "premium_physical";
 export type EditionTier =
@@ -100,12 +103,10 @@ export type BookSummaryDto = {
   id: string;
   slug: string;
   title: string;
-  originalTitle: string | null;
   author: string;
   authorAvatar: string | null;
   editor: string | null;
   editorAvatar: string | null;
-  translator: string | null;
   coverUrl: string;
   coverColor: string;
   synopsis: string;
@@ -115,7 +116,7 @@ export type BookSummaryDto = {
   totalChapters: number;
   readingMinutes: number;
   audioDurationMinutes: number;
-  digitalPolicy: DigitalPolicy;
+  digitalPolicy: BookDistributionModel;
   accessTier: AccessTier;
   hasPhysical: boolean;
   isWeeklyBulletin: boolean;
@@ -132,7 +133,8 @@ export type BookSummaryDto = {
   publisherName?: string | null;
   publisherLogoUrl?: string | null;
   authorUserId?: string | null;
-  alacartePriceIdr?: number | null;
+  authorUsername?: string | null;
+  digitalPriceIdr?: number | null;
 };
 
 export type BookDetailDto = BookSummaryDto & {
@@ -149,6 +151,7 @@ export type BookChapterSummaryDto = {
   chapterNumber: number;
   title: string;
   isSample: boolean;
+  wordCount?: number;
 };
 
 export type BookReaderChapterDto = {
@@ -160,6 +163,8 @@ export type BookReaderChapterDto = {
   blueprintContent: string;
   audioUrl: string | null;
   audioDurationSeconds: number | null;
+  fullWordCount?: number;
+  isPreviewTruncated?: boolean;
 };
 
 export type BookReaderPayloadDto = {
@@ -213,6 +218,7 @@ export type ShelfItemDto = {
   favorite: boolean;
   progressPercent: number;
   previewProgressPercent?: number | null;
+  previewBookPercent?: number | null;
   updatedAt: string;
 };
 
@@ -240,8 +246,14 @@ export type BookHighlightDto = {
   id: string;
   userId: string;
   bookId: string;
+  bookSlug?: string;
   bookTitle?: string;
+  bookAuthor?: string;
   bookCoverUrl?: string | null;
+  bookCoverColor?: string | null;
+  bookPublishedYear?: number | null;
+  bookGenres?: string[];
+  bookPageCount?: number | null;
   chapterId: string | null;
   chapterNumber: number;
   pageNumber: number;
@@ -456,18 +468,21 @@ export type ManagedCommunitySummaryDto = {
   id: string;
   name: string;
   slug: string;
+  description?: string | null;
   avatarUrl: string | null;
   coverUrl: string | null;
   city: string | null;
   verificationStatus: "pending" | "verified" | "trusted" | "rejected";
   rejectionReason?: string | null;
   role: "owner" | "admin" | "checkin_staff" | "member";
+  followerCount?: number;
 };
 
 export type ManagedPublisherSummaryDto = {
   id: string;
   name: string;
   slug: string;
+  description?: string | null;
   logoUrl: string | null;
   headerImageUrl: string | null;
   city: string | null;
@@ -475,6 +490,8 @@ export type ManagedPublisherSummaryDto = {
   verificationStatus: PublisherVerificationStatus;
   rejectionReason?: string | null;
   role?: PublisherMemberRole | null;
+  followerCount?: number;
+  isFollowing?: boolean;
 };
 
 export type PublicProfileReviewDto = {
@@ -500,6 +517,7 @@ export type SocialProfileDto = {
   followingCount: number;
   isFollowing?: boolean;
   isSubscribedUpdates?: boolean;
+  isApprovedWriter?: boolean;
   booksPublishedCount?: number;
   totalReadingMinutes?: number;
   isPublisher?: boolean;
@@ -593,6 +611,9 @@ export type ExplorePostItemDto = {
     author: string;
     coverColor?: string | null;
     coverUrl?: string | null;
+    publishedYear?: number | null;
+    genres?: string[];
+    pageCount?: number | null;
   };
   rating?: number;
   color?: HighlightColor;
@@ -625,6 +646,57 @@ export type UnifiedExploreResultDto = {
 export type PublisherVerificationStatus = "pending" | "verified" | "rejected";
 export type PublisherMemberRole = "owner" | "editor" | "finance";
 
+export type PublisherApprovedWriterStatus = "invited" | "active" | "revoked";
+
+export type PublisherApprovedWriterSummaryDto = {
+  id: string;
+  userId: string | null;
+  name: string;
+  username: string | null;
+  image: string | null;
+};
+
+export type PublisherApprovedWriterDto = {
+  id: string;
+  publisherId: string;
+  userId: string | null;
+  invitedEmail: string | null;
+  status: PublisherApprovedWriterStatus;
+  canFastTrack: boolean;
+  name: string | null;
+  username: string | null;
+  image: string | null;
+  acceptedAt: string | null;
+  createdAt: string;
+};
+
+export type StoreBranchDto = {
+  id: string;
+  chainName: PartnerType;
+  branchName: string;
+  city: string;
+  address: string;
+};
+
+export type PublisherBookInventoryItemDto = {
+  branchId: string;
+  branchName: string;
+  chainName: PartnerType;
+  city: string;
+  address: string;
+  rakyatStock: number;
+  standardStock: number;
+  stockStatus: string;
+  lastSyncedAt: string;
+};
+
+export type UploadedMediaDto = {
+  key: string;
+  url: string;
+  contentType: string;
+  bytes: number;
+};
+
 export type PublisherDto = {
   id: string;
   slug: string;
@@ -641,6 +713,8 @@ export type PublisherDto = {
   submissionGuidelines?: string | null;
   topicMatchScore?: number;
   matchedTopics?: string[];
+  approvedWriters?: PublisherApprovedWriterSummaryDto[];
+  isCurrentUserApprovedWriter?: boolean;
   verificationStatus: PublisherVerificationStatus;
   rejectionReason?: string | null;
   verificationDocuments?: VerificationDocumentDto[] | null;
@@ -654,6 +728,8 @@ export type PublisherDto = {
   freeClaimCodeQuotaPerBook: number;
   claimCodeFeeIdr: number;
   totalBooks?: number;
+  followerCount?: number;
+  isFollowing?: boolean;
   currentUserRole?: PublisherMemberRole | null;
   createdAt: string;
   updatedAt: string;
@@ -702,15 +778,22 @@ export type ManuscriptSubmissionDto = {
   title: string;
   slug?: string | null;
   coverUrl?: string | null;
+  coverColor?: string | null;
   category?: string | null;
   synopsis: string;
+  sourceLanguage?: ManuscriptSourceLanguage;
+  targetAudience?: ManuscriptTargetAudience;
+  authorNotes?: string | null;
+  isbn?: string | null;
+  estimatedPages?: number | null;
   editorialNotes?: string | null;
-  proposedDigitalPolicy: DigitalPolicy;
-  proposedAlacartePriceIdr: number | null;
+  proposedDigitalPolicy: BookDistributionModel;
+  proposedDigitalPriceIdr: number | null;
   printSimJson: Record<string, unknown> | null;
   status: ManuscriptSubmissionStatus;
   rejectionReason: string | null;
   publishedBookId: string | null;
+  isApprovedWriter?: boolean;
   chapters?: ManuscriptChapterDto[];
   totalChapters?: number;
   createdAt: string;
@@ -783,11 +866,9 @@ export type AdminOverviewDto = {
   pendingCalendarsCount: number;
   pendingAuthorsCount: number;
   pendingPublishersCount: number;
-  /** @deprecated Removed across Issues #9 and #10 */
-  pendingManuscriptsCount?: number;
   highRiskDrmEvents24hCount: number;
   estimatedNakamaRoyaltyPoolIdr: number;
-  totalAlacarteSalesIdr: number;
+  totalSinglePurchaseSalesIdr: number;
   totalPublisherShareIdr: number;
   totalAffiliateCommissionsIdr: number;
   totalNetAnzabookIdr: number;

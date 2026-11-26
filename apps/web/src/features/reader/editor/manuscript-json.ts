@@ -8,26 +8,60 @@ export interface ExtractedChapter {
 }
 
 /**
- * Extracts plain text recursively from a Tiptap node
+ * Extracts inline plain text recursively from any Tiptap node (including chapterBreak titles).
  */
-export function extractTextFromNode(node: JSONContent): string {
-  if (node.type === "chapterBreak" || node.type === "pageBreak") {
-    return "";
-  }
+export function extractInlineText(node: JSONContent): string {
   if (node.type === "text" && node.text) {
     return node.text;
   }
   if (node.content && Array.isArray(node.content)) {
-    return node.content.map(extractTextFromNode).join("").trim();
+    return node.content.map(extractInlineText).join("").trim();
   }
   return "";
 }
 
 /**
+ * Extracts plain body text recursively from a Tiptap node (skips chapter/page markers).
+ */
+export function extractTextFromNode(node: JSONContent): string {
+  if (node.type === "chapterBreak" || node.type === "pageBreak") {
+    return "";
+  }
+  return extractInlineText(node);
+}
+
+function normalizeChapterBreakNode(
+  node: JSONContent,
+  chapterNumber: number,
+  fallbackTitle: string,
+): JSONContent {
+  const inlineText = extractInlineText(node);
+  const resolvedTitle =
+    inlineText ||
+    (typeof node.attrs?.title === "string" ? node.attrs.title.trim() : "") ||
+    fallbackTitle;
+
+  const hasExplicitContentArray = Array.isArray(node.content);
+  const nextContent = hasExplicitContentArray
+    ? node.content
+    : resolvedTitle
+      ? [{ type: "text", text: resolvedTitle }]
+      : [];
+
+  return {
+    type: "chapterBreak",
+    attrs: {
+      chapterNumber,
+    },
+    content: nextContent,
+  };
+}
+
+/**
  * Normalizes a Tiptap document so that:
  * 1. It is a valid doc object
- * 2. It always starts with Chapter 1 break at content[0]
- * 3. All chapter breaks have valid chapter numbers and titles
+ * 2. It always starts with Chapter 1 break at content[0] with live editable text content
+ * 3. All chapter breaks have valid sequential chapter numbers
  */
 export function normalizeManuscriptJson(
   rawJson: JSONContent | null | undefined,
@@ -39,7 +73,8 @@ export function normalizeManuscriptJson(
       content: [
         {
           type: "chapterBreak",
-          attrs: { chapterNumber: 1, title: defaultTitle },
+          attrs: { chapterNumber: 1 },
+          content: [{ type: "text", text: defaultTitle }],
         },
         {
           type: "paragraph",
@@ -61,7 +96,8 @@ export function normalizeManuscriptJson(
       content: [
         {
           type: "chapterBreak",
-          attrs: { chapterNumber: 1, title: defaultTitle },
+          attrs: { chapterNumber: 1 },
+          content: [{ type: "text", text: defaultTitle }],
         },
         {
           type: "paragraph",
@@ -73,6 +109,19 @@ export function normalizeManuscriptJson(
     };
   }
 
+  // Upgrade any chapterBreak node that still carries legacy attrs.title without content
+  for (let i = 0; i < content.length; i++) {
+    const item = content[i];
+    if (item?.type === "chapterBreak") {
+      const num = Number(item.attrs?.chapterNumber) || 1;
+      content[i] = normalizeChapterBreakNode(
+        item,
+        num,
+        num === 1 ? defaultTitle : `Bab ${num}`,
+      );
+    }
+  }
+
   // Check if first element is chapterBreak for Chapter 1
   const firstNode = content[0];
   if (
@@ -81,7 +130,8 @@ export function normalizeManuscriptJson(
   ) {
     content.unshift({
       type: "chapterBreak",
-      attrs: { chapterNumber: 1, title: defaultTitle },
+      attrs: { chapterNumber: 1 },
+      content: [{ type: "text", text: defaultTitle }],
     });
   }
 
@@ -169,7 +219,13 @@ export function extractChaptersFromJson(doc: JSONContent): ExtractedChapter[] {
       }
       foundAnyChapterBreak = true;
       currentNum = Number(node.attrs?.chapterNumber) || chapters.length + 1;
-      currentTitle = String(node.attrs?.title || `Bab ${currentNum}`);
+      const inlineTitle = extractInlineText(node).trim();
+      currentTitle =
+        inlineTitle ||
+        (typeof node.attrs?.title === "string"
+          ? node.attrs.title.trim()
+          : "") ||
+        `Bab ${currentNum}`;
     } else {
       currentNodes.push(node);
     }
@@ -245,13 +301,13 @@ export function buildUnifiedDocFromChapters(
     const chapNum = chap.chapterNumber || idx + 1;
     const chapTitle = chap.titleId || chap.title || `Bab ${chapNum}`;
 
-    // Add chapter break header node
+    // Add live editable chapter break header node
     unifiedContent.push({
       type: "chapterBreak",
       attrs: {
         chapterNumber: chapNum,
-        title: chapTitle,
       },
+      ...(chapTitle ? { content: [{ type: "text", text: chapTitle }] } : {}),
     });
 
     // Check if blueprintContent is a Tiptap JSON

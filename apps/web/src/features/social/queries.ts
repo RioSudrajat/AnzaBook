@@ -15,8 +15,11 @@ import {
   getUserFollowers,
   getUserFollowing,
   getUserProfile,
+  listPublisherApprovedWriters,
+  listPublisherBookInventory,
   listPublisherBooks,
   listPublisherMembers,
+  listStoreBranches,
   listSubmissionTargets,
   listVerifiedPublishers,
 } from "./api";
@@ -60,6 +63,11 @@ export const publisherKeys = {
   detail: (slug: string) => [...publisherKeys.all, "detail", slug] as const,
   books: (slug: string) => [...publisherKeys.all, "books", slug] as const,
   members: (slug: string) => [...publisherKeys.all, "members", slug] as const,
+  approvedWriters: (slug: string) =>
+    [...publisherKeys.all, "approved-writers", slug] as const,
+  storeBranches: () => [...publisherKeys.all, "store-branches"] as const,
+  bookInventory: (slug: string, bookId: string) =>
+    [...publisherKeys.all, "book-inventory", slug, bookId] as const,
   myManuscripts: () => [...publisherKeys.all, "manuscripts", "mine"] as const,
   manuscriptDetail: (idOrSlug: string) =>
     [...publisherKeys.all, "manuscript", idOrSlug] as const,
@@ -195,5 +203,28 @@ export function publisherManuscriptsQuery(slug: string) {
     queryKey: publisherKeys.publisherManuscripts(slug),
     queryFn: ({ signal }) => getPublisherManuscripts(slug, signal),
     enabled: Boolean(slug),
+  });
+}
+
+export function publisherApprovedWritersQuery(slug: string) {
+  return queryOptions({
+    queryKey: publisherKeys.approvedWriters(slug),
+    queryFn: ({ signal }) => listPublisherApprovedWriters(slug, signal),
+    enabled: Boolean(slug),
+  });
+}
+
+export function storeBranchesQuery() {
+  return queryOptions({
+    queryKey: publisherKeys.storeBranches(),
+    queryFn: ({ signal }) => listStoreBranches(signal),
+  });
+}
+
+export function publisherBookInventoryQuery(slug: string, bookId: string) {
+  return queryOptions({
+    queryKey: publisherKeys.bookInventory(slug, bookId),
+    queryFn: ({ signal }) => listPublisherBookInventory(slug, bookId, signal),
+    enabled: Boolean(slug && bookId),
   });
 }

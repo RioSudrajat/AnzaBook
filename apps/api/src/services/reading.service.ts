@@ -1,6 +1,9 @@
 import { and, desc, eq, lt, sql } from "drizzle-orm";
 import {
   bookProgressPercent,
+  computeWordWeightedProgress,
+  countContentWords,
+  extractPlainParagraphs,
   wordsToStandardPages,
 } from "@starter/shared/reading-progress";
 import { db } from "../db";
@@ -62,8 +65,8 @@ export async function createReadingSession(
 
   const hasMembership = !!(await getActiveMembership(userId));
   const isNakamaEligible =
-    book.digitalPolicy === "sample_only" ||
-    book.digitalPolicy === "hybrid_nakama_alacarte";
+    book.digitalPolicy === "nakama_subscription" ||
+    book.digitalPolicy === "nakama_or_purchase";
   const isWpmValid = input.avgWpm >= 80 && input.avgWpm <= 600;
   const isDurationValid =
     input.durationSeconds >= 120 && input.durationSeconds <= 3600;
@@ -370,8 +373,7 @@ export async function saveReadingProgress(
   const paragraphCount =
     scope === "preview"
       ? getPreviewParagraphCount(chapter.contentId)
-      : chapter.contentId.split(/\n\n+/).filter((paragraph) => paragraph.trim())
-          .length;
+      : extractPlainParagraphs(chapter.contentId).length;
   if (
     (input.lastParagraphIndex !== undefined &&
       input.lastParagraphIndex >= paragraphCount) ||
@@ -407,7 +409,10 @@ export async function saveReadingProgress(
   const chapters =
     scope === "full"
       ? await db
-          .select({ number: bookChapters.chapterNumber })
+          .select({
+            number: bookChapters.chapterNumber,
+            contentId: bookChapters.contentId,
+          })
           .from(bookChapters)
           .where(eq(bookChapters.bookId, bookId))
           .orderBy(bookChapters.chapterNumber)
@@ -415,11 +420,21 @@ export async function saveReadingProgress(
   const chapterIndex = chapters.findIndex(
     (item) => item.number === input.lastChapterNumber,
   );
-  const progressPercent = bookProgressPercent(
-    chapterIndex,
-    chapters.length,
-    input.lastScrollPercent,
+  const chapterWordCounts = chapters.map((item) =>
+    countContentWords(item.contentId),
   );
+  const progressPercent =
+    scope === "full"
+      ? computeWordWeightedProgress(
+          chapterWordCounts,
+          chapterIndex,
+          input.lastScrollPercent / 100,
+        )
+      : bookProgressPercent(
+          chapterIndex,
+          chapters.length,
+          input.lastScrollPercent,
+        );
   const shelfStatus = progressPercent >= 100 ? "finished" : "reading";
 
   const row = await db.transaction(async (tx) => {
@@ -447,12 +462,19 @@ export async function saveReadingProgress(
 
     await tx
       .insert(userShelves)
-      .values({ userId, bookId, shelfStatus, progressPercent })
+      .values({
+        userId,
+        bookId,
+        shelfStatus,
+        progressPercent,
+        lastChapter: input.lastChapterNumber,
+      })
       .onConflictDoUpdate({
         target: [userShelves.userId, userShelves.bookId],
         set: {
           shelfStatus: sql`case when ${userShelves.shelfStatus} = 'finished' then 'finished' else ${shelfStatus} end`,
           progressPercent: sql`greatest(${userShelves.progressPercent}, ${progressPercent})`,
+          lastChapter: input.lastChapterNumber,
         },
       });
     return saved;
@@ -468,8 +490,14 @@ export async function listHighlights(
   const rows = await db
     .select({
       highlight: bookHighlights,
+      bookSlug: books.slug,
       bookTitle: books.title,
+      bookAuthor: books.author,
       bookCoverUrl: books.coverUrl,
+      bookCoverColor: books.coverColor,
+      bookPublishedYear: books.publishedYear,
+      bookGenres: books.genres,
+      bookPageCount: books.pageCount,
     })
     .from(bookHighlights)
     .innerJoin(books, eq(bookHighlights.bookId, books.id))
@@ -478,24 +506,42 @@ export async function listHighlights(
     )
     .orderBy(desc(bookHighlights.createdAt));
 
-  return rows.map(({ highlight: r, bookTitle, bookCoverUrl }) => ({
-    id: r.id,
-    userId: r.userId,
-    bookId: r.bookId,
-    bookTitle,
-    bookCoverUrl,
-    chapterId: r.chapterId,
-    chapterNumber: r.chapterNumber,
-    pageNumber: r.pageNumber,
-    selectedText: r.selectedText,
-    color: r.color as HighlightColor,
-    note: r.note,
-    postCaption: r.postCaption,
-    postConfig: r.postConfig ?? null,
-    isPosted: r.isPosted,
-    postedAt: r.postedAt ? r.postedAt.toISOString() : null,
-    createdAt: r.createdAt.toISOString(),
-  }));
+  return rows.map(
+    ({
+      highlight: r,
+      bookSlug,
+      bookTitle,
+      bookAuthor,
+      bookCoverUrl,
+      bookCoverColor,
+      bookPublishedYear,
+      bookGenres,
+      bookPageCount,
+    }) => ({
+      id: r.id,
+      userId: r.userId,
+      bookId: r.bookId,
+      bookSlug,
+      bookTitle,
+      bookAuthor,
+      bookCoverUrl,
+      bookCoverColor,
+      bookPublishedYear,
+      bookGenres: (bookGenres as string[]) || [],
+      bookPageCount,
+      chapterId: r.chapterId,
+      chapterNumber: r.chapterNumber,
+      pageNumber: r.pageNumber,
+      selectedText: r.selectedText,
+      color: r.color as HighlightColor,
+      note: r.note,
+      postCaption: r.postCaption,
+      postConfig: r.postConfig ?? null,
+      isPosted: r.isPosted,
+      postedAt: r.postedAt ? r.postedAt.toISOString() : null,
+      createdAt: r.createdAt.toISOString(),
+    }),
+  );
 }
 
 export async function listAllUserHighlights(
@@ -504,32 +550,56 @@ export async function listAllUserHighlights(
   const rows = await db
     .select({
       highlight: bookHighlights,
+      bookSlug: books.slug,
       bookTitle: books.title,
+      bookAuthor: books.author,
       bookCoverUrl: books.coverUrl,
+      bookCoverColor: books.coverColor,
+      bookPublishedYear: books.publishedYear,
+      bookGenres: books.genres,
+      bookPageCount: books.pageCount,
     })
     .from(bookHighlights)
     .innerJoin(books, eq(bookHighlights.bookId, books.id))
     .where(eq(bookHighlights.userId, userId))
     .orderBy(desc(bookHighlights.createdAt));
 
-  return rows.map(({ highlight: r, bookTitle, bookCoverUrl }) => ({
-    id: r.id,
-    userId: r.userId,
-    bookId: r.bookId,
-    bookTitle,
-    bookCoverUrl,
-    chapterId: r.chapterId,
-    chapterNumber: r.chapterNumber,
-    pageNumber: r.pageNumber,
-    selectedText: r.selectedText,
-    color: r.color as HighlightColor,
-    note: r.note,
-    postCaption: r.postCaption,
-    postConfig: r.postConfig ?? null,
-    isPosted: r.isPosted,
-    postedAt: r.postedAt ? r.postedAt.toISOString() : null,
-    createdAt: r.createdAt.toISOString(),
-  }));
+  return rows.map(
+    ({
+      highlight: r,
+      bookSlug,
+      bookTitle,
+      bookAuthor,
+      bookCoverUrl,
+      bookCoverColor,
+      bookPublishedYear,
+      bookGenres,
+      bookPageCount,
+    }) => ({
+      id: r.id,
+      userId: r.userId,
+      bookId: r.bookId,
+      bookSlug,
+      bookTitle,
+      bookAuthor,
+      bookCoverUrl,
+      bookCoverColor,
+      bookPublishedYear,
+      bookGenres: (bookGenres as string[]) || [],
+      bookPageCount,
+      chapterId: r.chapterId,
+      chapterNumber: r.chapterNumber,
+      pageNumber: r.pageNumber,
+      selectedText: r.selectedText,
+      color: r.color as HighlightColor,
+      note: r.note,
+      postCaption: r.postCaption,
+      postConfig: r.postConfig ?? null,
+      isPosted: r.isPosted,
+      postedAt: r.postedAt ? r.postedAt.toISOString() : null,
+      createdAt: r.createdAt.toISOString(),
+    }),
+  );
 }
 
 export async function createHighlight(

@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { manuscriptStatusEnum } from "./publisher";
 
 export const adminVerifyCalendarSchema = z
   .object({
@@ -39,59 +38,6 @@ export const adminVerifyPublisherSchema = z
     },
   );
 
-/** @deprecated Removed in Issue #9 (Slice 2) */
-export const adminEditManuscriptChapterSchema = z
-  .object({
-    id: z.string().uuid().optional(),
-    chapterNumber: z.number().int().positive(),
-    titleId: z.string().min(1).max(255),
-    contentId: z.string().min(1),
-    contentEn: z.string().optional().nullable(),
-    blueprintContent: z.string().optional().nullable(),
-    estimatedMinutes: z.number().int().min(1).default(5),
-  })
-  .strict();
-
-/** @deprecated Removed in Issue #9 (Slice 2) */
-export const adminEditManuscriptSchema = z
-  .object({
-    title: z.string().min(2).max(255).optional(),
-    synopsis: z.string().min(10).optional(),
-    proposedDigitalPolicy: z
-      .enum([
-        "free_open",
-        "sample_only",
-        "alacarte_only",
-        "print_claim_only",
-        "hybrid_nakama_alacarte",
-      ])
-      .optional(),
-    proposedAlacartePriceIdr: z.number().int().min(0).optional().nullable(),
-    status: manuscriptStatusEnum.optional(),
-    rejectionReason: z.string().max(1000).optional().nullable(),
-    chapters: z.array(adminEditManuscriptChapterSchema).optional(),
-  })
-  .strict();
-
-/** @deprecated Removed in Issue #9 (Slice 2) */
-export const adminPublishManuscriptSchema = z
-  .object({
-    coverUrl: z.string().optional().nullable(),
-    digitalPolicy: z
-      .enum([
-        "free_open",
-        "sample_only",
-        "alacarte_only",
-        "print_claim_only",
-        "hybrid_nakama_alacarte",
-      ])
-      .optional(),
-    alacartePriceIdr: z.number().int().min(0).optional().nullable(),
-    author: z.string().max(255).optional(),
-  })
-  .strict()
-  .optional();
-
 export const adminListQuerySchema = z
   .object({
     status: z.string().optional(),
@@ -108,18 +54,6 @@ export type AdminReviewAuthorApplicationInput = z.infer<
 >;
 export type AdminVerifyPublisherInput = z.infer<
   typeof adminVerifyPublisherSchema
->;
-/** @deprecated Removed in Issue #9 (Slice 2) */
-export type AdminEditManuscriptChapterInput = z.infer<
-  typeof adminEditManuscriptChapterSchema
->;
-/** @deprecated Removed in Issue #9 (Slice 2) */
-export type AdminEditManuscriptInput = z.infer<
-  typeof adminEditManuscriptSchema
->;
-/** @deprecated Removed in Issue #9 (Slice 2) */
-export type AdminPublishManuscriptInput = z.infer<
-  typeof adminPublishManuscriptSchema
 >;
 export type AdminListQueryInput = {
   status?: string;

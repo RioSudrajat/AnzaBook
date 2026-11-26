@@ -1,9 +1,10 @@
 import { randomBytes } from "node:crypto";
-import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import type {
   ManagedPublisherSummaryDto,
   ManuscriptChapterDto,
   ManuscriptSubmissionDto,
+  PublisherApprovedWriterSummaryDto,
   PublisherDto,
   PublisherMemberRole,
 } from "@starter/shared/types";
@@ -22,6 +23,8 @@ import {
   books,
   manuscriptChapters,
   manuscriptSubmissions,
+  publisherApprovedWriters,
+  publisherFollowers,
   publisherMembers,
   publishers,
   user,
@@ -57,7 +60,14 @@ function toPublisherDto(
   pub: typeof publishers.$inferSelect,
   totalBooks = 0,
   currentUserRole?: PublisherMemberRole | null,
-  extras?: { topicMatchScore?: number; matchedTopics?: string[] },
+  extras?: {
+    topicMatchScore?: number;
+    matchedTopics?: string[];
+    approvedWriters?: PublisherApprovedWriterSummaryDto[];
+    isCurrentUserApprovedWriter?: boolean;
+    followerCount?: number;
+    isFollowing?: boolean;
+  },
 ): PublisherDto {
   return {
     id: pub.id,
@@ -79,6 +89,18 @@ function toPublisherDto(
     ...(extras?.matchedTopics !== undefined
       ? { matchedTopics: extras.matchedTopics }
       : {}),
+    ...(extras?.approvedWriters !== undefined
+      ? { approvedWriters: extras.approvedWriters }
+      : {}),
+    ...(extras?.isCurrentUserApprovedWriter !== undefined
+      ? { isCurrentUserApprovedWriter: extras.isCurrentUserApprovedWriter }
+      : {}),
+    ...(extras?.followerCount !== undefined
+      ? { followerCount: extras.followerCount }
+      : {}),
+    ...(extras?.isFollowing !== undefined
+      ? { isFollowing: extras.isFollowing }
+      : {}),
     socialLinks: pub.socialLinks || null,
     verificationStatus: pub.verificationStatus,
     rejectionReason: pub.rejectionReason,
@@ -98,6 +120,7 @@ function formatManuscriptDto(
   author: { name: string | null; authorPenName?: string | null } | null,
   publisherName: string | null | undefined,
   chapters: (typeof manuscriptChapters.$inferSelect)[],
+  isApprovedWriter?: boolean,
 ): ManuscriptSubmissionDto {
   const chapterDtos: ManuscriptChapterDto[] = chapters.map((ch) => ({
     id: ch.id,
@@ -122,20 +145,83 @@ function formatManuscriptDto(
     title: submission.title,
     slug: submission.slug || null,
     coverUrl: submission.coverUrl || null,
+    coverColor: submission.coverColor,
     category: submission.category || null,
     synopsis: submission.synopsis,
+    sourceLanguage: submission.sourceLanguage,
+    targetAudience: submission.targetAudience,
+    authorNotes: submission.authorNotes ?? null,
+    isbn: submission.isbn ?? null,
+    estimatedPages: submission.estimatedPages ?? null,
     editorialNotes: submission.editorialNotes || null,
     proposedDigitalPolicy: submission.proposedDigitalPolicy,
-    proposedAlacartePriceIdr: submission.proposedAlacartePriceIdr,
+    proposedDigitalPriceIdr: submission.proposedDigitalPriceIdr,
     printSimJson: submission.printSimJson,
     status: submission.status,
     rejectionReason: submission.rejectionReason,
     publishedBookId: submission.publishedBookId,
+    ...(isApprovedWriter !== undefined ? { isApprovedWriter } : {}),
     chapters: chapterDtos,
     totalChapters: chapterDtos.length,
     createdAt: submission.createdAt.toISOString(),
     updatedAt: submission.updatedAt.toISOString(),
   };
+}
+
+async function resolveApprovedPublisherIdsForUser(
+  userId?: string,
+): Promise<Set<string>> {
+  const set = new Set<string>();
+  if (!userId) return set;
+
+  const [caller] = await db
+    .select({ email: user.email })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1);
+
+  const callerEmail = caller?.email?.trim().toLowerCase() ?? "";
+
+  const rows = await db
+    .select({
+      id: publisherApprovedWriters.id,
+      publisherId: publisherApprovedWriters.publisherId,
+      userId: publisherApprovedWriters.userId,
+      status: publisherApprovedWriters.status,
+    })
+    .from(publisherApprovedWriters)
+    .where(
+      and(
+        ne(publisherApprovedWriters.status, "revoked"),
+        callerEmail
+          ? or(
+              eq(publisherApprovedWriters.userId, userId),
+              ilike(publisherApprovedWriters.invitedEmail, callerEmail),
+            )
+          : eq(publisherApprovedWriters.userId, userId),
+      ),
+    );
+
+  const pendingBindIds: string[] = [];
+  for (const row of rows) {
+    set.add(row.publisherId);
+    if (!row.userId || row.status === "invited") {
+      pendingBindIds.push(row.id);
+    }
+  }
+
+  if (pendingBindIds.length > 0) {
+    await db
+      .update(publisherApprovedWriters)
+      .set({
+        userId,
+        status: "active",
+        acceptedAt: new Date(),
+      })
+      .where(inArray(publisherApprovedWriters.id, pendingBindIds));
+  }
+
+  return set;
 }
 
 async function resolveDefaultAnzaBookPublisher(): Promise<{
@@ -197,6 +283,84 @@ async function loadUserRolesMap(
     map.set(row.publisherId, row.role);
   }
   return map;
+}
+
+async function loadFollowerCountsMap(
+  publisherIds: readonly string[],
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (publisherIds.length === 0) return map;
+
+  const rows = await db
+    .select({
+      publisherId: publisherFollowers.publisherId,
+      count: sql<number>`count(*)`,
+    })
+    .from(publisherFollowers)
+    .where(inArray(publisherFollowers.publisherId, [...publisherIds]))
+    .groupBy(publisherFollowers.publisherId);
+
+  for (const row of rows) {
+    map.set(row.publisherId, Number(row.count || 0));
+  }
+  return map;
+}
+
+async function loadUserFollowingPublisherSet(
+  userId?: string,
+  publisherIds: readonly string[] = [],
+): Promise<Set<string>> {
+  const set = new Set<string>();
+  if (!userId || publisherIds.length === 0) return set;
+
+  const rows = await db
+    .select({ publisherId: publisherFollowers.publisherId })
+    .from(publisherFollowers)
+    .where(
+      and(
+        eq(publisherFollowers.userId, userId),
+        inArray(publisherFollowers.publisherId, [...publisherIds]),
+      ),
+    );
+
+  for (const row of rows) {
+    set.add(row.publisherId);
+  }
+  return set;
+}
+
+/**
+ * Ensures the caller is either a verified official author (`authorStatus === "verified"`)
+ * or an approved writer invited/activated by a publisher (scoped to `targetPublisherId` when given).
+ */
+async function assertCanWriteManuscript(
+  userId: string,
+  targetPublisherId?: string | null,
+): Promise<void> {
+  const [caller] = await db
+    .select({ authorStatus: user.authorStatus })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1);
+
+  if (caller?.authorStatus === "verified") {
+    return;
+  }
+
+  const approvedSet = await resolveApprovedPublisherIdsForUser(userId);
+  if (targetPublisherId) {
+    if (approvedSet.has(targetPublisherId)) {
+      return;
+    }
+  } else if (approvedSet.size > 0) {
+    return;
+  }
+
+  throw new HttpError(
+    403,
+    "AUTHOR_VERIFICATION_REQUIRED",
+    "Anda harus terdaftar dan terverifikasi sebagai Penulis Resmi AnzaBook atau penulis rekanan penerbit untuk mengakses Studio Penulis dan menulis naskah.",
+  );
 }
 
 export async function applyPublisher(
@@ -297,12 +461,36 @@ export async function updatePublisher(
     .where(eq(publishers.id, pub.id))
     .returning();
 
-  const [bookCountRow] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(books)
-    .where(eq(books.publisherId, pub.id));
+  const [bookCountRow, followerCountRow, followRow] = await Promise.all([
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(books)
+      .where(eq(books.publisherId, pub.id)),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(publisherFollowers)
+      .where(eq(publisherFollowers.publisherId, pub.id)),
+    db
+      .select({ id: publisherFollowers.id })
+      .from(publisherFollowers)
+      .where(
+        and(
+          eq(publisherFollowers.publisherId, pub.id),
+          eq(publisherFollowers.userId, userId),
+        ),
+      )
+      .limit(1),
+  ]);
 
-  return toPublisherDto(updated, Number(bookCountRow?.count || 0), member.role);
+  return toPublisherDto(
+    updated,
+    Number(bookCountRow[0]?.count || 0),
+    member.role,
+    {
+      followerCount: Number(followerCountRow[0]?.count || 0),
+      isFollowing: Boolean(followRow[0]),
+    },
+  );
 }
 
 export async function listVerifiedPublishers(
@@ -315,9 +503,11 @@ export async function listVerifiedPublishers(
     .orderBy(publishers.name);
 
   const pubIds = pubRows.map((p) => p.id);
-  const [countsMap, rolesMap] = await Promise.all([
+  const [countsMap, rolesMap, followersMap, followingSet] = await Promise.all([
     loadBookCountsMap(pubIds),
     loadUserRolesMap(currentUserId, pubIds),
+    loadFollowerCountsMap(pubIds),
+    loadUserFollowingPublisherSet(currentUserId, pubIds),
   ]);
 
   return pubRows.map((pub) =>
@@ -325,6 +515,10 @@ export async function listVerifiedPublishers(
       pub,
       countsMap.get(pub.id) ?? 0,
       rolesMap.get(pub.id) ?? null,
+      {
+        followerCount: followersMap.get(pub.id) ?? 0,
+        isFollowing: followingSet.has(pub.id),
+      },
     ),
   );
 }
@@ -340,6 +534,7 @@ export async function listMyManagedPublishers(
       id: publishers.id,
       name: publishers.name,
       slug: publishers.slug,
+      description: publishers.description,
       logoUrl: publishers.logoUrl,
       headerImageUrl: publishers.headerImageUrl,
       city: publishers.city,
@@ -357,6 +552,7 @@ export async function listMyManagedPublishers(
     id: row.id,
     name: row.name,
     slug: row.slug,
+    description: row.description,
     logoUrl: row.logoUrl,
     headerImageUrl: row.headerImageUrl,
     city: row.city,
@@ -376,15 +572,17 @@ export async function listSubmissionTargets(
   query: ListSubmissionTargetsQuery,
   currentUserId?: string,
 ): Promise<PublisherDto[]> {
-  const pubRows = await db
-    .select()
-    .from(publishers)
-    .where(
-      and(
-        eq(publishers.verificationStatus, "verified"),
-        eq(publishers.isAcceptingSubmissions, true),
-      ),
-    );
+  const [verifiedRows, approvedSet] = await Promise.all([
+    db
+      .select()
+      .from(publishers)
+      .where(eq(publishers.verificationStatus, "verified")),
+    resolveApprovedPublisherIdsForUser(currentUserId),
+  ]);
+
+  const pubRows = verifiedRows.filter(
+    (pub) => pub.isAcceptingSubmissions || approvedSet.has(pub.id),
+  );
 
   const pubIds = pubRows.map((p) => p.id);
   const [countsMap, rolesMap] = await Promise.all([
@@ -439,7 +637,12 @@ export async function listSubmissionTargets(
       pub,
       countsMap.get(pub.id) ?? 0,
       rolesMap.get(pub.id) ?? null,
-      topicQuery ? { topicMatchScore, matchedTopics } : undefined,
+      {
+        ...(topicQuery ? { topicMatchScore, matchedTopics } : {}),
+        ...(approvedSet.has(pub.id)
+          ? { isCurrentUserApprovedWriter: true }
+          : {}),
+      },
     );
   });
 
@@ -497,13 +700,122 @@ export async function getPublisherBySlug(
     if (member) currentUserRole = member.role;
   }
 
-  return toPublisherDto(pub, Number(bookCountRow?.count || 0), currentUserRole);
+  const [approvedWriterRows, approvedSet, followerCountRows, followRows] =
+    await Promise.all([
+      db
+        .select({
+          id: publisherApprovedWriters.id,
+          userId: publisherApprovedWriters.userId,
+          name: user.name,
+          username: user.username,
+          image: user.image,
+        })
+        .from(publisherApprovedWriters)
+        .innerJoin(user, eq(publisherApprovedWriters.userId, user.id))
+        .where(
+          and(
+            eq(publisherApprovedWriters.publisherId, pub.id),
+            eq(publisherApprovedWriters.status, "active"),
+          ),
+        )
+        .orderBy(asc(publisherApprovedWriters.createdAt)),
+      resolveApprovedPublisherIdsForUser(currentUserId),
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(publisherFollowers)
+        .where(eq(publisherFollowers.publisherId, pub.id)),
+      currentUserId
+        ? db
+            .select({ id: publisherFollowers.id })
+            .from(publisherFollowers)
+            .where(
+              and(
+                eq(publisherFollowers.publisherId, pub.id),
+                eq(publisherFollowers.userId, currentUserId),
+              ),
+            )
+            .limit(1)
+        : Promise.resolve([]),
+    ]);
+
+  return toPublisherDto(
+    pub,
+    Number(bookCountRow?.count || 0),
+    currentUserRole,
+    {
+      approvedWriters: approvedWriterRows,
+      isCurrentUserApprovedWriter: approvedSet.has(pub.id),
+      followerCount: Number(followerCountRows[0]?.count || 0),
+      isFollowing: Boolean(followRows[0]),
+    },
+  );
+}
+
+export async function followPublisher(
+  userId: string,
+  slug: string,
+): Promise<{ isFollowing: boolean; followerCount: number }> {
+  const pub = await resolvePublisherBySlugOrId(slug);
+  if (pub.verificationStatus !== "verified") {
+    throw new HttpError(
+      403,
+      "PUBLISHER_NOT_VERIFIED",
+      "Hanya penerbit terverifikasi yang dapat diikuti.",
+    );
+  }
+
+  await db
+    .insert(publisherFollowers)
+    .values({
+      publisherId: pub.id,
+      userId,
+    })
+    .onConflictDoNothing({
+      target: [publisherFollowers.publisherId, publisherFollowers.userId],
+    });
+
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(publisherFollowers)
+    .where(eq(publisherFollowers.publisherId, pub.id));
+
+  return {
+    isFollowing: true,
+    followerCount: Number(countRow?.count || 0),
+  };
+}
+
+export async function unfollowPublisher(
+  userId: string,
+  slug: string,
+): Promise<{ isFollowing: boolean; followerCount: number }> {
+  const pub = await resolvePublisherBySlugOrId(slug);
+
+  await db
+    .delete(publisherFollowers)
+    .where(
+      and(
+        eq(publisherFollowers.publisherId, pub.id),
+        eq(publisherFollowers.userId, userId),
+      ),
+    );
+
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(publisherFollowers)
+    .where(eq(publisherFollowers.publisherId, pub.id));
+
+  return {
+    isFollowing: false,
+    followerCount: Number(countRow?.count || 0),
+  };
 }
 
 export async function createManuscriptDraft(
   authorUserId: string,
   input: CreateManuscriptDraftInput,
 ): Promise<ManuscriptSubmissionDto> {
+  await assertCanWriteManuscript(authorUserId, input.publisherId ?? null);
   let publisherName: string | null = null;
   if (input.publisherId) {
     const [pub] = await db
@@ -543,11 +855,17 @@ export async function createManuscriptDraft(
         slug,
         title: input.title,
         coverUrl: input.coverUrl || null,
+        coverColor: input.coverColor || "#13110F",
         category: input.category || null,
         synopsis: input.synopsis || "",
+        sourceLanguage: input.sourceLanguage ?? "id",
+        targetAudience: input.targetAudience ?? "general",
+        authorNotes: input.authorNotes ?? null,
+        isbn: input.isbn ?? null,
+        estimatedPages: input.estimatedPages ?? null,
         proposedDigitalPolicy:
-          input.proposedDigitalPolicy || "hybrid_nakama_alacarte",
-        proposedAlacartePriceIdr: input.proposedAlacartePriceIdr ?? null,
+          input.proposedDigitalPolicy || "nakama_or_purchase",
+        proposedDigitalPriceIdr: input.proposedDigitalPriceIdr ?? null,
         status: "draft",
       })
       .returning();
@@ -700,6 +1018,11 @@ export async function updateManuscript(
     );
   }
 
+  await assertCanWriteManuscript(
+    userId,
+    input.publisherId ?? existing.publisherId ?? null,
+  );
+
   if (existing.status !== "draft" && existing.status !== "revision_requested") {
     throw new HttpError(
       409,
@@ -732,11 +1055,21 @@ export async function updateManuscript(
     if (input.slug !== undefined) patch.slug = input.slug || existing.slug;
     if (input.synopsis !== undefined) patch.synopsis = input.synopsis;
     if (input.coverUrl !== undefined) patch.coverUrl = input.coverUrl;
+    if (input.coverColor !== undefined && input.coverColor !== null)
+      patch.coverColor = input.coverColor;
     if (input.category !== undefined) patch.category = input.category;
+    if (input.sourceLanguage !== undefined)
+      patch.sourceLanguage = input.sourceLanguage;
+    if (input.targetAudience !== undefined)
+      patch.targetAudience = input.targetAudience;
+    if (input.authorNotes !== undefined) patch.authorNotes = input.authorNotes;
+    if (input.isbn !== undefined) patch.isbn = input.isbn;
+    if (input.estimatedPages !== undefined)
+      patch.estimatedPages = input.estimatedPages;
     if (input.proposedDigitalPolicy !== undefined)
       patch.proposedDigitalPolicy = input.proposedDigitalPolicy;
-    if (input.proposedAlacartePriceIdr !== undefined)
-      patch.proposedAlacartePriceIdr = input.proposedAlacartePriceIdr;
+    if (input.proposedDigitalPriceIdr !== undefined)
+      patch.proposedDigitalPriceIdr = input.proposedDigitalPriceIdr;
     if (input.printSimJson !== undefined)
       patch.printSimJson = input.printSimJson;
 
@@ -826,12 +1159,22 @@ export async function editPublisherManuscript(
     if (input.title !== undefined) patch.title = input.title;
     if (input.slug !== undefined) patch.slug = input.slug || existing.slug;
     if (input.coverUrl !== undefined) patch.coverUrl = input.coverUrl;
+    if (input.coverColor !== undefined && input.coverColor !== null)
+      patch.coverColor = input.coverColor;
     if (input.category !== undefined) patch.category = input.category;
     if (input.synopsis !== undefined) patch.synopsis = input.synopsis;
+    if (input.sourceLanguage !== undefined)
+      patch.sourceLanguage = input.sourceLanguage;
+    if (input.targetAudience !== undefined)
+      patch.targetAudience = input.targetAudience;
+    if (input.authorNotes !== undefined) patch.authorNotes = input.authorNotes;
+    if (input.isbn !== undefined) patch.isbn = input.isbn;
+    if (input.estimatedPages !== undefined)
+      patch.estimatedPages = input.estimatedPages;
     if (input.proposedDigitalPolicy !== undefined)
       patch.proposedDigitalPolicy = input.proposedDigitalPolicy;
-    if (input.proposedAlacartePriceIdr !== undefined)
-      patch.proposedAlacartePriceIdr = input.proposedAlacartePriceIdr;
+    if (input.proposedDigitalPriceIdr !== undefined)
+      patch.proposedDigitalPriceIdr = input.proposedDigitalPriceIdr;
     if (input.printSimJson !== undefined)
       patch.printSimJson = input.printSimJson;
     if (input.editorialNotes !== undefined)
@@ -873,12 +1216,17 @@ export async function submitManuscript(
   authorUserId: string,
   input: SubmitManuscriptInput,
 ): Promise<ManuscriptSubmissionDto> {
+  await assertCanWriteManuscript(authorUserId, input.publisherId ?? null);
   let finalPublisherId: string | null = input.publisherId || null;
   let publisherName: string | null = null;
 
   if (finalPublisherId) {
     const [pub] = await db
-      .select({ id: publishers.id, name: publishers.name })
+      .select({
+        id: publishers.id,
+        name: publishers.name,
+        isAcceptingSubmissions: publishers.isAcceptingSubmissions,
+      })
       .from(publishers)
       .where(eq(publishers.id, finalPublisherId))
       .limit(1);
@@ -889,6 +1237,17 @@ export async function submitManuscript(
         "PUBLISHER_NOT_FOUND",
         "Penerbit tidak ditemukan.",
       );
+    }
+    if (!pub.isAcceptingSubmissions) {
+      const approvedSet =
+        await resolveApprovedPublisherIdsForUser(authorUserId);
+      if (!approvedSet.has(pub.id)) {
+        throw new HttpError(
+          403,
+          "SUBMISSIONS_CLOSED",
+          "Penerbit ini sedang tidak menerima pengajuan naskah umum.",
+        );
+      }
     }
     publisherName = pub.name;
   } else {
@@ -921,10 +1280,16 @@ export async function submitManuscript(
         slug,
         title: input.title,
         coverUrl: input.coverUrl || null,
+        coverColor: input.coverColor || "#13110F",
         category: input.category || null,
         synopsis: input.synopsis,
+        sourceLanguage: input.sourceLanguage ?? "id",
+        targetAudience: input.targetAudience ?? "general",
+        authorNotes: input.authorNotes ?? null,
+        isbn: input.isbn ?? null,
+        estimatedPages: input.estimatedPages ?? null,
         proposedDigitalPolicy: input.proposedDigitalPolicy,
-        proposedAlacartePriceIdr: input.proposedAlacartePriceIdr ?? null,
+        proposedDigitalPriceIdr: input.proposedDigitalPriceIdr ?? null,
         printSimJson: input.printSimJson ?? null,
         status: "pending_review",
       })
@@ -991,6 +1356,11 @@ export async function submitManuscriptDraft(
     );
   }
 
+  await assertCanWriteManuscript(
+    authorUserId,
+    publisherId ?? current.publisherId ?? null,
+  );
+
   if (current.status !== "draft" && current.status !== "revision_requested") {
     throw new HttpError(
       409,
@@ -1002,7 +1372,10 @@ export async function submitManuscriptDraft(
   let finalPublisherId = publisherId || current.publisherId || null;
   if (finalPublisherId) {
     const [pub] = await db
-      .select({ id: publishers.id })
+      .select({
+        id: publishers.id,
+        isAcceptingSubmissions: publishers.isAcceptingSubmissions,
+      })
       .from(publishers)
       .where(eq(publishers.id, finalPublisherId))
       .limit(1);
@@ -1012,6 +1385,17 @@ export async function submitManuscriptDraft(
         "PUBLISHER_NOT_FOUND",
         "Penerbit tujuan tidak ditemukan.",
       );
+    }
+    if (!pub.isAcceptingSubmissions) {
+      const approvedSet =
+        await resolveApprovedPublisherIdsForUser(authorUserId);
+      if (!approvedSet.has(pub.id)) {
+        throw new HttpError(
+          403,
+          "SUBMISSIONS_CLOSED",
+          "Penerbit ini sedang tidak menerima pengajuan naskah umum.",
+        );
+      }
     }
   } else {
     const defaultPub = await resolveDefaultAnzaBookPublisher();
@@ -1033,6 +1417,59 @@ export async function submitManuscriptDraft(
 }
 
 /**
+ * Allows the author to withdraw a submitted manuscript back to `draft`
+ * while it is still `pending_review` (not yet `in_editing` or `published`).
+ */
+export async function withdrawManuscript(
+  authorUserId: string,
+  idOrSlug: string,
+): Promise<ManuscriptSubmissionDto> {
+  const isUuid = UUID_REGEX.test(idOrSlug);
+  const [current] = await db
+    .select()
+    .from(manuscriptSubmissions)
+    .where(
+      isUuid
+        ? or(
+            eq(manuscriptSubmissions.id, idOrSlug),
+            eq(manuscriptSubmissions.slug, idOrSlug),
+          )
+        : eq(manuscriptSubmissions.slug, idOrSlug),
+    )
+    .limit(1);
+
+  if (!current) {
+    throw new HttpError(404, "MANUSCRIPT_NOT_FOUND", "Naskah tidak ditemukan.");
+  }
+
+  if (current.authorUserId !== authorUserId) {
+    throw new HttpError(
+      403,
+      "FORBIDDEN",
+      "Hanya penulis pemilik naskah yang dapat menarik kembali naskah ini.",
+    );
+  }
+
+  if (current.status !== "pending_review") {
+    throw new HttpError(
+      409,
+      "MANUSCRIPT_LOCKED",
+      "Naskah hanya dapat ditarik kembali selama masih berstatus menunggu kurasi.",
+    );
+  }
+
+  await db
+    .update(manuscriptSubmissions)
+    .set({
+      status: "draft",
+      updatedAt: new Date(),
+    })
+    .where(eq(manuscriptSubmissions.id, current.id));
+
+  return await getManuscript(authorUserId, current.id);
+}
+
+/**
  * Lists incoming manuscripts for a publisher (owner or editor only — no system admin bypass).
  */
 export async function listPublisherManuscripts(
@@ -1042,16 +1479,33 @@ export async function listPublisherManuscripts(
   const pub = await resolvePublisherBySlugOrId(publisherSlug);
   await requirePublisherMember(pub.id, userId, ["owner", "editor"]);
 
-  const submissions = await db
-    .select({
-      submission: manuscriptSubmissions,
-      authorName: user.name,
-      authorPenName: user.authorPenName,
-    })
-    .from(manuscriptSubmissions)
-    .leftJoin(user, eq(manuscriptSubmissions.authorUserId, user.id))
-    .where(eq(manuscriptSubmissions.publisherId, pub.id))
-    .orderBy(desc(manuscriptSubmissions.updatedAt));
+  const [submissions, approvedRows] = await Promise.all([
+    db
+      .select({
+        submission: manuscriptSubmissions,
+        authorName: user.name,
+        authorPenName: user.authorPenName,
+      })
+      .from(manuscriptSubmissions)
+      .leftJoin(user, eq(manuscriptSubmissions.authorUserId, user.id))
+      .where(eq(manuscriptSubmissions.publisherId, pub.id))
+      .orderBy(desc(manuscriptSubmissions.updatedAt)),
+    db
+      .select({ userId: publisherApprovedWriters.userId })
+      .from(publisherApprovedWriters)
+      .where(
+        and(
+          eq(publisherApprovedWriters.publisherId, pub.id),
+          eq(publisherApprovedWriters.status, "active"),
+        ),
+      ),
+  ]);
+
+  const approvedUserIds = new Set(
+    approvedRows
+      .map((row) => row.userId)
+      .filter((id): id is string => Boolean(id)),
+  );
 
   const results: ManuscriptSubmissionDto[] = [];
   for (const s of submissions) {
@@ -1067,6 +1521,7 @@ export async function listPublisherManuscripts(
         { name: s.authorName, authorPenName: s.authorPenName },
         pub.name,
         chapters,
+        approvedUserIds.has(s.submission.authorUserId),
       ),
     );
   }

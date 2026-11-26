@@ -7,6 +7,7 @@ import {
   buildBookWordMap,
   clampSessionWpm,
   computeBookWordWeightedPercent,
+  computeReaderProgressBarState,
   computeSessionMetrics,
   computeSessionWordDelta,
   computeStandardPageForPosition,
@@ -289,5 +290,53 @@ describe("reader session metrics & word-delta calculations", () => {
     expect(tempoLabelId("reflective").label).toBe("Mendalam");
     expect(tempoLabelId("steady").label).toBe("Mengalir");
     expect(tempoLabelId("brisk").label).toBe("Lugas");
+  });
+
+  it("computes segmented chapter weights and caps truncated preview progress accurately", () => {
+    // Full book with unequal chapters: decimal progress follows true word proportions
+    const fullState = computeReaderProgressBarState({
+      chapters: [{ chapterNumber: 1, contentId: `<p>${words(200)}</p>` }],
+      languageView: "id",
+      allChapters: [
+        { chapterNumber: 1, wordCount: 200 },
+        { chapterNumber: 2, wordCount: 300 },
+        { chapterNumber: 3, wordCount: 300 },
+        { chapterNumber: 4, wordCount: 200 },
+      ],
+      activeChapterNumber: 1,
+      chapterPercent: 14.5,
+    });
+    expect(fullState.segments).toHaveLength(4);
+    expect(fullState.segments.map((s) => s.weight)).toEqual([
+      200, 300, 300, 200,
+    ]);
+    expect(fullState.overallPercent).toBe(2.9);
+    expect(fullState.formattedPercent).toBe("2.9%");
+    expect(fullState.segments[0]?.fillPercent).toBe(14.5);
+    expect(fullState.segments[1]?.fillPercent).toBe(0);
+
+    // Premium preview ("cuplikan"): scrolling 100% to "Akhir cuplikan" reflects only
+    // the preview fraction of chapter 1 against the full 8-chapter book (~2.5%, not 59% or 100%).
+    const previewState = computeReaderProgressBarState({
+      chapters: [
+        {
+          chapterNumber: 1,
+          contentId: `<p>${words(200)}</p>`,
+          fullWordCount: 1000,
+          isPreviewTruncated: true,
+        },
+      ],
+      languageView: "id",
+      allChapters: Array.from({ length: 8 }, (_, idx) => ({
+        chapterNumber: idx + 1,
+        wordCount: 1000,
+      })),
+      activeChapterNumber: 1,
+      chapterPercent: 100,
+    });
+    expect(previewState.overallPercent).toBe(2.5);
+    expect(previewState.formattedPercent).toBe("2.5%");
+    expect(previewState.segments[0]?.fillPercent).toBe(20);
+    expect(previewState.segments[1]?.fillPercent).toBe(0);
   });
 });

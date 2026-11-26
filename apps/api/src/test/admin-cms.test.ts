@@ -137,11 +137,11 @@ describe("Admin Internal CMS API (/api/admin/*)", () => {
       publisherId: seededPub.id,
       title: "Jelajah Galaksi Timur",
       synopsis: "Petualangan penjelajah ruang angkasa di gugus bintang timur.",
-      proposedDigitalPolicy: "hybrid_nakama_alacarte",
+      proposedDigitalPolicy: "nakama_or_purchase",
       status: "pending_review",
     });
 
-    // Seed financial records: paid membership, ala carte purchase, community wallet
+    // Seed financial records: paid membership, single purchase, community wallet
     await db.insert(membershipOrders).values({
       requestId: randomUUID(),
       buyerId: dbCreator.id,
@@ -161,7 +161,7 @@ describe("Admin Internal CMS API (/api/admin/*)", () => {
         author: "Pakar Keuangan",
         synopsis: "Panduan keuangan sehat.",
         coverUrl: "/covers/fin.jpg",
-        digitalPolicy: "alacarte_only",
+        digitalPolicy: "single_purchase",
         pageCount: 150,
       })
       .returning();
@@ -181,7 +181,7 @@ describe("Admin Internal CMS API (/api/admin/*)", () => {
       calendarId: seededCal.id,
       entryType: "affiliate_book_purchase",
       amountIdr: 5_000,
-      description: "Komisi penjualan buku alacarte",
+      description: "Komisi penjualan buku satuan",
     });
 
     const res = await admin.get("/api/admin/overview");
@@ -190,7 +190,9 @@ describe("Admin Internal CMS API (/api/admin/*)", () => {
     expect(res.body.data.pendingAuthorsCount).toBeGreaterThanOrEqual(1);
     expect(res.body.data.pendingPublishersCount).toBeGreaterThanOrEqual(1);
     expect(res.body.data.pendingManuscriptsCount).toBeUndefined();
-    expect(res.body.data.totalAlacarteSalesIdr).toBeGreaterThanOrEqual(50_000);
+    expect(res.body.data.totalSinglePurchaseSalesIdr).toBeGreaterThanOrEqual(
+      50_000,
+    );
     expect(res.body.data.totalPublisherShareIdr).toBeGreaterThanOrEqual(37_500);
     expect(res.body.data.totalAffiliateCommissionsIdr).toBeGreaterThanOrEqual(
       5_000,
@@ -266,7 +268,7 @@ describe("Admin Internal CMS API (/api/admin/*)", () => {
         synopsis: "Kisah pengembara malam mencari jawaban teka-teki leluhur.",
         coverUrl: "/covers/kembara.jpg",
         pageCount: 220,
-        digitalPolicy: "hybrid_nakama_alacarte",
+        digitalPolicy: "nakama_or_purchase",
       })
       .returning();
 
@@ -401,7 +403,7 @@ describe("Admin Internal CMS API (/api/admin/*)", () => {
         author: "Penyair Muda",
         synopsis: "Antologi puisi pilihan nusantara.",
         coverUrl: "/covers/puisi.jpg",
-        digitalPolicy: "print_claim_only",
+        digitalPolicy: "print_code_only",
         publisherId: pub.id,
         pageCount: 180,
       })

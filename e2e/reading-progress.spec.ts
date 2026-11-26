@@ -113,7 +113,7 @@ test("Post-Reading Exit Prompt skips immediate exit and shows real metrics after
   await secondChapter.evaluate((section) =>
     section.scrollIntoView({ block: "start" }),
   );
-  await expect(page.getByText(/Bab 2\//)).toBeVisible();
+  await expect(page.getByText(/^2\/\d+$/)).toBeVisible();
 
   await page.getByRole("button", { name: "Keluar ke Home" }).click();
   const exitDialog = page.getByRole("dialog", { name: "Ringkasan Sesi Baca" });

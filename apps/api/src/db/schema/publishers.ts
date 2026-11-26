@@ -11,10 +11,11 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import type {
-  DigitalPolicy,
+  BookDistributionModel,
+  ManuscriptSubmissionStatus,
+  PublisherApprovedWriterStatus,
   PublisherMemberRole,
   PublisherVerificationStatus,
-  ManuscriptSubmissionStatus,
 } from "@starter/shared/types";
 import { user } from "./user";
 import { books } from "./anzabook";
@@ -97,6 +98,58 @@ export const publisherMembers = pgTable(
   ],
 );
 
+export const publisherFollowers = pgTable(
+  "publisher_followers",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    publisherId: uuid("publisher_id")
+      .notNull()
+      .references(() => publishers.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("publisher_followers_pub_user_unique").on(
+      table.publisherId,
+      table.userId,
+    ),
+    index("publisher_followers_user_idx").on(table.userId),
+  ],
+);
+
+export const publisherApprovedWriters = pgTable(
+  "publisher_approved_writers",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    publisherId: uuid("publisher_id")
+      .notNull()
+      .references(() => publishers.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+    invitedEmail: varchar("invited_email", { length: 255 }),
+    status: varchar("status", { length: 20 })
+      .$type<PublisherApprovedWriterStatus>()
+      .notNull()
+      .default("active"),
+    canFastTrack: boolean("can_fast_track").notNull().default(true),
+    invitedByUserId: text("invited_by_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("publisher_approved_writers_pub_idx").on(table.publisherId),
+    index("publisher_approved_writers_user_idx").on(table.userId),
+    index("publisher_approved_writers_email_idx").on(table.invitedEmail),
+  ],
+);
+
 export const manuscriptSubmissions = pgTable(
   "manuscript_submissions",
   {
@@ -110,13 +163,27 @@ export const manuscriptSubmissions = pgTable(
     slug: varchar("slug", { length: 255 }),
     title: varchar("title", { length: 255 }).notNull(),
     coverUrl: text("cover_url"),
+    coverColor: varchar("cover_color", { length: 32 })
+      .notNull()
+      .default("#13110F"),
     category: varchar("category", { length: 80 }),
     synopsis: text("synopsis").notNull(),
+    sourceLanguage: varchar("source_language", { length: 10 })
+      .$type<"id" | "en">()
+      .notNull()
+      .default("id"),
+    targetAudience: varchar("target_audience", { length: 40 })
+      .$type<"general" | "young_adult" | "mature_academic">()
+      .notNull()
+      .default("general"),
+    authorNotes: text("author_notes"),
+    isbn: varchar("isbn", { length: 32 }),
+    estimatedPages: integer("estimated_pages"),
     editorialNotes: text("editorial_notes"),
     proposedDigitalPolicy: varchar("proposed_digital_policy", { length: 32 })
-      .$type<DigitalPolicy>()
+      .$type<BookDistributionModel>()
       .notNull(),
-    proposedAlacartePriceIdr: integer("proposed_alacarte_price_idr"),
+    proposedDigitalPriceIdr: integer("proposed_digital_price_idr"),
     printSimJson: jsonb("print_sim_json").$type<Record<
       string,
       unknown

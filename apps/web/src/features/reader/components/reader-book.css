@@ -1,84 +1,56 @@
+.reader-slide-shell,
 .reader-book {
   --reader-paper: #faf6ee;
   --reader-spine-ink: black;
   --reader-spine-rule: color-mix(
     in oklab,
-    var(--reader-spine-ink) 40%,
+    var(--reader-spine-ink) 22%,
     transparent
   );
   --reader-spine-edge: color-mix(
     in oklab,
-    var(--reader-spine-ink) 25%,
+    var(--reader-spine-ink) 12%,
     transparent
   );
   --reader-spine-soft: color-mix(
     in oklab,
-    var(--reader-spine-ink) 5%,
+    var(--reader-spine-ink) 3.5%,
     transparent
   );
-  --reader-cover-edge: color-mix(
-    in oklab,
-    var(--reader-cover, var(--book-cover-base)) 54%,
-    var(--book-cover-base)
-  );
+  background: var(--reader-paper);
+}
+
+.reader-book {
   position: relative;
   isolation: isolate;
   flex: 1;
   min-height: 0;
-  margin: 8px 5px 11px;
-  border-radius: 5px 10px 9px 5px;
-  background: var(--reader-paper);
+  margin: 0;
+  border-radius: 0;
 }
 
+[data-theme="sepia"] .reader-slide-shell,
 [data-theme="sepia"] .reader-book {
-  --reader-paper: var(--color-paper-2);
+  --reader-paper: var(--color-paper);
 }
 
+[data-theme="night"] .reader-slide-shell,
 [data-theme="night"] .reader-book {
   --reader-paper: #1c1a17;
   --reader-spine-rule: color-mix(
     in oklab,
-    var(--reader-spine-ink) 90%,
+    var(--reader-spine-ink) 45%,
     transparent
   );
   --reader-spine-edge: color-mix(
     in oklab,
-    var(--reader-spine-ink) 60%,
+    var(--reader-spine-ink) 28%,
     transparent
   );
   --reader-spine-soft: color-mix(
     in oklab,
-    var(--reader-spine-ink) 15%,
+    var(--reader-spine-ink) 8%,
     transparent
-  );
-}
-
-.reader-book::before,
-.reader-book::after {
-  position: absolute;
-  pointer-events: none;
-  content: "";
-}
-
-.reader-book::before {
-  z-index: -2;
-  inset: -3px -5px -9px;
-  border-radius: 7px 13px 11px 7px;
-  border: 1px solid
-    color-mix(in oklab, var(--reader-cover-edge), var(--color-ink) 25%);
-  background: var(--reader-cover-edge);
-  box-shadow: 0 3px 6px
-    color-mix(in oklab, var(--book-cover-base) 24%, transparent);
-}
-
-.reader-book::after {
-  z-index: -1;
-  inset: -1px -2px -5px;
-  border-radius: inherit;
-  background: repeating-linear-gradient(
-    to bottom,
-    var(--color-paper-3) 0 1px,
-    var(--color-rule) 1px 2px
   );
 }
 
@@ -105,18 +77,35 @@
 }
 
 .reader-leaf {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.72em;
   height: 100%;
   min-width: 0;
   min-height: 0;
-  padding: 20px 22px 24px;
+  padding: 96px 22px 76px;
   background-color: var(--reader-paper);
+  color: var(--color-ink);
   font-size: var(--reader-leaf-size);
   line-height: 1.66;
   overflow: hidden;
   overflow-wrap: break-word;
+}
+
+.reader-leaf-number {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 52px;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: color-mix(in oklab, var(--color-ink) 45%, transparent);
+  pointer-events: none;
+  user-select: none;
 }
 
 .reader-leaf > p {
@@ -194,7 +183,7 @@
 .reader-corner {
   position: absolute;
   bottom: 0;
-  z-index: 1;
+  z-index: 30;
   display: grid;
   width: 44px;
   height: 44px;
@@ -241,7 +230,7 @@
 
 @media (min-width: 48rem) {
   .reader-book {
-    border-radius: 10px 10px 8px 8px;
+    border-radius: 0;
   }
 
   .reader-spread {
@@ -249,7 +238,11 @@
   }
 
   .reader-leaf {
-    padding: clamp(22px, 3vw, 42px);
+    padding: clamp(66px, 8.5vh, 84px) clamp(36px, 5.5vw, 92px) 66px;
+  }
+
+  .reader-leaf-number {
+    bottom: 22px;
   }
 
   .reader-leaf[data-side] {
