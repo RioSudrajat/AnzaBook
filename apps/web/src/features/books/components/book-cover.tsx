@@ -1,12 +1,15 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import type { BookSummaryDto } from "@starter/shared/types";
 import { AnzaLogoMark } from "@/components/brand";
+import { isUsableAssetUrl } from "@/lib/media-url";
 import { cn } from "@/lib/utils";
 
 type CoverBook = Pick<
   BookSummaryDto,
   "title" | "author" | "coverColor" | "publishedYear" | "genres" | "pageCount"
->;
+> & {
+  coverUrl?: string | null;
+};
 
 function CoverArtwork({ genre }: { genre?: string }) {
   const g = (genre || "").toLowerCase();
@@ -294,7 +297,10 @@ export function BookCover({
   decorative?: boolean;
   edition?: { paperColor: string; label: string; priceIdr?: number | null };
 }) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const primaryGenre = book.genres?.[0] || "";
+  const showUploadedImage =
+    isUsableAssetUrl(book.coverUrl) && failedUrl !== book.coverUrl;
 
   return (
     <div
@@ -315,66 +321,84 @@ export function BookCover({
       }
     >
       <div className="absolute inset-0 flex flex-col justify-between overflow-hidden rounded-[inherit] bg-[var(--book-cover-color)] p-[7cqw] text-[var(--book-cover-text)]">
+        {showUploadedImage ? (
+          <img
+            src={book.coverUrl!}
+            alt={decorative ? "" : `Sampul ${book.title}, ${book.author}`}
+            onError={() => setFailedUrl(book.coverUrl ?? null)}
+            className="absolute inset-0 size-full object-cover"
+          />
+        ) : null}
+
         {/* Subtle cover textures & spine crease */}
+        {!showUploadedImage && (
+          <span
+            aria-hidden="true"
+            className="absolute inset-0 bg-[var(--book-cover-shade)] pointer-events-none"
+          />
+        )}
         <span
           aria-hidden="true"
-          className="absolute inset-0 bg-[var(--book-cover-shade)] pointer-events-none"
-        />
-        <span
-          aria-hidden="true"
-          className="absolute inset-y-0 left-0 w-[9%] bg-linear-to-r from-[var(--book-cover-spine)] via-[var(--book-cover-crease)] to-transparent pointer-events-none"
+          className="absolute inset-y-0 left-0 z-20 w-[9%] bg-linear-to-r from-[var(--book-cover-spine)] via-[var(--book-cover-crease)] to-transparent pointer-events-none"
         />
 
         {/* Edition paper accent on the fore-edge */}
         {edition && (
           <span
             aria-hidden="true"
-            className="absolute inset-y-[3%] right-0 w-[4%] rounded-r-sm"
+            className="absolute inset-y-[3%] right-0 z-20 w-[4%] rounded-r-sm"
             style={{ backgroundColor: edition.paperColor }}
           />
         )}
 
-        {/* HEADER: Year/Tag on the left, AnzaBook brand mark on the right */}
-        <div className="relative z-10 flex min-w-0 items-center justify-between gap-1 border-b border-current/15 pb-[2.5cqw]">
-          <span className="font-mono text-[4.2cqw] font-semibold opacity-80">
-            {book.publishedYear}
-          </span>
+        {!showUploadedImage && (
+          <>
+            {/* HEADER: Year/Tag on the left, AnzaBook brand mark on the right */}
+            <div className="relative z-10 flex min-w-0 items-center justify-between gap-1 border-b border-current/15 pb-[2.5cqw]">
+              <span className="font-mono text-[4.2cqw] font-semibold opacity-80">
+                {book.publishedYear}
+              </span>
 
-          {/* AnzaBook Logo & Brand Name on Top Right */}
-          <div className="flex items-center gap-[1.5cqw] text-[var(--book-cover-text)]">
-            <AnzaLogoMark variant="badge" className="size-[4.4cqw] shrink-0" />
-            <span className="font-sans font-bold text-[3.8cqw] tracking-wider uppercase">
-              AnzaBook
-            </span>
-          </div>
-        </div>
+              {/* AnzaBook Logo & Brand Name on Top Right */}
+              <div className="flex items-center gap-[1.5cqw] text-[var(--book-cover-text)]">
+                <AnzaLogoMark
+                  variant="badge"
+                  className="size-[4.4cqw] shrink-0"
+                />
+                <span className="font-sans font-bold text-[3.8cqw] tracking-wider uppercase">
+                  AnzaBook
+                </span>
+              </div>
+            </div>
 
-        {/* CENTER BODY: Dynamic Visual Artwork + Title */}
-        <div className="relative z-10 my-auto flex flex-col items-center text-center px-[2cqw]">
-          {/* Visual Artwork Motif */}
-          <div className="w-[85%] max-w-[120px] aspect-[4/3] my-[2cqw] flex items-center justify-center pointer-events-none">
-            <CoverArtwork genre={primaryGenre} />
-          </div>
+            {/* CENTER BODY: Dynamic Visual Artwork + Title */}
+            <div className="relative z-10 my-auto flex flex-col items-center text-center px-[2cqw]">
+              {/* Visual Artwork Motif */}
+              <div className="w-[85%] max-w-[120px] aspect-[4/3] my-[2cqw] flex items-center justify-center pointer-events-none">
+                <CoverArtwork genre={primaryGenre} />
+              </div>
 
-          {/* Book Title */}
-          <h4 className="font-serif text-[7.8cqw] leading-[1.15] font-bold tracking-tight text-[var(--book-cover-text)] line-clamp-3 break-words drop-shadow-xs">
-            {book.title}
-          </h4>
+              {/* Book Title */}
+              <h4 className="font-serif text-[7.8cqw] leading-[1.15] font-bold tracking-tight text-[var(--book-cover-text)] line-clamp-3 break-words drop-shadow-xs">
+                {book.title}
+              </h4>
 
-          {/* Subtle genre/category pill under title */}
-          {primaryGenre && (
-            <span className="mt-[2.5cqw] inline-block font-mono text-[3.4cqw] uppercase tracking-widest px-[2.5cqw] py-[0.5cqw] rounded-full bg-current/10 opacity-75">
-              {primaryGenre}
-            </span>
-          )}
-        </div>
+              {/* Subtle genre/category pill under title */}
+              {primaryGenre && (
+                <span className="mt-[2.5cqw] inline-block font-mono text-[3.4cqw] uppercase tracking-widest px-[2.5cqw] py-[0.5cqw] rounded-full bg-current/10 opacity-75">
+                  {primaryGenre}
+                </span>
+              )}
+            </div>
 
-        {/* FOOTER: Author Name centered at the bottom (No Price) */}
-        <div className="relative z-10 text-center border-t border-current/20 pt-[3cqw] pb-[0.5cqw] px-[1cqw]">
-          <p className="truncate text-[4.6cqw] font-serif font-semibold tracking-wide uppercase text-[var(--book-cover-text)]">
-            {book.author}
-          </p>
-        </div>
+            {/* FOOTER: Author Name centered at the bottom (No Price) */}
+            <div className="relative z-10 text-center border-t border-current/20 pt-[3cqw] pb-[0.5cqw] px-[1cqw]">
+              <p className="truncate text-[4.6cqw] font-serif font-semibold tracking-wide uppercase text-[var(--book-cover-text)]">
+                {book.author}
+              </p>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

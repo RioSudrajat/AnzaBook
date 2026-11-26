@@ -12,13 +12,14 @@ import {
   Check,
   ChevronRight,
   Crown,
+  KeyRound,
   Loader2,
   MapPin,
   MessageSquare,
   Package,
   Share2,
+  ShieldCheck,
   ShoppingBag,
-  Sparkles,
   Star,
 } from "lucide-react";
 import type {
@@ -152,11 +153,15 @@ function B2B2CActionButtons({
     <div className="w-full max-w-[280px] space-y-3 font-mono text-left">
       {/* 1. Policy Context Notice / Badge */}
       {isClaimOnly && (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] font-sans leading-snug text-amber-900 dark:text-amber-200">
-          <div className="font-bold flex items-center gap-1 text-amber-700 dark:text-amber-300 font-mono text-[10px] uppercase">
-            <span>🛡️ Eksklusif Pembeli Buku Cetak</span>
+        <div className="rounded-lg border border-[var(--color-accent)]/35 bg-[var(--color-accent-soft)] p-3 text-[11px] font-sans leading-snug text-[var(--color-ink)]">
+          <div className="font-bold flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-[var(--color-ink)]">
+            <ShieldCheck
+              className="size-3.5 text-[var(--color-accent)] shrink-0"
+              aria-hidden="true"
+            />
+            <span>Eksklusif Pembeli Buku Cetak</span>
           </div>
-          <p className="mt-1 text-[11px]">
+          <p className="mt-1 text-[11px] text-[var(--color-ink-2)]">
             Eksklusif Pemilik Buku Cetak Resmi — Tidak Dijual Satuan Digital.
             Masukkan kode unik buku fisik Anda untuk membuka akses penuh.
           </p>
@@ -164,9 +169,13 @@ function B2B2CActionButtons({
       )}
 
       {isNakamaOnly && (
-        <div className="rounded-lg border border-border/80 bg-muted/40 p-2.5 text-[11px] font-sans leading-snug text-foreground/80">
-          <div className="font-bold flex items-center gap-1 font-mono text-[10px] uppercase text-foreground">
-            <span>👑 Khusus Anggota Nakama</span>
+        <div className="rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-3 text-[11px] font-sans leading-snug text-[var(--color-ink-2)]">
+          <div className="font-bold flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-[var(--color-ink)]">
+            <Crown
+              className="size-3.5 text-[var(--color-accent)] shrink-0"
+              aria-hidden="true"
+            />
+            <span>Khusus Anggota Nakama</span>
           </div>
           <p className="mt-1 text-[11px]">
             Buka Penuh dengan Langganan Nakama — Buku ini termasuk dalam
@@ -189,10 +198,11 @@ function B2B2CActionButtons({
             <Button
               asChild
               size="lg"
-              className="w-full h-12 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs gap-2 shadow-md transition-all active:scale-95"
+              className="w-full min-h-11 bg-[var(--color-accent)] hover:brightness-95 text-[var(--color-accent-ink)] font-semibold text-xs gap-2 transition-colors"
             >
               <Link to="/sign-in" search={{ redirect: `/books/${book.slug}` }}>
-                🔑 Klaim Kode Buku Cetak Asli
+                <KeyRound className="size-4" aria-hidden="true" />
+                <span>Klaim Kode Buku Cetak Asli</span>
               </Link>
             </Button>
           )}
@@ -201,9 +211,9 @@ function B2B2CActionButtons({
             onClick={onReadSample}
             variant="outline"
             size="lg"
-            className="w-full h-11 bg-background text-foreground border-border hover:bg-muted font-medium text-xs gap-2 transition-all active:scale-95"
+            className="w-full min-h-11 border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] font-medium text-xs gap-2 transition-colors cursor-pointer"
           >
-            <BookOpen className="size-4" />
+            <BookOpen className="size-4" aria-hidden="true" />
             Baca Cuplikan Bab 1
           </Button>
         </>
@@ -215,9 +225,9 @@ function B2B2CActionButtons({
           <Button
             onClick={onStartReading}
             size="lg"
-            className="w-full h-12 bg-red-600 hover:bg-red-500 text-white font-bold text-xs gap-2 shadow-md transition-all active:scale-95"
+            className="w-full min-h-11 bg-[var(--color-accent)] hover:brightness-95 text-[var(--color-accent-ink)] font-semibold text-xs gap-2 transition-colors cursor-pointer"
           >
-            <BookOpen className="size-4" />
+            <BookOpen className="size-4" aria-hidden="true" />
             Mulai Membaca
           </Button>
 
@@ -225,10 +235,13 @@ function B2B2CActionButtons({
             asChild
             variant="outline"
             size="lg"
-            className="w-full h-11 border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 dark:text-amber-200 font-medium text-xs gap-2 transition-all active:scale-95"
+            className="w-full min-h-11 border-[var(--color-accent)]/40 bg-[var(--color-accent-soft)] hover:brightness-95 text-[var(--color-ink)] font-medium text-xs gap-2 transition-colors"
           >
             <Link to="/membership">
-              <Sparkles className="size-4 text-amber-500" />
+              <Crown
+                className="size-4 text-[var(--color-accent)]"
+                aria-hidden="true"
+              />
               Buka Penuh dengan Nakama
             </Link>
           </Button>
@@ -245,7 +258,7 @@ function B2B2CActionButtons({
                 asChild
                 variant="outline"
                 size="sm"
-                className="w-full h-10 text-xs"
+                className="w-full min-h-11 border-[var(--color-rule)] text-xs"
               >
                 <Link
                   to="/sign-in"
@@ -265,21 +278,21 @@ function B2B2CActionButtons({
             onClick={onPurchaseDigitalBook}
             disabled={isPurchasing}
             size="lg"
-            className="w-full h-12 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs gap-2 shadow-md transition-all active:scale-95"
+            className="w-full min-h-11 bg-[var(--color-accent)] hover:brightness-95 text-[var(--color-accent-ink)] font-semibold text-xs gap-2 transition-colors cursor-pointer"
           >
             {isPurchasing ? (
               <>
-                <Loader2 className="size-4 animate-spin" />
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
                 Memproses Pembelian...
               </>
             ) : purchaseSuccess ? (
               <>
-                <Check className="size-4" />
+                <Check className="size-4" aria-hidden="true" />
                 Akses Berhasil Dibeli!
               </>
             ) : (
               <>
-                <ShoppingBag className="size-4" />
+                <ShoppingBag className="size-4" aria-hidden="true" />
                 Beli Akses Digital Selamanya ({priceFormatted})
               </>
             )}
@@ -289,14 +302,17 @@ function B2B2CActionButtons({
             onClick={onReadSample}
             variant="outline"
             size="lg"
-            className="w-full h-11 bg-background text-foreground border-border hover:bg-muted font-medium text-xs gap-2 transition-all active:scale-95"
+            className="w-full min-h-11 border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] font-medium text-xs gap-2 transition-colors cursor-pointer"
           >
-            <BookOpen className="size-4" />
+            <BookOpen className="size-4" aria-hidden="true" />
             Baca Cuplikan Bab 1
           </Button>
 
           {purchaseError && (
-            <p role="alert" className="text-xs text-destructive font-sans">
+            <p
+              role="alert"
+              className="text-xs text-[var(--color-error)] font-sans"
+            >
               {purchaseError}
             </p>
           )}
@@ -310,12 +326,12 @@ function B2B2CActionButtons({
             onClick={onPurchaseDigitalBook}
             disabled={isPurchasing}
             size="lg"
-            className="w-full h-12 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs gap-2 shadow-md transition-all active:scale-95"
+            className="w-full min-h-11 bg-[var(--color-accent)] hover:brightness-95 text-[var(--color-accent-ink)] font-semibold text-xs gap-2 transition-colors cursor-pointer"
           >
             {isPurchasing ? (
-              <Loader2 className="size-4 animate-spin" />
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
             ) : (
-              <ShoppingBag className="size-4" />
+              <ShoppingBag className="size-4" aria-hidden="true" />
             )}
             Beli Akses Digital ({priceFormatted})
           </Button>
@@ -324,10 +340,13 @@ function B2B2CActionButtons({
             asChild
             variant="outline"
             size="lg"
-            className="w-full h-11 border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 dark:text-amber-200 font-medium text-xs gap-2 transition-all active:scale-95"
+            className="w-full min-h-11 border-[var(--color-accent)]/40 bg-[var(--color-accent-soft)] hover:brightness-95 text-[var(--color-ink)] font-medium text-xs gap-2 transition-colors"
           >
             <Link to="/membership">
-              <Sparkles className="size-4 text-amber-500" />
+              <Crown
+                className="size-4 text-[var(--color-accent)]"
+                aria-hidden="true"
+              />
               Buka dengan Nakama (Rp39rb/bln)
             </Link>
           </Button>
@@ -336,14 +355,17 @@ function B2B2CActionButtons({
             onClick={onReadSample}
             variant="outline"
             size="sm"
-            className="w-full h-11 bg-background text-foreground text-xs gap-2 transition-all active:scale-95"
+            className="w-full min-h-11 border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] text-xs gap-2 transition-colors cursor-pointer"
           >
-            <BookOpen className="size-3.5" />
+            <BookOpen className="size-3.5" aria-hidden="true" />
             Baca Cuplikan Bab 1
           </Button>
 
           {purchaseError && (
-            <p role="alert" className="text-xs text-destructive font-sans">
+            <p
+              role="alert"
+              className="text-xs text-[var(--color-error)] font-sans"
+            >
               {purchaseError}
             </p>
           )}
@@ -355,30 +377,33 @@ function B2B2CActionButtons({
         <Button
           onClick={onStartReading}
           size="lg"
-          className="w-full h-12 bg-red-600 hover:bg-red-500 text-white font-bold text-xs gap-2 shadow-md transition-all active:scale-95"
+          className="w-full min-h-11 bg-[var(--color-accent)] hover:brightness-95 text-[var(--color-accent-ink)] font-semibold text-xs gap-2 transition-colors cursor-pointer"
         >
-          <BookOpen className="size-4" />
+          <BookOpen className="size-4" aria-hidden="true" />
           Mulai Membaca
         </Button>
       )}
 
-      {/* Save to Library Button (common for all) */}
+      {/* Simpan ke Rak Baca */}
       <Button
         onClick={onSaveToLibrary}
         variant="outline"
         size="lg"
         disabled={isSavingShelf || shelfSaved}
-        className="w-full h-11 bg-background text-foreground border-border hover:bg-muted font-medium text-xs gap-2 transition-all active:scale-95"
+        className="w-full min-h-11 border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] font-medium text-xs gap-2 transition-colors cursor-pointer"
       >
         {shelfSaved ? (
           <>
-            <Check className="size-4 text-emerald-600" />
+            <Check
+              className="size-4 text-[var(--color-green)]"
+              aria-hidden="true"
+            />
             Tersimpan di Rak!
           </>
         ) : (
           <>
-            <BookMarked className="size-4" />
-            Save to Library
+            <BookMarked className="size-4" aria-hidden="true" />
+            Simpan ke Rak Baca
           </>
         )}
       </Button>
@@ -519,7 +544,7 @@ export default function BookDetailPage() {
     }
   };
 
-  // Action 2: Save to Library
+  // Simpan ke rak baca
   const handleSaveToLibrary = async () => {
     if (!isLoggedIn) {
       navigate({
@@ -778,64 +803,75 @@ export default function BookDetailPage() {
               </div>
 
               {/* Bibliography & Edition Metadata */}
-              {(book.publishedYear ||
-                book.originalTitle ||
-                book.translator ||
-                book.collectionName ||
-                book.pageCount > 0) && (
-                <dl className="mt-5 grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-xl border border-border/80 bg-muted/30 p-3.5 text-xs">
-                  {book.publishedYear && (
-                    <div>
-                      <dt className="font-mono text-[11px] text-muted-foreground">
-                        Tahun Terbit
-                      </dt>
-                      <dd className="font-semibold text-foreground mt-0.5">
-                        {book.publishedYear}
-                      </dd>
-                    </div>
-                  )}
-                  {book.pageCount > 0 && (
-                    <div>
-                      <dt className="font-mono text-[11px] text-muted-foreground">
-                        Tebal Halaman
-                      </dt>
-                      <dd className="font-semibold text-foreground mt-0.5">
-                        {book.pageCount} halaman
-                      </dd>
-                    </div>
-                  )}
-                  {book.originalTitle && (
-                    <div className="col-span-2 sm:col-span-1">
-                      <dt className="font-mono text-[11px] text-muted-foreground">
-                        Judul Asli
-                      </dt>
-                      <dd className="font-semibold text-foreground mt-0.5 italic">
-                        {book.originalTitle}
-                      </dd>
-                    </div>
-                  )}
-                  {book.translator && (
-                    <div>
-                      <dt className="font-mono text-[11px] text-muted-foreground">
-                        Penerjemah
-                      </dt>
-                      <dd className="font-semibold text-foreground mt-0.5">
-                        {book.translator}
-                      </dd>
-                    </div>
-                  )}
-                  {book.collectionName && (
-                    <div>
-                      <dt className="font-mono text-[11px] text-muted-foreground">
-                        Seri / Koleksi
-                      </dt>
-                      <dd className="font-semibold text-foreground mt-0.5">
-                        {book.collectionName}
-                      </dd>
-                    </div>
-                  )}
-                </dl>
-              )}
+              {(() => {
+                const hasDistinctOriginalTitle = Boolean(
+                  book.originalTitle &&
+                  book.originalTitle.trim().toLowerCase() !==
+                    book.title.trim().toLowerCase(),
+                );
+                const hasBibliography = Boolean(
+                  book.publishedYear ||
+                  hasDistinctOriginalTitle ||
+                  book.translator ||
+                  book.collectionName ||
+                  book.pageCount > 0,
+                );
+                if (!hasBibliography) return null;
+                return (
+                  <dl className="mt-5 grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-3.5 text-xs">
+                    {book.publishedYear && (
+                      <div>
+                        <dt className="font-mono text-[11px] text-[var(--color-muted)]">
+                          Tahun Terbit
+                        </dt>
+                        <dd className="font-semibold text-[var(--color-ink)] mt-0.5">
+                          {book.publishedYear}
+                        </dd>
+                      </div>
+                    )}
+                    {book.pageCount > 0 && (
+                      <div>
+                        <dt className="font-mono text-[11px] text-[var(--color-muted)]">
+                          Tebal Halaman
+                        </dt>
+                        <dd className="font-semibold text-[var(--color-ink)] mt-0.5">
+                          {book.pageCount} halaman
+                        </dd>
+                      </div>
+                    )}
+                    {hasDistinctOriginalTitle && (
+                      <div className="col-span-2 sm:col-span-1">
+                        <dt className="font-mono text-[11px] text-[var(--color-muted)]">
+                          Judul Asli
+                        </dt>
+                        <dd className="font-semibold text-[var(--color-ink)] mt-0.5 italic">
+                          {book.originalTitle}
+                        </dd>
+                      </div>
+                    )}
+                    {book.translator && (
+                      <div>
+                        <dt className="font-mono text-[11px] text-[var(--color-muted)]">
+                          Penerjemah
+                        </dt>
+                        <dd className="font-semibold text-[var(--color-ink)] mt-0.5">
+                          {book.translator}
+                        </dd>
+                      </div>
+                    )}
+                    {book.collectionName && (
+                      <div>
+                        <dt className="font-mono text-[11px] text-[var(--color-muted)]">
+                          Seri / Koleksi
+                        </dt>
+                        <dd className="font-semibold text-[var(--color-ink)] mt-0.5">
+                          {book.collectionName}
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
+                );
+              })()}
 
               {/* Mobile Cover & Action Buttons Block */}
               <div className="block lg:hidden my-6 p-4 rounded-xl border border-border/80 bg-card/60 flex flex-col items-center">
@@ -1207,7 +1243,7 @@ export default function BookDetailPage() {
                   key={ev.id}
                   to="/events/$slug"
                   params={{ slug: ev.slug }}
-                  className="group block p-4 rounded-[10px] bg-background border border-border/80 hover:border-foreground/30 transition-all shadow-sm"
+                  className="group block p-4 rounded-[10px] bg-[var(--color-paper-2)] border border-[var(--color-rule)] hover:border-[var(--color-ink)]/30 transition-colors"
                 >
                   <div className="flex gap-3">
                     {ev.coverUrl ? (
@@ -1227,8 +1263,8 @@ export default function BookDetailPage() {
                           weekday: "short",
                           day: "numeric",
                           month: "short",
-                        })}{" "}
-                        ·{" "}
+                        })}
+                        {" — "}
                         {new Date(ev.startsAt).toLocaleTimeString("id-ID", {
                           hour: "2-digit",
                           minute: "2-digit",

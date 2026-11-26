@@ -18,7 +18,7 @@ interface BookCatalogCardProps {
 }
 
 export function BookCatalogCard({ book }: BookCatalogCardProps) {
-  const isPremium = book.accessTier === "premium";
+  const isPremium = book.accessTier !== "free";
   const hasPhysical = book.hasPhysical;
   const primaryCategory = book.genres?.[0] || book.categories?.[0] || "Umum";
 
@@ -33,7 +33,7 @@ export function BookCatalogCard({ book }: BookCatalogCardProps) {
   );
 
   return (
-    <div className="group relative bg-background border border-border/70 rounded-[12px] p-4 flex flex-col justify-between hover:border-border hover:shadow-md transition-all">
+    <div className="group relative bg-background border border-border/70 rounded-[12px] p-4 flex flex-col justify-between hover:border-border hover:shadow-md transition-colors">
       <div>
         {/* Top Header: Category on Left, Clean Badges on Right */}
         <div className="flex items-center justify-between gap-2 mb-3.5 pb-2.5 border-b border-border/40">
@@ -143,14 +143,13 @@ export function BookCatalogCard({ book }: BookCatalogCardProps) {
 
             {/* Rating Stars & Count */}
             {book.ratingCount > 0 ? (
-              <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground mt-2">
+              <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground mt-2">
                 <div className="flex items-center text-amber-500">
                   <Star className="size-3.5 fill-amber-500 text-amber-500" />
                   <span className="font-bold ml-1 text-foreground">
                     {book.ratingAvg.toFixed(1)}
                   </span>
                 </div>
-                <span>&bull;</span>
                 <span className="text-[11px]">({book.ratingCount} ulasan)</span>
               </div>
             ) : (
@@ -183,7 +182,7 @@ export function BookCatalogCard({ book }: BookCatalogCardProps) {
 
       {/* Action Footer: Reading Metrics & Navigation Link */}
       <div className="pt-3 mt-3 border-t border-border/60 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2.5 text-xs text-muted-foreground font-sans">
+        <div className="flex items-center gap-3 text-xs text-muted-foreground font-sans">
           {/* Reader Count */}
           <span
             className="flex items-center gap-1"
@@ -198,8 +197,6 @@ export function BookCatalogCard({ book }: BookCatalogCardProps) {
             <span className="text-muted-foreground/75 text-[11px]">dibaca</span>
           </span>
 
-          <span className="text-border/80 text-[10px]">&bull;</span>
-
           {/* Share Count */}
           <span
             className="flex items-center gap-1"
@@ -209,7 +206,9 @@ export function BookCatalogCard({ book }: BookCatalogCardProps) {
             <span className="font-medium text-foreground/90">
               {sharesCount}
             </span>
-            <span className="text-muted-foreground/75 text-[11px]">share</span>
+            <span className="text-muted-foreground/75 text-[11px]">
+              bagikan
+            </span>
           </span>
         </div>
 

@@ -61,7 +61,7 @@ test.describe("Social Sharing, Styled Feed Cards & Public OG Previews (Issue #14
 
       // Publish via real Quote Post Composer UI from Profile -> Ulasan & Kutipan
       await page.goto("/app?tab=profile");
-      await page.getByRole("button", { name: /Ulasan & Kutipan/i }).click();
+      await page.getByRole("tab", { name: /Ulasan & Kutipan/i }).click();
       await expect(page.getByText(quoteText)).toBeVisible();
 
       await page

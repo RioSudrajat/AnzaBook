@@ -396,6 +396,93 @@
       --reader-font-size: 1.0625rem;
     }
   }
+
+  /* Auto-growing inline editorial title & synopsis using field-sizing with CSS Grid fallback. */
+  .editorial-title-textarea {
+    field-sizing: content;
+    width: 100%;
+    height: auto;
+    min-block-size: 1.3lh;
+    max-block-size: 5lh;
+    resize: none;
+    overflow: hidden;
+  }
+
+  .editorial-synopsis-textarea {
+    field-sizing: content;
+    width: 100%;
+    height: auto;
+    min-block-size: 2.5lh;
+    max-block-size: 18lh;
+    resize: none;
+  }
+
+  @supports not (field-sizing: content) {
+    .editorial-title-grow,
+    .editorial-synopsis-grow {
+      display: grid;
+    }
+    .editorial-title-grow::after,
+    .editorial-title-grow > .editorial-title-textarea,
+    .editorial-synopsis-grow::after,
+    .editorial-synopsis-grow > .editorial-synopsis-textarea {
+      grid-area: 1 / 1 / 2 / 2;
+      font: inherit;
+      letter-spacing: inherit;
+      line-height: inherit;
+      padding-block: 0.25rem;
+      padding-inline: 0;
+    }
+    .editorial-title-grow::after {
+      content: attr(data-replicated-value) " ";
+      white-space: pre-wrap;
+      word-break: break-word;
+      visibility: hidden;
+      min-block-size: 2.5rem;
+    }
+    .editorial-synopsis-grow::after {
+      content: attr(data-replicated-value) " ";
+      white-space: pre-wrap;
+      word-break: break-word;
+      visibility: hidden;
+      min-block-size: 3.5rem;
+    }
+    .editorial-title-grow > .editorial-title-textarea,
+    .editorial-synopsis-grow > .editorial-synopsis-textarea {
+      overflow: hidden;
+    }
+  }
+
+  /* Accessible disclosure (<details>) with clean chevron marker next to label text. */
+  .editorial-disclosure > summary {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    user-select: none;
+  }
+  .editorial-disclosure > summary::-webkit-details-marker {
+    display: none;
+  }
+  .editorial-disclosure > summary::before {
+    content: "";
+    inline-size: 0.55rem;
+    block-size: 0.55rem;
+    flex-shrink: 0;
+    border-inline-end: 2px solid currentColor;
+    border-block-end: 2px solid currentColor;
+    transform: rotate(-45deg);
+    margin-inline-end: 0.125rem;
+  }
+  .editorial-disclosure[open] > summary::before {
+    transform: rotate(45deg);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .editorial-disclosure > summary::before {
+      transition: transform 0.18s ease-out;
+    }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

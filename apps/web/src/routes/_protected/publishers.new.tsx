@@ -1,6 +1,7 @@
 import { useState, useRef, type FormEvent } from "react";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { Camera, Globe, Mail, Plus, X } from "lucide-react";
+import { InstagramIcon, XTwitterIcon } from "@/components/profile/social-icons";
 import { SmartBackButton } from "@/components/smart-back-button";
 import { AppShell } from "@/features/dashboard/components/app-shell";
 import { Button } from "@/components/ui/button";
@@ -23,36 +24,10 @@ import { ApiError } from "@/lib/api/client";
 
 export const Route = createFileRoute("/_protected/publishers/new")({
   head: () => ({
-    meta: [{ title: "Daftarkan Penerbit Mitra (New Publication) | AnzaBook" }],
+    meta: [{ title: "Daftarkan Penerbit Mitra | AnzaBook" }],
   }),
   component: NewPublicationPage,
 });
-
-function XTwitterIcon({ className = "size-4" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-    </svg>
-  );
-}
-
-function InstagramIcon({ className = "size-4" }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
-      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-      <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
-    </svg>
-  );
-}
 
 const PRESET_TOPICS = [
   "Sastra & Fiksi",
@@ -81,12 +56,12 @@ export default function NewPublicationPage() {
   const [slug, setSlug] = useState("");
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
   const [description, setDescription] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
-  const [isAvatarDragOver, setIsAvatarDragOver] = useState(false);
+  const [headerImageUrl, setHeaderImageUrl] = useState("");
   const [isLogoDragOver, setIsLogoDragOver] = useState(false);
-  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [isBannerDragOver, setIsBannerDragOver] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
 
   const processImageFile = async (
     file: File,
@@ -238,7 +213,8 @@ export default function NewPublicationPage() {
         slug: cleanSlug,
         ikapiNumber: ikapiNumber.trim() || undefined,
         description: description.trim() || undefined,
-        logoUrl: logoUrl.trim() || avatarUrl.trim() || undefined,
+        logoUrl: logoUrl.trim() || undefined,
+        headerImageUrl: headerImageUrl.trim() || undefined,
         city: city.trim() || undefined,
         address: address.trim() || undefined,
         contactEmail: contactEmail.trim() || undefined,
@@ -316,42 +292,40 @@ export default function NewPublicationPage() {
     <AppShell user={sessionUser} activeTab="profile" title="Daftarkan Penerbit">
       <div className="flex items-center justify-between gap-3 mb-6">
         <SmartBackButton fallbackTo="/partner-program" className="-ml-2" />
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-mono text-muted-foreground">
-            Tahap 1 dari 2
-          </span>
-          <Button
-            type="button"
-            onClick={handleSubmit}
-            disabled={
-              applyPublisherMutation.isPending ||
-              uploadImageMutation.isPending ||
-              !name.trim()
-            }
-            className="bg-foreground text-background hover:opacity-90 text-xs px-4 py-2 min-h-11 rounded-full font-medium cursor-pointer"
-          >
-            {applyPublisherMutation.isPending
-              ? "Menyimpan..."
-              : "Daftarkan Penerbit"}
-          </Button>
-        </div>
+        <Button
+          type="button"
+          onClick={handleSubmit}
+          disabled={
+            applyPublisherMutation.isPending ||
+            uploadImageMutation.isPending ||
+            !name.trim()
+          }
+          className="bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:brightness-95 text-xs px-5 min-h-11 rounded-xl font-semibold cursor-pointer"
+        >
+          {applyPublisherMutation.isPending
+            ? "Menyimpan..."
+            : "Daftarkan Penerbit"}
+        </Button>
       </div>
 
       {/* Main Container */}
-      <div className="max-w-4xl w-full mx-auto space-y-12">
+      <div className="max-w-4xl w-full mx-auto space-y-12 text-[var(--color-ink)]">
         {/* Title Heading */}
-        <div className="space-y-1 border-b border-border/60 pb-6">
-          <h1 className="font-serif text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+        <div className="space-y-1.5 border-b border-[var(--color-rule)] pb-6">
+          <h1 className="font-serif text-3xl sm:text-4xl font-bold tracking-tight">
             Daftarkan Penerbit Baru
           </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground">
+          <p className="text-xs sm:text-sm text-[var(--color-muted)]">
             Daftarkan entitas penerbit mitra Anda untuk menerbitkan karya buku,
             mengelola tim redaksi, dan menjangkau ribuan pembaca setia AnzaBook.
           </p>
         </div>
 
         {formError && (
-          <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-xs space-y-1">
+          <div
+            role="alert"
+            className="p-4 rounded-xl bg-[var(--color-error-soft)] border border-[var(--color-error)]/40 text-[var(--color-ink)] text-xs space-y-1"
+          >
             <p className="font-bold">Gagal Mendaftarkan Penerbit</p>
             <p>{formError}</p>
           </div>
@@ -430,116 +404,34 @@ export default function NewPublicationPage() {
               </div>
             </div>
 
-            {/* Field: Avatar Penerbit* */}
+            {/* Field: Logo Penerbit (1:1) */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
               <div className="w-full sm:w-56 shrink-0 space-y-1">
-                <Label className="text-sm font-semibold text-foreground">
-                  Avatar Penerbit<span className="text-red-500">*</span>
+                <Label className="text-sm font-semibold text-[var(--color-ink)]">
+                  Logo Penerbit (1:1)
                 </Label>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[11px] text-[var(--color-muted)]">
                   Kolom bertanda * wajib diisi.
                 </p>
               </div>
 
               <div className="flex-1 max-w-xl flex flex-col sm:flex-row items-start justify-between gap-6">
                 <div className="space-y-1.5 flex-1">
-                  <h4 className="font-semibold text-xs text-foreground">
-                    Unggah Avatar
-                  </h4>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Avatar tampil di halaman publik penerbit dan setiap judul
-                    yang diterbitkan. Seret dan letakkan gambar atau klik kotak
-                    di samping.
+                  <p className="font-semibold text-xs text-[var(--color-ink)]">
+                    Unggah Logo Persegi
                   </p>
-                  <p className="text-[11px] font-mono text-muted-foreground">
-                    Format: JPG, PNG, WebP • Maks. 5MB
+                  <p className="text-xs text-[var(--color-muted)] leading-relaxed">
+                    Logo tampil di bagian atas halaman publik penerbit,
+                    direktori eksplorasi, dan studio redaksi.
                   </p>
-                </div>
-
-                {/* Avatar Preview & Dropzone Box */}
-                <div
-                  onClick={() => avatarInputRef.current?.click()}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setIsAvatarDragOver(true);
-                  }}
-                  onDragLeave={() => setIsAvatarDragOver(false)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setIsAvatarDragOver(false);
-                    const file = e.dataTransfer.files?.[0];
-                    if (file)
-                      void processImageFile(file, (data) => setAvatarUrl(data));
-                  }}
-                  className={`size-28 sm:size-32 rounded-xl border border-dashed flex flex-col items-center justify-center text-muted-foreground shrink-0 overflow-hidden relative group cursor-pointer transition-colors ${
-                    isAvatarDragOver
-                      ? "border-foreground bg-muted/60"
-                      : "border-border bg-muted/20 hover:border-foreground/60"
-                  }`}
-                  title="Klik atau seret avatar ke sini"
-                >
-                  {avatarUrl ? (
-                    <>
-                      <img
-                        src={avatarUrl}
-                        alt="Avatar Preview"
-                        className="size-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white text-[11px] transition-opacity">
-                        <Camera className="size-5 mb-0.5" />
-                        <span>Ganti</span>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center p-2 text-center pointer-events-none">
-                      <Camera className="size-6 text-muted-foreground/60 mb-1" />
-                      <span className="text-[10px] text-muted-foreground">
-                        Pilih avatar
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                <input
-                  ref={avatarInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file)
-                      void processImageFile(file, (data) => setAvatarUrl(data));
-                    e.target.value = "";
-                  }}
-                  className="hidden"
-                />
-              </div>
-            </div>
-
-            {/* Field: Logo Penerbit */}
-            <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
-              <div className="w-full sm:w-56 shrink-0 space-y-1">
-                <Label className="text-sm font-semibold text-foreground">
-                  Logo Penerbit
-                </Label>
-              </div>
-
-              <div className="flex-1 max-w-xl flex flex-col sm:flex-row items-start justify-between gap-6">
-                <div className="space-y-1.5 flex-1">
-                  <h4 className="font-semibold text-xs text-foreground">
-                    Unggah Logo
-                  </h4>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Logo ditampilkan di bagian atas halaman penerbit dan studio
-                    redaksi. Seret dan letakkan berkas logo atau klik kotak di
-                    samping.
-                  </p>
-                  <p className="text-[11px] font-mono text-muted-foreground">
-                    Format: JPG, PNG, WebP • Maks. 5MB
+                  <p className="text-[11px] font-mono text-[var(--color-muted)]">
+                    Format: JPG, PNG, WebP — Maks. 5MB
                   </p>
                 </div>
 
                 {/* Logo Preview & Dropzone Box */}
-                <div
+                <button
+                  type="button"
                   onClick={() => logoInputRef.current?.click()}
                   onDragOver={(e) => {
                     e.preventDefault();
@@ -553,34 +445,35 @@ export default function NewPublicationPage() {
                     if (file)
                       void processImageFile(file, (data) => setLogoUrl(data));
                   }}
-                  className={`size-28 sm:size-32 rounded-xl border border-dashed flex flex-col items-center justify-center text-muted-foreground shrink-0 overflow-hidden relative group cursor-pointer transition-colors ${
+                  className={`size-28 sm:size-32 rounded-xl border border-dashed flex flex-col items-center justify-center text-[var(--color-muted)] shrink-0 overflow-hidden relative group cursor-pointer transition-colors ${
                     isLogoDragOver
-                      ? "border-foreground bg-muted/60"
-                      : "border-border bg-muted/20 hover:border-foreground/60"
+                      ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)]"
+                      : "border-[var(--color-rule)] bg-[var(--color-paper-2)] hover:border-[var(--color-ink)]"
                   }`}
-                  title="Klik atau seret logo ke sini"
+                  aria-label="Pilih atau seret logo penerbit"
                 >
                   {logoUrl ? (
                     <>
                       <img
                         src={logoUrl}
-                        alt="Logo Preview"
+                        alt="Pratinjau logo penerbit"
                         className="size-full object-contain p-2"
                       />
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white text-[11px] transition-opacity">
-                        <Camera className="size-5 mb-0.5" />
-                        <span>Ganti</span>
-                      </div>
+                      <span className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white text-[11px] transition-opacity">
+                        <Camera className="size-5 mb-0.5" aria-hidden="true" />
+                        <span>Ganti Logo</span>
+                      </span>
                     </>
                   ) : (
-                    <div className="flex flex-col items-center justify-center p-2 text-center pointer-events-none">
-                      <Camera className="size-6 text-muted-foreground/60 mb-1" />
-                      <span className="text-[10px] text-muted-foreground">
-                        Pilih logo
-                      </span>
-                    </div>
+                    <span className="flex flex-col items-center justify-center p-2 text-center pointer-events-none">
+                      <Camera
+                        className="size-6 opacity-60 mb-1"
+                        aria-hidden="true"
+                      />
+                      <span className="text-[10px]">Pilih logo</span>
+                    </span>
                   )}
-                </div>
+                </button>
 
                 <input
                   ref={logoInputRef}
@@ -590,6 +483,87 @@ export default function NewPublicationPage() {
                     const file = e.target.files?.[0];
                     if (file)
                       void processImageFile(file, (data) => setLogoUrl(data));
+                    e.target.value = "";
+                  }}
+                  className="hidden"
+                />
+              </div>
+            </div>
+
+            {/* Field: Banner Sampul (3:1) */}
+            <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
+              <div className="w-full sm:w-56 shrink-0 space-y-1">
+                <Label className="text-sm font-semibold text-[var(--color-ink)]">
+                  Banner Sampul (3:1)
+                </Label>
+                <p className="text-[11px] text-[var(--color-muted)]">
+                  Opsional untuk header halaman publik &amp; studio.
+                </p>
+              </div>
+
+              <div className="flex-1 max-w-xl space-y-3">
+                <button
+                  type="button"
+                  onClick={() => bannerInputRef.current?.click()}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsBannerDragOver(true);
+                  }}
+                  onDragLeave={() => setIsBannerDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsBannerDragOver(false);
+                    const file = e.dataTransfer.files?.[0];
+                    if (file)
+                      void processImageFile(file, (data) =>
+                        setHeaderImageUrl(data),
+                      );
+                  }}
+                  className={`w-full aspect-[3/1] rounded-xl border border-dashed flex flex-col items-center justify-center text-[var(--color-muted)] overflow-hidden relative group cursor-pointer transition-colors ${
+                    isBannerDragOver
+                      ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)]"
+                      : "border-[var(--color-rule)] bg-[var(--color-paper-2)] hover:border-[var(--color-ink)]"
+                  }`}
+                  aria-label="Pilih atau seret banner sampul penerbit"
+                >
+                  {headerImageUrl ? (
+                    <>
+                      <img
+                        src={headerImageUrl}
+                        alt="Pratinjau banner sampul penerbit"
+                        className="size-full object-cover"
+                      />
+                      <span className="absolute inset-0 bg-black/55 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white text-xs transition-opacity">
+                        <Camera className="size-5 mb-1" aria-hidden="true" />
+                        <span>Ganti Banner Sampul</span>
+                      </span>
+                    </>
+                  ) : (
+                    <span className="flex flex-col items-center justify-center p-4 text-center pointer-events-none">
+                      <Camera
+                        className="size-6 opacity-60 mb-1"
+                        aria-hidden="true"
+                      />
+                      <span className="text-xs font-medium text-[var(--color-ink)]">
+                        Unggah Banner Sampul (rasio 3:1)
+                      </span>
+                      <span className="text-[11px] font-mono text-[var(--color-muted)] mt-0.5">
+                        JPG, PNG, WebP — Maks. 5MB
+                      </span>
+                    </span>
+                  )}
+                </button>
+
+                <input
+                  ref={bannerInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file)
+                      void processImageFile(file, (data) =>
+                        setHeaderImageUrl(data),
+                      );
                     e.target.value = "";
                   }}
                   className="hidden"
@@ -694,41 +668,44 @@ export default function NewPublicationPage() {
 
           <hr className="border-border/60" />
 
-          {/* ================= SECTION 2: SOCIAL AND TOPICS ================= */}
+          {/* ================= BAGIAN 2: KONTAK & TOPIK KURASI ================= */}
           <section className="space-y-8">
-            <h2 className="font-serif text-xl font-bold text-foreground">
-              Social and topics
+            <h2 className="font-serif text-xl font-bold text-[var(--color-ink)]">
+              Kontak &amp; Fokus Kurasi
             </h2>
 
-            {/* Field: Contact info */}
+            {/* Field: Kontak Publik */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
               <div className="w-full sm:w-56 shrink-0 space-y-1">
-                <Label className="text-sm font-semibold text-foreground">
-                  Contact info
+                <Label className="text-sm font-semibold text-[var(--color-ink)]">
+                  Kontak Publik
                 </Label>
-                <p className="text-[11px] text-muted-foreground">
-                  These links will be public.
+                <p className="text-[11px] text-[var(--color-muted)]">
+                  Tautan ini tampil di halaman profil publik penerbit.
                 </p>
               </div>
 
               <div className="flex-1 max-w-xl space-y-3">
                 {/* Email */}
                 <div className="flex items-center gap-3">
-                  <Mail className="size-4 text-muted-foreground shrink-0" />
+                  <Mail
+                    className="size-4 text-[var(--color-muted)] shrink-0"
+                    aria-hidden="true"
+                  />
                   <Input
                     type="email"
                     value={contactEmail}
                     onChange={(e) => setContactEmail(e.target.value)}
                     placeholder="Email resmi redaksi (redaksi@penerbit.id)"
-                    className="text-xs"
+                    className="min-h-11 text-xs bg-[var(--color-paper-2)]"
                   />
                 </div>
 
                 {/* X / Twitter */}
                 <div className="flex items-center gap-3">
-                  <XTwitterIcon className="size-4 text-muted-foreground shrink-0" />
-                  <div className="flex-1 flex items-center rounded-lg border border-border bg-card px-3 py-1.5">
-                    <span className="text-xs text-muted-foreground font-mono shrink-0 mr-1.5">
+                  <XTwitterIcon className="size-4 text-[var(--color-muted)] shrink-0" />
+                  <div className="flex-1 flex items-center rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-3 py-2">
+                    <span className="text-xs text-[var(--color-muted)] font-mono shrink-0 mr-1.5">
                       x.com/
                     </span>
                     <input
@@ -738,16 +715,16 @@ export default function NewPublicationPage() {
                         setTwitterHandle(e.target.value.replace(/^@/, ""))
                       }
                       placeholder="username"
-                      className="w-full bg-transparent text-xs font-mono text-foreground outline-hidden"
+                      className="w-full bg-transparent text-xs font-mono text-[var(--color-ink)] outline-hidden"
                     />
                   </div>
                 </div>
 
                 {/* Instagram */}
                 <div className="flex items-center gap-3">
-                  <InstagramIcon className="size-4 text-muted-foreground shrink-0" />
-                  <div className="flex-1 flex items-center rounded-lg border border-border bg-card px-3 py-1.5">
-                    <span className="text-xs text-muted-foreground font-mono shrink-0 mr-1.5">
+                  <InstagramIcon className="size-4 text-[var(--color-muted)] shrink-0" />
+                  <div className="flex-1 flex items-center rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-3 py-2">
+                    <span className="text-xs text-[var(--color-muted)] font-mono shrink-0 mr-1.5">
                       instagram.com/
                     </span>
                     <input
@@ -757,29 +734,32 @@ export default function NewPublicationPage() {
                         setInstagramHandle(e.target.value.replace(/^@/, ""))
                       }
                       placeholder="username"
-                      className="w-full bg-transparent text-xs font-mono text-foreground outline-hidden"
+                      className="w-full bg-transparent text-xs font-mono text-[var(--color-ink)] outline-hidden"
                     />
                   </div>
                 </div>
 
                 {/* Website */}
                 <div className="flex items-center gap-3">
-                  <Globe className="size-4 text-muted-foreground shrink-0" />
+                  <Globe
+                    className="size-4 text-[var(--color-muted)] shrink-0"
+                    aria-hidden="true"
+                  />
                   <Input
                     value={websiteUrl}
                     onChange={(e) => setWebsiteUrl(e.target.value)}
                     placeholder="https://penerbit.id"
-                    className="text-xs font-mono"
+                    className="min-h-11 text-xs font-mono bg-[var(--color-paper-2)]"
                   />
                 </div>
               </div>
             </div>
 
-            {/* Field: Topics */}
+            {/* Field: Topik Kurasi */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
               <div className="w-full sm:w-56 shrink-0 space-y-1">
-                <Label className="text-sm font-semibold text-foreground">
-                  Topics
+                <Label className="text-sm font-semibold text-[var(--color-ink)]">
+                  Fokus Topik Kurasi
                 </Label>
               </div>
 
@@ -789,13 +769,13 @@ export default function NewPublicationPage() {
                   {topics.map((topic) => (
                     <span
                       key={topic}
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted border border-border text-xs font-medium text-foreground"
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--color-paper-2)] border border-[var(--color-rule)] text-xs font-medium text-[var(--color-ink)]"
                     >
                       <span>{topic}</span>
                       <button
                         type="button"
                         onClick={() => handleRemoveTopic(topic)}
-                        className="hover:text-destructive cursor-pointer transition-colors"
+                        className="hover:text-[var(--color-error)] cursor-pointer transition-colors"
                         title={`Hapus topik ${topic}`}
                       >
                         <X className="size-3" />
@@ -816,21 +796,21 @@ export default function NewPublicationPage() {
                           }
                         }}
                         placeholder="Ketik topik..."
-                        className="h-8 text-xs w-36 font-sans"
+                        className="min-h-11 text-xs w-36 font-sans"
                         autoFocus
                       />
                       <Button
                         type="button"
                         size="sm"
                         onClick={() => handleAddTopic(newTopicInput)}
-                        className="h-8 px-2.5 text-xs bg-foreground text-background"
+                        className="min-h-11 px-3 text-xs bg-[var(--color-accent)] text-[var(--color-accent-ink)]"
                       >
                         Tambah
                       </Button>
                       <button
                         type="button"
                         onClick={() => setIsAddingTopic(false)}
-                        className="text-muted-foreground hover:text-foreground p-1 text-xs"
+                        className="text-[var(--color-muted)] hover:text-[var(--color-ink)] p-2 text-xs"
                       >
                         Batal
                       </button>
@@ -840,10 +820,10 @@ export default function NewPublicationPage() {
                       <button
                         type="button"
                         onClick={() => setIsAddingTopic(true)}
-                        className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-dashed border-border/80 hover:border-foreground text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                        className="inline-flex min-h-11 items-center gap-1 px-3 py-1 rounded-full border border-dashed border-[var(--color-rule)] hover:border-[var(--color-ink)] text-xs text-[var(--color-muted)] hover:text-[var(--color-ink)] transition-colors cursor-pointer"
                       >
                         <Plus className="size-3" />
-                        <span>Add a topic...</span>
+                        <span>Tambah topik...</span>
                       </button>
                     )
                   )}
@@ -914,24 +894,24 @@ export default function NewPublicationPage() {
 
           <hr className="border-border/60" />
 
-          {/* ================= SECTION 3: PEOPLE ================= */}
+          {/* ================= BAGIAN 3: TIM REDAKSI & PENULIS ================= */}
           <section className="space-y-8">
-            <h2 className="font-serif text-xl font-bold text-foreground">
-              People
+            <h2 className="font-serif text-xl font-bold text-[var(--color-ink)]">
+              Tim Redaksi &amp; Penulis Rekanan
             </h2>
 
-            {/* Row: Owner */}
+            {/* Row: Pemilik Penerbit */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
               <div className="w-full sm:w-56 shrink-0 space-y-1">
-                <Label className="text-sm font-semibold text-foreground">
-                  Owner
+                <Label className="text-sm font-semibold text-[var(--color-ink)]">
+                  Pemilik Penerbit
                 </Label>
               </div>
 
               <div className="flex-1 max-w-xl">
-                <div className="flex items-center justify-between p-3.5 rounded-xl border border-border bg-card">
+                <div className="flex items-center justify-between p-3.5 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper-2)]">
                   <div className="flex items-center gap-3">
-                    <div className="size-10 rounded-full bg-zinc-800 border border-border flex items-center justify-center font-bold text-sm text-foreground overflow-hidden">
+                    <div className="size-10 rounded-full bg-[var(--color-paper-3)] border border-[var(--color-rule)] flex items-center justify-center font-bold text-sm text-[var(--color-ink)] overflow-hidden">
                       {myProfile?.image ? (
                         <img
                           src={myProfile.image}
@@ -945,34 +925,34 @@ export default function NewPublicationPage() {
                       )}
                     </div>
                     <div>
-                      <p className="font-semibold text-xs text-foreground">
+                      <p className="font-semibold text-xs text-[var(--color-ink)]">
                         {myProfile?.name || "Pengguna AnzaBook"}
                       </p>
-                      <p className="text-[11px] text-muted-foreground font-mono">
-                        @{myProfile?.username || "nakama"} • Pemilik Akun Utama
+                      <p className="text-[11px] text-[var(--color-muted)] font-mono">
+                        @{myProfile?.username || "nakama"} — Pemilik Akun Utama
                       </p>
                     </div>
                   </div>
 
-                  <span className="text-[11px] font-mono font-semibold px-2.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                    Owner
+                  <span className="text-[11px] font-mono font-semibold px-2.5 py-0.5 rounded-md bg-[var(--color-green-soft)] text-[var(--color-green)] border border-[var(--color-green)]/30">
+                    Pemilik
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* Row: Editors */}
+            {/* Row: Editor Redaksi */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8 pt-2">
               <div className="w-full sm:w-56 shrink-0 space-y-1">
-                <Label className="text-sm font-semibold text-foreground">
-                  Editors
+                <Label className="text-sm font-semibold text-[var(--color-ink)]">
+                  Editor Redaksi
                 </Label>
               </div>
 
               <div className="flex-1 max-w-xl space-y-3">
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Editors can add or remove stories. They can also review, edit
-                  and publish submissions.
+                <p className="text-xs text-[var(--color-muted)] leading-relaxed">
+                  Editor dapat meninjau naskah masuk, menyunting bab, serta
+                  menerbitkan buku ke katalog resmi penerbit.
                 </p>
 
                 {editors.length > 0 && (
@@ -1129,33 +1109,28 @@ export default function NewPublicationPage() {
           </section>
 
           {/* ================= BOTTOM BAR ================= */}
-          <div className="pt-8 border-t border-border/80 flex items-center justify-between">
+          <div className="pt-8 border-t border-[var(--color-rule)] flex items-center justify-between">
             <Link
               to="/app"
               search={{ tab: "profile" }}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="text-xs text-[var(--color-muted)] hover:text-[var(--color-ink)] transition-colors"
             >
               Batalkan
             </Link>
 
-            <div className="flex items-center gap-4">
-              <span className="text-xs font-mono text-muted-foreground">
-                Tahap 1 dari 2
-              </span>
-              <Button
-                type="submit"
-                disabled={
-                  applyPublisherMutation.isPending ||
-                  uploadImageMutation.isPending ||
-                  !name.trim()
-                }
-                className="bg-foreground text-background hover:opacity-90 text-xs px-6 py-2.5 min-h-11 rounded-full font-semibold cursor-pointer"
-              >
-                {applyPublisherMutation.isPending
-                  ? "Mendaftarkan Penerbit..."
-                  : "Daftarkan Penerbit"}
-              </Button>
-            </div>
+            <Button
+              type="submit"
+              disabled={
+                applyPublisherMutation.isPending ||
+                uploadImageMutation.isPending ||
+                !name.trim()
+              }
+              className="bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:brightness-95 text-xs px-6 min-h-11 rounded-xl font-semibold cursor-pointer"
+            >
+              {applyPublisherMutation.isPending
+                ? "Mendaftarkan Penerbit..."
+                : "Daftarkan Penerbit"}
+            </Button>
           </div>
         </form>
       </div>

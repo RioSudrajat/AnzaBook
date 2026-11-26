@@ -7,8 +7,11 @@ import {
 } from "@tanstack/react-router";
 import {
   ArrowRight,
+  Award,
   BookOpen,
   Building2,
+  Compass,
+  Feather,
   FileText,
   Globe,
   Mail,
@@ -16,10 +19,14 @@ import {
   PenTool,
   Send,
   ShieldCheck,
-  Sparkles,
   Users,
   X,
 } from "lucide-react";
+import { EntityProfileHeader } from "@/components/profile/entity-profile-header";
+import {
+  ProfileTabs,
+  type ProfileTabItem,
+} from "@/components/profile/profile-tabs";
 import { Button } from "@/components/ui/button";
 import { BookCatalogCard } from "@/features/books/components/book-catalog-card";
 import { useBooks } from "@/features/books/hooks";
@@ -278,121 +285,132 @@ export default function PublisherPublicProfilePage() {
     }
   };
 
+  const publicTabs: ProfileTabItem<"books" | "about">[] = [
+    {
+      id: "books",
+      label: "Katalog Buku",
+      count: publishedBooks.length,
+      icon: <BookOpen className="size-4" aria-hidden="true" />,
+    },
+    {
+      id: "about",
+      label: "Tentang & Ketentuan",
+      icon: <Building2 className="size-4" aria-hidden="true" />,
+    },
+  ];
+
+  const verificationBadge =
+    publisher.verificationStatus === "verified"
+      ? {
+          label: "Mitra Penerbit Terverifikasi IKAPI",
+          tone: "success" as const,
+          icon: <ShieldCheck className="size-3.5" aria-hidden="true" />,
+        }
+      : publisher.verificationStatus === "rejected"
+        ? { label: "Verifikasi Ditolak", tone: "error" as const }
+        : { label: "Menunggu Verifikasi", tone: "warning" as const };
+
   return (
     <PageFrame
       user={sessionUser}
       activeTab={hasStudioAccess ? "profile" : "explore"}
       title={publisher.name}
+      wide
     >
       <div className="space-y-8 pb-12 text-[var(--color-ink)]">
-        {/* Publisher Hero Banner */}
-        <section
-          aria-labelledby="publisher-heading"
-          className="rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-6 sm:p-9 space-y-6"
-        >
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-              {publisher.logoUrl ? (
-                <img
-                  src={publisher.logoUrl}
-                  alt={publisher.name}
-                  className="size-20 rounded-2xl object-contain bg-[var(--color-paper)] p-2 border border-[var(--color-rule)] shrink-0"
-                />
-              ) : (
-                <div className="flex size-20 items-center justify-center rounded-2xl bg-[var(--color-accent-soft)] text-[var(--color-ink)] font-serif font-bold text-3xl border border-[var(--color-accent)]/40 shrink-0">
-                  {publisher.name.slice(0, 1).toUpperCase()}
-                </div>
-              )}
-
-              <div className="space-y-1.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1
-                    id="publisher-heading"
-                    className="font-serif text-2xl sm:text-3xl font-bold tracking-tight"
-                  >
-                    {publisher.name}
-                  </h1>
-                  {publisher.verificationStatus === "verified" ? (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-[var(--color-green-soft)] text-[var(--color-ink)] border border-[var(--color-green)]/40">
-                      <ShieldCheck className="size-3.5" aria-hidden="true" />
-                      Mitra Penerbit Terverifikasi IKAPI
-                    </span>
-                  ) : publisher.verificationStatus === "rejected" ? (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-[var(--color-error-soft)] text-[var(--color-ink)] border border-[var(--color-error)]/40">
-                      Verifikasi Ditolak
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-[var(--color-accent-soft)] text-[var(--color-ink)] border border-[var(--color-accent)]/40">
-                      Menunggu Verifikasi
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex flex-wrap items-center gap-4 text-xs font-mono text-[var(--color-muted)]">
-                  {publisher.ikapiNumber && (
-                    <span className="font-semibold text-[var(--color-ink-2)]">
-                      IKAPI: {publisher.ikapiNumber}
-                    </span>
-                  )}
-                  {publisher.city && (
-                    <span className="flex items-center gap-1">
-                      <MapPin className="size-3.5" aria-hidden="true" />
-                      {publisher.city}
-                    </span>
-                  )}
-                  {publisher.contactEmail && (
-                    <span className="flex items-center gap-1">
-                      <Mail className="size-3.5" aria-hidden="true" />
-                      {publisher.contactEmail}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {hasStudioAccess && (
+        {/* Unified Publisher Profile Masthead */}
+        <EntityProfileHeader
+          kind="publisher"
+          headingId="publisher-heading"
+          headingLevel="h2"
+          logoFit="contain"
+          name={publisher.name}
+          handleOrSlug={`/p/${publisher.slug}`}
+          avatarUrl={publisher.logoUrl}
+          bannerUrl={publisher.headerImageUrl}
+          badges={[verificationBadge]}
+          metaItems={[
+            ...(publisher.ikapiNumber
+              ? [{ label: `IKAPI: ${publisher.ikapiNumber}` }]
+              : []),
+            ...(publisher.city
+              ? [
+                  {
+                    icon: <MapPin className="size-3.5" aria-hidden="true" />,
+                    label: publisher.city,
+                  },
+                ]
+              : []),
+            ...(publisher.contactEmail
+              ? [
+                  {
+                    icon: <Mail className="size-3.5" aria-hidden="true" />,
+                    label: publisher.contactEmail,
+                  },
+                ]
+              : []),
+          ]}
+          bio={publisher.description}
+          topics={publisher.topics ?? []}
+          socialLinks={publisher.socialLinks}
+          modeSwitcher={
+            hasStudioAccess ? (
+              <nav
+                aria-label="Mode tampilan penerbit"
+                className="inline-flex items-center rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-1 text-xs"
+              >
+                <span className="inline-flex min-h-9 items-center rounded-lg bg-[var(--color-ink)] px-3 font-semibold text-[var(--color-paper)]">
+                  Halaman Publik
+                </span>
                 <Link
                   to="/p/$slug/studio"
                   params={{ slug: publisher.slug }}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--color-accent)] px-4 text-xs font-semibold text-[var(--color-accent-ink)] hover:brightness-95"
+                  className="inline-flex min-h-9 items-center rounded-lg px-3 font-medium text-[var(--color-ink-2)] hover:text-[var(--color-ink)] transition-colors"
                 >
-                  <Building2 className="size-4" aria-hidden="true" />
-                  <span>Buka Studio Penerbit</span>
+                  Studio Penerbit
                 </Link>
-              )}
+              </nav>
+            ) : undefined
+          }
+          actions={
+            <Link
+              to="/app"
+              search={{ tab: "explore" }}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-4 text-xs font-mono text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] transition-colors"
+            >
+              <Compass className="size-3.5" aria-hidden="true" />
+              <span>Jelajahi Katalog</span>
+            </Link>
+          }
+          metrics={[
+            {
+              label: "Buku Terbit",
+              value: publishedBooks.length,
+              icon: <BookOpen className="size-3.5" aria-hidden="true" />,
+            },
+            {
+              label: "Penulis Rekanan",
+              value: approvedWritersShowcase.length,
+              icon: <Users className="size-3.5" aria-hidden="true" />,
+            },
+            {
+              label: "Topik Kurasi",
+              value: publisher.topics?.length ?? 0,
+              icon: <Feather className="size-3.5" aria-hidden="true" />,
+            },
+            {
+              label: "Status Naskah",
+              value: isAccepting
+                ? "Terbuka"
+                : isApprovedWriterFastTrack
+                  ? "Jalur Rekanan"
+                  : "Ditutup",
+              icon: <FileText className="size-3.5" aria-hidden="true" />,
+            },
+          ]}
+        />
 
-              <Link
-                to="/app"
-                search={{ tab: "explore" }}
-                className="inline-flex min-h-11 items-center rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-4 text-xs font-mono text-[var(--color-ink)] hover:bg-[var(--color-paper-3)]"
-              >
-                Jelajahi Katalog
-              </Link>
-            </div>
-          </div>
-
-          {publisher.description && (
-            <p className="font-serif text-sm text-[var(--color-ink-2)] max-w-3xl leading-relaxed">
-              {publisher.description}
-            </p>
-          )}
-
-          {publisher.topics && publisher.topics.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              {publisher.topics.map((topic) => (
-                <span
-                  key={topic}
-                  className="rounded-full border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 py-1 text-xs font-medium text-[var(--color-ink-2)]"
-                >
-                  {topic}
-                </span>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Path 1: Editorial Submission CTA Banner (Open or Approved Writer Fast-Track) */}
+        {/* Editorial Submission CTA Banner */}
         {canSubmitToPublisher ? (
           <section
             aria-labelledby="submit-to-publisher-heading"
@@ -401,8 +419,8 @@ export default function PublisherPublicProfilePage() {
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
               <div className="space-y-2 max-w-2xl">
                 {isApprovedWriterFastTrack && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-accent)] bg-[var(--color-paper)] px-3 py-1 text-[11px] font-semibold text-[var(--color-ink)]">
-                    <Sparkles
+                  <span className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-accent)] bg-[var(--color-paper)] px-3 py-1 text-[11px] font-semibold text-[var(--color-ink)]">
+                    <Award
                       className="size-3.5 text-[var(--color-accent)]"
                       aria-hidden="true"
                     />
@@ -488,44 +506,13 @@ export default function PublisherPublicProfilePage() {
           )
         )}
 
-        {/* Public Navigation Tabs */}
-        <div
-          role="tablist"
-          aria-label="Informasi Publik Penerbit"
-          className="flex items-center gap-2 overflow-x-auto border-b border-[var(--color-rule)]"
-        >
-          <button
-            id="pub-public-tab-books"
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "books"}
-            onClick={() => setActiveTab("books")}
-            className={`relative flex-none min-h-11 px-4 text-xs sm:text-sm font-medium whitespace-nowrap cursor-pointer inline-flex items-center gap-2 ${
-              activeTab === "books"
-                ? "text-[var(--color-ink)] font-semibold after:content-[''] after:absolute after:inset-x-0 after:bottom-0 after:border-b-3 after:border-[var(--color-accent)]"
-                : "text-[var(--color-muted)] hover:text-[var(--color-ink)]"
-            }`}
-          >
-            <BookOpen className="size-4" aria-hidden="true" />
-            <span>Katalog Buku ({publishedBooks.length})</span>
-          </button>
-
-          <button
-            id="pub-public-tab-about"
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "about"}
-            onClick={() => setActiveTab("about")}
-            className={`relative flex-none min-h-11 px-4 text-xs sm:text-sm font-medium whitespace-nowrap cursor-pointer inline-flex items-center gap-2 ${
-              activeTab === "about"
-                ? "text-[var(--color-ink)] font-semibold after:content-[''] after:absolute after:inset-x-0 after:bottom-0 after:border-b-3 after:border-[var(--color-accent)]"
-                : "text-[var(--color-muted)] hover:text-[var(--color-ink)]"
-            }`}
-          >
-            <Building2 className="size-4" aria-hidden="true" />
-            <span>Tentang &amp; Ketentuan</span>
-          </button>
-        </div>
+        <ProfileTabs
+          tabs={publicTabs}
+          activeTab={activeTab}
+          onChange={setActiveTab}
+          ariaLabel="Informasi Publik Penerbit"
+          idPrefix="pub-public"
+        />
 
         {/* Published Books Catalog */}
         {activeTab === "books" && (

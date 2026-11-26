@@ -1,7 +1,9 @@
 import * as React from "react";
-import { BookOpen, Camera, Upload, Palette, Check, X } from "lucide-react";
+import { Camera, Check, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BookCover } from "@/features/books/components/book-cover";
+import { useUploadMediaImage } from "@/features/social/hooks";
+import { isUsableAssetUrl } from "@/lib/media-url";
 
 export const COVER_PALETTES = [
   { name: "Manila Krem", color: "#E8DFD1", textDark: true },
@@ -14,26 +16,14 @@ export const COVER_PALETTES = [
   { name: "Terracotta Bata", color: "#5C2818", textDark: false },
 ];
 
-/** Checks if a cover URL is an actual loaded image (http/https/data:image). Seed placeholders or invalid paths default to the signature AnzaBook BookCover. */
-export function isUsableCoverImageUrl(url?: string | null): url is string {
-  if (!url) return false;
-  const trimmed = url.trim();
-  if (!trimmed || trimmed === "template") return false;
-  if (trimmed.startsWith("/covers/")) return false;
-  if (
-    !trimmed.startsWith("http://") &&
-    !trimmed.startsWith("https://") &&
-    !trimmed.startsWith("data:image/")
-  ) {
-    return false;
-  }
-  return true;
-}
+export const isUsableCoverImageUrl = isUsableAssetUrl;
 
 interface ReaderBookHeaderProps {
   authorOrPublisher: string;
   title: string;
-  totalChapters: number;
+  synopsis?: string;
+  canEditSynopsis?: boolean;
+  totalChapters?: number;
   coverUrl?: string | null;
   coverColor?: string | null;
   publishedYear?: number;
@@ -41,6 +31,7 @@ interface ReaderBookHeaderProps {
   pageCount?: number;
   isEditMode?: boolean;
   onTitleChange?: (newTitle: string) => void;
+  onSynopsisChange?: (newSynopsis: string) => void;
   onCoverUrlChange?: (newCoverUrl: string | null) => void;
   onCoverColorChange?: (newCoverColor: string) => void;
   className?: string;
@@ -49,7 +40,8 @@ interface ReaderBookHeaderProps {
 export function ReaderBookHeader({
   authorOrPublisher,
   title,
-  totalChapters,
+  synopsis = "",
+  canEditSynopsis = true,
   coverUrl,
   coverColor = "#181614",
   publishedYear,
@@ -57,173 +49,322 @@ export function ReaderBookHeader({
   pageCount,
   isEditMode = false,
   onTitleChange,
+  onSynopsisChange,
   onCoverUrlChange,
   onCoverColorChange,
   className = "",
 }: ReaderBookHeaderProps) {
   const [isCoverModalOpen, setIsCoverModalOpen] = React.useState(false);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [uploadError, setUploadError] = React.useState<string | null>(null);
+  const [isSynopsisFocused, setIsSynopsisFocused] = React.useState(false);
+  const [isSynopsisExpanded, setIsSynopsisExpanded] = React.useState(false);
+  const [isSynopsisTruncatable, setIsSynopsisTruncatable] =
+    React.useState(false);
 
-  const handleDeviceFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      onCoverUrlChange?.(dataUrl);
-      setIsCoverModalOpen(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const coverDialogRef = React.useRef<HTMLDialogElement>(null);
+  const synopsisPreviewRef = React.useRef<HTMLParagraphElement>(null);
+  const synopsisId = React.useId();
+  const coverTitleId = React.useId();
+
+  const uploadMediaMutation = useUploadMediaImage();
+  const isCustomImage = isUsableAssetUrl(coverUrl);
+  const trimmedSynopsis = synopsis.trim();
+
+  React.useEffect(() => {
+    const dialog = coverDialogRef.current;
+    if (!dialog) return;
+    if (isCoverModalOpen && !dialog.open) {
+      dialog.showModal();
+    } else if (!isCoverModalOpen && dialog.open) {
+      dialog.close();
+    }
+  }, [isCoverModalOpen]);
+
+  React.useEffect(() => {
+    const el = synopsisPreviewRef.current;
+    if (!el || isEditMode || !trimmedSynopsis) {
+      setIsSynopsisTruncatable(false);
+      return;
+    }
+
+    const measure = () => {
+      if (!el || isSynopsisExpanded) return;
+      setIsSynopsisTruncatable(el.scrollHeight > el.clientHeight + 2);
     };
-    reader.readAsDataURL(file);
+
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [trimmedSynopsis, isEditMode, isSynopsisExpanded]);
+
+  const handleDeviceFileUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
     e.target.value = "";
+    if (!file) return;
+    setUploadError(null);
+
+    if (!file.type.startsWith("image/")) {
+      setUploadError("Pilih berkas gambar JPG, PNG, atau WebP.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError("Ukuran berkas melebihi batas maksimal 5 MB.");
+      return;
+    }
+
+    try {
+      const uploaded = await uploadMediaMutation.mutateAsync(file);
+      onCoverUrlChange?.(uploaded.url);
+    } catch (error) {
+      setUploadError(
+        error instanceof Error
+          ? error.message
+          : "Gagal mengunggah sampul ke server media.",
+      );
+    }
   };
 
   const handleSelectPalette = (paletteColor: string) => {
+    setUploadError(null);
     onCoverColorChange?.(paletteColor);
-    onCoverUrlChange?.("template"); // Revert to template cover with chosen color
+    onCoverUrlChange?.("template");
   };
 
-  const [imgFailedFor, setImgFailedFor] = React.useState<string | null>(null);
-  const isCustomImage =
-    isUsableCoverImageUrl(coverUrl) && imgFailedFor !== coverUrl;
+  const handleCoverDialogBackdropClick = (
+    e: React.PointerEvent<HTMLDialogElement>,
+  ) => {
+    const dialog = coverDialogRef.current;
+    if (!dialog) return;
+    const rect = dialog.getBoundingClientRect();
+    const isOutside =
+      e.clientX < rect.left ||
+      e.clientX > rect.right ||
+      e.clientY < rect.top ||
+      e.clientY > rect.bottom;
+    if (isOutside) {
+      setIsCoverModalOpen(false);
+    }
+  };
 
   return (
     <header
-      className={`w-full pt-8 pb-12 mb-8 border-b border-border/60 flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-6 transition-all ${className}`}
+      className={`w-full pt-8 pb-10 mb-8 border-b border-[var(--color-rule)] flex flex-col-reverse sm:flex-row sm:items-start justify-between gap-6 ${className}`}
     >
       {/* Hidden file input for device cover upload */}
       <input
         type="file"
         ref={fileInputRef}
         onChange={handleDeviceFileUpload}
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp"
         className="hidden"
       />
 
-      {/* Left / Info Section */}
+      {/* Left: Author, Title, and Substack/Medium Inline Synopsis */}
       <div className="flex-1 space-y-3 min-w-0">
-        <div className="space-y-1">
-          <p className="text-xs sm:text-sm font-sans tracking-wide text-muted-foreground uppercase font-medium">
-            {authorOrPublisher || "Penulis Resmi AnzaBook"}
-          </p>
+        <p className="text-xs sm:text-sm font-sans tracking-wide text-[var(--color-muted)] uppercase font-medium">
+          {authorOrPublisher || "Penulis Resmi AnzaBook"}
+        </p>
 
-          {isEditMode ? (
-            <input
-              type="text"
+        {isEditMode ? (
+          <div
+            className="editorial-title-grow font-serif font-bold text-2xl sm:text-3xl md:text-4xl leading-tight"
+            data-replicated-value={title}
+          >
+            <textarea
+              rows={1}
+              aria-label="Judul buku atau naskah"
               value={title}
-              onChange={(e) => onTitleChange?.(e.target.value)}
-              placeholder="Ketik Judul Buku / Naskah..."
-              className="w-full bg-transparent font-serif font-bold text-2xl sm:text-3xl md:text-4xl text-foreground outline-none border-b border-dashed border-border/80 focus:border-[var(--color-accent)] placeholder:text-muted-foreground/40 py-1 transition-colors"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                }
+              }}
+              onChange={(e) =>
+                onTitleChange?.(e.target.value.replace(/\r?\n/g, " "))
+              }
+              placeholder="Ketik judul buku atau naskah..."
+              className="editorial-title-textarea bg-transparent font-serif font-bold text-2xl sm:text-3xl md:text-4xl leading-tight text-[var(--color-ink)] outline-none border-b border-dashed border-[var(--color-rule)] focus:border-[var(--color-accent)] placeholder:text-[var(--color-muted)]/50 py-1 transition-colors"
             />
-          ) : (
-            <h1 className="font-serif font-bold text-2xl sm:text-3xl md:text-4xl text-foreground leading-tight">
-              {title || "Naskah Tanpa Judul"}
-            </h1>
-          )}
-        </div>
+          </div>
+        ) : (
+          <h1 className="font-serif font-bold text-2xl sm:text-3xl md:text-4xl text-[var(--color-ink)] leading-tight">
+            {title || "Naskah Tanpa Judul"}
+          </h1>
+        )}
 
-        <div className="flex items-center gap-2 pt-1 text-xs font-mono text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted/60 border border-border/60">
-            <BookOpen className="size-3.5 text-muted-foreground" />
-            <span>
-              {totalChapters} {totalChapters === 1 ? "chapter" : "chapters"}
-            </span>
-          </span>
-          {isEditMode && (
-            <span className="text-[11px] font-sans text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">
-              Mode Edit Aktif
-            </span>
-          )}
-        </div>
+        {/* Inline Editorial Synopsis directly beneath Title */}
+        {isEditMode && canEditSynopsis && onSynopsisChange ? (
+          <div className="space-y-1 pt-0.5">
+            <label htmlFor={synopsisId} className="sr-only">
+              Sinopsis buku
+            </label>
+            <div
+              className="editorial-synopsis-grow text-[15px] sm:text-base leading-relaxed"
+              data-replicated-value={synopsis}
+            >
+              <textarea
+                id={synopsisId}
+                aria-label="Sinopsis buku"
+                value={synopsis}
+                maxLength={5000}
+                onFocus={() => setIsSynopsisFocused(true)}
+                onBlur={() => setIsSynopsisFocused(false)}
+                onChange={(e) =>
+                  onSynopsisChange(e.target.value.slice(0, 5000))
+                }
+                placeholder="Tulis sinopsis atau ringkasan singkat buku di sini..."
+                className="editorial-synopsis-textarea bg-transparent font-sans text-[15px] sm:text-base leading-relaxed text-[var(--color-ink-2)] placeholder:text-[var(--color-muted)]/60 border-b border-dashed border-[var(--color-rule)] focus:border-[var(--color-accent)] outline-none py-1 transition-colors"
+              />
+            </div>
+            {(isSynopsisFocused || synopsis.length > 0) && (
+              <p className="font-mono text-[11px] text-[var(--color-muted)] text-right">
+                {synopsis.length} / 5000 karakter
+              </p>
+            )}
+          </div>
+        ) : trimmedSynopsis ? (
+          <div className="space-y-1 pt-0.5">
+            <p
+              ref={synopsisPreviewRef}
+              className={`font-sans text-[15px] sm:text-base leading-relaxed text-[var(--color-ink-2)] whitespace-pre-line ${
+                isSynopsisExpanded ? "" : "line-clamp-3"
+              }`}
+            >
+              {trimmedSynopsis}
+            </p>
+            {(isSynopsisTruncatable || isSynopsisExpanded) && (
+              <button
+                type="button"
+                aria-expanded={isSynopsisExpanded}
+                onClick={() => setIsSynopsisExpanded((prev) => !prev)}
+                className="inline-flex min-h-11 items-center text-xs font-semibold text-[var(--color-accent)] hover:underline cursor-pointer"
+              >
+                {isSynopsisExpanded ? "Ringkas" : "Lihat selengkapnya"}
+              </button>
+            )}
+          </div>
+        ) : canEditSynopsis ? (
+          <p className="pt-0.5 text-sm italic text-[var(--color-muted)]">
+            Sinopsis belum diisi. Aktifkan mode Edit untuk menulis ringkasan
+            buku di bawah judul.
+          </p>
+        ) : null}
       </div>
 
-      {/* Right / Book Cover: Signature AnzaBook Template Cover by default, or Custom Device Image */}
+      {/* Right: Book Cover Preview & Edit Trigger */}
       <div className="shrink-0 self-start sm:self-center">
-        <div className="relative group w-24 sm:w-28 md:w-32 aspect-[7/10] rounded-lg overflow-hidden border border-border/80 shadow-md bg-muted/40">
-          {isCustomImage ? (
-            <img
-              src={coverUrl!}
-              alt={title || "Cover Buku"}
-              onError={() => setImgFailedFor(coverUrl ?? null)}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            />
-          ) : (
-            <BookCover
-              book={{
-                title: title || "Naskah Buku",
-                author: authorOrPublisher || "Penulis",
-                coverColor: coverColor || "#181614",
-                publishedYear: publishedYear ?? new Date().getFullYear(),
-                genres: genres && genres.length > 0 ? genres : ["Sastra"],
-                pageCount: pageCount ?? 120,
-              }}
-              className="w-full h-full"
-              decorative
-            />
-          )}
+        <div className="relative group w-24 sm:w-28 md:w-32 aspect-[7/10]">
+          <BookCover
+            book={{
+              title: title || "Naskah Buku",
+              author: authorOrPublisher || "Penulis",
+              coverUrl,
+              coverColor: coverColor || "#181614",
+              publishedYear: publishedYear ?? new Date().getFullYear(),
+              genres: genres && genres.length > 0 ? genres : ["Sastra"],
+              pageCount: pageCount ?? 120,
+            }}
+            className="w-full h-full"
+            decorative
+          />
 
           {isEditMode && (
             <button
               type="button"
               onClick={() => setIsCoverModalOpen(true)}
-              className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center gap-1 text-white text-[11px] font-medium transition-opacity cursor-pointer p-2 text-center"
-              title="Atur Warna Template atau Unggah dari Device"
+              className="absolute inset-0 z-30 rounded-[2%_5%_5%_2%] bg-black/65 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 flex flex-col items-center justify-center gap-1.5 text-white text-xs font-medium transition-opacity cursor-pointer p-2 text-center"
+              title="Atur warna template atau unggah gambar sampul"
             >
-              <Camera className="size-4" />
-              <span>Ganti Cover</span>
+              <Camera className="size-4" aria-hidden="true" />
+              <span>Ganti Sampul</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* In-App Cover Configuration Dialog (Template Palettes + Device Upload) */}
-      {isCoverModalOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs text-foreground animate-in fade-in duration-100"
-        >
-          <div
-            className="fixed inset-0"
-            onClick={() => setIsCoverModalOpen(false)}
-            aria-hidden="true"
-          />
-          <div className="relative max-w-md w-full rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 z-10">
-            <div className="flex items-start justify-between border-b border-border/80 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-[var(--color-accent)]/10 text-[var(--color-accent)] border border-[var(--color-accent)]/20">
-                  <Palette className="size-5" />
-                </div>
-                <div>
-                  <h3 className="font-serif text-base sm:text-lg font-bold">
-                    Konfigurasi Sampul Buku
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Gunakan sampul resmi template AnzaBook atau unggah gambar
-                    dari perangkat.
-                  </p>
-                </div>
+      {/* Native Cover Configuration Dialog */}
+      <dialog
+        ref={coverDialogRef}
+        aria-labelledby={coverTitleId}
+        onPointerUp={handleCoverDialogBackdropClick}
+        onClose={() => {
+          if (coverDialogRef.current) coverDialogRef.current.returnValue = "";
+          setUploadError(null);
+          if (isCoverModalOpen) setIsCoverModalOpen(false);
+        }}
+        className="m-auto w-[min(94vw,30rem)] max-h-[90vh] overflow-y-auto overscroll-contain rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-0 text-[var(--color-ink)] shadow-2xl backdrop:bg-black/65 backdrop:overflow-hidden backdrop:overscroll-contain"
+      >
+        {isCoverModalOpen && (
+          <div className="p-6 space-y-5">
+            <div className="flex items-start justify-between gap-4 border-b border-[var(--color-rule)] pb-3">
+              <div className="space-y-1">
+                <h1
+                  id={coverTitleId}
+                  className="font-serif text-lg font-bold text-[var(--color-ink)]"
+                >
+                  Konfigurasi Sampul Buku
+                </h1>
+                <p className="text-xs text-[var(--color-muted)]">
+                  Pilih palet warna template resmi atau unggah gambar sampul
+                  dari perangkat.
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsCoverModalOpen(false)}
-                className="size-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                aria-label="Tutup pengaturan sampul"
+                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-[var(--color-muted)] hover:bg-[var(--color-paper-3)] hover:text-[var(--color-ink)] cursor-pointer"
               >
-                <X className="size-4" />
+                <X className="size-4" aria-hidden="true" />
               </button>
+            </div>
+
+            {uploadError && (
+              <p
+                role="alert"
+                className="rounded-xl border border-[var(--color-error)]/40 bg-[var(--color-error-soft)] px-3.5 py-2.5 text-xs"
+              >
+                {uploadError}
+              </p>
+            )}
+
+            <div className="flex items-center gap-4 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-3.5">
+              <div className="w-16 shrink-0">
+                <BookCover
+                  book={{
+                    title: title || "Naskah Buku",
+                    author: authorOrPublisher || "Penulis",
+                    coverUrl,
+                    coverColor: coverColor || "#181614",
+                    publishedYear: publishedYear ?? new Date().getFullYear(),
+                    genres: genres && genres.length > 0 ? genres : ["Sastra"],
+                    pageCount: pageCount ?? 120,
+                  }}
+                  decorative
+                />
+              </div>
+              <div className="min-w-0 space-y-1">
+                <p className="font-serif text-sm font-bold truncate">
+                  {title || "Naskah Buku"}
+                </p>
+                <p className="font-mono text-[11px] text-[var(--color-muted)]">
+                  {isCustomImage
+                    ? "Menggunakan gambar sampul unggahan"
+                    : "Menggunakan sampul template AnzaBook"}
+                </p>
+              </div>
             </div>
 
             {/* Section 1: Template Color Palette */}
             <div className="space-y-2.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  1. Pilih Warna Sampul Template Resmi
-                </label>
-                {!isCustomImage && (
-                  <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
-                    Template Aktif
-                  </span>
-                )}
-              </div>
+              <span className="block text-xs font-semibold text-[var(--color-ink-2)]">
+                1. Pilih warna sampul template
+              </span>
 
               <div className="grid grid-cols-4 gap-2">
                 {COVER_PALETTES.map((palette) => {
@@ -235,16 +376,18 @@ export function ReaderBookHeader({
                       type="button"
                       onClick={() => handleSelectPalette(palette.color)}
                       style={{ backgroundColor: palette.color }}
-                      className={`relative aspect-[3/2] rounded-lg border flex flex-col items-center justify-center p-1 text-center transition-all cursor-pointer ${
+                      className={`relative aspect-[3/2] min-h-11 rounded-lg border flex flex-col items-center justify-center p-1 text-center transition-transform cursor-pointer ${
                         isSelected
-                          ? "ring-2 ring-[var(--color-accent)] ring-offset-2 scale-102 shadow-sm border-transparent"
-                          : "border-border/40 hover:scale-102"
+                          ? "ring-2 ring-[var(--color-accent)] ring-offset-2 border-transparent"
+                          : "border-[var(--color-rule)] hover:scale-[1.02]"
                       } ${palette.textDark ? "text-neutral-900" : "text-white"}`}
                     >
                       <span className="text-[10px] font-medium leading-tight line-clamp-1">
                         {palette.name}
                       </span>
-                      {isSelected && <Check className="size-3.5 mt-0.5" />}
+                      {isSelected && (
+                        <Check className="size-3.5 mt-0.5" aria-hidden="true" />
+                      )}
                     </button>
                   );
                 })}
@@ -252,19 +395,24 @@ export function ReaderBookHeader({
             </div>
 
             {/* Section 2: Direct Device File Upload */}
-            <div className="space-y-2 pt-2 border-t border-border/80">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                2. Atau Unggah Gambar Sampul dari Perangkat
-              </label>
+            <div className="space-y-2 border-t border-[var(--color-rule)] pt-3">
+              <span className="block text-xs font-semibold text-[var(--color-ink-2)]">
+                2. Unggah gambar sampul (JPG, PNG, WebP maksimal 5 MB)
+              </span>
 
               <div className="flex flex-col gap-2">
                 <Button
                   type="button"
+                  disabled={uploadMediaMutation.isPending}
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full flex items-center justify-center gap-2 h-10 bg-[var(--color-accent)] hover:opacity-90 text-white font-medium text-xs rounded-xl cursor-pointer"
+                  className="w-full flex items-center justify-center gap-2 min-h-11 bg-[var(--color-accent)] hover:brightness-95 text-[var(--color-accent-ink)] font-semibold text-xs rounded-xl cursor-pointer"
                 >
-                  <Upload className="size-4" />
-                  <span>Pilih File Gambar dari Device (PC / HP)</span>
+                  <Upload className="size-4" aria-hidden="true" />
+                  <span>
+                    {uploadMediaMutation.isPending
+                      ? "Mengunggah sampul..."
+                      : "Pilih gambar dari perangkat"}
+                  </span>
                 </Button>
 
                 {isCustomImage && (
@@ -274,28 +422,27 @@ export function ReaderBookHeader({
                     onClick={() => {
                       onCoverUrlChange?.("template");
                     }}
-                    className="w-full text-xs text-muted-foreground hover:text-foreground h-9 border-border/80 rounded-xl"
+                    className="w-full text-xs text-[var(--color-muted)] hover:text-[var(--color-ink)] min-h-11 border-[var(--color-rule)] rounded-xl cursor-pointer"
                   >
-                    Kembalikan ke Sampul Template
+                    Kembalikan ke sampul template
                   </Button>
                 )}
               </div>
             </div>
 
-            <div className="flex items-center justify-end pt-3 border-t border-border/80">
+            <div className="flex items-center justify-end border-t border-[var(--color-rule)] pt-3">
               <Button
                 type="button"
                 variant="outline"
-                size="sm"
                 onClick={() => setIsCoverModalOpen(false)}
-                className="h-9 px-4 text-xs font-medium"
+                className="min-h-11 px-5 text-xs font-medium cursor-pointer"
               >
-                Tutup
+                Selesai
               </Button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </dialog>
     </header>
   );
 }

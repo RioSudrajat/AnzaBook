@@ -39,6 +39,7 @@ export default function CalendarHubPage() {
       title="Komunitas Literasi"
       showBack={false}
       backLabel="Kembali"
+      wide
     >
       <CommunityHubView slug={slug} isInsideApp={Boolean(sessionUser)} />
     </PageFrame>

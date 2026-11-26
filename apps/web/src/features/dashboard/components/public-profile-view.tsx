@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
+  BookMarked,
   BookOpen,
   CheckCircle,
   Clock,
@@ -20,6 +21,11 @@ import type {
   ExplorePostItemDto,
   SocialProfileDto,
 } from "@starter/shared/types";
+import { EntityProfileHeader } from "@/components/profile/entity-profile-header";
+import {
+  ProfileTabs,
+  type ProfileTabItem,
+} from "@/components/profile/profile-tabs";
 import { Button } from "@/components/ui/button";
 import { BookCover } from "@/features/books/components/book-cover";
 import { PostShareDialog } from "@/features/share/components/post-share-dialog";
@@ -63,7 +69,7 @@ function BookLine({ book }: { book: ExplorePostItemDto["book"] }) {
     <Link
       to="/books/$slug"
       params={{ slug: book.slug }}
-      className="flex items-center gap-3 rounded-lg focus-visible:outline-2 focus-visible:outline-ring group w-fit max-w-full"
+      className="flex items-center gap-3 rounded-lg focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] group w-fit max-w-full"
     >
       <BookCover
         book={book as unknown as BookSummaryDto}
@@ -95,7 +101,6 @@ export function PublicProfileView({
   const finished = shelves.filter((s) => s.shelfStatus === "finished");
   const wantToRead = shelves.filter((s) => s.shelfStatus === "want_to_read");
 
-  // Activities: includes reviews, posted highlights/quotes, and posted reading sessions
   const activities: ExplorePostItemDto[] =
     profile.publicActivities && profile.publicActivities.length > 0
       ? profile.publicActivities
@@ -114,12 +119,28 @@ export function PublicProfileView({
           rating: r.rating,
         }));
 
-  // Tab 1: Rak Bacaan (Default), Tab 2: Aktivitas, Tab 3: Karya
-  const tabs: { id: Tab; label: string; count: number }[] = [
-    { id: "shelf", label: "Rak Bacaan", count: shelves.length },
-    { id: "activities", label: "Aktivitas", count: activities.length },
+  const tabs: ProfileTabItem<Tab>[] = [
+    {
+      id: "shelf",
+      label: "Rak Bacaan",
+      count: shelves.length,
+      icon: <BookMarked className="size-4" aria-hidden="true" />,
+    },
+    {
+      id: "activities",
+      label: "Aktivitas",
+      count: activities.length,
+      icon: <Quote className="size-4" aria-hidden="true" />,
+    },
     ...(works.length > 0
-      ? [{ id: "works" as const, label: "Karya", count: works.length }]
+      ? [
+          {
+            id: "works" as const,
+            label: "Karya",
+            count: works.length,
+            icon: <BookOpen className="size-4" aria-hidden="true" />,
+          },
+        ]
       : []),
   ];
 
@@ -146,201 +167,135 @@ export function PublicProfileView({
     }
   };
 
-  const stats = [
-    {
-      label: "Pengikut",
-      value: profile.followersCount,
-      onClick: () => setRelations({ isOpen: true, initialTab: "followers" }),
-    },
-    {
-      label: "Mengikuti",
-      value: profile.followingCount,
-      onClick: () => setRelations({ isOpen: true, initialTab: "following" }),
-    },
-    { label: "Buku tamat", value: profile.booksCompletedCount ?? 0 },
-    { label: "Menit baca", value: profile.totalReadingMinutes ?? 0 },
-  ];
-
   return (
-    <div className="space-y-6">
-      <section
-        aria-label="Informasi profil"
-        className="overflow-hidden rounded-2xl border border-border bg-card"
-      >
-        {profile.headerImage?.trim() ? (
-          <img
-            src={profile.headerImage}
-            alt=""
-            className="h-32 w-full object-cover sm:h-44"
-            onError={(e) => {
-              e.currentTarget.style.display = "none";
-            }}
-          />
-        ) : (
-          <div className="h-20 w-full bg-muted sm:h-28" aria-hidden="true" />
-        )}
-
-        <div className="px-5 pb-6 sm:px-8">
-          <div className="-mt-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div className="flex items-end gap-4">
-              <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-card bg-muted text-2xl font-bold sm:size-24">
-                {profile.image ? (
-                  <img
-                    src={profile.image}
-                    alt={profile.name}
-                    className="size-full object-cover"
-                  />
-                ) : (
-                  <span>{profile.name.slice(0, 1).toUpperCase()}</span>
-                )}
-              </div>
-            </div>
-
-            {viewerId ? (
-              <Button
-                type="button"
-                onClick={toggleFollow}
-                disabled={busy}
-                className={`min-h-11 cursor-pointer gap-2 rounded-xl px-5 text-sm font-semibold transition-all ${
-                  profile.isFollowing
-                    ? "border border-border bg-muted text-foreground hover:bg-muted/80"
-                    : "bg-orange-600 hover:bg-orange-700 text-white"
-                }`}
-              >
-                {profile.isFollowing ? (
-                  <UserCheck className="size-4" aria-hidden="true" />
-                ) : (
-                  <UserPlus className="size-4" aria-hidden="true" />
-                )}
-                <span>{profile.isFollowing ? "Mengikuti" : "Ikuti"}</span>
-              </Button>
-            ) : (
-              <Button
-                asChild
-                className="min-h-11 rounded-xl bg-orange-600 hover:bg-orange-700 text-white"
-              >
-                <Link to="/sign-in" search={{ redirect: `/u/@${username}` }}>
-                  Masuk untuk mengikuti
-                </Link>
-              </Button>
-            )}
-          </div>
-
-          <div className="mt-4 space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="font-serif text-2xl font-bold tracking-tight sm:text-3xl">
-                {profile.name}
-              </h2>
-              {isVerifiedAuthor && (
-                <span className="inline-flex items-center gap-1 rounded-md border border-border/80 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 font-mono text-xs font-semibold">
-                  <CheckCircle
-                    className="size-3.5 text-emerald-600"
-                    aria-hidden="true"
-                  />
-                  Penulis Resmi
-                </span>
-              )}
-            </div>
-            <div className="flex flex-wrap items-center gap-3 font-mono text-xs text-muted-foreground">
-              <span className="font-semibold text-foreground">@{username}</span>
-              {profile.locationCity && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="size-3.5" aria-hidden="true" />
-                  {profile.locationCity}
-                </span>
-              )}
-            </div>
-            {profile.bio && (
-              <p className="max-w-2xl whitespace-pre-line pt-1 text-sm leading-relaxed text-foreground/80">
-                {profile.bio}
-              </p>
-            )}
-
-            {(communities.length > 0 || publishers.length > 0) && (
-              <ul className="flex flex-wrap gap-2 pt-2" aria-label="Afiliasi">
-                {publishers.map((p) => (
-                  <li key={p.id}>
-                    <Link
-                      to="/p/$slug"
-                      params={{ slug: p.slug }}
-                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border bg-muted/50 px-3 text-xs font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
-                    >
-                      <BookOpen className="size-3.5" aria-hidden="true" />
-                      Penerbit: {p.name}
-                    </Link>
-                  </li>
-                ))}
-                {communities.map((c) => (
-                  <li key={c.id}>
-                    <Link
-                      to="/c/$slug"
-                      params={{ slug: c.slug }}
-                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border bg-muted/50 px-3 text-xs font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
-                    >
-                      <Users className="size-3.5" aria-hidden="true" />
-                      Komunitas: {c.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {stats.map((s) => {
-              const body = (
-                <>
-                  <dt className="font-mono text-[11px] text-muted-foreground">
-                    {s.label}
-                  </dt>
-                  <dd className="font-serif text-xl font-bold">{s.value}</dd>
-                </>
-              );
-              return s.onClick ? (
-                <button
-                  key={s.label}
-                  type="button"
-                  onClick={s.onClick}
-                  className="cursor-pointer rounded-xl border border-border/70 bg-muted/30 p-3 text-left hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-ring"
-                >
-                  {body}
-                </button>
+    <div className="space-y-6 pb-12">
+      <EntityProfileHeader
+        kind="user"
+        headingLevel="h2"
+        ariaLabel="Informasi profil"
+        name={profile.name}
+        handleOrSlug={username ? `@${username}` : undefined}
+        avatarUrl={profile.image}
+        bannerUrl={profile.headerImage || profile.socialLinks?.headerImage}
+        badges={
+          isVerifiedAuthor
+            ? [
+                {
+                  label: "Penulis Resmi",
+                  tone: "success",
+                  icon: <CheckCircle className="size-3.5" aria-hidden="true" />,
+                },
+              ]
+            : []
+        }
+        metaItems={
+          profile.locationCity
+            ? [
+                {
+                  icon: <MapPin className="size-3.5" aria-hidden="true" />,
+                  label: profile.locationCity,
+                },
+              ]
+            : []
+        }
+        bio={profile.bio}
+        socialLinks={profile.socialLinks}
+        affiliations={
+          communities.length > 0 || publishers.length > 0 ? (
+            <ul className="flex flex-wrap gap-2 pt-1" aria-label="Afiliasi">
+              {publishers.map((p) => (
+                <li key={p.id}>
+                  <Link
+                    to="/p/$slug"
+                    params={{ slug: p.slug }}
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 text-xs font-medium text-[var(--color-ink-2)] hover:border-[var(--color-ink)] hover:text-[var(--color-ink)] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+                  >
+                    <BookOpen className="size-3.5" aria-hidden="true" />
+                    Penerbit: {p.name}
+                  </Link>
+                </li>
+              ))}
+              {communities.map((c) => (
+                <li key={c.id}>
+                  <Link
+                    to="/c/$slug"
+                    params={{ slug: c.slug }}
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 text-xs font-medium text-[var(--color-ink-2)] hover:border-[var(--color-ink)] hover:text-[var(--color-ink)] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+                  >
+                    <Users className="size-3.5" aria-hidden="true" />
+                    Komunitas: {c.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : undefined
+        }
+        actions={
+          viewerId ? (
+            <Button
+              type="button"
+              onClick={toggleFollow}
+              disabled={busy}
+              className={`min-h-11 cursor-pointer gap-2 rounded-xl px-5 text-xs font-semibold transition-colors ${
+                profile.isFollowing
+                  ? "border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] hover:bg-[var(--color-paper-3)]"
+                  : "bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:brightness-95"
+              }`}
+            >
+              {profile.isFollowing ? (
+                <UserCheck className="size-4" aria-hidden="true" />
               ) : (
-                <div
-                  key={s.label}
-                  className="rounded-xl border border-border/70 bg-muted/30 p-3"
-                >
-                  {body}
-                </div>
-              );
-            })}
-          </dl>
-        </div>
-      </section>
+                <UserPlus className="size-4" aria-hidden="true" />
+              )}
+              <span>{profile.isFollowing ? "Mengikuti" : "Ikuti"}</span>
+            </Button>
+          ) : (
+            <Button
+              asChild
+              className="min-h-11 rounded-xl bg-[var(--color-accent)] px-5 text-xs font-semibold text-[var(--color-accent-ink)] hover:brightness-95"
+            >
+              <Link to="/sign-in" search={{ redirect: `/u/@${username}` }}>
+                Masuk untuk mengikuti
+              </Link>
+            </Button>
+          )
+        }
+        metrics={[
+          {
+            label: "Pengikut",
+            value: profile.followersCount,
+            icon: <Users className="size-3.5" aria-hidden="true" />,
+            onClick: () =>
+              setRelations({ isOpen: true, initialTab: "followers" }),
+          },
+          {
+            label: "Mengikuti",
+            value: profile.followingCount,
+            icon: <UserCheck className="size-3.5" aria-hidden="true" />,
+            onClick: () =>
+              setRelations({ isOpen: true, initialTab: "following" }),
+          },
+          {
+            label: "Buku Tamat",
+            value: profile.booksCompletedCount ?? 0,
+            icon: <BookMarked className="size-3.5" aria-hidden="true" />,
+          },
+          {
+            label: "Total Menit Baca",
+            value: profile.totalReadingMinutes ?? 0,
+            unit: "menit",
+            icon: <Clock className="size-3.5" aria-hidden="true" />,
+          },
+        ]}
+      />
 
-      {/* Tabs Navigation Bar (Rak Bacaan default first, Aktivitas second) */}
-      <div
-        role="tablist"
-        aria-label="Isi profil"
-        className="flex gap-1 border-b border-border overflow-x-auto no-scrollbar scrollbar-none"
-      >
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === t.id}
-            onClick={() => setActiveTab(t.id)}
-            className={`min-h-11 cursor-pointer border-b-2 px-4 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-ring whitespace-nowrap ${
-              activeTab === t.id
-                ? "border-orange-600 dark:border-orange-500 font-bold text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {t.label} ({t.count})
-          </button>
-        ))}
-      </div>
+      <ProfileTabs
+        tabs={tabs}
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        ariaLabel="Isi profil"
+        idPrefix="pub-user"
+      />
 
       {/* TAB 1: RAK BACAAN */}
       {activeTab === "shelf" &&
@@ -367,7 +322,7 @@ export function PublicProfileView({
                         <Link
                           to="/books/$slug"
                           params={{ slug: item.book.slug }}
-                          className="block space-y-2 p-2 rounded-xl border border-border/70 hover:border-foreground/30 bg-card transition-colors group focus-visible:outline-2 focus-visible:outline-ring"
+                          className="block space-y-2 p-2.5 rounded-xl border border-border/70 hover:border-foreground/30 bg-card transition-colors group focus-visible:outline-2 focus-visible:outline-ring"
                         >
                           <BookCover book={item.book} decorative />
                           <div className="space-y-1">
@@ -382,7 +337,7 @@ export function PublicProfileView({
                                 <div className="space-y-1 pt-1">
                                   <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
                                     <div
-                                      className="h-full bg-orange-600 rounded-full"
+                                      className="h-full bg-[var(--color-accent)] rounded-full"
                                       style={{
                                         width: `${item.progressPercent}%`,
                                       }}
@@ -403,7 +358,7 @@ export function PublicProfileView({
           </div>
         ))}
 
-      {/* TAB 2: AKTIVITAS (Ulasan, Kutipan/Highlight yang di-post, Sesi yang di-post) */}
+      {/* TAB 2: AKTIVITAS */}
       {activeTab === "activities" &&
         (activities.length === 0 ? (
           <p className="py-12 text-center text-sm text-muted-foreground">
@@ -418,7 +373,7 @@ export function PublicProfileView({
           </div>
         ))}
 
-      {/* TAB 3: KARYA TERBIT (Khusus Penulis) */}
+      {/* TAB 3: KARYA TERBIT */}
       {activeTab === "works" && (
         <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {works.map((book) => (
@@ -426,7 +381,7 @@ export function PublicProfileView({
               <Link
                 to="/books/$slug"
                 params={{ slug: book.slug }}
-                className="block space-y-2 p-2 rounded-xl border border-border/70 hover:border-foreground/30 bg-card transition-colors group focus-visible:outline-2 focus-visible:outline-ring"
+                className="block space-y-2 p-2.5 rounded-xl border border-border/70 hover:border-foreground/30 bg-card transition-colors group focus-visible:outline-2 focus-visible:outline-ring"
               >
                 <BookCover book={book} decorative />
                 <div className="space-y-0.5">
@@ -472,25 +427,25 @@ function ActivityFeedCard({ activity }: { activity: ExplorePostItemDto }) {
 
   return (
     <article className="rounded-xl border border-border/80 bg-card p-5 space-y-3.5 shadow-xs hover:border-foreground/30 transition-colors">
-      {/* Activity Type Header */}
       <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
         <div className="flex items-center gap-2">
           {activity.type === "quote" && (
-            <span className="inline-flex items-center gap-1 font-mono font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full text-[11px]">
-              <Quote className="size-3" /> Kutipan Publik
+            <span className="inline-flex items-center gap-1 font-mono font-medium text-[var(--color-green)] bg-[var(--color-green-soft)] px-2.5 py-0.5 rounded-md text-[11px]">
+              <Quote className="size-3" aria-hidden="true" /> Kutipan Publik
             </span>
           )}
           {activity.type === "review" && (
-            <span className="inline-flex items-center gap-1 font-mono font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full text-[11px]">
-              <Star className="size-3 fill-current" /> Ulasan Buku
+            <span className="inline-flex items-center gap-1 font-mono font-medium text-[var(--color-ink)] bg-[var(--color-accent-soft)] px-2.5 py-0.5 rounded-md text-[11px]">
+              <Star className="size-3 fill-current" aria-hidden="true" /> Ulasan
+              Buku
             </span>
           )}
           {activity.type === "session" && (
-            <span className="inline-flex items-center gap-1 font-mono font-medium text-[var(--color-accent)] bg-[var(--color-accent)]/10 px-2 py-0.5 rounded-full text-[11px]">
-              <Clock className="size-3" /> Sesi Membaca
+            <span className="inline-flex items-center gap-1 font-mono font-medium text-[var(--color-ink)] bg-[var(--color-accent-soft)] px-2.5 py-0.5 rounded-md text-[11px]">
+              <Clock className="size-3" aria-hidden="true" /> Sesi Membaca
             </span>
           )}
-          <span className="font-mono text-[11px]">· {formattedDate}</span>
+          <span className="font-mono text-[11px]">{formattedDate}</span>
         </div>
 
         {activity.type === "review" && activity.rating && (
@@ -498,7 +453,6 @@ function ActivityFeedCard({ activity }: { activity: ExplorePostItemDto }) {
         )}
       </div>
 
-      {/* Content based on type */}
       {activity.type === "quote" ? (
         <QuotePostCard post={activity} as="div" />
       ) : activity.type === "session" ? (
@@ -512,13 +466,12 @@ function ActivityFeedCard({ activity }: { activity: ExplorePostItemDto }) {
         </div>
       )}
 
-      {/* Social interaction footer */}
       <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-border/60 text-muted-foreground text-xs">
         <button
           type="button"
           onClick={() => setIsLiked(!isLiked)}
-          className={`inline-flex min-h-10 items-center gap-1.5 px-2 rounded-md hover:text-red-500 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] cursor-pointer ${
-            isLiked ? "text-red-500 font-semibold" : ""
+          className={`inline-flex min-h-10 items-center gap-1.5 px-2 rounded-md hover:text-destructive transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)] cursor-pointer ${
+            isLiked ? "text-destructive font-semibold" : ""
           }`}
         >
           <Heart className={`size-4 ${isLiked ? "fill-current" : ""}`} />
@@ -527,7 +480,7 @@ function ActivityFeedCard({ activity }: { activity: ExplorePostItemDto }) {
 
         <button
           type="button"
-          className="inline-flex min-h-10 items-center gap-1.5 px-2 rounded-md hover:text-foreground transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] cursor-pointer"
+          className="inline-flex min-h-10 items-center gap-1.5 px-2 rounded-md hover:text-foreground transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)] cursor-pointer"
         >
           <MessageSquare className="size-4" />
           <span>Balas</span>
@@ -538,7 +491,7 @@ function ActivityFeedCard({ activity }: { activity: ExplorePostItemDto }) {
             <Link
               to="/post/$type/$id"
               params={{ type: activity.type, id: activity.id }}
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)]"
             >
               <ExternalLink className="size-3.5" aria-hidden="true" />
               <span>Detail</span>
@@ -548,7 +501,7 @@ function ActivityFeedCard({ activity }: { activity: ExplorePostItemDto }) {
           <button
             type="button"
             onClick={() => setIsShareOpen(true)}
-            className="inline-flex min-h-10 min-w-10 items-center justify-center gap-1.5 rounded-md px-2.5 hover:bg-muted hover:text-foreground transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] cursor-pointer"
+            className="inline-flex min-h-10 min-w-10 items-center justify-center gap-1.5 rounded-md px-2.5 hover:bg-muted hover:text-foreground transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)] cursor-pointer"
             aria-label="Bagikan aktivitas"
           >
             <Share2 className="size-4" aria-hidden="true" />

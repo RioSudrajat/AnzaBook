@@ -488,6 +488,7 @@ function ReaderBook() {
       (isManuscript && manuscript?.status === "draft" ? "edit" : "preview"),
   );
   const [editorialTitle, setEditorialTitle] = useState("");
+  const [editorialSynopsis, setEditorialSynopsis] = useState("");
   const [editorialCoverUrl, setEditorialCoverUrl] = useState<string | null>(
     null,
   );
@@ -500,25 +501,34 @@ function ReaderBook() {
   const [isSavingDraft, setIsSavingDraft] = useState(false);
 
   const coverInitializedRef = useRef(false);
+  const titleInitializedRef = useRef(false);
+  const synopsisInitializedRef = useRef(false);
 
   useEffect(() => {
     if (!payload?.book) return;
     const book = payload.book;
     queueMicrotask(() => {
-      if (book.title && !editorialTitle) {
+      if (!titleInitializedRef.current && book.title) {
         setEditorialTitle(book.title);
+        titleInitializedRef.current = true;
+      }
+      if (!synopsisInitializedRef.current) {
+        setEditorialSynopsis(manuscript?.synopsis ?? book.synopsis ?? "");
+        synopsisInitializedRef.current = true;
       }
       if (!coverInitializedRef.current) {
         if (book.coverUrl) {
           setEditorialCoverUrl(book.coverUrl);
         }
-        if (book.coverColor) {
-          setEditorialCoverColor(book.coverColor);
+        if (manuscript?.coverColor || book.coverColor) {
+          setEditorialCoverColor(
+            manuscript?.coverColor || book.coverColor || "#181614",
+          );
         }
         coverInitializedRef.current = true;
       }
     });
-  }, [payload?.book, editorialTitle]);
+  }, [payload?.book, manuscript?.synopsis, manuscript?.coverColor]);
 
   const bookId = payload?.book?.id || "";
   const scope = payload?.hasFullAccess ? "full" : "preview";
@@ -682,12 +692,14 @@ function ReaderBook() {
       }));
       const baseFields = {
         title: editorialTitle.trim() || undefined,
+        synopsis: editorialSynopsis.trim(),
         coverUrl:
           editorialCoverUrl === "template"
             ? null
             : editorialCoverUrl !== undefined
               ? editorialCoverUrl
               : undefined,
+        coverColor: editorialCoverColor || undefined,
         chapters: chapterPayload,
       };
 
@@ -2368,6 +2380,8 @@ function ReaderBook() {
               <ReaderBookHeader
                 authorOrPublisher={book.author || user.name || "Penulis"}
                 title={editorialTitle || book.title}
+                synopsis={isManuscript ? editorialSynopsis : book.synopsis}
+                canEditSynopsis={isManuscript && isAuthorOrPublisher}
                 totalChapters={displayChapters.length}
                 coverUrl={
                   editorialCoverUrl !== undefined
@@ -2380,6 +2394,7 @@ function ReaderBook() {
                 pageCount={book.pageCount}
                 isEditMode={isAuthorOrPublisher && editMode === "edit"}
                 onTitleChange={setEditorialTitle}
+                onSynopsisChange={setEditorialSynopsis}
                 onCoverUrlChange={setEditorialCoverUrl}
                 onCoverColorChange={setEditorialCoverColor}
               />
@@ -2895,7 +2910,11 @@ function ReaderBook() {
             onClose={() => setIsConfigDialogOpen(false)}
             initialData={{
               title: editorialTitle || book.title,
-              synopsis: manuscript?.synopsis || book.synopsis || "",
+              synopsis:
+                editorialSynopsis ||
+                manuscript?.synopsis ||
+                book.synopsis ||
+                "",
               category: manuscript?.category || "",
               sourceLanguage: manuscript?.sourceLanguage || "id",
               targetAudience: manuscript?.targetAudience || "general",
@@ -2909,6 +2928,8 @@ function ReaderBook() {
                 manuscript?.proposedDigitalPriceIdr ?? 45_000,
             }}
             onSubmit={async (config) => {
+              setEditorialTitle(config.title);
+              setEditorialSynopsis(config.synopsis);
               await handleSaveDraft();
               if (isManuscript && manuscriptId) {
                 await updateManuscriptMutation.mutateAsync({
@@ -2954,7 +2975,9 @@ function ReaderBook() {
               }
               manuscript={manuscript}
               initialTitle={editorialTitle || manuscript.title}
+              initialSynopsis={editorialSynopsis || manuscript.synopsis}
               initialCoverUrl={editorialCoverUrl}
+              initialCoverColor={editorialCoverColor}
             />
           )}
 

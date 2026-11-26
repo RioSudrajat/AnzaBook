@@ -270,7 +270,7 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     ).toBeVisible();
     await expect(
       page
-        .getByRole("button", { name: /Save to Library/i })
+        .getByRole("button", { name: /Simpan ke Rak Baca/i })
         .locator(":visible")
         .first(),
     ).toBeVisible();

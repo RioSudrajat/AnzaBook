@@ -49,6 +49,7 @@ export default function PublicUserProfilePage() {
       activeTab={isOwnProfile ? "profile" : "explore"}
       title={isOwnProfile ? "Profil Saya" : "Profil"}
       backLabel="Kembali"
+      wide
     >
       {isOwnProfile ? (
         <DashboardProfile isOwnProfile profile={profile} />

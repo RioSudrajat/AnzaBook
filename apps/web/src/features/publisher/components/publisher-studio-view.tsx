@@ -1,12 +1,7 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type FormEvent,
-  type KeyboardEvent,
-} from "react";
+import { useState, useRef, type FormEvent } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
+  Award,
   BookOpen,
   CheckCircle2,
   ExternalLink,
@@ -17,13 +12,16 @@ import {
   Search,
   Settings2,
   ShieldCheck,
-  Sparkles,
   Store,
   Trash2,
   Upload,
   Users,
   X,
 } from "lucide-react";
+import { EntityProfileHeader } from "@/components/profile/entity-profile-header";
+import { ProfileTabs } from "@/components/profile/profile-tabs";
+import { StudioDrawer } from "@/components/profile/studio-drawer";
+import { TranslationFieldsSection } from "@/components/profile/translation-fields-section";
 import type {
   BookDistributionModel,
   BookSummaryDto,
@@ -165,6 +163,9 @@ function EditPublishedBookForm({
   const [publishedYear, setPublishedYear] = useState(
     book.publishedYear ? String(book.publishedYear) : "",
   );
+  const [isTranslation, setIsTranslation] = useState(
+    Boolean(book.originalTitle?.trim() || book.translator?.trim()),
+  );
   const [originalTitle, setOriginalTitle] = useState(book.originalTitle || "");
   const [translator, setTranslator] = useState(book.translator || "");
   const [collectionName, setCollectionName] = useState(
@@ -174,6 +175,23 @@ function EditPublishedBookForm({
   const [rakyatPriceIdr, setRakyatPriceIdr] = useState("45000");
   const [standardPriceIdr, setStandardPriceIdr] = useState("75000");
   const [formError, setFormError] = useState<string | null>(null);
+
+  const isDirty =
+    title !== book.title ||
+    synopsis !== (book.synopsis || "") ||
+    coverUrl !== (book.coverUrl || "") ||
+    coverColor !== (book.coverColor || "#3D2B1F") ||
+    digitalPolicy !== book.digitalPolicy ||
+    digitalPriceIdr !==
+      (book.digitalPriceIdr != null ? String(book.digitalPriceIdr) : "") ||
+    categoriesText !== (book.categories ?? []).join(", ") ||
+    publishedYear !== (book.publishedYear ? String(book.publishedYear) : "") ||
+    isTranslation !==
+      Boolean(book.originalTitle?.trim() || book.translator?.trim()) ||
+    originalTitle !== (book.originalTitle || "") ||
+    translator !== (book.translator || "") ||
+    collectionName !== (book.collectionName || "") ||
+    hasPhysical !== Boolean(book.hasPhysical);
 
   const handleCoverUpload = async (file: File) => {
     setFormError(null);
@@ -251,8 +269,8 @@ function EditPublishedBookForm({
           categories,
           publishedYear:
             parsedYear && Number.isFinite(parsedYear) ? parsedYear : undefined,
-          originalTitle: originalTitle.trim() || null,
-          translator: translator.trim() || null,
+          originalTitle: isTranslation ? originalTitle.trim() || null : null,
+          translator: isTranslation ? translator.trim() || null : null,
           collectionName: collectionName.trim() || null,
           hasPhysical,
           rakyatPriceIdr:
@@ -273,330 +291,362 @@ function EditPublishedBookForm({
     }
   };
 
+  const previewCategories = categoriesText
+    .split(",")
+    .map((c) => c.trim())
+    .filter(Boolean);
+
   return (
-    <div className="space-y-5 p-6 text-[var(--color-ink)]">
-      <div className="flex items-start justify-between gap-4 border-b border-[var(--color-rule)] pb-4">
-        <div className="space-y-1">
-          <h1
-            id="edit-book-dialog-title"
-            className="font-serif text-lg font-bold"
+    <StudioDrawer
+      isOpen
+      onClose={onClose}
+      title="Edit Metadata Buku Terbit"
+      subtitle={book.title}
+      titleId="edit-book-dialog-title"
+      widthClass="max-w-2xl"
+      isDirty={isDirty}
+    >
+      <div className="space-y-5 text-[var(--color-ink)]">
+        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-4">
+          <div className="w-20 shrink-0">
+            <BookCover
+              book={{
+                title: title.trim() || book.title,
+                author: book.author,
+                coverUrl: coverUrl.trim() || null,
+                coverColor,
+                genres:
+                  previewCategories.length > 0
+                    ? previewCategories
+                    : book.genres,
+                pageCount: book.pageCount,
+                publishedYear:
+                  Number.parseInt(publishedYear, 10) || book.publishedYear,
+              }}
+              decorative
+            />
+          </div>
+          <div className="min-w-0 flex-1 space-y-1 text-center sm:text-left">
+            <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--color-muted)]">
+              Pratinjau Katalog
+            </p>
+            <p className="font-serif text-base font-bold text-[var(--color-ink)] break-words">
+              {title.trim() || book.title}
+            </p>
+            <p className="text-xs text-[var(--color-muted)]">{book.author}</p>
+            <p className="text-xs font-mono text-[var(--color-ink-2)]">
+              {formatDigitalPolicy(digitalPolicy)}
+              {digitalPriceIdr.trim()
+                ? ` — Rp ${Number.parseInt(digitalPriceIdr, 10).toLocaleString("id-ID")}`
+                : ""}
+            </p>
+          </div>
+        </div>
+
+        {formError && (
+          <div
+            role="alert"
+            className="rounded-xl border border-[var(--color-error)]/40 bg-[var(--color-error-soft)] p-3 text-xs text-[var(--color-ink)]"
           >
-            Edit Metadata Buku Terbit
-          </h1>
-          <p className="text-xs text-[var(--color-muted)]">{book.title}</p>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Tutup editor metadata buku"
-          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-[var(--color-muted)] hover:bg-[var(--color-paper-3)] hover:text-[var(--color-ink)] cursor-pointer shrink-0"
-        >
-          <X className="size-4" aria-hidden="true" />
-        </button>
-      </div>
-
-      {formError && (
-        <div
-          role="alert"
-          className="rounded-xl border border-[var(--color-error)]/40 bg-[var(--color-error-soft)] p-3 text-xs text-[var(--color-ink)]"
-        >
-          {formError}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="edit-book-title" className="text-xs font-semibold">
-            Judul Buku
-          </Label>
-          <Input
-            id="edit-book-title"
-            name="title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-            className="min-h-11 bg-[var(--color-paper)]"
-            autoFocus
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="edit-book-synopsis" className="text-xs font-semibold">
-            Sinopsis
-          </Label>
-          <Textarea
-            id="edit-book-synopsis"
-            name="synopsis"
-            rows={4}
-            value={synopsis}
-            onChange={(e) => setSynopsis(e.target.value)}
-            required
-            className="text-sm bg-[var(--color-paper)]"
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="edit-book-cover" className="text-xs font-semibold">
-            Sampul Buku (URL atau Unggah Berkas)
-          </Label>
-          <div className="flex flex-wrap items-center gap-2">
-            <Input
-              id="edit-book-cover"
-              name="coverUrl"
-              value={coverUrl}
-              onChange={(e) => setCoverUrl(e.target.value)}
-              autoCorrect="off"
-              autoCapitalize="none"
-              spellCheck={false}
-              placeholder="https://... atau unggah sampul"
-              className="min-h-11 flex-1 font-mono text-xs bg-[var(--color-paper)]"
-            />
-            <input
-              ref={coverInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void handleCoverUpload(file);
-                e.target.value = "";
-              }}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              disabled={uploadMutation.isPending}
-              onClick={() => coverInputRef.current?.click()}
-              className="min-h-11 px-3 text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
-            >
-              <Upload className="size-3.5" aria-hidden="true" />
-              <span>
-                {uploadMutation.isPending ? "Mengunggah..." : "Unggah"}
-              </span>
-            </Button>
+            {formError}
           </div>
-        </div>
+        )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="edit-book-policy" className="text-xs font-semibold">
-              Model Distribusi
-            </Label>
-            <select
-              id="edit-book-policy"
-              name="digitalPolicy"
-              value={digitalPolicy}
-              onChange={(e) => {
-                const next = e.target.value as BookDistributionModel;
-                setDigitalPolicy(next);
-                if (
-                  (next === "single_purchase" ||
-                    next === "nakama_or_purchase") &&
-                  !digitalPriceIdr.trim()
-                ) {
-                  setDigitalPriceIdr(String(DEFAULT_DIGITAL_BOOK_PRICE_IDR));
-                }
-              }}
-              className="w-full h-11 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 text-xs text-[var(--color-ink)]"
-            >
-              {DISTRIBUTION_MODELS.map((policy) => (
-                <option key={policy} value={policy}>
-                  {formatDigitalPolicy(policy)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-book-price" className="text-xs font-semibold">
-              Harga Beli Satuan (IDR)
+            <Label htmlFor="edit-book-title" className="text-xs font-semibold">
+              Judul Buku
             </Label>
             <Input
-              id="edit-book-price"
-              name="digitalPriceIdr"
-              type="text"
-              inputMode="numeric"
-              value={digitalPriceIdr}
-              onChange={(e) => setDigitalPriceIdr(e.target.value)}
-              placeholder="45000"
-              className="min-h-11 font-mono text-xs bg-[var(--color-paper)]"
+              id="edit-book-title"
+              name="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+              className="min-h-11 bg-[var(--color-paper)]"
+              autoFocus
             />
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label
-              htmlFor="edit-book-categories"
+              htmlFor="edit-book-synopsis"
               className="text-xs font-semibold"
             >
-              Kategori (pisahkan dengan koma)
+              Sinopsis
             </Label>
-            <Input
-              id="edit-book-categories"
-              name="categories"
-              value={categoriesText}
-              onChange={(e) => setCategoriesText(e.target.value)}
-              placeholder="Sastra & Fiksi, Filsafat"
-              className="min-h-11 text-xs bg-[var(--color-paper)]"
+            <Textarea
+              id="edit-book-synopsis"
+              name="synopsis"
+              rows={4}
+              value={synopsis}
+              onChange={(e) => setSynopsis(e.target.value)}
+              required
+              className="text-sm bg-[var(--color-paper)]"
             />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="edit-book-color" className="text-xs font-semibold">
-              Warna Sampul
+            <Label htmlFor="edit-book-cover" className="text-xs font-semibold">
+              Sampul Buku (URL atau Unggah Berkas)
             </Label>
-            <div className="flex items-center gap-2">
-              <input
-                id="edit-book-color"
-                type="color"
-                value={coverColor}
-                onChange={(e) => setCoverColor(e.target.value)}
-                className="h-11 w-14 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] p-1 cursor-pointer"
-              />
+            <div className="flex flex-wrap items-center gap-2">
               <Input
-                value={coverColor}
-                onChange={(e) => setCoverColor(e.target.value)}
+                id="edit-book-cover"
+                name="coverUrl"
+                value={coverUrl}
+                onChange={(e) => setCoverUrl(e.target.value)}
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                placeholder="https://... atau unggah sampul"
+                className="min-h-11 flex-1 font-mono text-xs bg-[var(--color-paper)]"
+              />
+              <input
+                ref={coverInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void handleCoverUpload(file);
+                  e.target.value = "";
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={uploadMutation.isPending}
+                onClick={() => coverInputRef.current?.click()}
+                className="min-h-11 px-3 text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
+              >
+                <Upload className="size-3.5" aria-hidden="true" />
+                <span>
+                  {uploadMutation.isPending ? "Mengunggah..." : "Unggah"}
+                </span>
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="edit-book-policy"
+                className="text-xs font-semibold"
+              >
+                Model Distribusi
+              </Label>
+              <select
+                id="edit-book-policy"
+                name="digitalPolicy"
+                value={digitalPolicy}
+                onChange={(e) => {
+                  const next = e.target.value as BookDistributionModel;
+                  setDigitalPolicy(next);
+                  if (
+                    (next === "single_purchase" ||
+                      next === "nakama_or_purchase") &&
+                    !digitalPriceIdr.trim()
+                  ) {
+                    setDigitalPriceIdr(String(DEFAULT_DIGITAL_BOOK_PRICE_IDR));
+                  }
+                }}
+                className="w-full h-11 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 text-xs text-[var(--color-ink)]"
+              >
+                {DISTRIBUTION_MODELS.map((policy) => (
+                  <option key={policy} value={policy}>
+                    {formatDigitalPolicy(policy)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="edit-book-price"
+                className="text-xs font-semibold"
+              >
+                Harga Beli Satuan (IDR)
+              </Label>
+              <Input
+                id="edit-book-price"
+                name="digitalPriceIdr"
+                type="text"
+                inputMode="numeric"
+                value={digitalPriceIdr}
+                onChange={(e) => setDigitalPriceIdr(e.target.value)}
+                placeholder="45000"
                 className="min-h-11 font-mono text-xs bg-[var(--color-paper)]"
               />
             </div>
           </div>
-        </div>
 
-        <details className="rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-3.5 text-xs">
-          <summary className="cursor-pointer font-semibold text-[var(--color-ink)] select-none py-1">
-            Bibliografi &amp; Edisi Cetak Fisik
-          </summary>
-          <div className="mt-3 space-y-3 border-t border-[var(--color-rule)] pt-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label
-                  htmlFor="edit-book-year"
-                  className="text-xs font-semibold"
-                >
-                  Tahun Terbit
-                </Label>
-                <Input
-                  id="edit-book-year"
-                  type="number"
-                  value={publishedYear}
-                  onChange={(e) => setPublishedYear(e.target.value)}
-                  className="min-h-11 font-mono text-xs bg-[var(--color-paper-2)]"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label
-                  htmlFor="edit-book-orig"
-                  className="text-xs font-semibold"
-                >
-                  Judul Asli
-                </Label>
-                <Input
-                  id="edit-book-orig"
-                  value={originalTitle}
-                  onChange={(e) => setOriginalTitle(e.target.value)}
-                  className="min-h-11 text-xs bg-[var(--color-paper-2)]"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label
-                  htmlFor="edit-book-trans"
-                  className="text-xs font-semibold"
-                >
-                  Penerjemah
-                </Label>
-                <Input
-                  id="edit-book-trans"
-                  value={translator}
-                  onChange={(e) => setTranslator(e.target.value)}
-                  className="min-h-11 text-xs bg-[var(--color-paper-2)]"
-                />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="edit-book-coll" className="text-xs font-semibold">
-                Seri / Koleksi
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="edit-book-categories"
+                className="text-xs font-semibold"
+              >
+                Kategori (pisahkan dengan koma)
               </Label>
               <Input
-                id="edit-book-coll"
-                value={collectionName}
-                onChange={(e) => setCollectionName(e.target.value)}
-                className="min-h-11 text-xs bg-[var(--color-paper-2)]"
+                id="edit-book-categories"
+                name="categories"
+                value={categoriesText}
+                onChange={(e) => setCategoriesText(e.target.value)}
+                placeholder="Sastra & Fiksi, Filsafat"
+                className="min-h-11 text-xs bg-[var(--color-paper)]"
               />
             </div>
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                id="edit-book-physical"
-                type="checkbox"
-                checked={hasPhysical}
-                onChange={(e) => setHasPhysical(e.target.checked)}
-                className="size-4 accent-[var(--color-accent)]"
-              />
+
+            <div className="space-y-1.5">
               <Label
-                htmlFor="edit-book-physical"
-                className="text-xs font-semibold cursor-pointer"
+                htmlFor="edit-book-color"
+                className="text-xs font-semibold"
               >
-                Tersedia dalam edisi cetak fisik
+                Warna Sampul
               </Label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="edit-book-color"
+                  type="color"
+                  value={coverColor}
+                  onChange={(e) => setCoverColor(e.target.value)}
+                  className="h-11 w-14 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] p-1 cursor-pointer"
+                />
+                <Input
+                  value={coverColor}
+                  onChange={(e) => setCoverColor(e.target.value)}
+                  className="min-h-11 font-mono text-xs bg-[var(--color-paper)]"
+                />
+              </div>
             </div>
-            {hasPhysical && (
+          </div>
+
+          <details className="editorial-disclosure rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-3.5 text-xs">
+            <summary className="cursor-pointer font-semibold text-[var(--color-ink)] select-none py-1">
+              Bibliografi &amp; Edisi Cetak Fisik
+            </summary>
+            <div className="mt-3 space-y-3 border-t border-[var(--color-rule)] pt-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label
-                    htmlFor="edit-book-rakyat"
+                    htmlFor="edit-book-year"
                     className="text-xs font-semibold"
                   >
-                    Harga Edisi Rakyat (IDR)
+                    Tahun Terbit
                   </Label>
                   <Input
-                    id="edit-book-rakyat"
+                    id="edit-book-year"
                     type="number"
-                    min={5000}
-                    value={rakyatPriceIdr}
-                    onChange={(e) => setRakyatPriceIdr(e.target.value)}
+                    value={publishedYear}
+                    onChange={(e) => setPublishedYear(e.target.value)}
                     className="min-h-11 font-mono text-xs bg-[var(--color-paper-2)]"
                   />
                 </div>
                 <div className="space-y-1">
                   <Label
-                    htmlFor="edit-book-std"
+                    htmlFor="edit-book-coll"
                     className="text-xs font-semibold"
                   >
-                    Harga Edisi Standar (IDR)
+                    Seri / Koleksi
                   </Label>
                   <Input
-                    id="edit-book-std"
-                    type="number"
-                    min={5000}
-                    value={standardPriceIdr}
-                    onChange={(e) => setStandardPriceIdr(e.target.value)}
-                    className="min-h-11 font-mono text-xs bg-[var(--color-paper-2)]"
+                    id="edit-book-coll"
+                    value={collectionName}
+                    onChange={(e) => setCollectionName(e.target.value)}
+                    className="min-h-11 text-xs bg-[var(--color-paper-2)]"
                   />
                 </div>
               </div>
-            )}
-          </div>
-        </details>
 
-        <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[var(--color-rule)]">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-            className="min-h-11 px-4 text-xs cursor-pointer"
-          >
-            Batal
-          </Button>
-          <Button
-            type="submit"
-            disabled={updateBookMutation.isPending}
-            className="min-h-11 px-5 text-xs font-semibold bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:brightness-95 cursor-pointer"
-          >
-            {updateBookMutation.isPending ? "Menyimpan..." : "Simpan Metadata"}
-          </Button>
-        </div>
-      </form>
-    </div>
+              <TranslationFieldsSection
+                isTranslation={isTranslation}
+                onIsTranslationChange={setIsTranslation}
+                originalTitle={originalTitle}
+                onOriginalTitleChange={setOriginalTitle}
+                translator={translator}
+                onTranslatorChange={setTranslator}
+                idPrefix="edit-book"
+                inputClassName="min-h-11 text-xs bg-[var(--color-paper-2)]"
+              />
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  id="edit-book-physical"
+                  type="checkbox"
+                  checked={hasPhysical}
+                  onChange={(e) => setHasPhysical(e.target.checked)}
+                  className="size-4 accent-[var(--color-accent)]"
+                />
+                <Label
+                  htmlFor="edit-book-physical"
+                  className="text-xs font-semibold cursor-pointer"
+                >
+                  Tersedia dalam edisi cetak fisik
+                </Label>
+              </div>
+              {hasPhysical && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="edit-book-rakyat"
+                      className="text-xs font-semibold"
+                    >
+                      Harga Edisi Rakyat (IDR)
+                    </Label>
+                    <Input
+                      id="edit-book-rakyat"
+                      type="number"
+                      min={5000}
+                      value={rakyatPriceIdr}
+                      onChange={(e) => setRakyatPriceIdr(e.target.value)}
+                      className="min-h-11 font-mono text-xs bg-[var(--color-paper-2)]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="edit-book-std"
+                      className="text-xs font-semibold"
+                    >
+                      Harga Edisi Standar (IDR)
+                    </Label>
+                    <Input
+                      id="edit-book-std"
+                      type="number"
+                      min={5000}
+                      value={standardPriceIdr}
+                      onChange={(e) => setStandardPriceIdr(e.target.value)}
+                      className="min-h-11 font-mono text-xs bg-[var(--color-paper-2)]"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </details>
+
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[var(--color-rule)]">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="min-h-11 px-4 text-xs cursor-pointer"
+            >
+              Batal
+            </Button>
+            <Button
+              type="submit"
+              disabled={updateBookMutation.isPending}
+              className="min-h-11 px-5 text-xs font-semibold bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:brightness-95 cursor-pointer"
+            >
+              {updateBookMutation.isPending
+                ? "Menyimpan..."
+                : "Simpan Metadata"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </StudioDrawer>
   );
 }
 
@@ -609,37 +659,14 @@ function EditPublishedBookDialog({
   book: BookSummaryDto | null;
   onClose: () => void;
 }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    const el = dialogRef.current;
-    if (!el) return;
-    if (book && !el.open) {
-      el.showModal();
-    } else if (!book && el.open) {
-      el.close();
-    }
-  }, [book]);
-
+  if (!book) return null;
   return (
-    <dialog
-      ref={dialogRef}
-      aria-labelledby="edit-book-dialog-title"
-      onClose={() => {
-        if (dialogRef.current) dialogRef.current.returnValue = "";
-        if (book) onClose();
-      }}
-      className="m-auto w-[min(94vw,34rem)] max-h-[90vh] overflow-y-auto overscroll-contain rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-0 shadow-2xl backdrop:bg-black/65 backdrop:overflow-hidden backdrop:overscroll-contain"
-    >
-      {book && (
-        <EditPublishedBookForm
-          key={book.id}
-          publisherSlug={publisherSlug}
-          book={book}
-          onClose={onClose}
-        />
-      )}
-    </dialog>
+    <EditPublishedBookForm
+      key={book.id}
+      publisherSlug={publisherSlug}
+      book={book}
+      onClose={onClose}
+    />
   );
 }
 
@@ -703,162 +730,152 @@ function BookInventoryForm({
     }
   };
 
+  const isDirty = Object.keys(draftCounts).length > 0;
+
   return (
-    <div className="space-y-5 p-6 text-[var(--color-ink)]">
-      <div className="flex items-start justify-between gap-4 border-b border-[var(--color-rule)] pb-4">
-        <div className="space-y-1">
-          <h1
-            id="inventory-dialog-title"
-            className="font-serif text-lg font-bold flex items-center gap-2"
+    <StudioDrawer
+      isOpen
+      onClose={onClose}
+      title="Stok Buku Cetak di Toko Mitra"
+      subtitle={book.title}
+      titleId="inventory-dialog-title"
+      widthClass="max-w-xl"
+      isDirty={isDirty}
+    >
+      <div className="space-y-5 text-[var(--color-ink)]">
+        {errorMsg && (
+          <div
+            role="alert"
+            className="rounded-xl border border-[var(--color-error)]/40 bg-[var(--color-error-soft)] p-3 text-xs"
           >
-            <Store
-              className="size-4 text-[var(--color-accent)]"
-              aria-hidden="true"
-            />
-            <span>Stok Buku Cetak di Toko Mitra</span>
-          </h1>
-          <p className="text-xs text-[var(--color-muted)]">{book.title}</p>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Tutup dialog stok toko"
-          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-[var(--color-muted)] hover:bg-[var(--color-paper-3)] hover:text-[var(--color-ink)] cursor-pointer shrink-0"
-        >
-          <X className="size-4" aria-hidden="true" />
-        </button>
-      </div>
-
-      {errorMsg && (
-        <div
-          role="alert"
-          className="rounded-xl border border-[var(--color-error)]/40 bg-[var(--color-error-soft)] p-3 text-xs"
-        >
-          {errorMsg}
-        </div>
-      )}
-      {feedback && (
-        <div
-          role="status"
-          className="rounded-xl border border-[var(--color-green)]/40 bg-[var(--color-green-soft)] p-3 text-xs"
-        >
-          {feedback}
-        </div>
-      )}
-
-      {isLoading ? (
-        <div className="flex min-h-36 items-center justify-center">
-          <LoaderCircle className="size-6 animate-spin text-[var(--color-muted)]" />
-        </div>
-      ) : branches.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-[var(--color-rule)] p-6 text-center text-xs text-[var(--color-muted)]">
-          Belum ada cabang toko fisik terdaftar dalam sistem.
-        </p>
-      ) : (
-        <form onSubmit={handleSave} className="space-y-4">
-          <ul className="space-y-3">
-            {branches.map((branch) => {
-              const counts = getCounts(
-                branch.branchId,
-                branch.rakyatStock,
-                branch.standardStock,
-              );
-              return (
-                <li
-                  key={branch.branchId}
-                  className="rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-3.5 space-y-2.5"
-                >
-                  <div>
-                    <p className="font-semibold text-xs text-[var(--color-ink)]">
-                      {branch.branchName} · {branch.city}
-                    </p>
-                    <p className="text-[11px] text-[var(--color-muted)]">
-                      {branch.address}
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label
-                        htmlFor={`inv-rakyat-${branch.branchId}`}
-                        className="text-[11px] font-semibold"
-                      >
-                        Stok Edisi Rakyat
-                      </Label>
-                      <Input
-                        id={`inv-rakyat-${branch.branchId}`}
-                        type="number"
-                        min={0}
-                        max={100000}
-                        value={counts.rakyatStock}
-                        onChange={(e) =>
-                          setDraftCounts((prev) => ({
-                            ...prev,
-                            [branch.branchId]: {
-                              rakyatStock: Number.parseInt(
-                                e.target.value || "0",
-                                10,
-                              ),
-                              standardStock: counts.standardStock,
-                            },
-                          }))
-                        }
-                        className="min-h-11 font-mono text-xs bg-[var(--color-paper-2)]"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label
-                        htmlFor={`inv-std-${branch.branchId}`}
-                        className="text-[11px] font-semibold"
-                      >
-                        Stok Edisi Standar
-                      </Label>
-                      <Input
-                        id={`inv-std-${branch.branchId}`}
-                        type="number"
-                        min={0}
-                        max={100000}
-                        value={counts.standardStock}
-                        onChange={(e) =>
-                          setDraftCounts((prev) => ({
-                            ...prev,
-                            [branch.branchId]: {
-                              rakyatStock: counts.rakyatStock,
-                              standardStock: Number.parseInt(
-                                e.target.value || "0",
-                                10,
-                              ),
-                            },
-                          }))
-                        }
-                        className="min-h-11 font-mono text-xs bg-[var(--color-paper-2)]"
-                      />
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-
-          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[var(--color-rule)]">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className="min-h-11 px-4 text-xs cursor-pointer"
-            >
-              Tutup
-            </Button>
-            <Button
-              type="submit"
-              disabled={saveInventoryMutation.isPending}
-              className="min-h-11 px-5 text-xs font-semibold bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:brightness-95 cursor-pointer"
-            >
-              {saveInventoryMutation.isPending ? "Menyimpan..." : "Simpan Stok"}
-            </Button>
+            {errorMsg}
           </div>
-        </form>
-      )}
-    </div>
+        )}
+        {feedback && (
+          <div
+            role="status"
+            className="rounded-xl border border-[var(--color-green)]/40 bg-[var(--color-green-soft)] p-3 text-xs"
+          >
+            {feedback}
+          </div>
+        )}
+
+        {isLoading ? (
+          <div className="flex min-h-36 items-center justify-center">
+            <LoaderCircle className="size-6 animate-spin text-[var(--color-muted)]" />
+          </div>
+        ) : branches.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-[var(--color-rule)] p-6 text-center text-xs text-[var(--color-muted)]">
+            Belum ada cabang toko fisik terdaftar dalam sistem.
+          </p>
+        ) : (
+          <form onSubmit={handleSave} className="space-y-4">
+            <ul className="space-y-3">
+              {branches.map((branch) => {
+                const counts = getCounts(
+                  branch.branchId,
+                  branch.rakyatStock,
+                  branch.standardStock,
+                );
+                return (
+                  <li
+                    key={branch.branchId}
+                    className="rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-3.5 space-y-2.5"
+                  >
+                    <div>
+                      <p className="font-semibold text-xs text-[var(--color-ink)]">
+                        {branch.branchName} — {branch.city}
+                      </p>
+                      <p className="text-[11px] text-[var(--color-muted)]">
+                        {branch.address}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor={`inv-rakyat-${branch.branchId}`}
+                          className="text-[11px] font-semibold"
+                        >
+                          Stok Edisi Rakyat
+                        </Label>
+                        <Input
+                          id={`inv-rakyat-${branch.branchId}`}
+                          type="number"
+                          min={0}
+                          max={100000}
+                          value={counts.rakyatStock}
+                          onChange={(e) =>
+                            setDraftCounts((prev) => ({
+                              ...prev,
+                              [branch.branchId]: {
+                                rakyatStock: Number.parseInt(
+                                  e.target.value || "0",
+                                  10,
+                                ),
+                                standardStock: counts.standardStock,
+                              },
+                            }))
+                          }
+                          className="min-h-11 font-mono text-xs bg-[var(--color-paper-2)]"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor={`inv-std-${branch.branchId}`}
+                          className="text-[11px] font-semibold"
+                        >
+                          Stok Edisi Standar
+                        </Label>
+                        <Input
+                          id={`inv-std-${branch.branchId}`}
+                          type="number"
+                          min={0}
+                          max={100000}
+                          value={counts.standardStock}
+                          onChange={(e) =>
+                            setDraftCounts((prev) => ({
+                              ...prev,
+                              [branch.branchId]: {
+                                rakyatStock: counts.rakyatStock,
+                                standardStock: Number.parseInt(
+                                  e.target.value || "0",
+                                  10,
+                                ),
+                              },
+                            }))
+                          }
+                          className="min-h-11 font-mono text-xs bg-[var(--color-paper-2)]"
+                        />
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[var(--color-rule)]">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                className="min-h-11 px-4 text-xs cursor-pointer"
+              >
+                Tutup
+              </Button>
+              <Button
+                type="submit"
+                disabled={saveInventoryMutation.isPending}
+                className="min-h-11 px-5 text-xs font-semibold bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:brightness-95 cursor-pointer"
+              >
+                {saveInventoryMutation.isPending
+                  ? "Menyimpan..."
+                  : "Simpan Stok"}
+              </Button>
+            </div>
+          </form>
+        )}
+      </div>
+    </StudioDrawer>
   );
 }
 
@@ -871,37 +888,14 @@ function BookInventoryDialog({
   book: BookSummaryDto | null;
   onClose: () => void;
 }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    const el = dialogRef.current;
-    if (!el) return;
-    if (book && !el.open) {
-      el.showModal();
-    } else if (!book && el.open) {
-      el.close();
-    }
-  }, [book]);
-
+  if (!book) return null;
   return (
-    <dialog
-      ref={dialogRef}
-      aria-labelledby="inventory-dialog-title"
-      onClose={() => {
-        if (dialogRef.current) dialogRef.current.returnValue = "";
-        if (book) onClose();
-      }}
-      className="m-auto w-[min(94vw,36rem)] max-h-[90vh] overflow-y-auto overscroll-contain rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-0 shadow-2xl backdrop:bg-black/65 backdrop:overflow-hidden backdrop:overscroll-contain"
-    >
-      {book && (
-        <BookInventoryForm
-          key={book.id}
-          publisherSlug={publisherSlug}
-          book={book}
-          onClose={onClose}
-        />
-      )}
-    </dialog>
+    <BookInventoryForm
+      key={book.id}
+      publisherSlug={publisherSlug}
+      book={book}
+      onClose={onClose}
+    />
   );
 }
 
@@ -1462,8 +1456,6 @@ export function PublisherStudioView({
     }
   };
 
-  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-
   // Inbox filters
   const [inboxQuery, setInboxQuery] = useState("");
   const [inboxStatus, setInboxStatus] = useState<string>("all");
@@ -1526,29 +1518,37 @@ export function PublisherStudioView({
       .includes(q);
   });
 
-  const handleTabKeyDown = (
-    e: KeyboardEvent<HTMLButtonElement>,
-    index: number,
-  ) => {
-    let nextIndex: number | null = null;
-    if (e.key === "ArrowRight") nextIndex = (index + 1) % STUDIO_TABS.length;
-    if (e.key === "ArrowLeft")
-      nextIndex = (index - 1 + STUDIO_TABS.length) % STUDIO_TABS.length;
-    if (e.key === "Home") nextIndex = 0;
-    if (e.key === "End") nextIndex = STUDIO_TABS.length - 1;
+  const studioTabs = STUDIO_TABS.map((tab) => {
+    const count =
+      tab.id === "inbox"
+        ? canReview
+          ? manuscripts.length
+          : null
+        : tab.id === "catalog"
+          ? canEditBooks
+            ? books.length
+            : null
+          : tab.id === "team"
+            ? canManageTeam
+              ? members.length + approvedWriters.length
+              : canReview
+                ? approvedWriters.length
+                : null
+            : null;
 
-    if (nextIndex !== null) {
-      e.preventDefault();
-      const targetTab = STUDIO_TABS[nextIndex];
-      setActiveTab(targetTab.id);
-      const btn = tabRefs.current[targetTab.id];
-      btn?.focus();
-      btn?.scrollIntoView({
-        block: "nearest",
-        inline: "nearest",
-      });
-    }
-  };
+    const icon =
+      tab.id === "inbox" ? (
+        <Inbox className="size-4" aria-hidden="true" />
+      ) : tab.id === "catalog" ? (
+        <BookOpen className="size-4" aria-hidden="true" />
+      ) : tab.id === "team" ? (
+        <Users className="size-4" aria-hidden="true" />
+      ) : (
+        <Settings2 className="size-4" aria-hidden="true" />
+      );
+
+    return { ...tab, count, icon };
+  });
 
   const handleAddMember = async (e: FormEvent) => {
     e.preventDefault();
@@ -1613,120 +1613,88 @@ export function PublisherStudioView({
   return (
     <div className="space-y-6 pb-12 text-[var(--color-ink)]">
       {/* Studio Identity Header */}
-      <header className="rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-5 sm:p-7 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-        <div className="flex items-start sm:items-center gap-4 min-w-0">
-          {publisher.logoUrl ? (
-            <img
-              src={publisher.logoUrl}
-              alt={publisher.name}
-              className="size-16 rounded-xl object-contain border border-[var(--color-rule)] bg-[var(--color-paper)] p-1.5 shrink-0"
-            />
-          ) : (
-            <div className="size-16 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper-3)] flex items-center justify-center font-serif text-2xl font-bold shrink-0">
-              {publisher.name.slice(0, 1).toUpperCase()}
-            </div>
-          )}
-
-          <div className="space-y-1.5 min-w-0">
-            <h2 className="font-serif text-2xl sm:text-3xl font-bold tracking-tight truncate">
-              {publisher.name}
-            </h2>
-            <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
-              <span className="inline-flex items-center gap-1 rounded-md border border-[var(--color-rule)] bg-[var(--color-paper)] px-2.5 py-0.5 text-[var(--color-ink-2)]">
-                <ShieldCheck
-                  className="size-3.5 text-[var(--color-green)]"
-                  aria-hidden="true"
-                />
-                {publisher.verificationStatus === "verified"
-                  ? "Terverifikasi IKAPI"
-                  : publisher.verificationStatus}
-              </span>
-              <span className="inline-flex items-center rounded-md border border-[var(--color-accent)]/40 bg-[var(--color-accent-soft)] px-2.5 py-0.5 font-semibold text-[var(--color-ink)]">
-                Peran Anda: {formatRoleName(role)}
-              </span>
-              <span className="text-[var(--color-muted)]">
-                /p/{publisher.slug}
-              </span>
-            </div>
+      <EntityProfileHeader
+        kind="publisher"
+        headingLevel="h2"
+        logoFit="contain"
+        name={publisher.name}
+        handleOrSlug={`/p/${publisher.slug}`}
+        handleHref={`/p/${publisher.slug}`}
+        avatarUrl={publisher.logoUrl}
+        bannerUrl={publisher.headerImageUrl}
+        bio={publisher.description}
+        topics={publisher.topics ?? undefined}
+        socialLinks={normalizeSocialLinks(publisher.socialLinks)}
+        ariaLabel="Identitas Studio Penerbit"
+        badges={[
+          {
+            label:
+              publisher.verificationStatus === "verified"
+                ? "Terverifikasi IKAPI"
+                : publisher.verificationStatus,
+            tone:
+              publisher.verificationStatus === "verified"
+                ? "success"
+                : "neutral",
+            icon: <ShieldCheck className="size-3.5" aria-hidden="true" />,
+          },
+          {
+            label: `Peran Anda: ${formatRoleName(role)}`,
+            tone: "accent",
+          },
+        ]}
+        modeSwitcher={
+          <div className="inline-flex items-center rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-1 text-xs">
+            <Link
+              to="/p/$slug"
+              params={{ slug: publisher.slug }}
+              className="inline-flex min-h-9 items-center rounded-lg px-3 font-medium text-[var(--color-muted)] hover:text-[var(--color-ink)]"
+            >
+              Halaman Publik
+            </Link>
+            <span className="inline-flex min-h-9 items-center rounded-lg bg-[var(--color-accent)] px-3 font-semibold text-[var(--color-accent-ink)]">
+              Studio Redaksi
+            </span>
           </div>
-        </div>
-
-        <Link
-          to="/p/$slug"
-          params={{ slug: publisher.slug }}
-          className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-4 text-xs font-semibold text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
-        >
-          <span>Lihat Halaman Publik</span>
-          <ExternalLink className="size-3.5" aria-hidden="true" />
-        </Link>
-      </header>
+        }
+        actions={
+          <Link
+            to="/p/$slug"
+            params={{ slug: publisher.slug }}
+            className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-4 text-xs font-semibold text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+          >
+            <span>Lihat Halaman Publik</span>
+            <ExternalLink className="size-3.5" aria-hidden="true" />
+          </Link>
+        }
+        metrics={[
+          {
+            label: "Naskah Masuk",
+            value: canReview ? manuscripts.length : "—",
+          },
+          {
+            label: "Buku Terbit",
+            value: canEditBooks ? books.length : "—",
+          },
+          {
+            label: "Penulis Rekanan",
+            value: canReview ? approvedWriters.length : "—",
+          },
+          {
+            label: "Anggota Tim",
+            value: canManageTeam ? members.length : "—",
+          },
+        ]}
+      />
 
       {/* Accessible Single-Row Horizontal Scrollable Tablist */}
-      <div
-        role="tablist"
-        aria-label="Navigasi Studio Penerbit"
-        className="flex items-center gap-1 overflow-x-auto border-b border-[var(--color-rule)]"
-      >
-        {STUDIO_TABS.map((tab, index) => {
-          const isSelected = activeTab === tab.id;
-          const countBadge =
-            tab.id === "inbox"
-              ? canReview
-                ? manuscripts.length
-                : null
-              : tab.id === "catalog"
-                ? canEditBooks
-                  ? books.length
-                  : null
-                : tab.id === "team"
-                  ? canManageTeam
-                    ? members.length + approvedWriters.length
-                    : canReview
-                      ? approvedWriters.length
-                      : null
-                  : null;
-
-          return (
-            <button
-              key={tab.id}
-              ref={(el) => {
-                tabRefs.current[tab.id] = el;
-              }}
-              id={`studio-tab-${tab.id}`}
-              type="button"
-              role="tab"
-              aria-selected={isSelected}
-              tabIndex={isSelected ? 0 : -1}
-              onClick={() => setActiveTab(tab.id)}
-              onKeyDown={(e) => handleTabKeyDown(e, index)}
-              className={`relative flex-none min-h-11 px-4 text-xs sm:text-sm font-medium whitespace-nowrap cursor-pointer inline-flex items-center gap-2 focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] ${
-                isSelected
-                  ? "text-[var(--color-ink)] font-semibold after:content-[''] after:absolute after:inset-x-0 after:bottom-0 after:border-b-3 after:border-[var(--color-accent)]"
-                  : "text-[var(--color-muted)] hover:text-[var(--color-ink)]"
-              }`}
-            >
-              {tab.id === "inbox" && (
-                <Inbox className="size-4" aria-hidden="true" />
-              )}
-              {tab.id === "catalog" && (
-                <BookOpen className="size-4" aria-hidden="true" />
-              )}
-              {tab.id === "team" && (
-                <Users className="size-4" aria-hidden="true" />
-              )}
-              {tab.id === "profile" && (
-                <Settings2 className="size-4" aria-hidden="true" />
-              )}
-              <span>{tab.label}</span>
-              {countBadge !== null && (
-                <span className="rounded-md bg-[var(--color-paper-3)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--color-ink-2)]">
-                  {countBadge}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      <ProfileTabs
+        tabs={studioTabs}
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        ariaLabel="Navigasi Studio Penerbit"
+        idPrefix="studio"
+      />
 
       {/* Tab 1: Inbox Naskah */}
       {activeTab === "inbox" && (
@@ -1822,25 +1790,31 @@ export function PublisherStudioView({
                         </span>
                         {item.isApprovedWriter && (
                           <span className="inline-flex items-center gap-1 rounded-full border border-[var(--color-accent)]/50 bg-[var(--color-accent-soft)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--color-ink)]">
-                            <Sparkles className="size-3" aria-hidden="true" />
+                            <Award className="size-3" aria-hidden="true" />
                             Penulis Rekanan
                           </span>
                         )}
                       </div>
 
-                      <p className="text-xs text-[var(--color-muted)] font-mono">
-                        Penulis:{" "}
-                        <strong className="text-[var(--color-ink)]">
-                          {item.authorPenName || item.authorName || "Anonim"}
-                        </strong>
-                        {item.category ? ` · ${item.category}` : ""}
-                        {item.sourceLanguage
-                          ? ` · ${formatSourceLanguage(item.sourceLanguage)}`
-                          : ""}
-                        {item.targetAudience
-                          ? ` · ${formatTargetAudience(item.targetAudience)}`
-                          : ""}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[var(--color-muted)] font-mono">
+                        <span>
+                          Penulis:{" "}
+                          <strong className="text-[var(--color-ink)]">
+                            {item.authorPenName || item.authorName || "Anonim"}
+                          </strong>
+                        </span>
+                        {item.category && <span>{item.category}</span>}
+                        {item.sourceLanguage && (
+                          <span>
+                            {formatSourceLanguage(item.sourceLanguage)}
+                          </span>
+                        )}
+                        {item.targetAudience && (
+                          <span>
+                            {formatTargetAudience(item.targetAudience)}
+                          </span>
+                        )}
+                      </div>
 
                       <p className="text-xs text-[var(--color-ink-2)] line-clamp-2 leading-relaxed">
                         {item.synopsis || "Belum ada sinopsis naskah."}
@@ -1888,8 +1862,8 @@ export function PublisherStudioView({
 
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--color-rule)] pt-2.5 text-xs text-[var(--color-muted)] font-mono">
                     <span>
-                      {item.chapters?.length || item.totalChapters || 1} bab ·
-                      Diperbarui{" "}
+                      {item.chapters?.length || item.totalChapters || 1} bab,
+                      diperbarui{" "}
                       {new Date(item.updatedAt).toLocaleDateString("id-ID")}
                     </span>
                     <span>
@@ -1950,7 +1924,7 @@ export function PublisherStudioView({
                         {book.title}
                       </h2>
                       <p className="text-xs text-[var(--color-muted)]">
-                        {book.author} · {book.totalChapters} bab
+                        {book.author} — {book.totalChapters} bab
                       </p>
                       <div className="flex flex-wrap items-center gap-2 pt-1 text-xs font-mono">
                         <span className="rounded border border-[var(--color-rule)] bg-[var(--color-paper)] px-2 py-0.5 text-[var(--color-ink-2)]">
@@ -2256,7 +2230,7 @@ export function PublisherStudioView({
               >
                 <div className="space-y-1">
                   <h2 className="font-serif text-lg font-bold flex items-center gap-2">
-                    <Sparkles
+                    <Award
                       className="size-4 text-[var(--color-accent)]"
                       aria-hidden="true"
                     />
@@ -2356,10 +2330,12 @@ export function PublisherStudioView({
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs text-[var(--color-muted)] font-mono truncate">
-                              {writer.invitedEmail || "Terdaftar"}
-                              {writer.username ? ` · @${writer.username}` : ""}
-                            </p>
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-muted)] font-mono truncate">
+                              <span>{writer.invitedEmail || "Terdaftar"}</span>
+                              {writer.username && (
+                                <span>@{writer.username}</span>
+                              )}
+                            </div>
                           </div>
                         </div>
 

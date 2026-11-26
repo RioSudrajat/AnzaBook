@@ -305,9 +305,9 @@ function EditProfileForm({
             type="button"
             onClick={handleSubmit}
             disabled={updateProfileMutation.isPending}
-            className="bg-foreground text-background hover:opacity-90 text-xs font-semibold h-9 px-5 rounded-lg cursor-pointer"
+            className="bg-[var(--color-ink)] text-[var(--color-paper)] hover:opacity-90 text-xs font-semibold min-h-11 px-5 rounded-xl cursor-pointer"
           >
-            {updateProfileMutation.isPending ? "Menyimpan..." : "Done (Simpan)"}
+            {updateProfileMutation.isPending ? "Menyimpan..." : "Simpan Profil"}
           </Button>
         </div>
       </div>

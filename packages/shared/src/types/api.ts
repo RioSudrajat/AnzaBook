@@ -459,6 +459,7 @@ export type ManagedCommunitySummaryDto = {
   id: string;
   name: string;
   slug: string;
+  description?: string | null;
   avatarUrl: string | null;
   coverUrl: string | null;
   city: string | null;
@@ -471,6 +472,7 @@ export type ManagedPublisherSummaryDto = {
   id: string;
   name: string;
   slug: string;
+  description?: string | null;
   logoUrl: string | null;
   headerImageUrl: string | null;
   city: string | null;
