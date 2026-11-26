@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import { Pool } from "pg";
 import { API_URL, fitsWidth, headers, setRole, signUp } from "./helpers";
 
 const SCREENSHOT_DIR = process.env.CAPTURE_SCREENSHOT_DIR;
@@ -108,7 +109,7 @@ test.describe("Publisher Studio, Dual Submission Flow, and Admin Cleanup (Issue 
     const authorContext = await browser.newContext();
     const authorPage = await authorContext.newPage();
     await authorPage.setViewportSize({ width: 1280, height: 800 });
-    await signUp(authorPage.request, "Penulis Uji");
+    const authorEmail = await signUp(authorPage.request, "Penulis Uji");
 
     await authorPage.goto(`/p/${publisherSlug}/studio`);
     await expect(
@@ -127,6 +128,29 @@ test.describe("Publisher Studio, Dual Submission Flow, and Admin Cleanup (Issue 
     await expect(
       authorPage.getByRole("tab", { name: /Inbox Naskah/i }),
     ).toHaveCount(0);
+    await expect(
+      authorPage.getByRole("link", {
+        name: /Daftar Penulis Resmi untuk Kirim Naskah/i,
+      }),
+    ).toBeVisible();
+    await expect(
+      authorPage.getByRole("button", { name: "Tulis Draf Baru" }),
+    ).toHaveCount(0);
+
+    // Verify official author status enables Path 1 ("Tulis Draf Baru") + Path 2 submission
+    const pool = new Pool({
+      connectionString: process.env.STARTER_TEST_DATABASE_URL,
+      max: 1,
+    });
+    try {
+      await pool.query(
+        `UPDATE "user" SET author_status = 'verified' WHERE email = $1`,
+        [authorEmail],
+      );
+    } finally {
+      await pool.end();
+    }
+    await authorPage.reload();
 
     // 3. Author clicks "Tulis Draf Baru" (Path 1) and opens Path 2 searchable picker
     await authorPage.getByRole("button", { name: "Tulis Draf Baru" }).click();
@@ -472,13 +496,8 @@ test.describe("Publisher Studio, Dual Submission Flow, and Admin Cleanup (Issue 
       /\/api\/media\/images\/.+\.png$/,
     );
 
-    // Fill collapsible bibliography & progressive translation disclosure
+    // Fill collapsible bibliography
     await publishDialog.getByText(/Metadata Bibliografi/i).click();
-    await publishDialog.locator("#publish-is-translation").check();
-    await publishDialog
-      .locator("#publish-orig-title")
-      .fill("The Bilingual Essay");
-    await publishDialog.locator("#publish-translator").fill("Siti Bahasa");
     await publishDialog
       .locator("#publish-collection")
       .fill("Seri Pustaka Baru");
@@ -538,8 +557,6 @@ test.describe("Publisher Studio, Dual Submission Flow, and Admin Cleanup (Issue 
       ownerPage.locator('img[src*="/api/media/images/"]:visible').first(),
     ).toBeVisible();
     await expect(ownerPage.getByText("Premium", { exact: true })).toBeVisible();
-    await expect(ownerPage.getByText("The Bilingual Essay")).toBeVisible();
-    await expect(ownerPage.getByText("Siti Bahasa")).toBeVisible();
     await expect(ownerPage.getByText("Seri Pustaka Baru")).toBeVisible();
     await expect(
       ownerPage.getByRole("button", { name: /Beli Akses Digital/i }).first(),

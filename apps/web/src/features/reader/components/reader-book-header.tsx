@@ -157,6 +157,9 @@ export function ReaderBookHeader({
     >
       {/* Hidden file input for device cover upload */}
       <input
+        id="reader-cover-upload"
+        name="readerCoverFile"
+        aria-label="Unggah sampul buku"
         type="file"
         ref={fileInputRef}
         onChange={handleDeviceFileUpload}

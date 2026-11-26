@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
+import { AnzaLogoMark } from "@/components/brand";
 import { SiteFooter } from "@/components/site-footer";
 import { SmartBackButton } from "@/components/smart-back-button";
 import { AppShell } from "@/features/dashboard/components/app-shell";
@@ -61,11 +62,7 @@ export function PageFrame({
           <span />
         )}
         <Link to="/" className="flex items-center gap-2">
-          <img
-            src="/icon.svg"
-            alt=""
-            className="size-6 rounded-[5px] object-contain border border-border/40 shadow-xs"
-          />
+          <AnzaLogoMark className="size-5 text-foreground shrink-0" />
           <span className="font-serif font-bold text-sm">AnzaBook</span>
         </Link>
       </header>

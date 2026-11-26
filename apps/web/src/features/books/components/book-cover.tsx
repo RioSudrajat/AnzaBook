@@ -4,10 +4,11 @@ import { AnzaLogoMark } from "@/components/brand";
 import { isUsableAssetUrl } from "@/lib/media-url";
 import { cn } from "@/lib/utils";
 
-type CoverBook = Pick<
-  BookSummaryDto,
-  "title" | "author" | "coverColor" | "publishedYear" | "genres" | "pageCount"
-> & {
+type CoverBook = Pick<BookSummaryDto, "title" | "author"> & {
+  coverColor?: string | null;
+  publishedYear?: number | null;
+  genres?: string[] | null;
+  pageCount?: number | null;
   coverUrl?: string | null;
 };
 
@@ -356,7 +357,7 @@ export function BookCover({
             {/* HEADER: Year/Tag on the left, AnzaBook brand mark on the right */}
             <div className="relative z-10 flex min-w-0 items-center justify-between gap-1 border-b border-current/15 pb-[2.5cqw]">
               <span className="font-mono text-[4.2cqw] font-semibold opacity-80">
-                {book.publishedYear}
+                {book.publishedYear ?? 2026}
               </span>
 
               {/* AnzaBook Logo & Brand Name on Top Right */}

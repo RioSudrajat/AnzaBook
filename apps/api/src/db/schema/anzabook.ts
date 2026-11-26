@@ -25,12 +25,10 @@ export const books = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     slug: varchar("slug", { length: 120 }).notNull().unique(),
     title: varchar("title", { length: 255 }).notNull(),
-    originalTitle: varchar("original_title", { length: 255 }),
     author: varchar("author", { length: 255 }).notNull(),
     authorAvatar: text("author_avatar"),
     editor: varchar("editor", { length: 255 }),
     editorAvatar: text("editor_avatar"),
-    translator: varchar("translator", { length: 255 }),
     coverUrl: text("cover_url").notNull(),
     coverColor: varchar("cover_color", { length: 32 })
       .notNull()

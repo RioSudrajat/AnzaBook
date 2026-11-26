@@ -8,6 +8,8 @@ import { db } from "../db";
 import {
   account,
   books,
+  communityCalendarMembers,
+  communityCalendars,
   publisherMembers,
   publishers,
   user,
@@ -300,6 +302,7 @@ describe("AnzaBook Official Publisher Seed & Owner Assignment CLI", () => {
 
     try {
       delete process.env.ANZABOOK_OWNER_EMAIL;
+      await db.delete(user).where(eq(user.username, "selembarawan"));
       await db.insert(user).values({
         id: earlierId,
         name: "Selembar Awan",
@@ -350,6 +353,7 @@ describe("AnzaBook Official Publisher Seed & Owner Assignment CLI", () => {
       if (prevOwnerEmail === undefined) delete process.env.ANZABOOK_OWNER_EMAIL;
       else process.env.ANZABOOK_OWNER_EMAIL = prevOwnerEmail;
       await db.delete(user).where(inArray(user.id, [earlierId, laterId]));
+      await seedCatalog(db);
     }
 
     // 2. ANZABOOK_OWNER_EMAIL override (case-insensitive)
@@ -533,6 +537,7 @@ describe("AnzaBook Official Publisher Seed & Owner Assignment CLI", () => {
     const prevOwnerEmail = process.env.ANZABOOK_OWNER_EMAIL;
 
     try {
+      await db.delete(user).where(eq(user.username, "selembarawan"));
       await db.insert(user).values([
         {
           id: selembarUserId,
@@ -605,6 +610,78 @@ describe("AnzaBook Official Publisher Seed & Owner Assignment CLI", () => {
       await db
         .delete(user)
         .where(inArray(user.id, [selembarUserId, explicitOwnerId]));
+      await seedCatalog(db);
+    }
+  });
+
+  it("seeds 3 verified author accounts, links all 13 books with clean covers, and seeds 3 verified communities", async () => {
+    await seedCatalog(db);
+
+    const seededAuthors = await db
+      .select({
+        id: user.id,
+        username: user.username,
+        authorStatus: user.authorStatus,
+      })
+      .from(user)
+      .where(
+        inArray(user.username, ["selembarawan", "okesudrajat", "anzabook"]),
+      );
+
+    expect(seededAuthors).toHaveLength(3);
+    for (const a of seededAuthors) {
+      expect(a.authorStatus).toBe("verified");
+    }
+
+    const authorIdSet = new Set(seededAuthors.map((a) => a.id));
+    const seededBooks = await db
+      .select({
+        slug: books.slug,
+        authorUserId: books.authorUserId,
+        coverUrl: books.coverUrl,
+      })
+      .from(books)
+      .where(
+        inArray(
+          books.slug,
+          allBooksData.map((b) => b.slug),
+        ),
+      );
+
+    expect(seededBooks).toHaveLength(13);
+    for (const b of seededBooks) {
+      expect(b.authorUserId).toBeTruthy();
+      expect(authorIdSet.has(b.authorUserId!)).toBe(true);
+      expect(b.coverUrl.startsWith("/covers/")).toBe(true);
+    }
+
+    const expectedCommunitySlugs = [
+      "klub-baca-anzabook",
+      "lingkar-aksara-bandung",
+      "kolektif-literasi-merdeka",
+    ];
+    const seededCommunities = await db
+      .select({
+        id: communityCalendars.id,
+        slug: communityCalendars.slug,
+        verificationStatus: communityCalendars.verificationStatus,
+      })
+      .from(communityCalendars)
+      .where(inArray(communityCalendars.slug, expectedCommunitySlugs));
+
+    expect(seededCommunities).toHaveLength(3);
+    for (const c of seededCommunities) {
+      expect(c.verificationStatus).toBe("verified");
+      const owners = await db
+        .select({ id: communityCalendarMembers.id })
+        .from(communityCalendarMembers)
+        .where(
+          and(
+            eq(communityCalendarMembers.calendarId, c.id),
+            eq(communityCalendarMembers.role, "owner"),
+          ),
+        );
+      expect(owners.length).toBeGreaterThanOrEqual(1);
     }
   });
 });

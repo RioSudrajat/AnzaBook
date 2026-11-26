@@ -1,7 +1,6 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { PageFrame } from "@/features/dashboard/components/page-frame";
 import { PublicProfileView } from "@/features/dashboard/components/public-profile-view";
-import { DashboardProfile } from "@/features/dashboard/components/dashboard-profile";
 import { useUserProfile } from "@/features/social/hooks";
 import { userProfileQuery } from "@/features/social/queries";
 import { ApiError } from "@/lib/api/client";
@@ -30,7 +29,7 @@ export const Route = createFileRoute("/u/$username")({
   component: PublicUserProfilePage,
 });
 
-export default function PublicUserProfilePage() {
+function PublicUserProfilePage() {
   const { username } = Route.useParams();
   const cleanUsername = username.replace(/^@/, "");
   const context = Route.useRouteContext();
@@ -41,21 +40,15 @@ export default function PublicUserProfilePage() {
 
   if (!profile) return null;
 
-  const isOwnProfile = Boolean(currentUserId && currentUserId === profile.id);
-
   return (
     <PageFrame
       user={sessionUser}
-      activeTab={isOwnProfile ? "profile" : "explore"}
-      title={isOwnProfile ? "Profil Saya" : "Profil"}
+      activeTab="explore"
+      title={profile.name || "Profil"}
       backLabel="Kembali"
       wide
     >
-      {isOwnProfile ? (
-        <DashboardProfile isOwnProfile profile={profile} />
-      ) : (
-        <PublicProfileView profile={profile} viewerId={currentUserId} />
-      )}
+      <PublicProfileView profile={profile} viewerId={currentUserId} />
     </PageFrame>
   );
 }

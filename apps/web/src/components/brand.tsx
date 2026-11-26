@@ -85,18 +85,10 @@ export function Brand({
 }: BrandProps) {
   const content = (
     <>
-      <img
-        src="/icon.svg"
-        alt=""
-        width={size === "sm" ? 24 : size === "lg" ? 40 : 32}
-        height={size === "sm" ? 24 : size === "lg" ? 40 : 32}
+      <AnzaLogoMark
         className={`${
-          size === "sm"
-            ? "size-6 rounded-[5px]"
-            : size === "lg"
-              ? "size-10 rounded-[8px]"
-              : "size-8 rounded-[6px]"
-        } shrink-0 border border-border/40 shadow-xs`}
+          size === "sm" ? "size-5" : size === "lg" ? "size-8" : "size-6"
+        } shrink-0 text-foreground`}
       />
       <span className="flex flex-col items-start text-left leading-none">
         <span

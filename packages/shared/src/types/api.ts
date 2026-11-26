@@ -103,12 +103,10 @@ export type BookSummaryDto = {
   id: string;
   slug: string;
   title: string;
-  originalTitle: string | null;
   author: string;
   authorAvatar: string | null;
   editor: string | null;
   editorAvatar: string | null;
-  translator: string | null;
   coverUrl: string;
   coverColor: string;
   synopsis: string;
@@ -135,6 +133,7 @@ export type BookSummaryDto = {
   publisherName?: string | null;
   publisherLogoUrl?: string | null;
   authorUserId?: string | null;
+  authorUsername?: string | null;
   digitalPriceIdr?: number | null;
 };
 
@@ -152,6 +151,7 @@ export type BookChapterSummaryDto = {
   chapterNumber: number;
   title: string;
   isSample: boolean;
+  wordCount?: number;
 };
 
 export type BookReaderChapterDto = {
@@ -163,6 +163,8 @@ export type BookReaderChapterDto = {
   blueprintContent: string;
   audioUrl: string | null;
   audioDurationSeconds: number | null;
+  fullWordCount?: number;
+  isPreviewTruncated?: boolean;
 };
 
 export type BookReaderPayloadDto = {
@@ -216,6 +218,7 @@ export type ShelfItemDto = {
   favorite: boolean;
   progressPercent: number;
   previewProgressPercent?: number | null;
+  previewBookPercent?: number | null;
   updatedAt: string;
 };
 
@@ -243,8 +246,14 @@ export type BookHighlightDto = {
   id: string;
   userId: string;
   bookId: string;
+  bookSlug?: string;
   bookTitle?: string;
+  bookAuthor?: string;
   bookCoverUrl?: string | null;
+  bookCoverColor?: string | null;
+  bookPublishedYear?: number | null;
+  bookGenres?: string[];
+  bookPageCount?: number | null;
   chapterId: string | null;
   chapterNumber: number;
   pageNumber: number;
@@ -466,6 +475,7 @@ export type ManagedCommunitySummaryDto = {
   verificationStatus: "pending" | "verified" | "trusted" | "rejected";
   rejectionReason?: string | null;
   role: "owner" | "admin" | "checkin_staff" | "member";
+  followerCount?: number;
 };
 
 export type ManagedPublisherSummaryDto = {
@@ -480,6 +490,8 @@ export type ManagedPublisherSummaryDto = {
   verificationStatus: PublisherVerificationStatus;
   rejectionReason?: string | null;
   role?: PublisherMemberRole | null;
+  followerCount?: number;
+  isFollowing?: boolean;
 };
 
 export type PublicProfileReviewDto = {
@@ -505,6 +517,7 @@ export type SocialProfileDto = {
   followingCount: number;
   isFollowing?: boolean;
   isSubscribedUpdates?: boolean;
+  isApprovedWriter?: boolean;
   booksPublishedCount?: number;
   totalReadingMinutes?: number;
   isPublisher?: boolean;
@@ -598,6 +611,9 @@ export type ExplorePostItemDto = {
     author: string;
     coverColor?: string | null;
     coverUrl?: string | null;
+    publishedYear?: number | null;
+    genres?: string[];
+    pageCount?: number | null;
   };
   rating?: number;
   color?: HighlightColor;
@@ -712,6 +728,8 @@ export type PublisherDto = {
   freeClaimCodeQuotaPerBook: number;
   claimCodeFeeIdr: number;
   totalBooks?: number;
+  followerCount?: number;
+  isFollowing?: boolean;
   currentUserRole?: PublisherMemberRole | null;
   createdAt: string;
   updatedAt: string;

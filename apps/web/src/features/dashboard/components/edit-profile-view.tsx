@@ -378,12 +378,12 @@ function EditProfileForm({
             </div>
 
             {/* Profile Avatar Overlay Positioned over Banner */}
-            <div className="p-6 pt-0 relative flex flex-col sm:flex-row items-center sm:items-end justify-between gap-4 -mt-14 sm:-mt-16">
-              <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+            <div className="px-6 pb-6 relative">
+              <div className="-mt-12 sm:-mt-14 mb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                 {/* Avatar Click to Upload */}
                 <div
                   onClick={() => avatarFileInputRef.current?.click()}
-                  className="size-24 sm:size-28 rounded-full bg-zinc-800 border-4 border-card flex items-center justify-center font-bold text-3xl text-foreground shrink-0 overflow-hidden shadow-lg cursor-pointer group relative ring-1 ring-border/80"
+                  className="size-24 sm:size-28 rounded-full bg-zinc-800 border-4 border-card flex items-center justify-center font-bold text-3xl text-foreground shrink-0 overflow-hidden shadow-lg cursor-pointer group relative z-10 ring-1 ring-border/80"
                   title="Klik untuk memilih foto profil dari perangkat"
                 >
                   {image ? (
@@ -403,49 +403,54 @@ function EditProfileForm({
                   </div>
                 </div>
 
-                <div className="space-y-1 pt-2 sm:pt-6">
-                  <h3 className="font-serif text-lg font-bold text-foreground">
-                    Foto &amp; Header Profil
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Klik pada foto profil atau banner di atas untuk mengunggah
-                    dari perangkat lokal.
-                  </p>
-                </div>
+                {/* Quick Actions for Images */}
+                {(image || headerImage) && (
+                  <div className="flex flex-wrap items-center gap-2 sm:pt-14">
+                    {image && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setImage("")}
+                        className="min-h-10 text-xs border-border/80 cursor-pointer"
+                      >
+                        <Trash2 className="size-3.5 mr-1 text-muted-foreground" />
+                        <span>Hapus Foto</span>
+                      </Button>
+                    )}
+                    {headerImage && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setHeaderImage("")}
+                        className="min-h-10 text-xs border-border/80 cursor-pointer"
+                      >
+                        <Trash2 className="size-3.5 mr-1 text-muted-foreground" />
+                        <span>Hapus Header</span>
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {/* Quick Actions for Images */}
-              <div className="flex items-center gap-2">
-                {image && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setImage("")}
-                    className="h-8 text-xs border-border/80 cursor-pointer"
-                  >
-                    <Trash2 className="size-3.5 mr-1 text-muted-foreground" />
-                    <span>Hapus Foto</span>
-                  </Button>
-                )}
-                {headerImage && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setHeaderImage("")}
-                    className="h-8 text-xs border-border/80 cursor-pointer"
-                  >
-                    <Trash2 className="size-3.5 mr-1 text-muted-foreground" />
-                    <span>Hapus Header</span>
-                  </Button>
-                )}
+              <div className="space-y-1">
+                <h3 className="font-serif text-lg font-bold text-foreground">
+                  Foto &amp; Header Profil
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Klik pada foto profil atau banner di atas untuk mengunggah
+                  dari perangkat lokal.
+                </p>
               </div>
             </div>
           </div>
 
           {/* Hidden File Inputs */}
           <input
+            id="edit-profile-avatar-upload"
+            name="profileAvatarFile"
+            aria-label="Unggah foto profil"
             ref={avatarFileInputRef}
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif"
@@ -453,6 +458,9 @@ function EditProfileForm({
             className="hidden"
           />
           <input
+            id="edit-profile-banner-upload"
+            name="profileBannerFile"
+            aria-label="Unggah banner profil"
             ref={bannerFileInputRef}
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif"

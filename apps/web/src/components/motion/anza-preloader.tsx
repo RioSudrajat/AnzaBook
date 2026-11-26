@@ -6,6 +6,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import gsap from "gsap";
+import { AnzaLogoMark } from "@/components/brand";
 
 const emptySubscribe = () => () => {};
 
@@ -114,13 +115,7 @@ export function AnzaPreloader() {
       {/* Top Bar: Brand + Skip Button */}
       <div className="flex items-center justify-between w-full max-w-6xl mx-auto">
         <div className="flex items-center gap-3">
-          <img
-            src="/icon.svg"
-            alt=""
-            width={28}
-            height={28}
-            className="size-7 rounded-[6px] shrink-0 border border-white/20 shadow-xs"
-          />
+          <AnzaLogoMark className="size-7 shrink-0 text-white" />
           <span className="flex flex-col leading-none">
             <span className="font-serif text-sm font-semibold tracking-tight text-white">
               AnzaBook

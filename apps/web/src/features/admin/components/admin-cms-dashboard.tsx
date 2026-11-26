@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocalStorageFlag } from "@/lib/use-local-storage-flag";
 import { Link } from "@tanstack/react-router";
 import {
   ArrowLeft,
@@ -39,6 +40,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { AnzaLogoMark } from "@/components/brand";
 import { SiteFooter } from "@/components/site-footer";
 import { useCatalogBooks } from "@/features/books/hooks";
 import { AdminSidebar, type AdminTab } from "./admin-sidebar";
@@ -149,26 +151,16 @@ export function AdminCmsDashboard({
 
   const { data: overview } = useAdminOverview();
 
-  // Sidebar collapse state
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("anzabook_sidebar_collapsed") === "true";
-  });
+  // Sidebar collapse & theme state
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useLocalStorageFlag(
+    "anzabook_sidebar_collapsed",
+    "true",
+  );
+  const [isDark, setIsDark] = useLocalStorageFlag("anzabook-theme", "dark");
 
   const handleToggleSidebar = () => {
-    setIsSidebarCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem("anzabook_sidebar_collapsed", String(next));
-      return next;
-    });
+    setIsSidebarCollapsed((prev) => !prev);
   };
-
-  // Theme dark mode state: default is LIGHT!
-  const [isDark, setIsDark] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const savedTheme = localStorage.getItem("anzabook-theme");
-    return savedTheme === "dark";
-  });
 
   useEffect(() => {
     if (isDark) {
@@ -179,11 +171,7 @@ export function AdminCmsDashboard({
   }, [isDark]);
 
   const handleToggleTheme = () => {
-    setIsDark((prev) => {
-      const next = !prev;
-      localStorage.setItem("anzabook-theme", next ? "dark" : "light");
-      return next;
-    });
+    setIsDark((prev) => !prev);
   };
 
   const pendingCalendars = overview?.pendingCalendarsCount ?? 0;
@@ -221,11 +209,7 @@ export function AdminCmsDashboard({
         {/* Top Header Bar per App Layout */}
         <header className="sticky top-0 z-30 border-b border-border/80 bg-background/95 backdrop-blur-md px-6 py-3.5 flex items-center justify-between select-none">
           <div className="flex items-center gap-3 min-w-0">
-            <img
-              src="/icon.svg"
-              alt="AnzaBook"
-              className="size-6 rounded-[5px] object-contain md:hidden border border-border/40 shadow-xs shrink-0"
-            />
+            <AnzaLogoMark className="size-6 text-foreground md:hidden shrink-0" />
             <div className="min-w-0">
               <h1 className="font-serif text-xl sm:text-2xl font-bold truncate">
                 {tabTitles[activeTab]}

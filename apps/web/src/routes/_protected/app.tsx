@@ -78,7 +78,7 @@ const TAB_TITLES: Record<string, string> = {
   settings: "Settings",
 };
 
-export default function AppPage() {
+function AppPage() {
   const { user } = Route.useRouteContext().session;
   const search = Route.useSearch();
   const navigate = useNavigate();

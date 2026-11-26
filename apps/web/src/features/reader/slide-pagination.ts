@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { BookReaderChapterDto } from "@starter/shared/types";
 import {
+  computeSpreadLeafPageNumbers,
   computeStableBookSlideMeta,
   extractCleanSlideParagraphs as extractCleanSlideParagraphsCore,
   findSlide,
@@ -12,6 +13,7 @@ import {
 } from "./slide-pagination-helpers";
 
 export {
+  computeSpreadLeafPageNumbers,
   computeStableBookSlideMeta,
   findSlide,
   slideParagraphText,

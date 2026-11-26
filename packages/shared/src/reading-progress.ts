@@ -80,3 +80,109 @@ export function classifyReadingTempo(avgWpm: number): ReadingTempo {
   if (avgWpm <= 280) return "steady";
   return "brisk";
 }
+
+type TiptapTextNode = {
+  type?: string;
+  text?: string;
+  content?: TiptapTextNode[];
+};
+
+const SKIPPED_TIPTAP_NODES = new Set([
+  "chapterBreak",
+  "pageBreak",
+  "thinDivider",
+  "mediumDivider",
+]);
+
+function collectTiptapText(node: TiptapTextNode): string {
+  if (node.type === "text") return node.text ?? "";
+  if (node.type === "hardBreak") return " ";
+  if (!Array.isArray(node.content)) return "";
+  return node.content.map(collectTiptapText).join("");
+}
+
+function extractTiptapParagraphs(parsed: TiptapTextNode): string[] {
+  const blocks: string[] = [];
+  const visit = (node: TiptapTextNode) => {
+    if (!node || (node.type && SKIPPED_TIPTAP_NODES.has(node.type))) return;
+    if (
+      node.type === "paragraph" ||
+      node.type === "heading" ||
+      node.type === "codeBlock"
+    ) {
+      const text = collectTiptapText(node).trim();
+      if (text) blocks.push(text);
+      return;
+    }
+    if (Array.isArray(node.content)) {
+      node.content.forEach(visit);
+    }
+  };
+  visit(parsed);
+  return blocks;
+}
+
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'");
+}
+
+function stripHtmlTags(raw: string): string {
+  return decodeHtmlEntities(
+    raw.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]*>/g, ""),
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function extractPlainParagraphs(content?: string | null): string[] {
+  if (!content) return [];
+  const trimmed = content.trim();
+  if (!trimmed) return [];
+
+  if (trimmed.startsWith("{") && trimmed.includes('"type"')) {
+    try {
+      const parsed = JSON.parse(trimmed) as TiptapTextNode;
+      const blocks = extractTiptapParagraphs(parsed);
+      if (blocks.length > 0) return blocks;
+    } catch {
+      // Fall through to HTML/plain parsing if JSON is malformed.
+    }
+  }
+
+  if (trimmed.includes("<")) {
+    const cleaned = trimmed
+      .replace(
+        /<div[^>]*(?:data-type="(?:chapter-break|page-break)"|class="[^"]*tiptap-(?:chapter|page)-break[^"]*")[^>]*>[\s\S]*?<\/div>/gi,
+        "\n\n",
+      )
+      .replace(/<!--[\s\S]*?-->/g, "\n\n")
+      .replace(/<\/(?:p|h[1-6]|blockquote|li|div)>/gi, "\n\n");
+
+    return cleaned.split(/\n\n+/).map(stripHtmlTags).filter(Boolean);
+  }
+
+  return trimmed
+    .replace(/<!--\s*pagebreak\s*-->|---pagebreak---/gi, "\n\n")
+    .split(/\n\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+}
+
+export function countWords(text: string): number {
+  const trimmed = text.trim();
+  if (!trimmed) return 0;
+  return trimmed.split(/\s+/).filter(Boolean).length;
+}
+
+export function countContentWords(content?: string | null): number {
+  return extractPlainParagraphs(content).reduce(
+    (sum, paragraph) => sum + countWords(paragraph),
+    0,
+  );
+}

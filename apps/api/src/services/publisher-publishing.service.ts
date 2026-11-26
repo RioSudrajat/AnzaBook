@@ -281,8 +281,6 @@ export async function publishPublisherManuscript(
 
     const publishedYear =
       overrides?.publishedYear ?? new Date().getUTCFullYear();
-    const originalTitle = overrides?.originalTitle?.trim() || null;
-    const translator = overrides?.translator?.trim() || null;
     const collectionName = overrides?.collectionName?.trim() || null;
     const rakyatPriceIdr = overrides?.rakyatPriceIdr ?? 35_000;
     const standardPriceIdr = overrides?.standardPriceIdr ?? 75_000;
@@ -302,10 +300,8 @@ export async function publishPublisherManuscript(
       .values({
         slug: bookSlug,
         title: resolvedTitle,
-        originalTitle,
         author: authorName,
         authorAvatar: authorUser?.image ?? null,
-        translator,
         synopsis: resolvedSynopsis,
         coverUrl,
         coverColor,
@@ -516,10 +512,6 @@ export async function updatePublisherBook(
   }
   if (input.publishedYear !== undefined)
     patch.publishedYear = input.publishedYear;
-  if (input.originalTitle !== undefined)
-    patch.originalTitle = input.originalTitle || null;
-  if (input.translator !== undefined)
-    patch.translator = input.translator || null;
   if (input.collectionName !== undefined)
     patch.collectionName = input.collectionName || null;
   if (input.rakyatPriceIdr !== undefined)

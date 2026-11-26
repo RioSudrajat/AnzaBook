@@ -23,15 +23,17 @@ export type PrintEditionSeed = {
   isbn: string;
 };
 
+export type SeedAuthorUsername = "selembarawan" | "okesudrajat" | "anzabook";
+
 export type BookSeed = {
   slug: string;
   title: string;
-  originalTitle?: string;
   author: string;
-  authorAvatar?: string;
+  authorUsername: SeedAuthorUsername;
+  preserveDisplayAuthor?: boolean;
+  authorAvatar?: string | null;
   editor?: string;
   editorAvatar?: string;
-  translator?: string | null;
   coverUrl: string;
   coverColor: string;
   synopsis: string;

@@ -24,6 +24,7 @@ import {
   manuscriptChapters,
   manuscriptSubmissions,
   publisherApprovedWriters,
+  publisherFollowers,
   publisherMembers,
   publishers,
   user,
@@ -64,6 +65,8 @@ function toPublisherDto(
     matchedTopics?: string[];
     approvedWriters?: PublisherApprovedWriterSummaryDto[];
     isCurrentUserApprovedWriter?: boolean;
+    followerCount?: number;
+    isFollowing?: boolean;
   },
 ): PublisherDto {
   return {
@@ -91,6 +94,12 @@ function toPublisherDto(
       : {}),
     ...(extras?.isCurrentUserApprovedWriter !== undefined
       ? { isCurrentUserApprovedWriter: extras.isCurrentUserApprovedWriter }
+      : {}),
+    ...(extras?.followerCount !== undefined
+      ? { followerCount: extras.followerCount }
+      : {}),
+    ...(extras?.isFollowing !== undefined
+      ? { isFollowing: extras.isFollowing }
       : {}),
     socialLinks: pub.socialLinks || null,
     verificationStatus: pub.verificationStatus,
@@ -276,6 +285,84 @@ async function loadUserRolesMap(
   return map;
 }
 
+async function loadFollowerCountsMap(
+  publisherIds: readonly string[],
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (publisherIds.length === 0) return map;
+
+  const rows = await db
+    .select({
+      publisherId: publisherFollowers.publisherId,
+      count: sql<number>`count(*)`,
+    })
+    .from(publisherFollowers)
+    .where(inArray(publisherFollowers.publisherId, [...publisherIds]))
+    .groupBy(publisherFollowers.publisherId);
+
+  for (const row of rows) {
+    map.set(row.publisherId, Number(row.count || 0));
+  }
+  return map;
+}
+
+async function loadUserFollowingPublisherSet(
+  userId?: string,
+  publisherIds: readonly string[] = [],
+): Promise<Set<string>> {
+  const set = new Set<string>();
+  if (!userId || publisherIds.length === 0) return set;
+
+  const rows = await db
+    .select({ publisherId: publisherFollowers.publisherId })
+    .from(publisherFollowers)
+    .where(
+      and(
+        eq(publisherFollowers.userId, userId),
+        inArray(publisherFollowers.publisherId, [...publisherIds]),
+      ),
+    );
+
+  for (const row of rows) {
+    set.add(row.publisherId);
+  }
+  return set;
+}
+
+/**
+ * Ensures the caller is either a verified official author (`authorStatus === "verified"`)
+ * or an approved writer invited/activated by a publisher (scoped to `targetPublisherId` when given).
+ */
+async function assertCanWriteManuscript(
+  userId: string,
+  targetPublisherId?: string | null,
+): Promise<void> {
+  const [caller] = await db
+    .select({ authorStatus: user.authorStatus })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1);
+
+  if (caller?.authorStatus === "verified") {
+    return;
+  }
+
+  const approvedSet = await resolveApprovedPublisherIdsForUser(userId);
+  if (targetPublisherId) {
+    if (approvedSet.has(targetPublisherId)) {
+      return;
+    }
+  } else if (approvedSet.size > 0) {
+    return;
+  }
+
+  throw new HttpError(
+    403,
+    "AUTHOR_VERIFICATION_REQUIRED",
+    "Anda harus terdaftar dan terverifikasi sebagai Penulis Resmi AnzaBook atau penulis rekanan penerbit untuk mengakses Studio Penulis dan menulis naskah.",
+  );
+}
+
 export async function applyPublisher(
   userId: string,
   input: ApplyPublisherInput,
@@ -374,12 +461,36 @@ export async function updatePublisher(
     .where(eq(publishers.id, pub.id))
     .returning();
 
-  const [bookCountRow] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(books)
-    .where(eq(books.publisherId, pub.id));
+  const [bookCountRow, followerCountRow, followRow] = await Promise.all([
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(books)
+      .where(eq(books.publisherId, pub.id)),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(publisherFollowers)
+      .where(eq(publisherFollowers.publisherId, pub.id)),
+    db
+      .select({ id: publisherFollowers.id })
+      .from(publisherFollowers)
+      .where(
+        and(
+          eq(publisherFollowers.publisherId, pub.id),
+          eq(publisherFollowers.userId, userId),
+        ),
+      )
+      .limit(1),
+  ]);
 
-  return toPublisherDto(updated, Number(bookCountRow?.count || 0), member.role);
+  return toPublisherDto(
+    updated,
+    Number(bookCountRow[0]?.count || 0),
+    member.role,
+    {
+      followerCount: Number(followerCountRow[0]?.count || 0),
+      isFollowing: Boolean(followRow[0]),
+    },
+  );
 }
 
 export async function listVerifiedPublishers(
@@ -392,9 +503,11 @@ export async function listVerifiedPublishers(
     .orderBy(publishers.name);
 
   const pubIds = pubRows.map((p) => p.id);
-  const [countsMap, rolesMap] = await Promise.all([
+  const [countsMap, rolesMap, followersMap, followingSet] = await Promise.all([
     loadBookCountsMap(pubIds),
     loadUserRolesMap(currentUserId, pubIds),
+    loadFollowerCountsMap(pubIds),
+    loadUserFollowingPublisherSet(currentUserId, pubIds),
   ]);
 
   return pubRows.map((pub) =>
@@ -402,6 +515,10 @@ export async function listVerifiedPublishers(
       pub,
       countsMap.get(pub.id) ?? 0,
       rolesMap.get(pub.id) ?? null,
+      {
+        followerCount: followersMap.get(pub.id) ?? 0,
+        isFollowing: followingSet.has(pub.id),
+      },
     ),
   );
 }
@@ -583,26 +700,43 @@ export async function getPublisherBySlug(
     if (member) currentUserRole = member.role;
   }
 
-  const [approvedWriterRows, approvedSet] = await Promise.all([
-    db
-      .select({
-        id: publisherApprovedWriters.id,
-        userId: publisherApprovedWriters.userId,
-        name: user.name,
-        username: user.username,
-        image: user.image,
-      })
-      .from(publisherApprovedWriters)
-      .innerJoin(user, eq(publisherApprovedWriters.userId, user.id))
-      .where(
-        and(
-          eq(publisherApprovedWriters.publisherId, pub.id),
-          eq(publisherApprovedWriters.status, "active"),
-        ),
-      )
-      .orderBy(asc(publisherApprovedWriters.createdAt)),
-    resolveApprovedPublisherIdsForUser(currentUserId),
-  ]);
+  const [approvedWriterRows, approvedSet, followerCountRows, followRows] =
+    await Promise.all([
+      db
+        .select({
+          id: publisherApprovedWriters.id,
+          userId: publisherApprovedWriters.userId,
+          name: user.name,
+          username: user.username,
+          image: user.image,
+        })
+        .from(publisherApprovedWriters)
+        .innerJoin(user, eq(publisherApprovedWriters.userId, user.id))
+        .where(
+          and(
+            eq(publisherApprovedWriters.publisherId, pub.id),
+            eq(publisherApprovedWriters.status, "active"),
+          ),
+        )
+        .orderBy(asc(publisherApprovedWriters.createdAt)),
+      resolveApprovedPublisherIdsForUser(currentUserId),
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(publisherFollowers)
+        .where(eq(publisherFollowers.publisherId, pub.id)),
+      currentUserId
+        ? db
+            .select({ id: publisherFollowers.id })
+            .from(publisherFollowers)
+            .where(
+              and(
+                eq(publisherFollowers.publisherId, pub.id),
+                eq(publisherFollowers.userId, currentUserId),
+              ),
+            )
+            .limit(1)
+        : Promise.resolve([]),
+    ]);
 
   return toPublisherDto(
     pub,
@@ -611,14 +745,77 @@ export async function getPublisherBySlug(
     {
       approvedWriters: approvedWriterRows,
       isCurrentUserApprovedWriter: approvedSet.has(pub.id),
+      followerCount: Number(followerCountRows[0]?.count || 0),
+      isFollowing: Boolean(followRows[0]),
     },
   );
+}
+
+export async function followPublisher(
+  userId: string,
+  slug: string,
+): Promise<{ isFollowing: boolean; followerCount: number }> {
+  const pub = await resolvePublisherBySlugOrId(slug);
+  if (pub.verificationStatus !== "verified") {
+    throw new HttpError(
+      403,
+      "PUBLISHER_NOT_VERIFIED",
+      "Hanya penerbit terverifikasi yang dapat diikuti.",
+    );
+  }
+
+  await db
+    .insert(publisherFollowers)
+    .values({
+      publisherId: pub.id,
+      userId,
+    })
+    .onConflictDoNothing({
+      target: [publisherFollowers.publisherId, publisherFollowers.userId],
+    });
+
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(publisherFollowers)
+    .where(eq(publisherFollowers.publisherId, pub.id));
+
+  return {
+    isFollowing: true,
+    followerCount: Number(countRow?.count || 0),
+  };
+}
+
+export async function unfollowPublisher(
+  userId: string,
+  slug: string,
+): Promise<{ isFollowing: boolean; followerCount: number }> {
+  const pub = await resolvePublisherBySlugOrId(slug);
+
+  await db
+    .delete(publisherFollowers)
+    .where(
+      and(
+        eq(publisherFollowers.publisherId, pub.id),
+        eq(publisherFollowers.userId, userId),
+      ),
+    );
+
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(publisherFollowers)
+    .where(eq(publisherFollowers.publisherId, pub.id));
+
+  return {
+    isFollowing: false,
+    followerCount: Number(countRow?.count || 0),
+  };
 }
 
 export async function createManuscriptDraft(
   authorUserId: string,
   input: CreateManuscriptDraftInput,
 ): Promise<ManuscriptSubmissionDto> {
+  await assertCanWriteManuscript(authorUserId, input.publisherId ?? null);
   let publisherName: string | null = null;
   if (input.publisherId) {
     const [pub] = await db
@@ -821,6 +1018,11 @@ export async function updateManuscript(
     );
   }
 
+  await assertCanWriteManuscript(
+    userId,
+    input.publisherId ?? existing.publisherId ?? null,
+  );
+
   if (existing.status !== "draft" && existing.status !== "revision_requested") {
     throw new HttpError(
       409,
@@ -1014,6 +1216,7 @@ export async function submitManuscript(
   authorUserId: string,
   input: SubmitManuscriptInput,
 ): Promise<ManuscriptSubmissionDto> {
+  await assertCanWriteManuscript(authorUserId, input.publisherId ?? null);
   let finalPublisherId: string | null = input.publisherId || null;
   let publisherName: string | null = null;
 
@@ -1152,6 +1355,11 @@ export async function submitManuscriptDraft(
       "Hanya penulis pemilik naskah yang dapat mengajukan naskah.",
     );
   }
+
+  await assertCanWriteManuscript(
+    authorUserId,
+    publisherId ?? current.publisherId ?? null,
+  );
 
   if (current.status !== "draft" && current.status !== "revision_requested") {
     throw new HttpError(

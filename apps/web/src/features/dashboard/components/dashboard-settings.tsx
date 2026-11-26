@@ -322,6 +322,9 @@ export function DashboardSettings({
 
                   <div className="flex flex-wrap items-center gap-2">
                     <input
+                      id="settings-avatar-upload"
+                      name="avatarFile"
+                      aria-label="Unggah foto profil"
                       ref={fileInputRef}
                       type="file"
                       accept="image/*"
@@ -728,20 +731,34 @@ export function DashboardSettings({
 
           <div className="space-y-3">
             <div>
-              <label className="block text-muted-foreground mb-1">
+              <label
+                htmlFor="settings-default-layout"
+                className="block text-muted-foreground mb-1"
+              >
                 Tata Letak Membaca Default:
               </label>
-              <select className="w-full bg-card border border-border rounded-[6px] p-2 text-foreground focus:outline-none">
+              <select
+                id="settings-default-layout"
+                name="defaultLayout"
+                className="w-full bg-card border border-border rounded-[6px] p-2 text-foreground focus:outline-none"
+              >
                 <option value="scroll">Scroll Vertikal Berkelanjutan</option>
                 <option value="slide">Slide Horizontal Per Halaman</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-muted-foreground mb-1">
+              <label
+                htmlFor="settings-default-theme"
+                className="block text-muted-foreground mb-1"
+              >
                 Tema Kertas Default:
               </label>
-              <select className="w-full bg-card border border-border rounded-[6px] p-2 text-foreground focus:outline-none">
+              <select
+                id="settings-default-theme"
+                name="defaultTheme"
+                className="w-full bg-card border border-border rounded-[6px] p-2 text-foreground focus:outline-none"
+              >
                 <option value="manila">Kertas Manila Hangat (Newsprint)</option>
                 <option value="sepia">Sepia Nostalgia</option>
                 <option value="night">Mode Gelap (Malam)</option>

@@ -250,8 +250,15 @@ export function DashboardEvents() {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-muted-foreground text-[11px]">Format:</span>
+          <label
+            htmlFor="events-format-filter"
+            className="text-muted-foreground text-[11px]"
+          >
+            Format:
+          </label>
           <select
+            id="events-format-filter"
+            name="format"
             value={selectedFormat}
             onChange={(e) =>
               setSelectedFormat(e.target.value as "all" | "offline" | "online")

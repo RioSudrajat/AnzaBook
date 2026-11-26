@@ -26,6 +26,7 @@ import {
   applyPublisher,
   createManuscriptDraft,
   editPublisherManuscript,
+  followPublisher,
   getManuscript,
   getPublisherBySlug,
   listMyManagedPublishers,
@@ -36,6 +37,7 @@ import {
   reviewPublisherManuscript,
   submitManuscript,
   submitManuscriptDraft,
+  unfollowPublisher,
   updateManuscript,
   updatePublisher,
   withdrawManuscript,
@@ -437,6 +439,31 @@ publisherRouter.patch(
     const input = updatePublisherSchema.parse(req.body);
     const publisher = await updatePublisher(userId, slug, input);
     res.json({ data: publisher });
+  },
+);
+
+// Follow / Unfollow verified publisher
+publisherRouter.post(
+  "/:slug/follow",
+  requireAuth,
+  requireTrustedOrigin,
+  async (req, res) => {
+    const userId = getAuth(req).user.id;
+    const slug = String(req.params.slug);
+    const result = await followPublisher(userId, slug);
+    res.json({ data: result });
+  },
+);
+
+publisherRouter.delete(
+  "/:slug/follow",
+  requireAuth,
+  requireTrustedOrigin,
+  async (req, res) => {
+    const userId = getAuth(req).user.id;
+    const slug = String(req.params.slug);
+    const result = await unfollowPublisher(userId, slug);
+    res.json({ data: result });
   },
 );
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  computeSpreadLeafPageNumbers,
   computeStableBookSlideMeta,
   extractCleanSlideParagraphs,
   type SlideSpread,
@@ -94,5 +95,38 @@ describe("Slide Pagination Paragraphs & Stable Book Counter", () => {
       hasFullAccess: false,
     });
     expect(previewMeta).toEqual({ displayPage: 1, displayTotal: 2 });
+  });
+
+  it("computes per-leaf page numbers across two-page desktop spreads and single-page mobile views", () => {
+    const withLeaves = (chapter: number, leafCount: number): SlideSpread => ({
+      ...makeSpread(chapter, 1, 1),
+      leaves: Array.from({ length: leafCount }, () => ({
+        heading: false,
+        fragments: [],
+      })),
+    });
+
+    const desktopSpreads = [
+      withLeaves(1, 2),
+      withLeaves(1, 1), // chapter 1 ends on an odd left leaf
+      withLeaves(2, 2),
+    ];
+    expect(
+      computeSpreadLeafPageNumbers({ spreads: desktopSpreads, spreadIndex: 0 }),
+    ).toEqual({ left: 1, right: 2 });
+    expect(
+      computeSpreadLeafPageNumbers({ spreads: desktopSpreads, spreadIndex: 1 }),
+    ).toEqual({ left: 3, right: undefined });
+    expect(
+      computeSpreadLeafPageNumbers({ spreads: desktopSpreads, spreadIndex: 2 }),
+    ).toEqual({ left: 4, right: 5 });
+
+    const mobileSpreads = [withLeaves(1, 1), withLeaves(1, 1)];
+    expect(
+      computeSpreadLeafPageNumbers({ spreads: mobileSpreads, spreadIndex: 0 }),
+    ).toEqual({ left: 1, right: undefined });
+    expect(
+      computeSpreadLeafPageNumbers({ spreads: mobileSpreads, spreadIndex: 1 }),
+    ).toEqual({ left: 2, right: undefined });
   });
 });

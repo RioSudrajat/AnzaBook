@@ -21,7 +21,6 @@ import {
 import { EntityProfileHeader } from "@/components/profile/entity-profile-header";
 import { ProfileTabs } from "@/components/profile/profile-tabs";
 import { StudioDrawer } from "@/components/profile/studio-drawer";
-import { TranslationFieldsSection } from "@/components/profile/translation-fields-section";
 import type {
   BookDistributionModel,
   BookSummaryDto,
@@ -163,11 +162,6 @@ function EditPublishedBookForm({
   const [publishedYear, setPublishedYear] = useState(
     book.publishedYear ? String(book.publishedYear) : "",
   );
-  const [isTranslation, setIsTranslation] = useState(
-    Boolean(book.originalTitle?.trim() || book.translator?.trim()),
-  );
-  const [originalTitle, setOriginalTitle] = useState(book.originalTitle || "");
-  const [translator, setTranslator] = useState(book.translator || "");
   const [collectionName, setCollectionName] = useState(
     book.collectionName || "",
   );
@@ -186,10 +180,6 @@ function EditPublishedBookForm({
       (book.digitalPriceIdr != null ? String(book.digitalPriceIdr) : "") ||
     categoriesText !== (book.categories ?? []).join(", ") ||
     publishedYear !== (book.publishedYear ? String(book.publishedYear) : "") ||
-    isTranslation !==
-      Boolean(book.originalTitle?.trim() || book.translator?.trim()) ||
-    originalTitle !== (book.originalTitle || "") ||
-    translator !== (book.translator || "") ||
     collectionName !== (book.collectionName || "") ||
     hasPhysical !== Boolean(book.hasPhysical);
 
@@ -269,8 +259,6 @@ function EditPublishedBookForm({
           categories,
           publishedYear:
             parsedYear && Number.isFinite(parsedYear) ? parsedYear : undefined,
-          originalTitle: isTranslation ? originalTitle.trim() || null : null,
-          translator: isTranslation ? translator.trim() || null : null,
           collectionName: collectionName.trim() || null,
           hasPhysical,
           rakyatPriceIdr:
@@ -559,17 +547,6 @@ function EditPublishedBookForm({
                   />
                 </div>
               </div>
-
-              <TranslationFieldsSection
-                isTranslation={isTranslation}
-                onIsTranslationChange={setIsTranslation}
-                originalTitle={originalTitle}
-                onOriginalTitleChange={setOriginalTitle}
-                translator={translator}
-                onTranslatorChange={setTranslator}
-                idPrefix="edit-book"
-                inputClassName="min-h-11 text-xs bg-[var(--color-paper-2)]"
-              />
 
               <div className="flex items-center gap-2 pt-1">
                 <input

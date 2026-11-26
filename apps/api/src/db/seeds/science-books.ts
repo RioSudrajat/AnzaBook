@@ -4,15 +4,12 @@ export const scienceBooks: BookSeed[] = [
   {
     slug: "sains-logika-seni-hidup-bermutu",
     title: "Sains, Logika, dan Seni untuk Hidup Bermutu",
-    originalTitle: "Science, Logic, and the Art of High Quality Living",
-    author: "Zenius",
-    authorAvatar:
-      "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150&auto=format&fit=crop&q=80",
+    author: "AnzaBook",
+    authorUsername: "anzabook",
+    authorAvatar: null,
     editor: "Anza Book",
     editorAvatar: "/icon.svg",
-    translator: null,
-    coverUrl:
-      "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80",
+    coverUrl: "/covers/sains-logika.svg",
     coverColor: "#1E3A8A",
     synopsis:
       "Pernah merasa hidupmu seperti berputar di labirin tanpa peta? Info datang bertubi-tubi, keputusan harus diambil cepat, dan kamu cuma bisa bilang 'yaudah sih ikut arus aja'. Tenang, kamu tidak sendirian. Kabar baiknya, ada cara agar hidup tidak lagi se-random itu. Sains bisa jadi jalan ninjamu.",
@@ -159,15 +156,12 @@ export const scienceBooks: BookSeed[] = [
   {
     slug: "kecerdasan-sosial-homo-sapiens",
     title: "Kecerdasan Sosial: Senjata Utama Homo Sapiens",
-    originalTitle: "Social Intelligence: The Prime Weapon of Homo Sapiens",
-    author: "Zenius",
-    authorAvatar:
-      "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150&auto=format&fit=crop&q=80",
+    author: "Oke Sudrajat",
+    authorUsername: "okesudrajat",
+    authorAvatar: null,
     editor: "Anza Book",
     editorAvatar: "/icon.svg",
-    translator: null,
-    coverUrl:
-      "https://images.unsplash.com/photo-1532012164546-f432f2e3777f?w=600&auto=format&fit=crop&q=80",
+    coverUrl: "/covers/kecerdasan-sosial.svg",
     coverColor: "#EA580C",
     synopsis:
       "Mengapa Homo sapiens berhasil bertahan dan menguasai bumi sementara spesies manusia purba lainnya punah? Bukan karena otot yang lebih kuat atau cakar yang lebih tajam, melainkan kapasitas unik untuk bekerja sama dalam kelompok besar melalui bahasa, empati, dan kecerdasan sosial.",
@@ -300,16 +294,12 @@ export const scienceBooks: BookSeed[] = [
   {
     slug: "merobek-langit-dogma",
     title: "Merobek Langit Dogma: Awal Revolusi Sains",
-    originalTitle:
-      "Tearing the Sky of Dogma: The Dawn of Scientific Revolution",
-    author: "Sabda PS",
-    authorAvatar:
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+    author: "Selembar Awan",
+    authorUsername: "selembarawan",
+    authorAvatar: null,
     editor: "Anza Book",
     editorAvatar: "/icon.svg",
-    translator: null,
-    coverUrl:
-      "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&auto=format&fit=crop&q=80",
+    coverUrl: "/covers/merobek-langit.svg",
     coverColor: "#0284C7",
     synopsis:
       "Ketika teleskop Galileo pertama kali diarahkan ke langit malam dan menemukan bahwa bumi bukan pusat jagat raya, tatanan kekuasaan politik dan dogma berusia ribuan tahun terguncang. Buku ini menelusuri bagaimana keberanian bertanya meruntuhkan tirani kepalsuan.",
@@ -419,16 +409,12 @@ export const scienceBooks: BookSeed[] = [
   {
     slug: "akar-semua-kekusutan-percintaan",
     title: "Akar Semua Kekusutan Percintaan, Menurut Antropologi",
-    originalTitle:
-      "The Roots of Romantic Entanglements, According to Anthropology",
-    author: "Cania Citta",
-    authorAvatar:
-      "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80",
+    author: "Oke Sudrajat",
+    authorUsername: "okesudrajat",
+    authorAvatar: null,
     editor: "Anza Book",
     editorAvatar: "/icon.svg",
-    translator: null,
-    coverUrl:
-      "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=600&auto=format&fit=crop&q=80",
+    coverUrl: "/covers/akar-kekusutan.svg",
     coverColor: "#BE123C",
     synopsis:
       "Kenapa cinta terasa begitu rumit, penuh drama kecemburuan, dan sering bikin sakit hati? Melalui kacamata antropologi budaya dan biologi evolusioner, buku ini mengurai ekspektasi romantis modern yang kerap bertabrakan dengan naluri purba pembentukan ikatan pasangan manusia.",

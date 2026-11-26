@@ -248,6 +248,28 @@ export async function getPublisherBySlug(
   return data;
 }
 
+export async function followPublisher(
+  slug: string,
+): Promise<{ isFollowing: boolean; followerCount: number }> {
+  const { data } = await apiFetch<
+    DataResponse<{ isFollowing: boolean; followerCount: number }>
+  >(`/api/publisher/${encodeURIComponent(slug)}/follow`, {
+    method: "POST",
+  });
+  return data;
+}
+
+export async function unfollowPublisher(
+  slug: string,
+): Promise<{ isFollowing: boolean; followerCount: number }> {
+  const { data } = await apiFetch<
+    DataResponse<{ isFollowing: boolean; followerCount: number }>
+  >(`/api/publisher/${encodeURIComponent(slug)}/follow`, {
+    method: "DELETE",
+  });
+  return data;
+}
+
 export async function listPublisherBooks(
   slug: string,
   signal?: AbortSignal,

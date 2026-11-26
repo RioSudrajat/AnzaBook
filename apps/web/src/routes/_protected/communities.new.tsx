@@ -60,7 +60,7 @@ const COMMUNITY_TYPES: { value: CalendarType; label: string }[] = [
   { value: "author", label: "Kolektif / Ruang Penulis Mandiri" },
 ];
 
-export default function NewCommunityPage() {
+function NewCommunityPage() {
   const sessionUser = Route.useRouteContext().session.user;
 
   // General State
@@ -453,6 +453,9 @@ export default function NewCommunityPage() {
                 </div>
 
                 <input
+                  id="community-cover-upload"
+                  name="communityCoverFile"
+                  aria-label="Unggah sampul komunitas"
                   ref={fileInputRef}
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/gif"

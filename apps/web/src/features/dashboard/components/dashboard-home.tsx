@@ -211,7 +211,7 @@ export function DashboardHome({
                       <div
                         className="bg-[var(--color-accent)] h-1.5 rounded-full"
                         style={{
-                          width: `${Math.min(100, Math.max(0, item.previewProgressPercent ?? item.progressPercent))}%`,
+                          width: `${Math.min(100, Math.max(0, item.previewBookPercent ?? item.previewProgressPercent ?? item.progressPercent))}%`,
                         }}
                       />
                     </div>
@@ -219,7 +219,7 @@ export function DashboardHome({
                       <span>
                         {item.previewProgressPercent == null
                           ? `${item.progressPercent}%`
-                          : `Cuplikan ${item.previewProgressPercent}%`}
+                          : `Cuplikan ${item.previewBookPercent ?? item.previewProgressPercent}%`}
                       </span>
                       <Link
                         to="/read/$slug"

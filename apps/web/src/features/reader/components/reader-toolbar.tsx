@@ -16,6 +16,7 @@ import {
   Type,
   X,
 } from "lucide-react";
+import { AnzaLogoMark } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import { FlagIcon } from "@/components/ui/flag-icon";
 import {
@@ -43,6 +44,7 @@ type ReaderToolbarProps = {
   fontSize: number;
   onFontSizeChange: (s: number) => void;
   currentChapter: number;
+  currentPage?: number;
   allChapters: {
     id: string;
     chapterNumber: number;
@@ -83,6 +85,7 @@ export function ReaderToolbar({
   fontSize,
   onFontSizeChange,
   currentChapter,
+  currentPage,
   allChapters,
   onSelectChapter,
   onExit,
@@ -113,11 +116,29 @@ export function ReaderToolbar({
     setIsLanguageOpen(false);
   };
 
+  const isSlideMode = readingLayout === "slide";
+
   return (
-    <header className="w-full px-2 sm:px-4 py-2 transition-colors">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 lg:flex-nowrap">
-        {/* Top / Main Row: Back & Title on Left */}
-        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 max-w-[220px] xs:max-w-xs md:max-w-sm shrink">
+    <header
+      className={`w-full px-2 sm:px-4 py-2 transition-colors ${
+        isSlideMode ? "pointer-events-none" : ""
+      }`}
+    >
+      <div
+        className={`relative mx-auto w-full gap-2 ${
+          isAuthorOrPublisher
+            ? "flex flex-wrap items-center justify-between xl:flex-nowrap"
+            : "flex flex-wrap items-center justify-between md:grid md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center"
+        }`}
+      >
+        {/* Top / Main Row: Back & Title on Left (unboxed, directly blends onto canvas) */}
+        <div
+          className={`flex items-center gap-1.5 sm:gap-2 min-w-0 ${
+            isAuthorOrPublisher
+              ? "max-w-[200px] sm:max-w-[240px] shrink"
+              : "max-w-[220px] sm:max-w-xs justify-self-start"
+          } ${isSlideMode ? "pointer-events-auto" : ""}`}
+        >
           <Button
             type="button"
             variant="ghost"
@@ -133,11 +154,7 @@ export function ReaderToolbar({
             </span>
           </Button>
 
-          <img
-            src="/icon.svg"
-            alt="AnzaBook"
-            className="size-6 rounded-[6px] object-contain hidden md:block shrink-0 border border-border/40 shadow-xs"
-          />
+          <AnzaLogoMark className="size-5 hidden md:block shrink-0 text-foreground" />
 
           <div className="min-w-0">
             <h1 className="font-serif text-xs sm:text-sm font-bold text-foreground truncate">
@@ -145,16 +162,25 @@ export function ReaderToolbar({
             </h1>
             <div className="flex items-center gap-1.5 whitespace-nowrap text-[10px] sm:text-[11px] font-mono text-muted-foreground">
               <span>Bab {currentChapter}</span>
+              {currentPage !== undefined && editMode === "edit" && (
+                <>
+                  <span>&bull;</span>
+                  <span>Hal. {currentPage}</span>
+                </>
+              )}
               <span>&bull;</span>
               <span>{allChapters.length} Bab</span>
             </div>
           </div>
         </div>
 
-        {/* Center: Scroll vs Slide Toggle AND (if author/publisher) Editorial Preview vs Edit Toggle */}
-        <div className="flex items-center justify-center gap-2 shrink-0 order-3 md:order-2 w-full md:w-auto">
-          {/* Scroll vs Slide Toggle */}
-          <div className="flex items-center justify-center gap-1 bg-muted/60 p-1 rounded-full border border-border/60 text-xs font-mono shadow-xs">
+        {/* Center: Scroll vs Slide Toggle (pinned dead-center in reader mode; inline flex in studio mode so it never overlaps Preview/Edit) */}
+        <div
+          className={`flex items-center justify-center shrink-0 order-3 md:order-2 w-full md:w-auto ${
+            isSlideMode ? "pointer-events-auto" : ""
+          }`}
+        >
+          <div className="flex items-center justify-center gap-1 bg-muted/75 backdrop-blur-md p-1 rounded-full border border-border/60 text-xs font-mono shadow-xs">
             <button
               type="button"
               onClick={() => onReadingLayoutChange("scroll")}
@@ -184,10 +210,17 @@ export function ReaderToolbar({
               <span>Slide</span>
             </button>
           </div>
+        </div>
 
+        {/* Desktop & Tablet Right Controls */}
+        <div
+          className={`flex flex-wrap items-center justify-end gap-1.5 sm:gap-2 shrink-0 order-2 md:order-3 ${
+            isAuthorOrPublisher ? "" : "md:justify-self-end"
+          } ${isSlideMode ? "pointer-events-auto" : ""}`}
+        >
           {/* Editorial Mode Segmented Toggle: [Preview] vs [Edit] */}
           {isAuthorOrPublisher && onEditModeChange && (
-            <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-full border border-border/80 text-xs font-mono shadow-xs">
+            <div className="flex items-center gap-1 bg-muted/75 backdrop-blur-md p-1 rounded-full border border-border/70 text-xs font-mono shadow-xs">
               <button
                 type="button"
                 onClick={() => onEditModeChange("preview")}
@@ -208,7 +241,7 @@ export function ReaderToolbar({
                 aria-pressed={editMode === "edit"}
                 className={`min-h-8 sm:min-h-9 px-2.5 sm:px-3 rounded-full font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                   editMode === "edit"
-                    ? "bg-amber-500 text-black shadow-xs font-bold"
+                    ? "bg-foreground text-background shadow-xs font-bold"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
                 title="Mode Editorial Naskah"
@@ -218,10 +251,7 @@ export function ReaderToolbar({
               </button>
             </div>
           )}
-        </div>
 
-        {/* Desktop & Tablet Right Controls */}
-        <div className="flex items-center justify-end gap-1.5 sm:gap-2 shrink-0 order-2 md:order-3">
           {/* Quick Editorial Actions: Save & Submit */}
           {isAuthorOrPublisher && editMode === "edit" && onSaveDraft && (
             <button
@@ -248,15 +278,15 @@ export function ReaderToolbar({
             </button>
           )}
 
-          {/* DRM On/Off Toggle */}
+          {/* DRM On/Off Toggle (quiet neutral editorial style) */}
           {onToggleDrm && (
             <button
               type="button"
               onClick={onToggleDrm}
-              className={`min-h-11 min-w-11 justify-center text-[11px] font-mono gap-1 px-2.5 rounded-full border transition-all inline-flex items-center ${
+              className={`min-h-11 min-w-11 justify-center text-[11px] font-mono gap-1.5 px-3 rounded-full border transition-all inline-flex items-center cursor-pointer ${
                 isDrmEnabled
-                  ? "text-emerald-600 dark:text-emerald-400 border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20"
-                  : "text-amber-600 dark:text-amber-400 border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20"
+                  ? "text-foreground border-border/80 bg-card/85 backdrop-blur-md hover:bg-muted/70"
+                  : "text-muted-foreground border-border/50 bg-transparent hover:text-foreground hover:bg-muted/50"
               }`}
               title={
                 isDrmEnabled
@@ -265,9 +295,9 @@ export function ReaderToolbar({
               }
             >
               {isDrmEnabled ? (
-                <ShieldCheck className="size-3.5 text-emerald-500" />
+                <ShieldCheck className="size-3.5 text-foreground/80" />
               ) : (
-                <ShieldOff className="size-3.5 text-amber-500" />
+                <ShieldOff className="size-3.5 text-muted-foreground" />
               )}
               <span className="hidden lg:inline">
                 DRM {isDrmEnabled ? "ON" : "OFF"}
@@ -410,7 +440,7 @@ export function ReaderToolbar({
       {/* Universal Floating Dropdown Sheets (Mobile-safe & Desktop-anchored) */}
       {/* 1. TOC Sheet */}
       {isTocOpen && (
-        <div className="fixed inset-x-3 top-16 sm:absolute sm:inset-x-auto sm:right-6 sm:top-14 sm:w-68 bg-card border border-border rounded-[14px] shadow-2xl p-2.5 z-50 animate-in fade-in zoom-in-95 max-h-[75vh] flex flex-col">
+        <div className="pointer-events-auto fixed inset-x-3 top-16 sm:absolute sm:inset-x-auto sm:right-6 sm:top-14 sm:w-68 bg-card border border-border rounded-[14px] shadow-2xl p-2.5 z-50 animate-in fade-in zoom-in-95 max-h-[75vh] flex flex-col">
           <div className="flex items-center justify-between px-2 py-1.5 text-[11px] font-mono uppercase tracking-wider text-muted-foreground border-b border-border/60">
             <span>Daftar Bab & Sampel</span>
             <button
@@ -453,7 +483,7 @@ export function ReaderToolbar({
 
       {/* 2. Typography & Appearance Sheet */}
       {isSettingsOpen && (
-        <div className="fixed inset-x-3 top-16 sm:absolute sm:inset-x-auto sm:right-6 sm:top-14 sm:w-72 bg-card border border-border rounded-[14px] shadow-2xl p-4 z-50 space-y-4 animate-in fade-in zoom-in-95 max-h-[80vh] overflow-y-auto">
+        <div className="pointer-events-auto fixed inset-x-3 top-16 sm:absolute sm:inset-x-auto sm:right-6 sm:top-14 sm:w-72 bg-card border border-border rounded-[14px] shadow-2xl p-4 z-50 space-y-4 animate-in fade-in zoom-in-95 max-h-[80vh] overflow-y-auto">
           <div className="flex items-center justify-between border-b border-border/60 pb-2">
             <span className="text-xs font-mono font-semibold uppercase text-foreground">
               Tampilan & Tipografi
@@ -593,7 +623,7 @@ export function ReaderToolbar({
 
       {/* 3. Language Switcher Sheet */}
       {isLanguageOpen && (
-        <div className="fixed inset-x-3 top-16 sm:absolute sm:inset-x-auto sm:right-6 sm:top-14 sm:w-52 bg-[#161413]/95 text-[#EDE8DF] border border-white/10 rounded-[14px] shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 backdrop-blur-md">
+        <div className="pointer-events-auto fixed inset-x-3 top-16 sm:absolute sm:inset-x-auto sm:right-6 sm:top-14 sm:w-52 bg-[#161413]/95 text-[#EDE8DF] border border-white/10 rounded-[14px] shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 backdrop-blur-md">
           <div className="flex items-center justify-between px-2 py-1 text-[11px] font-mono uppercase tracking-wider text-white/60 border-b border-white/10 mb-1">
             <span>Bahasa Naskah</span>
             <button

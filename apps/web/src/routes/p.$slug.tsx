@@ -10,8 +10,8 @@ import {
   Award,
   BookOpen,
   Building2,
+  Check,
   Compass,
-  Feather,
   FileText,
   Globe,
   Mail,
@@ -19,6 +19,7 @@ import {
   PenTool,
   Send,
   ShieldCheck,
+  UserPlus,
   Users,
   X,
 } from "lucide-react";
@@ -35,9 +36,12 @@ import { PageFrame } from "@/features/dashboard/components/page-frame";
 import { canAccessPublisherStudio } from "@/features/publisher/publisher-helpers";
 import {
   useCreateManuscriptDraft,
+  useFollowPublisher,
   useMyManuscripts,
+  useMySocialProfile,
   usePublisher,
   useSubmitManuscriptDraft,
+  useUnfollowPublisher,
 } from "@/features/social/hooks";
 import { publisherDetailQuery } from "@/features/social/queries";
 import { ApiError } from "@/lib/api/client";
@@ -229,13 +233,22 @@ function DraftPickerDialog({
   );
 }
 
-export default function PublisherPublicProfilePage() {
+function PublisherPublicProfilePage() {
   const { slug } = Route.useParams();
   const sessionUser = Route.useRouteContext().session?.user;
   const { data: publisher } = usePublisher(slug);
+  const { data: myProfile } = useMySocialProfile(Boolean(sessionUser));
   const { data: booksResponse } = useBooks({ publisher: slug });
-  const { data: myManuscripts = [] } = useMyManuscripts(Boolean(sessionUser));
+  const canAuthorWriteManuscript = Boolean(
+    myProfile?.authorStatus === "verified" ||
+    publisher?.isCurrentUserApprovedWriter,
+  );
+  const { data: myManuscripts = [] } = useMyManuscripts(
+    Boolean(sessionUser) && canAuthorWriteManuscript,
+  );
   const createDraftMutation = useCreateManuscriptDraft();
+  const followPublisherMutation = useFollowPublisher(slug);
+  const unfollowPublisherMutation = useUnfollowPublisher(slug);
 
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<"books" | "about">("books");
@@ -373,16 +386,67 @@ export default function PublisherPublicProfilePage() {
             ) : undefined
           }
           actions={
-            <Link
-              to="/app"
-              search={{ tab: "explore" }}
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-4 text-xs font-mono text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] transition-colors"
-            >
-              <Compass className="size-3.5" aria-hidden="true" />
-              <span>Jelajahi Katalog</span>
-            </Link>
+            <>
+              {sessionUser ? (
+                <Button
+                  type="button"
+                  variant={publisher.isFollowing ? "outline" : "default"}
+                  disabled={
+                    followPublisherMutation.isPending ||
+                    unfollowPublisherMutation.isPending
+                  }
+                  onClick={() => {
+                    if (publisher.isFollowing) {
+                      unfollowPublisherMutation.mutate();
+                    } else {
+                      followPublisherMutation.mutate();
+                    }
+                  }}
+                  className={
+                    publisher.isFollowing
+                      ? "min-h-11 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-4 text-xs font-semibold text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] cursor-pointer inline-flex items-center gap-1.5"
+                      : "min-h-11 rounded-xl bg-[var(--color-accent)] px-4 text-xs font-semibold text-[var(--color-accent-ink)] hover:brightness-95 cursor-pointer inline-flex items-center gap-1.5"
+                  }
+                >
+                  {publisher.isFollowing ? (
+                    <>
+                      <Check className="size-3.5" aria-hidden="true" />
+                      <span>Mengikuti</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="size-3.5" aria-hidden="true" />
+                      <span>Ikuti Penerbit</span>
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Link
+                  to="/sign-in"
+                  search={{ redirect: `/p/${publisher.slug}` }}
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-[var(--color-accent)] px-4 text-xs font-semibold text-[var(--color-accent-ink)] hover:brightness-95"
+                >
+                  <UserPlus className="size-3.5" aria-hidden="true" />
+                  <span>Ikuti Penerbit</span>
+                </Link>
+              )}
+
+              <Link
+                to="/app"
+                search={{ tab: "explore" }}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-4 text-xs font-mono text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] transition-colors"
+              >
+                <Compass className="size-3.5" aria-hidden="true" />
+                <span>Jelajahi Katalog</span>
+              </Link>
+            </>
           }
           metrics={[
+            {
+              label: "Pengikut",
+              value: publisher.followerCount ?? 0,
+              icon: <Users className="size-3.5" aria-hidden="true" />,
+            },
             {
               label: "Buku Terbit",
               value: publishedBooks.length,
@@ -391,12 +455,7 @@ export default function PublisherPublicProfilePage() {
             {
               label: "Penulis Rekanan",
               value: approvedWritersShowcase.length,
-              icon: <Users className="size-3.5" aria-hidden="true" />,
-            },
-            {
-              label: "Topik Kurasi",
-              value: publisher.topics?.length ?? 0,
-              icon: <Feather className="size-3.5" aria-hidden="true" />,
+              icon: <PenTool className="size-3.5" aria-hidden="true" />,
             },
             {
               label: "Status Naskah",
@@ -441,36 +500,57 @@ export default function PublisherPublicProfilePage() {
 
               <div className="flex flex-wrap items-center gap-2.5 shrink-0">
                 {sessionUser ? (
-                  <>
-                    <Button
-                      type="button"
-                      disabled={createDraftMutation.isPending}
-                      onClick={handleStartNewDraftForPublisher}
-                      className="min-h-11 rounded-xl bg-[var(--color-accent)] px-5 text-xs font-semibold text-[var(--color-accent-ink)] hover:brightness-95 cursor-pointer"
-                    >
-                      <PenTool className="size-4 mr-1.5" aria-hidden="true" />
-                      <span>
-                        {createDraftMutation.isPending
-                          ? "Membuka Editor..."
-                          : "Tulis Draf Baru"}
-                      </span>
-                    </Button>
-
-                    {eligibleDraftCount > 0 && (
+                  canAuthorWriteManuscript ? (
+                    <>
                       <Button
                         type="button"
-                        variant="outline"
-                        onClick={() => setIsDraftPickerOpen(true)}
-                        className="min-h-11 rounded-xl border-[var(--color-rule)] bg-[var(--color-paper-2)] px-4 text-xs font-semibold text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] cursor-pointer"
+                        disabled={createDraftMutation.isPending}
+                        onClick={handleStartNewDraftForPublisher}
+                        className="min-h-11 rounded-xl bg-[var(--color-accent)] px-5 text-xs font-semibold text-[var(--color-accent-ink)] hover:brightness-95 cursor-pointer"
                       >
-                        <FileText
-                          className="size-4 mr-1.5"
-                          aria-hidden="true"
-                        />
-                        <span>Kirim dari Draf Saya ({eligibleDraftCount})</span>
+                        <PenTool className="size-4 mr-1.5" aria-hidden="true" />
+                        <span>
+                          {createDraftMutation.isPending
+                            ? "Membuka Editor..."
+                            : "Tulis Draf Baru"}
+                        </span>
                       </Button>
-                    )}
-                  </>
+
+                      {eligibleDraftCount > 0 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setIsDraftPickerOpen(true)}
+                          className="min-h-11 rounded-xl border-[var(--color-rule)] bg-[var(--color-paper-2)] px-4 text-xs font-semibold text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] cursor-pointer"
+                        >
+                          <FileText
+                            className="size-4 mr-1.5"
+                            aria-hidden="true"
+                          />
+                          <span>
+                            Kirim dari Draf Saya ({eligibleDraftCount})
+                          </span>
+                        </Button>
+                      )}
+                    </>
+                  ) : myProfile?.authorStatus === "pending" ? (
+                    <Link
+                      to="/app"
+                      search={{ tab: "profile" }}
+                      className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-4 text-xs font-semibold text-[var(--color-ink)] hover:bg-[var(--color-paper-3)]"
+                    >
+                      <span>Verifikasi Penulis Sedang Diproses</span>
+                      <ArrowRight className="size-4" aria-hidden="true" />
+                    </Link>
+                  ) : (
+                    <Link
+                      to="/authors/new"
+                      className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--color-ink)] px-5 text-xs font-semibold text-[var(--color-paper)] hover:opacity-90"
+                    >
+                      <PenTool className="size-4" aria-hidden="true" />
+                      <span>Daftar Penulis Resmi untuk Kirim Naskah</span>
+                    </Link>
+                  )
                 ) : (
                   <Link
                     to="/sign-in"

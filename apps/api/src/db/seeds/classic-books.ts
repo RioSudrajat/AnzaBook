@@ -4,13 +4,11 @@ export const classicBooks: BookSeed[] = [
   {
     slug: "revolusi-cetak-kedaulatan-membaca",
     title: "Revolusi Cetak & Kedaulatan Membaca",
-    originalTitle: "The Print Revolution & Reading Sovereignty",
-    author: "Sutan Sjahrir",
-    authorAvatar:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+    author: "AnzaBook",
+    authorUsername: "anzabook",
+    authorAvatar: null,
     editor: "Anza Book",
     editorAvatar: "/icon.svg",
-    translator: "Ahmad Sanusi",
     coverUrl: "/covers/revolusi-cetak.svg",
     coverColor: "#F06A24",
     synopsis:
@@ -158,13 +156,12 @@ export const classicBooks: BookSeed[] = [
   {
     slug: "madilog-tan-malaka",
     title: "Madilog: Materialisme, Dialektika, dan Logika",
-    originalTitle: "Madilog",
     author: "Tan Malaka",
-    authorAvatar:
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
+    authorUsername: "anzabook",
+    preserveDisplayAuthor: true,
+    authorAvatar: null,
     editor: "Anza Book",
     editorAvatar: "/icon.svg",
-    translator: null,
     coverUrl: "/covers/madilog.svg",
     coverColor: "#8B1E1E",
     synopsis:
@@ -301,12 +298,11 @@ export const classicBooks: BookSeed[] = [
   {
     slug: "filsafat-pasar-santa",
     title: "Filsafat Pasar Santa: Mengapa Buku Harus Murah",
-    author: "Rio & Rekan",
-    authorAvatar:
-      "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80",
+    author: "Selembar Awan",
+    authorUsername: "selembarawan",
+    authorAvatar: null,
     editor: "Anza Book",
     editorAvatar: "/icon.svg",
-    translator: null,
     coverUrl: "/covers/pasar-santa.svg",
     coverColor: "#059669",
     synopsis:
@@ -401,12 +397,11 @@ export const classicBooks: BookSeed[] = [
   {
     slug: "tipografi-proletar-desain-huruf",
     title: "Tipografi Proletar: Desain Huruf untuk Kaum Terpelajar",
-    author: "Studio Aksara Rakyat",
-    authorAvatar:
-      "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80",
+    author: "Selembar Awan",
+    authorUsername: "selembarawan",
+    authorAvatar: null,
     editor: "Anza Book",
     editorAvatar: "/icon.svg",
-    translator: null,
     coverUrl: "/covers/tipografi.svg",
     coverColor: "#4338CA",
     synopsis:
@@ -502,11 +497,11 @@ export const classicBooks: BookSeed[] = [
     slug: "indonesia-menggugat",
     title: "Indonesia Menggugat: Suara Kedaulatan dari Penjara Banceuy",
     author: "Ir. Soekarno",
-    authorAvatar:
-      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80",
+    authorUsername: "anzabook",
+    preserveDisplayAuthor: true,
+    authorAvatar: null,
     editor: "Anza Book",
     editorAvatar: "/icon.svg",
-    translator: null,
     coverUrl: "/covers/indonesia-menggugat.svg",
     coverColor: "#991B1B",
     synopsis:
@@ -615,12 +610,11 @@ export const classicBooks: BookSeed[] = [
   {
     slug: "panduan-komunitas-taman-bacaan",
     title: "Panduan Praktis Membangun Taman Bacaan Rakyat",
-    author: "Anza Literacy Movement",
-    authorAvatar:
-      "https://images.unsplash.com/photo-1544717305-2782549b5136?w=150&auto=format&fit=crop&q=80",
+    author: "AnzaBook",
+    authorUsername: "anzabook",
+    authorAvatar: null,
     editor: "Anza Book",
     editorAvatar: "/icon.svg",
-    translator: null,
     coverUrl: "/covers/panduan-tbr.svg",
     coverColor: "#0D9488",
     synopsis:

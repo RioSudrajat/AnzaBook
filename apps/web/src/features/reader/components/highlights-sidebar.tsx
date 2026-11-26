@@ -6,7 +6,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { BookHighlightDto } from "@starter/shared/types";
 import { Button } from "@/components/ui/button";
 
@@ -22,6 +22,7 @@ type HighlightsSidebarProps = {
   onSelectHighlight: (h: BookHighlightDto) => void;
   onFlexHighlight: (h: BookHighlightDto) => void;
   onDeleteHighlight?: (id: string) => void;
+  focusedHighlightId?: string | null;
 };
 
 export function HighlightsSidebar({
@@ -32,8 +33,17 @@ export function HighlightsSidebar({
   onSelectHighlight,
   onFlexHighlight,
   onDeleteHighlight,
+  focusedHighlightId,
 }: HighlightsSidebarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !focusedHighlightId) return;
+    const item = document.getElementById(
+      `sidebar-highlight-${focusedHighlightId}`,
+    );
+    item?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [isOpen, focusedHighlightId]);
 
   if (!isOpen) return null;
 
@@ -78,7 +88,7 @@ export function HighlightsSidebar({
       {/* Top Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
         <div className="flex items-center gap-2">
-          <h2 className="font-serif text-lg font-bold text-foreground">
+          <h2 className="font-serif text-lg font-bold text-[#EDE8DF]">
             Highlights ({highlights.length})
           </h2>
         </div>
@@ -86,7 +96,7 @@ export function HighlightsSidebar({
           <button
             type="button"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="p-1.5 text-muted-foreground hover:text-foreground rounded-[6px] hover:bg-white/5 transition-colors"
+            className="p-1.5 text-white/65 hover:text-white rounded-[6px] hover:bg-white/5 transition-colors"
             title={isExpanded ? "Perkecil Panel" : "Perluas Panel"}
           >
             {isExpanded ? (
@@ -98,7 +108,7 @@ export function HighlightsSidebar({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-muted-foreground hover:text-foreground rounded-[6px] hover:bg-white/5 transition-colors"
+            className="p-1.5 text-white/65 hover:text-white rounded-[6px] hover:bg-white/5 transition-colors"
             title="Tutup Panel Highlights"
           >
             <X className="size-4" />
@@ -129,6 +139,7 @@ export function HighlightsSidebar({
             return (
               <div
                 key={h.id}
+                id={`sidebar-highlight-${h.id}`}
                 className="flex items-start gap-3.5 group animate-in fade-in slide-in-from-right-2 duration-200"
               >
                 {/* Index Number Badge */}
@@ -152,7 +163,11 @@ export function HighlightsSidebar({
                   {/* Rounded Quote Box matching SS 5 */}
                   <div
                     onClick={() => onSelectHighlight(h)}
-                    className={`p-4 rounded-[10px] border cursor-pointer transition-all hover:brightness-105 shadow-sm space-y-2 ${colorClass}`}
+                    className={`p-4 rounded-[10px] border cursor-pointer transition-all hover:brightness-105 shadow-sm space-y-2 ${colorClass} ${
+                      focusedHighlightId === h.id
+                        ? "ring-2 ring-[var(--color-accent)] ring-offset-2 ring-offset-[#161413]"
+                        : ""
+                    }`}
                   >
                     <p className="font-serif text-xs sm:text-[13px] leading-relaxed">
                       &ldquo;{h.selectedText}&rdquo;

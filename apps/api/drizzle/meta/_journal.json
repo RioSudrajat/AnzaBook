@@ -120,6 +120,20 @@
       "when": 1795641202185,
       "tag": "0016_busy_iron_patriot",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1795654760867,
+      "tag": "0017_skinny_jack_power",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795684383352,
+      "tag": "0018_sad_mindworm",
+      "breakpoints": true
     }
   ]
 }

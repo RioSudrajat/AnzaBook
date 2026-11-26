@@ -29,6 +29,7 @@ import { QuotePostCard } from "@/features/share/components/quote-post-card";
 import { SessionPostCard } from "@/features/share/components/session-post-card";
 import {
   useFollowUser,
+  useMySocialProfile,
   useUnfollowUser,
   useUnifiedExplore,
   useVerifiedPublishers,
@@ -65,6 +66,8 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
 
   const categories = useCategories();
   const publishers = useVerifiedPublishers();
+  const { data: myProfile } = useMySocialProfile();
+  const currentUserId = myProfile?.id;
 
   // Unified Explore Hook
   const exploreQuery = useUnifiedExplore({
@@ -132,6 +135,8 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
         <div className="relative flex items-center">
           <Search className="absolute left-4 size-5 text-muted-foreground pointer-events-none" />
           <Input
+            id="explore-search-input"
+            name="exploreSearch"
             type="search"
             value={searchInput}
             onChange={(e) => handleSearchChange(e.target.value)}
@@ -322,6 +327,9 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
                       <UserSearchRow
                         key={user.id}
                         user={user}
+                        isSelf={Boolean(
+                          currentUserId && currentUserId === user.id,
+                        )}
                         onFollowToggle={() => handleFollowToggle(user)}
                         isMutationPending={
                           followUserMutation.isPending ||
@@ -628,6 +636,9 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
                     <UserSearchRow
                       key={user.id}
                       user={user}
+                      isSelf={Boolean(
+                        currentUserId && currentUserId === user.id,
+                      )}
                       onFollowToggle={() => handleFollowToggle(user)}
                       isMutationPending={
                         followUserMutation.isPending ||
@@ -689,10 +700,12 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
 // Sub-component: UserSearchRow (Instagram-style user item with orange button)
 function UserSearchRow({
   user,
+  isSelf = false,
   onFollowToggle,
   isMutationPending,
 }: {
   user: ExploreUserItemDto;
+  isSelf?: boolean;
   onFollowToggle: () => void;
   isMutationPending: boolean;
 }) {
@@ -757,18 +770,24 @@ function UserSearchRow({
       </Link>
 
       <div className="shrink-0">
-        <button
-          type="button"
-          onClick={onFollowToggle}
-          disabled={isMutationPending}
-          className={`min-h-10 px-4 rounded-xl text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer ${
-            user.isFollowing
-              ? "border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] font-medium"
-              : "bg-[var(--color-accent)] hover:brightness-95 text-[var(--color-accent-ink)]"
-          }`}
-        >
-          {user.isFollowing ? "Mengikuti" : "Ikuti"}
-        </button>
+        {isSelf ? (
+          <span className="inline-flex min-h-9 items-center rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 text-[11px] font-mono text-[var(--color-muted)]">
+            Akun Anda
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={onFollowToggle}
+            disabled={isMutationPending}
+            className={`min-h-10 px-4 rounded-xl text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer ${
+              user.isFollowing
+                ? "border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] font-medium"
+                : "bg-[var(--color-accent)] hover:brightness-95 text-[var(--color-accent-ink)]"
+            }`}
+          >
+            {user.isFollowing ? "Mengikuti" : "Ikuti"}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -934,7 +953,7 @@ function CommunityCard({
       city={community.city}
       description={community.description}
       verificationStatus={community.verificationStatus}
-      footerMeta="Komunitas Literasi"
+      footerMeta={`${community.followerCount ?? 0} pengikut · Komunitas Literasi`}
       actions={
         <Link
           to="/c/$slug"
@@ -967,7 +986,7 @@ function PublisherCard({
       description={publisher.description}
       topics={publisher.topics}
       verificationStatus={publisher.verificationStatus}
-      footerMeta="Mitra Penerbit Resmi"
+      footerMeta={`${publisher.followerCount ?? 0} pengikut · Mitra Penerbit`}
       actions={
         <Link
           to="/p/$slug"

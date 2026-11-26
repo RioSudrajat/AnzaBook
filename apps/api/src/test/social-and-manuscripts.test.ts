@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { agent, originHeader, signUp } from "./helpers";
+import { agent, originHeader, setAuthorStatus, signUp } from "./helpers";
 import { db } from "../db";
 import {
   bookHighlights,
@@ -430,7 +430,8 @@ describe("Social Profile, 4D Explore, Community Membership & Manuscript Studio A
 
     // Submit manuscript with multi-chapters
     const authorClient = agent();
-    await signUp(authorClient, "Penulis Fantasi");
+    const authorEmail = await signUp(authorClient, "Penulis Fantasi");
+    await setAuthorStatus(authorEmail, "verified");
 
     const submitRes = await authorClient
       .post("/api/publisher/manuscripts")

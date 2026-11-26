@@ -24,6 +24,7 @@ import {
   issueOrGetDrmWatermarkSession,
 } from "./drm.service";
 import { getActiveMembership } from "./membership.service";
+import { countContentWords } from "@starter/shared/reading-progress";
 import type {
   ListBooksQuery,
   ReadBookQuery,
@@ -53,6 +54,7 @@ export async function listBookChapters(
       id: bookChapters.id,
       chapterNumber: bookChapters.chapterNumber,
       title: bookChapters.titleId,
+      contentId: bookChapters.contentId,
     })
     .from(bookChapters)
     .where(eq(bookChapters.bookId, bookId))
@@ -62,11 +64,12 @@ export async function listBookChapters(
     ? await hasActiveEventBookSampleAccess(bookId, userId)
     : false;
 
-  return chapters.map((chapter) => ({
+  return chapters.map(({ contentId, ...chapter }) => ({
     ...chapter,
     isSample:
       chapter.chapterNumber === 1 ||
       (hasEventAccess && chapter.chapterNumber === 2),
+    wordCount: countContentWords(contentId),
   }));
 }
 
@@ -387,7 +390,7 @@ export function getPreviewParagraphCount(text: string): number {
   return Math.min(3, Math.max(1, splitParagraphs(text).length - 1));
 }
 
-function previewText(text: string | null, count: number): string | null {
+export function previewText(text: string | null, count: number): string | null {
   if (text === null) return null;
   const paragraphs = splitParagraphs(text);
   if (paragraphs.length === 1) {
@@ -453,17 +456,16 @@ export function toBookSummary(
   row: typeof books.$inferSelect,
   publisher?: BookSummaryPublisher | null,
   authorAvatarFallback?: string | null,
+  authorUsername?: string | null,
 ): BookSummaryDto {
   return {
     id: row.id,
     slug: row.slug,
     title: row.title,
-    originalTitle: row.originalTitle,
     author: row.author,
     authorAvatar: row.authorAvatar ?? authorAvatarFallback ?? null,
     editor: row.editor,
     editorAvatar: row.editorAvatar,
-    translator: row.translator,
     coverUrl: row.coverUrl,
     coverColor: row.coverColor,
     synopsis: row.synopsis,
@@ -490,6 +492,7 @@ export function toBookSummary(
     publisherName: publisher?.name ?? null,
     publisherLogoUrl: publisher?.logoUrl ?? null,
     authorUserId: row.authorUserId,
+    authorUsername: authorUsername ?? null,
     digitalPriceIdr: row.digitalPriceIdr,
   };
 }
@@ -554,6 +557,7 @@ export async function listBooks(query: ListBooksQuery) {
         logoUrl: publishers.logoUrl,
       },
       authorUserImage: user.image,
+      authorUsername: user.username,
     })
     .from(books)
     .leftJoin(publishers, eq(books.publisherId, publishers.id))
@@ -565,8 +569,8 @@ export async function listBooks(query: ListBooksQuery) {
 
   const data = rows
     .slice(0, query.limit)
-    .map(({ book, publisher, authorUserImage }) =>
-      toBookSummary(book, publisher, authorUserImage),
+    .map(({ book, publisher, authorUserImage, authorUsername }) =>
+      toBookSummary(book, publisher, authorUserImage, authorUsername),
     );
 
   const [bulletinRow] = await db
@@ -578,6 +582,7 @@ export async function listBooks(query: ListBooksQuery) {
         logoUrl: publishers.logoUrl,
       },
       authorUserImage: user.image,
+      authorUsername: user.username,
     })
     .from(books)
     .leftJoin(publishers, eq(books.publisherId, publishers.id))
@@ -592,6 +597,7 @@ export async function listBooks(query: ListBooksQuery) {
           bulletinRow.book,
           bulletinRow.publisher,
           bulletinRow.authorUserImage,
+          bulletinRow.authorUsername,
         )
       : null,
     meta: {
@@ -615,6 +621,7 @@ export async function getBookBySlug(
         logoUrl: publishers.logoUrl,
       },
       authorUserImage: user.image,
+      authorUsername: user.username,
     })
     .from(books)
     .leftJoin(publishers, eq(books.publisherId, publishers.id))
@@ -623,7 +630,7 @@ export async function getBookBySlug(
     .limit(1);
 
   if (!bookRow) return null;
-  const { book, publisher, authorUserImage } = bookRow;
+  const { book, publisher, authorUserImage, authorUsername } = bookRow;
 
   const editions = await db
     .select()
@@ -728,7 +735,7 @@ export async function getBookBySlug(
   );
 
   return {
-    ...toBookSummary(book, publisher, authorUserImage),
+    ...toBookSummary(book, publisher, authorUserImage, authorUsername),
     chapters,
     editions: editions.map((e) => ({
       id: e.id,
@@ -950,6 +957,7 @@ export async function getBookReaderPayload(
     const previewCount = isFullChapter
       ? 0
       : getPreviewParagraphCount(row.contentId);
+    const fullWordCount = countContentWords(row.contentId || row.contentEn);
     const contentId = isFullChapter
       ? row.contentId
       : (previewText(row.contentId, previewCount) ?? "");
@@ -966,6 +974,8 @@ export async function getBookReaderPayload(
       blueprintContent: query.mode === "blueprint" ? row.blueprintContent : "",
       audioUrl: canPlayAudio ? row.audioUrl : null,
       audioDurationSeconds: canPlayAudio ? row.audioDurationSec : null,
+      fullWordCount,
+      isPreviewTruncated: !isFullChapter,
     };
   });
   const currentChapter = chapters.find(

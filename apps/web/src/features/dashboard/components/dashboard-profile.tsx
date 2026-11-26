@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import type {
   BookHighlightDto,
+  ExplorePostItemDto,
   ReadingSessionDto,
   SocialProfileDto,
 } from "@starter/shared/types";
@@ -46,6 +47,7 @@ import { useReadingSessions, useUserShelves } from "@/features/community/hooks";
 import { getManuscriptStatusBadgeClass } from "@/features/publisher/publisher-helpers";
 import { HighlightStoryDialog } from "@/features/reader/components/highlight-story-dialog";
 import { FlexReadingDialog } from "@/features/share/components/flex-reading-dialog";
+import { QuotePostCard } from "@/features/share/components/quote-post-card";
 import { SocialRelationsDialog } from "@/features/social/components/social-relations-dialog";
 import {
   useCreateManuscriptDraft,
@@ -99,12 +101,17 @@ function DashboardProfileContent({
     useMySocialProfile();
   const profile = externalProfile || myProfile;
 
+  const isVerifiedAuthor = profile?.authorStatus === "verified";
+  const isPendingAuthor = profile?.authorStatus === "pending";
+  const canAccessAuthorStudio =
+    isVerifiedAuthor || Boolean(profile?.isApprovedWriter);
+
   const { data: shelves = [] } = useUserShelves();
   const { data: sessionsData } = useReadingSessions();
   const sessions = sessionsData?.data || [];
   const telemetrySummary = sessionsData?.summary;
   const { data: manuscripts = [], refetch: refetchManuscripts } =
-    useMyManuscripts();
+    useMyManuscripts(isOwnProfile && canAccessAuthorStudio);
   const userHighlights = useAllHighlights();
 
   const followMutation = useFollowUser();
@@ -118,9 +125,6 @@ function DashboardProfileContent({
     isError?: boolean;
   } | null>(null);
   const navigate = useNavigate();
-
-  const isVerifiedAuthor = profile?.authorStatus === "verified";
-  const isPendingAuthor = profile?.authorStatus === "pending";
   const isPublisher = Boolean(
     profile?.isPublisher ||
     (profile?.managedPublishers && profile.managedPublishers.length > 0),
@@ -288,7 +292,7 @@ function DashboardProfileContent({
           },
         ]
       : []),
-    ...(isOwnProfile && (isVerifiedAuthor || manuscripts.length > 0)
+    ...(isOwnProfile && canAccessAuthorStudio
       ? [
           {
             id: "author_studio" as const,
@@ -769,68 +773,115 @@ function DashboardProfileContent({
                 di E-Reader untuk membuat kutipan.
               </p>
             ) : (
-              <div className="space-y-3">
-                {userHighlights.data?.map((hl) => (
-                  <div
-                    key={hl.id}
-                    className="p-4 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] space-y-2.5"
-                  >
-                    <blockquote className="border-l-2 border-[var(--color-accent)] pl-3.5 italic text-xs sm:text-sm text-[var(--color-ink)] font-serif leading-relaxed">
-                      &ldquo;{hl.selectedText}&rdquo;
-                    </blockquote>
-                    {hl.note && (
-                      <p className="text-xs text-[var(--color-muted)] font-mono">
-                        Catatan: {hl.note}
-                      </p>
-                    )}
-                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[var(--color-rule)] text-xs">
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-mono text-[var(--color-muted)]">
-                        {hl.bookTitle && <span>{hl.bookTitle}</span>}
-                        <span>Bab {hl.chapterNumber}</span>
-                        <span>Halaman {hl.pageNumber}</span>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {hl.isPosted && (
-                          <Link
-                            to="/post/$type/$id"
-                            params={{ type: "quote", id: hl.id }}
-                            className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-[var(--color-rule)] px-3 text-xs font-medium text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] transition-colors"
-                          >
-                            <ExternalLink
-                              className="size-3.5"
-                              aria-hidden="true"
-                            />
-                            <span>Lihat Post</span>
-                          </Link>
-                        )}
-                        {isOwnProfile && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={hl.isPosted ? "outline" : "default"}
-                            onClick={() => {
-                              if (onOpenQuoteStory) {
-                                onOpenQuoteStory(hl);
-                                return;
-                              }
-                              setInternalQuoteTarget(hl);
-                            }}
-                            className={`text-xs min-h-11 px-3.5 rounded-xl inline-flex items-center gap-1.5 cursor-pointer ${
-                              hl.isPosted
-                                ? "border-[var(--color-green)]/40 text-[var(--color-ink)] bg-[var(--color-green-soft)]"
-                                : "bg-[var(--color-accent)] hover:brightness-95 text-[var(--color-accent-ink)] font-semibold"
-                            }`}
-                          >
-                            <Share2 className="size-3.5" aria-hidden="true" />
-                            <span>
-                              {hl.isPosted ? "Bagikan Ulang" : "Post & Bagikan"}
+              <div className="space-y-4">
+                {userHighlights.data?.map((hl) => {
+                  const meta = resolveBookMeta(
+                    hl.bookId,
+                    hl.bookTitle,
+                    hl.bookCoverUrl,
+                  );
+                  const quotePost: ExplorePostItemDto = {
+                    id: hl.id,
+                    type: "quote",
+                    content: hl.selectedText,
+                    note: hl.note,
+                    postCaption: hl.postCaption ?? null,
+                    postConfig: hl.postConfig ?? null,
+                    color: hl.color,
+                    chapterNumber: hl.chapterNumber,
+                    pageNumber: hl.pageNumber,
+                    createdAt: hl.postedAt || hl.createdAt,
+                    author: {
+                      id: profile?.id || hl.userId,
+                      name: profile?.name || "Pembaca AnzaBook",
+                      username: profile?.username ?? null,
+                      image: profile?.image ?? null,
+                    },
+                    book: {
+                      id: hl.bookId,
+                      slug: hl.bookSlug || meta.slug || hl.bookId,
+                      title: hl.bookTitle || meta.title,
+                      author: hl.bookAuthor || meta.author || "AnzaBook",
+                      coverUrl: hl.bookCoverUrl ?? meta.coverUrl,
+                      coverColor: hl.bookCoverColor ?? meta.coverColor,
+                      publishedYear: hl.bookPublishedYear ?? undefined,
+                      genres: hl.bookGenres ?? undefined,
+                      pageCount: hl.bookPageCount ?? undefined,
+                    },
+                  };
+
+                  return (
+                    <div
+                      key={hl.id}
+                      className="rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-4 sm:p-5 space-y-3"
+                    >
+                      <QuotePostCard
+                        post={quotePost}
+                        as="div"
+                        footerActions={
+                          <>
+                            <span
+                              className={`inline-flex items-center rounded-md border px-2.5 py-1 font-mono text-[11px] font-medium ${
+                                hl.isPosted
+                                  ? "border-[var(--color-green)]/40 bg-[var(--color-green-soft)] text-[var(--color-ink)]"
+                                  : "border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-muted)]"
+                              }`}
+                            >
+                              {hl.isPosted
+                                ? "Dipublikasikan ke Eksplor"
+                                : "Catatan Pribadi"}
                             </span>
-                          </Button>
-                        )}
-                      </div>
+
+                            <div className="flex flex-wrap items-center gap-2 ml-auto">
+                              {hl.isPosted && (
+                                <Link
+                                  to="/post/$type/$id"
+                                  params={{ type: "quote", id: hl.id }}
+                                  className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 text-xs font-medium text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] transition-colors"
+                                >
+                                  <ExternalLink
+                                    className="size-3.5"
+                                    aria-hidden="true"
+                                  />
+                                  <span>Lihat Post</span>
+                                </Link>
+                              )}
+                              {isOwnProfile && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={hl.isPosted ? "outline" : "default"}
+                                  onClick={() => {
+                                    if (onOpenQuoteStory) {
+                                      onOpenQuoteStory(hl);
+                                      return;
+                                    }
+                                    setInternalQuoteTarget(hl);
+                                  }}
+                                  className={`text-xs min-h-11 px-3.5 rounded-xl inline-flex items-center gap-1.5 cursor-pointer ${
+                                    hl.isPosted
+                                      ? "border-[var(--color-green)]/40 text-[var(--color-ink)] bg-[var(--color-green-soft)]"
+                                      : "bg-[var(--color-accent)] hover:brightness-95 text-[var(--color-accent-ink)] font-semibold"
+                                  }`}
+                                >
+                                  <Share2
+                                    className="size-3.5"
+                                    aria-hidden="true"
+                                  />
+                                  <span>
+                                    {hl.isPosted
+                                      ? "Bagikan Ulang"
+                                      : "Post & Bagikan"}
+                                  </span>
+                                </Button>
+                              )}
+                            </div>
+                          </>
+                        }
+                      />
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1050,7 +1101,7 @@ function DashboardProfileContent({
                 {profile.publishedBooks.map((book) => (
                   <Link
                     key={book.id}
-                    to="/read/$slug"
+                    to="/books/$slug"
                     params={{ slug: book.slug }}
                     className="group space-y-2 text-left focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] rounded-xl p-2.5 border border-[var(--color-rule)] hover:border-[var(--color-ink)]/40 transition-colors bg-[var(--color-paper)]"
                   >

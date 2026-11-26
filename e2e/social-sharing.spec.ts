@@ -190,14 +190,14 @@ test.describe("Social Sharing, Styled Feed Cards & Public OG Previews (Issue #14
       page.getByRole("dialog", { name: "Prapemuat Literasi AnzaBook" }),
     ).toHaveCount(0, { timeout: 10_000 });
     await expect(page.locator("#chapter-sec-1")).toBeVisible();
-    await expect(page.getByText(/Bab 1\//)).toBeVisible();
+    await expect(page.getByText(/^1\/\d+$/)).toBeVisible();
 
     const secondChapter = page.locator("#chapter-sec-2");
     await expect(secondChapter).toBeVisible();
     await secondChapter.evaluate((section) =>
       section.scrollIntoView({ block: "start" }),
     );
-    await expect(page.getByText(/Bab 2\//)).toBeVisible();
+    await expect(page.getByText(/^2\/\d+$/)).toBeVisible();
 
     await page.getByRole("button", { name: "Keluar ke Home" }).click();
     const exitDialog = page.getByRole("dialog", {

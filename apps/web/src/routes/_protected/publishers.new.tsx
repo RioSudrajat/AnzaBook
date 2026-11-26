@@ -42,7 +42,7 @@ const PRESET_TOPICS = [
   "Kajian Agraria",
 ];
 
-export default function NewPublicationPage() {
+function NewPublicationPage() {
   const sessionUser = Route.useRouteContext().session.user;
   const navigate = useNavigate();
   const { data: myProfile } = useMySocialProfile();
@@ -476,6 +476,9 @@ export default function NewPublicationPage() {
                 </button>
 
                 <input
+                  id="publisher-logo-upload"
+                  name="publisherLogoFile"
+                  aria-label="Unggah logo penerbit"
                   ref={logoInputRef}
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/gif"
@@ -555,6 +558,9 @@ export default function NewPublicationPage() {
                 </button>
 
                 <input
+                  id="publisher-banner-upload"
+                  name="publisherBannerFile"
+                  aria-label="Unggah banner penerbit"
                   ref={bannerInputRef}
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/gif"

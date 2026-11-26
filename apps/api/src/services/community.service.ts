@@ -1,7 +1,9 @@
-import { and, desc, eq, lt, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
+import { countContentWords } from "@starter/shared/reading-progress";
 import { db } from "../db";
 import {
   books,
+  bookChapters,
   bookReviews,
   paragraphComments,
   userShelves,
@@ -11,7 +13,11 @@ import {
   readingSessions,
 } from "../db/schema";
 import { HttpError } from "../lib/http-error";
-import { toBookSummary } from "./books.service";
+import {
+  getPreviewParagraphCount,
+  previewText,
+  toBookSummary,
+} from "./books.service";
 import type {
   CreateParagraphCommentInput,
   CreateReviewInput,
@@ -99,16 +105,75 @@ export async function getUserShelves(userId: string): Promise<ShelfItemDto[]> {
     .where(eq(userShelves.userId, userId))
     .orderBy(desc(activity), userShelves.id);
 
-  return rows.map(({ shelf, book, previewProgressPercent }) => ({
-    id: shelf.id,
-    bookId: shelf.bookId,
-    book: toBookSummary(book),
-    shelfStatus: shelf.shelfStatus as ShelfStatus,
-    favorite: shelf.favorite,
-    progressPercent: shelf.progressPercent,
-    previewProgressPercent,
-    updatedAt: shelf.updatedAt.toISOString(),
-  }));
+  const previewBookIds = Array.from(
+    new Set(
+      rows
+        .filter((r) => r.previewProgressPercent != null)
+        .map((r) => r.shelf.bookId),
+    ),
+  );
+  const previewWordRatioByBook = new Map<string, number>();
+  if (previewBookIds.length > 0) {
+    const chaps = await db
+      .select({
+        bookId: bookChapters.bookId,
+        chapterNumber: bookChapters.chapterNumber,
+        contentId: bookChapters.contentId,
+      })
+      .from(bookChapters)
+      .where(inArray(bookChapters.bookId, previewBookIds));
+
+    const stats = new Map<
+      string,
+      { previewWords: number; totalWords: number }
+    >();
+    for (const ch of chaps) {
+      const entry = stats.get(ch.bookId) ?? {
+        previewWords: 0,
+        totalWords: 0,
+      };
+      entry.totalWords += countContentWords(ch.contentId);
+      if (ch.chapterNumber === 1) {
+        const snippet = previewText(
+          ch.contentId,
+          getPreviewParagraphCount(ch.contentId),
+        );
+        entry.previewWords = countContentWords(snippet);
+      }
+      stats.set(ch.bookId, entry);
+    }
+    for (const [id, entry] of stats) {
+      previewWordRatioByBook.set(
+        id,
+        entry.totalWords > 0
+          ? Math.min(1, entry.previewWords / entry.totalWords)
+          : 1,
+      );
+    }
+  }
+
+  return rows.map(({ shelf, book, previewProgressPercent }) => {
+    const previewBookPercent =
+      previewProgressPercent == null
+        ? null
+        : Math.round(
+            Math.min(100, Math.max(0, previewProgressPercent)) *
+              (previewWordRatioByBook.get(shelf.bookId) ?? 1) *
+              10,
+          ) / 10;
+
+    return {
+      id: shelf.id,
+      bookId: shelf.bookId,
+      book: toBookSummary(book),
+      shelfStatus: shelf.shelfStatus as ShelfStatus,
+      favorite: shelf.favorite,
+      progressPercent: shelf.progressPercent,
+      previewProgressPercent,
+      previewBookPercent,
+      updatedAt: shelf.updatedAt.toISOString(),
+    };
+  });
 }
 
 export async function createReview(

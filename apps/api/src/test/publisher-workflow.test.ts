@@ -1,7 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { agent, originHeader, setRole, signUp } from "./helpers";
+import {
+  agent,
+  originHeader,
+  setAuthorStatus,
+  setRole,
+  signUp,
+} from "./helpers";
 import { db } from "../db";
 import {
   bookChapters,
@@ -158,7 +164,8 @@ describe("Publisher Publishing Workflow, Topic-Ranked Targets & Team RBAC (Issue
     await ensureSeededCatalog();
 
     const author = agent();
-    await signUp(author, "Penulis Draf");
+    const authorEmail = await signUp(author, "Penulis Draf");
+    await setAuthorStatus(authorEmail, "verified");
 
     const outsider = agent();
     await signUp(outsider, "Pengguna Asing");
@@ -267,7 +274,8 @@ describe("Publisher Publishing Workflow, Topic-Ranked Targets & Team RBAC (Issue
     await setRole(sysAdminEmail, "admin");
 
     const author = agent();
-    await signUp(author, "Author RBAC");
+    const authorEmail = await signUp(author, "Author RBAC");
+    await setAuthorStatus(authorEmail, "verified");
 
     // Apply verified & pending publishers
     const applyVerified = await owner
@@ -463,7 +471,8 @@ describe("Publisher Publishing Workflow, Topic-Ranked Targets & Team RBAC (Issue
     await setRole(adminEmail, "admin");
 
     const author = agent();
-    await signUp(author, "Novelis Phygital");
+    const authorEmail = await signUp(author, "Novelis Phygital");
+    await setAuthorStatus(authorEmail, "verified");
 
     // Create & verify Publisher A and Publisher B
     const applyA = await ownerA
@@ -727,7 +736,8 @@ describe("Publisher Publishing Workflow, Topic-Ranked Targets & Team RBAC (Issue
     await setRole(adminEmail, "admin");
 
     const author = agent();
-    await signUp(author, "Penulis Ditolak");
+    const authorEmail = await signUp(author, "Penulis Ditolak");
+    await setAuthorStatus(authorEmail, "verified");
 
     const applyRes = await owner
       .post("/api/publisher/apply")
@@ -990,8 +1000,6 @@ describe("Publisher Publishing Workflow, Topic-Ranked Targets & Team RBAC (Issue
         rakyatPriceIdr: 49_000,
         standardPriceIdr: 89_000,
         publishedYear: 2026,
-        originalTitle: "Original Discourse",
-        translator: "Tim Penerjemah Anza",
         collectionName: "Seri Pemikiran",
         isbn: `978-602-99-${suffix.slice(0, 2)}`,
       });
@@ -1004,8 +1012,6 @@ describe("Publisher Publishing Workflow, Topic-Ranked Targets & Team RBAC (Issue
     const bookDetailRes = await approvedAuthor.get(`/api/books/${bookSlug}`);
     expect(bookDetailRes.status).toBe(200);
     expect(bookDetailRes.body.data.publishedYear).toBe(2026);
-    expect(bookDetailRes.body.data.originalTitle).toBe("Original Discourse");
-    expect(bookDetailRes.body.data.translator).toBe("Tim Penerjemah Anza");
     expect(bookDetailRes.body.data.collectionName).toBe("Seri Pemikiran");
 
     // 7. Store branches & inventory CRUD
@@ -1049,5 +1055,135 @@ describe("Publisher Publishing Workflow, Topic-Ranked Targets & Team RBAC (Issue
       .set(originHeader);
     expect(delWriterRes.status).toBe(200);
     expect(delWriterRes.body.data.removed).toBe(true);
+  });
+
+  it("blocks unverified non-approved users from Studio Penulis endpoints and supports publisher followers", async () => {
+    await ensureSeededCatalog();
+    const suffix = randomUUID().slice(0, 6);
+
+    const reader = agent();
+    const readerEmail = await signUp(reader, "Pembaca Biasa");
+
+    const meRes = await reader.get("/api/social/me");
+    expect(meRes.status).toBe(200);
+    expect(meRes.body.data.authorStatus).toBe("none");
+    expect(meRes.body.data.isApprovedWriter).toBe(false);
+
+    // 1. Unverified user CANNOT create draft or submit manuscript
+    const draftBlocked = await reader
+      .post("/api/publisher/manuscripts/drafts")
+      .set(originHeader)
+      .send({ title: "Naskah Tanpa Izin", synopsis: "Sinopsis." });
+    expect(draftBlocked.status).toBe(403);
+    expect(draftBlocked.body.error.code).toBe("AUTHOR_VERIFICATION_REQUIRED");
+
+    const submitBlocked = await reader
+      .post("/api/publisher/manuscripts")
+      .set(originHeader)
+      .send({
+        title: "Naskah Langsung Tanpa Izin",
+        synopsis: "Sinopsis lengkap minimal sepuluh karakter.",
+        proposedDigitalPolicy: "free_open",
+      });
+    expect(submitBlocked.status).toBe(403);
+    expect(submitBlocked.body.error.code).toBe("AUTHOR_VERIFICATION_REQUIRED");
+
+    // Pending author is still blocked until verified
+    await setAuthorStatus(readerEmail, "pending");
+    const pendingBlocked = await reader
+      .post("/api/publisher/manuscripts/drafts")
+      .set(originHeader)
+      .send({ title: "Naskah Pending", synopsis: "Sinopsis." });
+    expect(pendingBlocked.status).toBe(403);
+    expect(pendingBlocked.body.error.code).toBe("AUTHOR_VERIFICATION_REQUIRED");
+
+    // 2. Even if an unverified user owns a legacy manuscript row, PATCH & submit are blocked
+    const [dbReader] = await db
+      .select({ id: user.id, username: user.username })
+      .from(user)
+      .where(eq(user.email, readerEmail));
+    const [legacyDraft] = await db
+      .insert(manuscriptSubmissions)
+      .values({
+        authorUserId: dbReader.id,
+        title: `Draf Lama ${suffix}`,
+        synopsis: "Sinopsis draf lama yang belum terverifikasi.",
+        proposedDigitalPolicy: "free_open",
+        status: "draft",
+      })
+      .returning();
+
+    const patchBlocked = await reader
+      .patch(`/api/publisher/manuscripts/${legacyDraft.id}`)
+      .set(originHeader)
+      .send({ title: "Ubah Judul Draf Lama" });
+    expect(patchBlocked.status).toBe(403);
+    expect(patchBlocked.body.error.code).toBe("AUTHOR_VERIFICATION_REQUIRED");
+
+    const submitDraftBlocked = await reader
+      .post(`/api/publisher/manuscripts/${legacyDraft.id}/submit`)
+      .set(originHeader)
+      .send({});
+    expect(submitDraftBlocked.status).toBe(403);
+    expect(submitDraftBlocked.body.error.code).toBe(
+      "AUTHOR_VERIFICATION_REQUIRED",
+    );
+
+    // 3. Publisher followers: follow / unfollow verified publisher, reject unverified publisher
+    const pendingOwner = agent();
+    await signUp(pendingOwner, "Owner Pending Pub");
+    const pendingPubSlug = `pub-unverified-follow-${suffix}`;
+    await pendingOwner
+      .post("/api/publisher/apply")
+      .set(originHeader)
+      .send({ name: `Penerbit Pending ${suffix}`, slug: pendingPubSlug });
+
+    const followPendingRes = await reader
+      .post(`/api/publisher/${pendingPubSlug}/follow`)
+      .set(originHeader);
+    expect(followPendingRes.status).toBe(403);
+    expect(followPendingRes.body.error.code).toBe("PUBLISHER_NOT_VERIFIED");
+
+    const pubBefore = await reader.get("/api/publisher/anzabook");
+    expect(pubBefore.status).toBe(200);
+    const initialCount = Number(pubBefore.body.data.followerCount ?? 0);
+    expect(pubBefore.body.data.isFollowing).toBe(false);
+
+    const followRes = await reader
+      .post("/api/publisher/anzabook/follow")
+      .set(originHeader);
+    expect(followRes.status).toBe(200);
+    expect(followRes.body.data.isFollowing).toBe(true);
+    expect(followRes.body.data.followerCount).toBe(initialCount + 1);
+
+    // Idempotent repeat follow
+    const repeatFollowRes = await reader
+      .post("/api/publisher/anzabook/follow")
+      .set(originHeader);
+    expect(repeatFollowRes.status).toBe(200);
+    expect(repeatFollowRes.body.data.followerCount).toBe(initialCount + 1);
+
+    const pubAfterFollow = await reader.get("/api/publisher/anzabook");
+    expect(pubAfterFollow.body.data.isFollowing).toBe(true);
+    expect(pubAfterFollow.body.data.followerCount).toBe(initialCount + 1);
+
+    const followingListRes = await reader.get(
+      `/api/social/users/${encodeURIComponent(dbReader.username || dbReader.id)}/following`,
+    );
+    expect(followingListRes.status).toBe(200);
+    expect(
+      (
+        followingListRes.body.data as Array<{ type: string; href: string }>
+      ).some(
+        (item) => item.type === "publisher" && item.href === "/p/anzabook",
+      ),
+    ).toBe(true);
+
+    const unfollowRes = await reader
+      .delete("/api/publisher/anzabook/follow")
+      .set(originHeader);
+    expect(unfollowRes.status).toBe(200);
+    expect(unfollowRes.body.data.isFollowing).toBe(false);
+    expect(unfollowRes.body.data.followerCount).toBe(initialCount);
   });
 });

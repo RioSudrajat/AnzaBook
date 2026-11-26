@@ -8,7 +8,6 @@ import type {
 } from "@starter/shared/types";
 import { DEFAULT_DIGITAL_BOOK_PRICE_IDR } from "@starter/shared/validators/publisher";
 import { StudioDrawer } from "@/components/profile/studio-drawer";
-import { TranslationFieldsSection } from "@/components/profile/translation-fields-section";
 import { BookCover } from "@/features/books/components/book-cover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -92,9 +91,6 @@ function PublishDialogFormContent({
   const [publishedYear, setPublishedYear] = useState(
     String(new Date().getFullYear()),
   );
-  const [isTranslation, setIsTranslation] = useState(false);
-  const [originalTitle, setOriginalTitle] = useState("");
-  const [translator, setTranslator] = useState("");
   const [collectionName, setCollectionName] = useState("");
   const [hasPhysical, setHasPhysical] = useState(
     (manuscript.proposedDigitalPolicy || "nakama_or_purchase") ===
@@ -130,7 +126,6 @@ function PublishDialogFormContent({
         (initialCoverColor || manuscript.coverColor || "#3D2B1F") ||
       digitalPolicy !==
         (manuscript.proposedDigitalPolicy || "nakama_or_purchase") ||
-      isTranslation ||
       Boolean(collectionName.trim()));
 
   const readinessItems = [
@@ -235,8 +230,6 @@ function PublishDialogFormContent({
           categories: categories.length > 0 ? categories : undefined,
           publishedYear:
             parsedYear && Number.isFinite(parsedYear) ? parsedYear : undefined,
-          originalTitle: isTranslation ? originalTitle.trim() || null : null,
-          translator: isTranslation ? translator.trim() || null : null,
           collectionName: collectionName.trim() || null,
           isbn: isbn.trim() || null,
           rakyatPriceIdr:
@@ -670,17 +663,6 @@ function PublishDialogFormContent({
                     className="min-h-11 text-xs bg-[var(--color-paper-2)]"
                   />
                 </div>
-
-                <TranslationFieldsSection
-                  isTranslation={isTranslation}
-                  onIsTranslationChange={setIsTranslation}
-                  originalTitle={originalTitle}
-                  onOriginalTitleChange={setOriginalTitle}
-                  translator={translator}
-                  onTranslatorChange={setTranslator}
-                  idPrefix="publish"
-                  inputClassName="min-h-11 text-xs bg-[var(--color-paper-2)]"
-                />
 
                 <div className="flex items-center gap-2 pt-1">
                   <input

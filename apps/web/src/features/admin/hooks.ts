@@ -136,7 +136,10 @@ export function useCreateClaimBatch() {
 }
 
 export function useClaimBatchCodes(batchId: string) {
-  return useQuery(adminClaimBatchCodesQuery(batchId));
+  return useQuery({
+    ...adminClaimBatchCodesQuery(batchId),
+    enabled: Boolean(batchId),
+  });
 }
 
 // ---------------- DRM Security Audit Monitoring ---------------- //
@@ -146,7 +149,10 @@ export function useAdminDrmEvents(params?: AdminDrmEventsQueryInput) {
 }
 
 export function useAdminDrmTrace(watermarkCode: string) {
-  return useQuery(adminDrmTraceQuery(watermarkCode));
+  return useQuery({
+    ...adminDrmTraceQuery(watermarkCode),
+    enabled: Boolean(watermarkCode),
+  });
 }
 
 export function useAdminDrmSuspensions(params?: AdminDrmSuspensionsQueryInput) {

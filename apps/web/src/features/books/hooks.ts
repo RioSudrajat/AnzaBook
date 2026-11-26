@@ -71,19 +71,31 @@ export function useBookDetail(slug: string) {
 }
 
 export function useBookStock(slug: string, query?: StockInput) {
-  return useQuery(bookStockQuery(slug, query));
+  return useQuery({
+    ...bookStockQuery(slug, query),
+    enabled: Boolean(slug),
+  });
 }
 
 export function useBookReader(slug: string, query: ReadBookInput) {
-  return useQuery(bookReaderQuery(slug, query));
+  return useQuery({
+    ...bookReaderQuery(slug, query),
+    enabled: Boolean(slug),
+  });
 }
 
 export function useBookReviews(slug: string) {
-  return useQuery(bookReviewsQuery(slug));
+  return useQuery({
+    ...bookReviewsQuery(slug),
+    enabled: Boolean(slug),
+  });
 }
 
 export function useChapterComments(slug: string, chapterId: string) {
-  return useQuery(chapterCommentsQuery(slug, chapterId));
+  return useQuery({
+    ...chapterCommentsQuery(slug, chapterId),
+    enabled: Boolean(slug && chapterId),
+  });
 }
 
 export function useClaimBookCode(slug: string) {
@@ -233,7 +245,10 @@ export function useDeleteHighlight(bookId?: string) {
 }
 
 export function useBookSessions(bookId: string) {
-  return useQuery(bookSessionsQuery(bookId));
+  return useQuery({
+    ...bookSessionsQuery(bookId),
+    enabled: Boolean(bookId),
+  });
 }
 
 export function useCreateBookReview(slug: string) {

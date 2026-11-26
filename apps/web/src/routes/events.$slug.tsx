@@ -1,4 +1,5 @@
 import { createFileRoute, notFound, Link } from "@tanstack/react-router";
+import { AnzaLogoMark } from "@/components/brand";
 import { SiteFooter } from "@/components/site-footer";
 import { SmartBackButton } from "@/components/smart-back-button";
 import { ApiError } from "@/lib/api/client";
@@ -28,7 +29,7 @@ export const Route = createFileRoute("/events/$slug")({
   component: EventPage,
 });
 
-export default function EventPage() {
+function EventPage() {
   const { slug } = Route.useParams();
   const sessionUser = Route.useRouteContext().session?.user;
   const { data: event } = useEvent(slug);
@@ -58,7 +59,7 @@ export default function EventPage() {
           to="/"
           className="flex items-center gap-2 text-xs font-semibold text-white"
         >
-          <img src="/icon.svg" alt="" className="size-6 rounded" />
+          <AnzaLogoMark className="size-5 text-white shrink-0" />
           <span>AnzaBook</span>
         </Link>
       </header>

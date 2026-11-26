@@ -28,7 +28,7 @@ export const Route = createFileRoute("/c/$slug")({
   component: CalendarHubPage,
 });
 
-export default function CalendarHubPage() {
+function CalendarHubPage() {
   const { slug } = Route.useParams();
   const sessionUser = Route.useRouteContext().session?.user;
 

@@ -32,6 +32,7 @@ import {
   applyPublisher,
   createManuscriptDraft,
   editPublisherManuscript,
+  followPublisher,
   followUser,
   publishPublisherManuscript,
   removePublisherApprovedWriter,
@@ -41,6 +42,7 @@ import {
   submitManuscriptDraft,
   togglePostHighlight,
   togglePostSession,
+  unfollowPublisher,
   unfollowUser,
   updateCalendarProfile,
   updateManuscript,
@@ -78,8 +80,11 @@ import {
 } from "./queries";
 import { eventsKeys } from "@/features/events/queries";
 
-export function useMySocialProfile() {
-  return useQuery(mySocialProfileQuery());
+export function useMySocialProfile(enabled = true) {
+  return useQuery({
+    ...mySocialProfileQuery(),
+    enabled,
+  });
 }
 
 export function useUserProfile(username: string) {
@@ -202,6 +207,30 @@ export function useMyManagedPublishers(enabled = true) {
 
 export function usePublisher(slug: string) {
   return useQuery(publisherDetailQuery(slug));
+}
+
+export function useFollowPublisher(slug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => followPublisher(slug),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: publisherKeys.detail(slug) });
+      queryClient.invalidateQueries({ queryKey: publisherKeys.verified() });
+      queryClient.invalidateQueries({ queryKey: socialKeys.all });
+    },
+  });
+}
+
+export function useUnfollowPublisher(slug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => unfollowPublisher(slug),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: publisherKeys.detail(slug) });
+      queryClient.invalidateQueries({ queryKey: publisherKeys.verified() });
+      queryClient.invalidateQueries({ queryKey: socialKeys.all });
+    },
+  });
 }
 
 export function usePublisherBooks(slug: string, enabled = true) {

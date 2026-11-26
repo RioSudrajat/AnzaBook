@@ -98,6 +98,29 @@ export const publisherMembers = pgTable(
   ],
 );
 
+export const publisherFollowers = pgTable(
+  "publisher_followers",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    publisherId: uuid("publisher_id")
+      .notNull()
+      .references(() => publishers.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("publisher_followers_pub_user_unique").on(
+      table.publisherId,
+      table.userId,
+    ),
+    index("publisher_followers_user_idx").on(table.userId),
+  ],
+);
+
 export const publisherApprovedWriters = pgTable(
   "publisher_approved_writers",
   {

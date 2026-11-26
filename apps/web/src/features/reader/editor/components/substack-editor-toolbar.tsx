@@ -301,37 +301,33 @@ export function SubstackEditorToolbar({
     editor.chain().focus().setPageBreak().run();
   };
 
-  // DIRECT INLINE CHAPTER INSERTION (Zero Modal Dialog - 1 Click!)
+  // DIRECT INLINE CHAPTER INSERTION (Zero Modal Dialog - live editable title right in canvas!)
   const handleInsertChapterBreak = (
     defaultNum?: number,
     defaultTitle?: string,
   ) => {
     closeAllMenus();
     const nextNum = defaultNum ?? getSuggestedNextChapter();
-    const title =
-      defaultTitle ??
-      (nextNum === 1
-        ? "Langkah Pertama di Bawah Naungan Selembar Awan"
-        : `Percakapan dengan Batu Karang di Pantai Sepi`);
-    // Append the new chapter at the end of the document to preserve preceding chapters
+    const insertAt = editor.state.doc.content.size;
+    const initialTitle = defaultTitle?.trim() ?? "";
+
     editor
       .chain()
-      .focus("end")
-      .insertContent([
+      .focus()
+      .insertContentAt(insertAt, [
         {
           type: "chapterBreak",
-          attrs: { chapterNumber: nextNum, title },
+          attrs: { chapterNumber: nextNum },
+          ...(initialTitle
+            ? { content: [{ type: "text", text: initialTitle }] }
+            : {}),
         },
         {
           type: "paragraph",
-          content: [
-            {
-              type: "text",
-              text: `Mulai menulis naskah Bab ${nextNum} di sini...`,
-            },
-          ],
         },
       ])
+      .setTextSelection(insertAt + 1 + initialTitle.length)
+      .scrollIntoView()
       .run();
   };
 
@@ -465,17 +461,19 @@ export function SubstackEditorToolbar({
   ) => {
     closeAllMenus();
     if (type === "chapter1" || type === "opening") {
-      // Sesuai Screenshot 1: Chapter 1 dengan border garis tipis atas & bawah
       editor
         .chain()
         .focus()
         .insertContent([
           {
             type: "chapterBreak",
-            attrs: {
-              chapterNumber: 1,
-              title: "Langkah Pertama di Bawah Naungan Selembar Awan",
-            },
+            attrs: { chapterNumber: 1 },
+            content: [
+              {
+                type: "text",
+                text: "Langkah Pertama di Bawah Naungan Selembar Awan",
+              },
+            ],
           },
           {
             type: "paragraph",
@@ -498,17 +496,19 @@ export function SubstackEditorToolbar({
         ])
         .run();
     } else if (type === "chapter2") {
-      // Sesuai Screenshot 3: Chapter 2+ dengan 4 manik bulat diapit garis tipis
       editor
         .chain()
         .focus()
         .insertContent([
           {
             type: "chapterBreak",
-            attrs: {
-              chapterNumber: 2,
-              title: "Percakapan dengan Batu Karang di Pantai Sepi",
-            },
+            attrs: { chapterNumber: 2 },
+            content: [
+              {
+                type: "text",
+                text: "Percakapan dengan Batu Karang di Pantai Sepi",
+              },
+            ],
           },
           {
             type: "paragraph",

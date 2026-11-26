@@ -414,13 +414,11 @@ export const specialBooks: BookSeed[] = [
   {
     slug: "ghost-back-to-campus",
     title: "Ghost Back to Campus",
-    originalTitle: "Ghost Back to Campus",
     author: "Oke Sudrajat",
     authorAvatar:
       "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80",
     editor: "Anza Book",
     editorAvatar: "/icon.svg",
-    translator: null,
     coverUrl: "/covers/ghost-campus.svg",
     coverColor: "#172554",
     synopsis:
@@ -481,13 +479,11 @@ export const specialBooks: BookSeed[] = [
   {
     slug: "kematian-kedua",
     title: "Kematian Kedua",
-    originalTitle: "The Second Death",
     author: "Oke Sudrajat",
     authorAvatar:
       "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80",
     editor: "Anza Book",
     editorAvatar: "/icon.svg",
-    translator: null,
     coverUrl: "/covers/kematian-kedua.svg",
     coverColor: "#450A0A",
     synopsis:
@@ -548,13 +544,11 @@ export const specialBooks: BookSeed[] = [
   {
     slug: "belum-ada-judul",
     title: "Belum Ada Judul",
-    originalTitle: "Untitled: The Wandering of Adam's Child",
     author: "Selembar Awan",
     authorAvatar:
       "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
     editor: "Anza Book",
     editorAvatar: "/icon.svg",
-    translator: null,
     coverUrl: "/covers/belum-ada-judul.svg",
     coverColor: "#1E293B",
     synopsis:

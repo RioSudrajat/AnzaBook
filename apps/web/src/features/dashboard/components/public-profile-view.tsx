@@ -231,7 +231,7 @@ export function PublicProfileView({
           ) : undefined
         }
         actions={
-          viewerId ? (
+          viewerId === profile.id ? undefined : viewerId ? (
             <Button
               type="button"
               onClick={toggleFollow}

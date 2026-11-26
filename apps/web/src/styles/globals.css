@@ -96,28 +96,6 @@
   --font-reader-accessible:
     "Atkinson Hyperlegible", ui-sans-serif, system-ui, sans-serif;
 
-  /* Furrow Manila (day) */
-  --color-paper: oklch(96% 0.011 85);
-  --color-paper-2: oklch(99.5% 0.005 85);
-  --color-paper-3: oklch(92% 0.016 85);
-  --color-sheet: oklch(99.3% 0.004 85);
-  --color-ink: oklch(18% 0.006 60);
-  --color-ink-2: oklch(28% 0.008 60);
-  --color-muted: oklch(44% 0.012 60);
-  --color-rule: oklch(88% 0.013 85);
-  --color-grid: oklch(90% 0.014 85);
-
-  --color-accent: oklch(70% 0.19 40);
-  --color-accent-ink: oklch(18% 0.006 60);
-  --color-accent-soft: oklch(91% 0.05 50);
-  --color-focus: oklch(60% 0.19 40);
-  --color-green: oklch(48% 0.11 150);
-  --color-green-soft: oklch(92% 0.04 150);
-  --color-water: oklch(60% 0.05 232);
-  --color-water-soft: oklch(92% 0.025 232);
-  --color-error: oklch(52% 0.18 25);
-  --color-error-soft: oklch(92% 0.04 25);
-
   --space-3xs: 0.125rem;
   --space-2xs: 0.25rem;
   --space-xs: 0.5rem;
@@ -149,39 +127,48 @@
   --reader-line-height: 1.7;
   --reader-measure: 62ch;
   --reader-font: var(--font-reader);
-
-  /* shadcn/ui bridge */
-  --background: var(--color-paper);
-  --foreground: var(--color-ink);
-  --card: var(--color-paper-2);
-  --card-foreground: var(--color-ink);
-  --popover: var(--color-paper-2);
-  --popover-foreground: var(--color-ink);
-  --primary: var(--color-accent);
-  --primary-foreground: var(--color-accent-ink);
-  --secondary: var(--color-paper-3);
-  --secondary-foreground: var(--color-ink-2);
-  --muted: var(--color-paper-3);
-  --muted-foreground: var(--color-muted);
-  --accent: var(--color-paper-3);
-  --accent-foreground: var(--color-ink);
-  --destructive: var(--color-error);
-  --destructive-foreground: var(--color-paper-2);
-  --border: var(--color-rule);
-  --input: var(--color-muted);
-  --ring: var(--color-focus);
   --radius: 10px;
 }
 
+/* Furrow Manila (day), explicit on both :root and [data-theme="manila"] */
+:root,
+[data-theme="manila"],
 [data-theme="sepia"] {
-  --color-paper: oklch(91% 0.022 80);
-  --color-paper-2: oklch(94% 0.016 80);
-  --color-paper-3: oklch(87% 0.026 80);
-  --color-ink: oklch(20% 0.01 55);
-  --color-ink-2: oklch(30% 0.012 55);
-  --color-muted: oklch(40% 0.015 55);
-  --color-rule: oklch(83% 0.022 80);
-  --color-grid: oklch(86% 0.022 80);
+  --color-accent: oklch(70% 0.19 40);
+  --color-accent-ink: oklch(18% 0.006 60);
+  --color-accent-soft: oklch(91% 0.05 50);
+  --color-focus: oklch(60% 0.19 40);
+  --color-green: oklch(48% 0.11 150);
+  --color-green-soft: oklch(92% 0.04 150);
+  --color-water: oklch(60% 0.05 232);
+  --color-water-soft: oklch(92% 0.025 232);
+  --color-error: oklch(52% 0.18 25);
+  --color-error-soft: oklch(92% 0.04 25);
+}
+
+:root,
+[data-theme="manila"] {
+  --color-paper: oklch(96% 0.011 85);
+  --color-paper-2: oklch(99.5% 0.005 85);
+  --color-paper-3: oklch(92% 0.016 85);
+  --color-sheet: oklch(99.3% 0.004 85);
+  --color-ink: oklch(18% 0.006 60);
+  --color-ink-2: oklch(28% 0.008 60);
+  --color-muted: oklch(44% 0.012 60);
+  --color-rule: oklch(88% 0.013 85);
+  --color-grid: oklch(90% 0.014 85);
+}
+
+[data-theme="sepia"] {
+  --color-paper: oklch(90.5% 0.032 78);
+  --color-paper-2: oklch(93.5% 0.024 78);
+  --color-paper-3: oklch(85.5% 0.036 78);
+  --color-sheet: oklch(94.5% 0.02 78);
+  --color-ink: oklch(21% 0.015 55);
+  --color-ink-2: oklch(31% 0.016 55);
+  --color-muted: oklch(42% 0.02 55);
+  --color-rule: oklch(81% 0.028 78);
+  --color-grid: oklch(84% 0.026 78);
 }
 
 .dark,
@@ -206,6 +193,37 @@
   --color-water-soft: oklch(27% 0.03 232);
   --color-error: oklch(70% 0.17 25);
   --color-error-soft: oklch(28% 0.06 25);
+}
+
+/* Re-bind Tailwind/shadcn bridge variables on every scoped data-theme node so CSS inheritance never freezes :root colors. */
+:root,
+[data-theme="manila"],
+[data-theme="sepia"],
+.dark,
+[data-theme="night"] {
+  --background: var(--color-paper);
+  --foreground: var(--color-ink);
+  --card: var(--color-paper-2);
+  --card-foreground: var(--color-ink);
+  --popover: var(--color-paper-2);
+  --popover-foreground: var(--color-ink);
+  --primary: var(--color-accent);
+  --primary-foreground: var(--color-accent-ink);
+  --secondary: var(--color-paper-3);
+  --secondary-foreground: var(--color-ink-2);
+  --muted: var(--color-paper-3);
+  --muted-foreground: var(--color-muted);
+  --accent: var(--color-paper-3);
+  --accent-foreground: var(--color-ink);
+  --destructive: var(--color-error);
+  --destructive-foreground: var(--color-paper-2);
+  --border: var(--color-rule);
+  --input: var(--color-muted);
+  --ring: var(--color-focus);
+}
+
+.dark,
+[data-theme="night"] {
   --destructive-foreground: var(--color-paper);
 }
 
@@ -482,6 +500,40 @@
     .editorial-disclosure > summary::before {
       transition: transform 0.18s ease-out;
     }
+  }
+
+  /* Selected component blocks & live editable chapter title inside Tiptap editor */
+  .tiptap-editorial-canvas .ProseMirror {
+    outline: none;
+  }
+
+  .tiptap-editorial-canvas .ProseMirror-selectednode {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 4px;
+    border-radius: 10px;
+  }
+
+  /* In edit mode, let clicks on embedded anchors/buttons/iframes select the block node cleanly. */
+  .tiptap-editorial-canvas:not(.is-preview-reading-mode)
+    [data-type="substack-button"]
+    a,
+  .tiptap-editorial-canvas:not(.is-preview-reading-mode)
+    [data-type="poll-block"]
+    button,
+  .tiptap-editorial-canvas:not(.is-preview-reading-mode)
+    [data-type="video-embed"]
+    iframe,
+  .tiptap-editorial-canvas:not(.is-preview-reading-mode)
+    [data-type="audio-embed"]
+    audio {
+    pointer-events: none;
+  }
+
+  .tiptap-chapter-title.is-chapter-title-empty::before {
+    content: attr(data-placeholder);
+    color: color-mix(in oklab, currentColor 38%, transparent);
+    pointer-events: none;
+    height: 0;
   }
 }
 
