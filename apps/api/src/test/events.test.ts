@@ -751,4 +751,259 @@ describe("Community Calendars & Events API", () => {
     );
     expect(chap3Res.status).toBe(403);
   });
+
+  it("persists and updates event coHosts and rejects unsafe coHost avatar URLs", async () => {
+    const host = agent();
+    const hostEmail = await signUp(host, "Host CoHost Test");
+    await setRole(hostEmail, "admin");
+
+    const calRes = await host
+      .post("/api/events/calendars")
+      .set(originHeader)
+      .send({
+        name: "Kalender CoHost",
+        slug: `kalender-cohost-${Date.now()}`,
+      });
+    const calId = calRes.body.data.id;
+
+    // Unsafe javascript: avatarUrl must be rejected
+    const badRes = await host
+      .post("/api/events")
+      .set(originHeader)
+      .send({
+        calendarId: calId,
+        title: "Acara Avatar Tidak Aman",
+        description: "Menguji validasi URL avatar co-host.",
+        coverUrl: "https://example.com/banner-cohost.jpg",
+        format: "online",
+        onlineMeetingUrl: "https://meet.google.com/cohost",
+        startsAt: new Date(Date.now() + 900000000).toISOString(),
+        endsAt: new Date(Date.now() + 910000000).toISOString(),
+        coHosts: [
+          {
+            name: "Bad CoHost",
+            avatarUrl: "javascript:alert(1)",
+            roleLabel: "Pembicara",
+          },
+        ],
+      });
+    expect([400, 422]).toContain(badRes.status);
+
+    // Create with valid coHosts
+    const createRes = await host
+      .post("/api/events")
+      .set(originHeader)
+      .send({
+        calendarId: calId,
+        title: "Bedah Buku Lintas Komunitas",
+        description: "Kolaborasi dua komunitas literasi Jakarta.",
+        coverUrl: "https://example.com/banner-cohost.jpg",
+        format: "online",
+        onlineMeetingUrl: "https://meet.google.com/cohost-ok",
+        startsAt: new Date(Date.now() + 900000000).toISOString(),
+        endsAt: new Date(Date.now() + 910000000).toISOString(),
+        coHosts: [
+          {
+            name: "Lingkar Baca Timur",
+            avatarUrl: "/icon.svg",
+            roleLabel: "Co-Host",
+          },
+        ],
+      });
+    expect(createRes.status).toBe(201);
+    expect(createRes.body.data.coHosts).toEqual([
+      {
+        name: "Lingkar Baca Timur",
+        avatarUrl: "/icon.svg",
+        roleLabel: "Co-Host",
+      },
+    ]);
+
+    const slug = createRes.body.data.slug;
+
+    // Update coHosts via PATCH
+    const patchRes = await host
+      .patch(`/api/events/${slug}`)
+      .set(originHeader)
+      .send({
+        coHosts: [
+          {
+            name: "Lingkar Baca Timur",
+            avatarUrl: "/icon.svg",
+            roleLabel: "Mitra Komunitas",
+          },
+          {
+            name: "Raka Alpiansyah",
+            roleLabel: "Moderator",
+          },
+        ],
+      });
+    expect(patchRes.status).toBe(200);
+    expect(patchRes.body.data.coHosts).toHaveLength(2);
+    expect(patchRes.body.data.coHosts[1]).toEqual({
+      name: "Raka Alpiansyah",
+      roleLabel: "Moderator",
+    });
+  });
+
+  it("allows calendar owner to add/manage hosts (admin) and checkin_staff with strict RBAC", async () => {
+    const owner = agent();
+    await signUp(owner, "Pemilik Kalender");
+
+    const coHostUser = agent();
+    await signUp(coHostUser, "Rekan Host");
+    const username = `cohost_${Date.now().toString(36)}`;
+    await coHostUser
+      .post("/api/membership/username")
+      .set(originHeader)
+      .send({ username });
+
+    const staffUser = agent();
+    const staffEmail = await signUp(staffUser, "Petugas Checkin");
+
+    const outsider = agent();
+    await signUp(outsider, "User Luar");
+
+    const adminVerifier = agent();
+    const adminVerifierEmail = await signUp(adminVerifier, "Kurator Platform");
+    await setRole(adminVerifierEmail, "admin");
+
+    const calSlug = `cal-team-${Date.now()}`;
+    const calRes = await owner
+      .post("/api/events/calendars")
+      .set(originHeader)
+      .send({
+        name: "Komunitas Kolaboratif",
+        slug: calSlug,
+      });
+    expect(calRes.status).toBe(201);
+    const calId = calRes.body.data.id;
+
+    await adminVerifier
+      .patch(`/api/events/calendars/${calSlug}/verify`)
+      .set(originHeader)
+      .send({ status: "verified" });
+
+    // Outsider cannot add calendar members
+    const outsiderAdd = await outsider
+      .post(`/api/events/calendars/${calSlug}/members`)
+      .set(originHeader)
+      .send({ identifier: staffEmail, role: "admin" });
+    expect(outsiderAdd.status).toBe(403);
+
+    // Owner invites coHostUser by @username as admin (Host Pengelola)
+    const addAdminRes = await owner
+      .post(`/api/events/calendars/${calSlug}/members`)
+      .set(originHeader)
+      .send({ identifier: `@${username}`, role: "admin" });
+    expect(addAdminRes.status).toBe(201);
+    expect(addAdminRes.body.data.role).toBe("admin");
+    const coHostMemberId = addAdminRes.body.data.id;
+
+    // Owner invites staffUser by email as checkin_staff
+    const addStaffRes = await owner
+      .post(`/api/events/calendars/${calSlug}/members`)
+      .set(originHeader)
+      .send({ identifier: staffEmail, role: "checkin_staff" });
+    expect(addStaffRes.status).toBe(201);
+    expect(addStaffRes.body.data.role).toBe("checkin_staff");
+
+    // Admin cannot promote someone else to admin (owner only)
+    const adminPromote = await coHostUser
+      .patch(
+        `/api/events/calendars/${calSlug}/members/${addStaffRes.body.data.id}`,
+      )
+      .set(originHeader)
+      .send({ role: "admin" });
+    expect(adminPromote.status).toBe(403);
+
+    // Public members list omits email PII
+    const membersRes = await outsider.get(
+      `/api/events/calendars/${calSlug}/members`,
+    );
+    expect(membersRes.status).toBe(200);
+    expect(membersRes.body.data).toHaveLength(3);
+    for (const member of membersRes.body.data) {
+      expect(member).not.toHaveProperty("email");
+    }
+
+    // Cannot remove the last owner
+    const ownerMember = membersRes.body.data.find(
+      (m: { role: string }) => m.role === "owner",
+    );
+    const delOwnerRes = await owner
+      .delete(`/api/events/calendars/${calSlug}/members/${ownerMember.id}`)
+      .set(originHeader)
+      .send();
+    expect(delOwnerRes.status).toBe(400);
+    expect(delOwnerRes.body.error.code).toBe("LAST_OWNER_REQUIRED");
+
+    // Newly added admin (coHostUser) can create & manage events in this calendar
+    const coHostCalDetail = await coHostUser.get(
+      `/api/events/calendars/${calSlug}`,
+    );
+    expect(coHostCalDetail.body.data.isManager).toBe(true);
+    expect(coHostCalDetail.body.data.memberRole).toBe("admin");
+
+    const evRes = await coHostUser
+      .post("/api/events")
+      .set(originHeader)
+      .send({
+        calendarId: calId,
+        title: "Acara Dibuat oleh Co-Host Admin",
+        description:
+          "Memastikan rekan pengurus dapat membuat dan mengelola acara.",
+        coverUrl: "https://example.com/banner-team.jpg",
+        format: "online",
+        onlineMeetingUrl: "https://meet.google.com/team-host",
+        startsAt: new Date(Date.now() + 950000000).toISOString(),
+        endsAt: new Date(Date.now() + 960000000).toISOString(),
+      });
+    expect(evRes.status).toBe(201);
+    const eventSlug = evRes.body.data.slug;
+    expect(evRes.body.data.canManage).toBe(true);
+
+    // Outsider RSVPs
+    const rsvpRes = await outsider
+      .post(`/api/events/${eventSlug}/rsvp`)
+      .set(originHeader)
+      .send({});
+    expect(rsvpRes.status).toBe(201);
+    const checkinCode = rsvpRes.body.data.checkinCode;
+
+    // checkin_staff can view attendees & check-in, but CANNOT edit event or view wallet
+    const staffAttendees = await staffUser.get(
+      `/api/events/${eventSlug}/attendees`,
+    );
+    expect(staffAttendees.status).toBe(200);
+    expect(staffAttendees.body.data).toHaveLength(1);
+
+    const staffCheckIn = await staffUser
+      .post(`/api/events/${eventSlug}/check-in`)
+      .set(originHeader)
+      .send({ checkinCode });
+    expect(staffCheckIn.status).toBe(200);
+    expect(staffCheckIn.body.data.checkedInAt).toBeTruthy();
+
+    const staffEdit = await staffUser
+      .patch(`/api/events/${eventSlug}`)
+      .set(originHeader)
+      .send({ title: "Diubah Petugas" });
+    expect(staffEdit.status).toBe(403);
+
+    const staffWallet = await staffUser.get(
+      `/api/events/calendars/${calSlug}/wallet`,
+    );
+    expect(staffWallet.status).toBe(403);
+
+    // Owner removes coHostUser -> coHostUser loses manager access
+    const removeRes = await owner
+      .delete(`/api/events/calendars/${calSlug}/members/${coHostMemberId}`)
+      .set(originHeader)
+      .send();
+    expect(removeRes.status).toBe(200);
+
+    const afterRemoveDetail = await coHostUser.get(`/api/events/${eventSlug}`);
+    expect(afterRemoveDetail.body.data.canManage).toBe(false);
+  });
 });

@@ -16,12 +16,14 @@ import {
 import { HttpError } from "../lib/http-error";
 import { toBookSummary } from "./books.service";
 import type {
+  AddCalendarMemberOutput,
   CheckInRsvpInput,
   CreateCalendarInput,
   CreateEventInput,
   ListEventsQuery,
   RsvpEventInput,
   UpdateCalendarInput,
+  UpdateCalendarMemberInput,
   UpdateEventInput,
 } from "@starter/shared/validators/community";
 import type {
@@ -68,6 +70,9 @@ function toCalendarDto(
   };
 }
 
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function isCalendarManager(
   calendarId: string,
   userId?: string,
@@ -84,6 +89,33 @@ export async function isCalendarManager(
         eq(communityCalendarMembers.calendarId, calendarId),
         eq(communityCalendarMembers.userId, userId),
         inArray(communityCalendarMembers.role, ["owner", "admin"]),
+      ),
+    )
+    .limit(1);
+
+  return !!membership;
+}
+
+export async function canCheckInEvent(
+  calendarId: string,
+  userId?: string,
+  userRole?: string,
+): Promise<boolean> {
+  if (!userId) return false;
+  if (userRole === "admin") return true;
+
+  const [membership] = await db
+    .select({ id: communityCalendarMembers.id })
+    .from(communityCalendarMembers)
+    .where(
+      and(
+        eq(communityCalendarMembers.calendarId, calendarId),
+        eq(communityCalendarMembers.userId, userId),
+        inArray(communityCalendarMembers.role, [
+          "owner",
+          "admin",
+          "checkin_staff",
+        ]),
       ),
     )
     .limit(1);
@@ -321,6 +353,7 @@ export async function getCalendarMembers(
       id: communityCalendarMembers.id,
       userId: communityCalendarMembers.userId,
       name: user.name,
+      username: user.username,
       image: user.image,
       role: communityCalendarMembers.role,
       createdAt: communityCalendarMembers.createdAt,
@@ -1078,16 +1111,16 @@ export async function checkInRsvp(
     throw new HttpError(404, "EVENT_NOT_FOUND", "Acara tidak ditemukan.");
   }
 
-  const canManage = await isCalendarManager(
+  const canCheckIn = await canCheckInEvent(
     event.calendarId,
     hostUserId,
     userRole,
   );
-  if (!canManage) {
+  if (!canCheckIn) {
     throw new HttpError(
       403,
       "FORBIDDEN",
-      "Hanya pengelola yang dapat mencatat kehadiran.",
+      "Hanya pengelola atau petugas check-in yang dapat mencatat kehadiran.",
     );
   }
 
@@ -1236,16 +1269,16 @@ export async function getEventAttendees(
     throw new HttpError(404, "EVENT_NOT_FOUND", "Acara tidak ditemukan.");
   }
 
-  const canManage = await isCalendarManager(
+  const canCheckIn = await canCheckInEvent(
     event.calendarId,
     hostUserId,
     userRole,
   );
-  if (!canManage) {
+  if (!canCheckIn) {
     throw new HttpError(
       403,
       "FORBIDDEN",
-      "Hanya pengelola kalender yang dapat melihat daftar peserta lengkap.",
+      "Hanya pengelola kalender atau petugas check-in yang dapat melihat daftar peserta lengkap.",
     );
   }
 
@@ -1382,6 +1415,9 @@ export async function updateEvent(
   if (input.startsAt !== undefined) patch.startsAt = new Date(input.startsAt);
   if (input.endsAt !== undefined) patch.endsAt = new Date(input.endsAt);
   if (input.capacity !== undefined) patch.capacity = input.capacity || null;
+  if (input.coHosts !== undefined) patch.coHosts = input.coHosts;
+  if (input.logisticsNotes !== undefined)
+    patch.logisticsNotes = input.logisticsNotes || null;
   if (input.requiresApproval !== undefined)
     patch.requiresApproval = input.requiresApproval;
   if (input.allowWaitlist !== undefined)
@@ -1532,6 +1568,301 @@ export async function leaveCalendar(
     success: true,
     message: "Berhasil keluar dari keanggotaan komunitas.",
   };
+}
+
+type CalendarTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function requireCalendarMemberContext(
+  tx: CalendarTx,
+  slug: string,
+  actorUserId: string,
+) {
+  const [cal] = await tx
+    .select({ id: communityCalendars.id })
+    .from(communityCalendars)
+    .where(eq(communityCalendars.slug, slug))
+    .limit(1);
+
+  if (!cal) {
+    throw new HttpError(
+      404,
+      "CALENDAR_NOT_FOUND",
+      "Kalender komunitas tidak ditemukan.",
+    );
+  }
+
+  const members = await tx
+    .select()
+    .from(communityCalendarMembers)
+    .where(eq(communityCalendarMembers.calendarId, cal.id))
+    .for("update");
+
+  const actor = members.find((m) => m.userId === actorUserId);
+  if (!actor || (actor.role !== "owner" && actor.role !== "admin")) {
+    throw new HttpError(
+      403,
+      "FORBIDDEN",
+      "Hanya pemilik atau pengurus komunitas yang dapat mengelola tim host.",
+    );
+  }
+
+  return { cal, members, actor };
+}
+
+export async function addCalendarMember(
+  actorUserId: string,
+  slug: string,
+  input: AddCalendarMemberOutput,
+): Promise<CommunityCalendarMemberDto> {
+  const identifier = input.identifier.trim().replace(/^@/, "");
+
+  return await db.transaction(async (tx) => {
+    const { cal, members, actor } = await requireCalendarMemberContext(
+      tx,
+      slug,
+      actorUserId,
+    );
+
+    if (input.role === "admin" && actor.role !== "owner") {
+      throw new HttpError(
+        403,
+        "FORBIDDEN",
+        "Hanya pemilik komunitas yang dapat menambahkan atau mengangkat Host Pengelola (Admin).",
+      );
+    }
+
+    const [targetUser] = await tx
+      .select({
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        image: user.image,
+      })
+      .from(user)
+      .where(
+        or(ilike(user.email, identifier), ilike(user.username, identifier)),
+      )
+      .limit(1);
+
+    if (!targetUser) {
+      throw new HttpError(
+        404,
+        "USER_NOT_FOUND",
+        "Pengguna dengan email atau username tersebut tidak ditemukan.",
+      );
+    }
+
+    const existing = members.find((m) => m.userId === targetUser.id);
+    if (existing) {
+      if (existing.role === "owner") {
+        throw new HttpError(
+          400,
+          "CANNOT_MODIFY_OWNER",
+          "Peran pemilik komunitas tidak dapat diubah melalui menu ini.",
+        );
+      }
+      if (existing.role === input.role) {
+        throw new HttpError(
+          409,
+          "MEMBER_ALREADY_EXISTS",
+          "Pengguna tersebut sudah memiliki peran yang sama di komunitas ini.",
+        );
+      }
+      if (existing.role === "admin" && actor.role !== "owner") {
+        throw new HttpError(
+          403,
+          "FORBIDDEN",
+          "Hanya pemilik komunitas yang dapat mengubah peran pengurus admin.",
+        );
+      }
+
+      const [promoted] = await tx
+        .update(communityCalendarMembers)
+        .set({ role: input.role })
+        .where(eq(communityCalendarMembers.id, existing.id))
+        .returning();
+
+      return {
+        id: promoted.id,
+        userId: promoted.userId,
+        name: targetUser.name,
+        username: targetUser.username,
+        image: targetUser.image,
+        role: promoted.role,
+        createdAt: promoted.createdAt.toISOString(),
+      };
+    }
+
+    const [inserted] = await tx
+      .insert(communityCalendarMembers)
+      .values({
+        calendarId: cal.id,
+        userId: targetUser.id,
+        role: input.role,
+      })
+      .returning();
+
+    return {
+      id: inserted.id,
+      userId: inserted.userId,
+      name: targetUser.name,
+      username: targetUser.username,
+      image: targetUser.image,
+      role: inserted.role,
+      createdAt: inserted.createdAt.toISOString(),
+    };
+  });
+}
+
+export async function updateCalendarMemberRole(
+  actorUserId: string,
+  slug: string,
+  memberId: string,
+  input: UpdateCalendarMemberInput,
+): Promise<CommunityCalendarMemberDto> {
+  if (!UUID_REGEX.test(memberId)) {
+    throw new HttpError(
+      404,
+      "MEMBER_NOT_FOUND",
+      "Anggota komunitas tidak ditemukan.",
+    );
+  }
+
+  return await db.transaction(async (tx) => {
+    const { cal, members, actor } = await requireCalendarMemberContext(
+      tx,
+      slug,
+      actorUserId,
+    );
+
+    const target = members.find((m) => m.id === memberId);
+    if (!target) {
+      throw new HttpError(
+        404,
+        "MEMBER_NOT_FOUND",
+        "Anggota komunitas tidak ditemukan.",
+      );
+    }
+
+    if (target.role === "owner") {
+      const ownerCount = members.filter((m) => m.role === "owner").length;
+      if (ownerCount <= 1) {
+        throw new HttpError(
+          400,
+          "LAST_OWNER_REQUIRED",
+          "Komunitas harus memiliki minimal satu pemilik (owner).",
+        );
+      }
+    }
+
+    if (
+      (input.role === "admin" ||
+        target.role === "admin" ||
+        target.role === "owner") &&
+      actor.role !== "owner"
+    ) {
+      throw new HttpError(
+        403,
+        "FORBIDDEN",
+        "Hanya pemilik komunitas yang dapat mengelola peran Host Pengelola (Admin).",
+      );
+    }
+
+    const [updated] = await tx
+      .update(communityCalendarMembers)
+      .set({ role: input.role })
+      .where(
+        and(
+          eq(communityCalendarMembers.id, memberId),
+          eq(communityCalendarMembers.calendarId, cal.id),
+        ),
+      )
+      .returning();
+
+    const [memberUser] = await tx
+      .select({
+        name: user.name,
+        username: user.username,
+        image: user.image,
+      })
+      .from(user)
+      .where(eq(user.id, updated.userId))
+      .limit(1);
+
+    return {
+      id: updated.id,
+      userId: updated.userId,
+      name: memberUser?.name ?? "Anggota Komunitas",
+      username: memberUser?.username ?? null,
+      image: memberUser?.image ?? null,
+      role: updated.role,
+      createdAt: updated.createdAt.toISOString(),
+    };
+  });
+}
+
+export async function removeCalendarMember(
+  actorUserId: string,
+  slug: string,
+  memberId: string,
+): Promise<{ removed: boolean }> {
+  if (!UUID_REGEX.test(memberId)) {
+    throw new HttpError(
+      404,
+      "MEMBER_NOT_FOUND",
+      "Anggota komunitas tidak ditemukan.",
+    );
+  }
+
+  return await db.transaction(async (tx) => {
+    const { cal, members, actor } = await requireCalendarMemberContext(
+      tx,
+      slug,
+      actorUserId,
+    );
+
+    const target = members.find((m) => m.id === memberId);
+    if (!target) {
+      throw new HttpError(
+        404,
+        "MEMBER_NOT_FOUND",
+        "Anggota komunitas tidak ditemukan.",
+      );
+    }
+
+    if (target.role === "owner") {
+      const ownerCount = members.filter((m) => m.role === "owner").length;
+      if (ownerCount <= 1) {
+        throw new HttpError(
+          400,
+          "LAST_OWNER_REQUIRED",
+          "Tidak dapat menghapus pemilik terakhir komunitas.",
+        );
+      }
+    }
+
+    if (
+      (target.role === "admin" || target.role === "owner") &&
+      actor.role !== "owner"
+    ) {
+      throw new HttpError(
+        403,
+        "FORBIDDEN",
+        "Hanya pemilik komunitas yang dapat menghapus Host Pengelola (Admin).",
+      );
+    }
+
+    await tx
+      .delete(communityCalendarMembers)
+      .where(
+        and(
+          eq(communityCalendarMembers.id, memberId),
+          eq(communityCalendarMembers.calendarId, cal.id),
+        ),
+      );
+
+    return { removed: true };
+  });
 }
 
 export async function getCommunityWallet(
