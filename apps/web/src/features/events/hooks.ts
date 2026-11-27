@@ -1,14 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
+  AddCalendarMemberInput,
   CheckInRsvpInput,
   CreateCalendarInput,
   CreateEventInput,
   ListEventsInput,
   ReportEventInput,
   RsvpEventInput,
+  UpdateCalendarMemberInput,
   UpdateEventInput,
 } from "@starter/shared/validators/community";
 import {
+  addCalendarMember,
   approveRsvp,
   cancelRsvp,
   checkInRsvp,
@@ -18,9 +21,11 @@ import {
   joinCalendar,
   leaveCalendar,
   rejectRsvp,
+  removeCalendarMember,
   reportEvent,
   rsvpEvent,
   toggleFollowCalendar,
+  updateCalendarMemberRole,
   updateEvent,
 } from "./api";
 import {
@@ -224,6 +229,55 @@ export function useLeaveCalendar(slug: string) {
       queryClient.invalidateQueries({
         queryKey: eventsKeys.calendarMembers(slug),
       });
+      queryClient.invalidateQueries({ queryKey: eventsKeys.calendars() });
+    },
+  });
+}
+
+export function useAddCalendarMember(slug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AddCalendarMemberInput) =>
+      addCalendarMember(slug, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: eventsKeys.calendarMembers(slug),
+      });
+      queryClient.invalidateQueries({ queryKey: eventsKeys.calendar(slug) });
+      queryClient.invalidateQueries({ queryKey: eventsKeys.calendars() });
+    },
+  });
+}
+
+export function useUpdateCalendarMemberRole(slug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      memberId,
+      input,
+    }: {
+      memberId: string;
+      input: UpdateCalendarMemberInput;
+    }) => updateCalendarMemberRole(slug, memberId, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: eventsKeys.calendarMembers(slug),
+      });
+      queryClient.invalidateQueries({ queryKey: eventsKeys.calendar(slug) });
+      queryClient.invalidateQueries({ queryKey: eventsKeys.calendars() });
+    },
+  });
+}
+
+export function useRemoveCalendarMember(slug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (memberId: string) => removeCalendarMember(slug, memberId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: eventsKeys.calendarMembers(slug),
+      });
+      queryClient.invalidateQueries({ queryKey: eventsKeys.calendar(slug) });
       queryClient.invalidateQueries({ queryKey: eventsKeys.calendars() });
     },
   });

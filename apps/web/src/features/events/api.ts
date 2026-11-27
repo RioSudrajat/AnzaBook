@@ -10,12 +10,14 @@ import type {
   PageMeta,
 } from "@starter/shared/types";
 import type {
+  AddCalendarMemberInput,
   CheckInRsvpInput,
   CreateCalendarInput,
   CreateEventInput,
   ListEventsInput,
   ReportEventInput,
   RsvpEventInput,
+  UpdateCalendarMemberInput,
   UpdateEventInput,
 } from "@starter/shared/validators/community";
 import { apiFetch } from "@/lib/api/client";
@@ -210,6 +212,45 @@ export async function getCalendarMembers(slug: string, signal?: AbortSignal) {
   const { data } = await apiFetch<DataResponse<CommunityCalendarMemberDto[]>>(
     `/api/events/calendars/${encodeURIComponent(slug)}/members`,
     { signal },
+  );
+  return data;
+}
+
+export async function addCalendarMember(
+  slug: string,
+  input: AddCalendarMemberInput,
+) {
+  const { data } = await apiFetch<DataResponse<CommunityCalendarMemberDto>>(
+    `/api/events/calendars/${encodeURIComponent(slug)}/members`,
+    {
+      method: "POST",
+      body: input,
+    },
+  );
+  return data;
+}
+
+export async function updateCalendarMemberRole(
+  slug: string,
+  memberId: string,
+  input: UpdateCalendarMemberInput,
+) {
+  const { data } = await apiFetch<DataResponse<CommunityCalendarMemberDto>>(
+    `/api/events/calendars/${encodeURIComponent(slug)}/members/${encodeURIComponent(memberId)}`,
+    {
+      method: "PATCH",
+      body: input,
+    },
+  );
+  return data;
+}
+
+export async function removeCalendarMember(slug: string, memberId: string) {
+  const { data } = await apiFetch<DataResponse<{ removed: boolean }>>(
+    `/api/events/calendars/${encodeURIComponent(slug)}/members/${encodeURIComponent(memberId)}`,
+    {
+      method: "DELETE",
+    },
   );
   return data;
 }

@@ -10,11 +10,13 @@ import {
 import type {
   CommunityEventDetailDto,
   CommunityEventSummaryDto,
+  EventCoHostDto,
 } from "@starter/shared/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { useUpdateEvent } from "../hooks";
+import { EventCoHostsField } from "./event-cohosts-field";
 
 interface EditEventDialogProps {
   open: boolean;
@@ -51,6 +53,9 @@ export function EditEventDialog({
   );
   const [requiresApproval, setRequiresApproval] = React.useState(
     event.requiresApproval,
+  );
+  const [coHosts, setCoHosts] = React.useState<EventCoHostDto[]>(
+    event.coHosts || [],
   );
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
@@ -104,6 +109,7 @@ export function EditEventDialog({
         endsAt,
         capacity: capacity ? Number(capacity) : undefined,
         requiresApproval,
+        coHosts,
       });
 
       onClose();
@@ -332,6 +338,12 @@ export function EditEventDialog({
               />
             </div>
           </div>
+
+          <EventCoHostsField
+            coHosts={coHosts}
+            onChange={setCoHosts}
+            calendarSlug={event.calendarSlug}
+          />
 
           {/* Submit Buttons */}
           <div className="flex items-center justify-end gap-2 pt-4 border-t border-white/10">

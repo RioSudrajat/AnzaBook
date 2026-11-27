@@ -220,30 +220,49 @@ export function EventDetailView({ event: initialEvent }: EventDetailViewProps) {
 
       {/* Location Row (Luma Screenshot 4) */}
       <div className="flex items-start gap-3.5 rounded-xl border border-white/10 bg-white/5 p-3.5">
-        <MapPin className="mt-0.5 size-5 shrink-0 text-amber-400" />
-        <div className="flex-1 space-y-0.5">
-          {event.isAddressHidden ? (
-            <div>
+        {event.format === "online" &&
+        !event.venueName &&
+        !event.venueAddress ? (
+          <>
+            <Video className="mt-0.5 size-5 shrink-0 text-blue-400" />
+            <div className="flex-1 space-y-0.5">
               <div className="font-semibold text-white text-sm">
-                Daftar untuk Melihat Alamat
+                Sesi Daring (Virtual)
               </div>
               <div className="text-white/60">
-                {event.district ? `${event.district}, ` : ""}
-                {event.city || "Jakarta"}
+                Tautan rapat tersedia untuk peserta terdaftar
               </div>
             </div>
-          ) : (
-            <div>
-              <div className="font-semibold text-white text-sm">
-                {event.venueName || "Lokasi Acara"}
-              </div>
-              <div className="text-white/60">
-                {event.venueAddress ||
-                  `${event.district || ""}, ${event.city || ""}`}
-              </div>
+          </>
+        ) : (
+          <>
+            <MapPin className="mt-0.5 size-5 shrink-0 text-amber-400" />
+            <div className="flex-1 space-y-0.5">
+              {event.isAddressHidden ? (
+                <div>
+                  <div className="font-semibold text-white text-sm">
+                    Daftar untuk Melihat Alamat
+                  </div>
+                  <div className="text-white/60">
+                    {event.district ? `${event.district}, ` : ""}
+                    {event.city || "Jakarta"}
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div className="font-semibold text-white text-sm">
+                    {event.venueName || "Lokasi Acara"}
+                  </div>
+                  <div className="text-white/60">
+                    {event.venueAddress ||
+                      [event.district, event.city].filter(Boolean).join(", ") ||
+                      "Lokasi ditentukan penyelenggara"}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
 
       {/* Dynamic Registration Box or Host Panel */}
@@ -297,7 +316,7 @@ export function EventDetailView({ event: initialEvent }: EventDetailViewProps) {
                 variant="outline"
                 size="sm"
                 onClick={() => setIsEditModalOpen(true)}
-                className="border-white/20 text-white hover:bg-white/10 cursor-pointer text-xs"
+                className="bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white cursor-pointer text-xs"
               >
                 <Pencil className="size-3.5 mr-1 text-white/70" />
                 Edit Acara
@@ -308,7 +327,7 @@ export function EventDetailView({ event: initialEvent }: EventDetailViewProps) {
                 variant="outline"
                 size="sm"
                 onClick={handleDeleteEvent}
-                className="border-rose-500/30 text-rose-300 hover:bg-rose-500/20 hover:text-rose-200 cursor-pointer text-xs"
+                className="bg-rose-500/10 border-rose-500/30 text-rose-300 hover:bg-rose-500/20 hover:text-rose-200 cursor-pointer text-xs"
               >
                 <Trash2 className="size-3.5 mr-1 text-rose-400" />
                 Hapus Acara
@@ -444,7 +463,7 @@ export function EventDetailView({ event: initialEvent }: EventDetailViewProps) {
                 size="sm"
                 disabled={cancelRsvpMutation.isPending}
                 onClick={handleCancelRsvp}
-                className="w-full border-white/20 text-white/70 hover:bg-white/10 hover:text-white"
+                className="w-full bg-transparent border-white/20 text-white/70 hover:bg-white/10 hover:text-white cursor-pointer"
               >
                 {cancelRsvpMutation.isPending
                   ? "Membatalkan..."
@@ -602,69 +621,86 @@ export function EventDetailView({ event: initialEvent }: EventDetailViewProps) {
         <h2 className="text-sm font-semibold text-white uppercase tracking-wider text-white/50">
           Lokasi
         </h2>
-        {event.isAddressHidden ? (
-          <p className="text-white/70">
-            Harap mendaftar untuk melihat lokasi tepat acara ini.
-            <br />
-            <span className="text-white/50">
-              {event.district ? `${event.district}, ` : ""}
-              {event.city || "Jakarta"}
+        {event.format === "online" &&
+        !event.venueName &&
+        !event.venueAddress &&
+        !event.latitude ? (
+          <div className="flex items-center gap-2 rounded-xl border border-blue-500/25 bg-blue-500/10 p-3.5 text-xs text-blue-200">
+            <Video className="size-4 shrink-0 text-blue-400" />
+            <span>
+              Acara berlangsung secara daring. Tautan rapat akan tampil di panel
+              pendaftaran.
             </span>
-          </p>
+          </div>
         ) : (
-          <div className="text-white/80 space-y-1">
-            <div className="font-semibold text-white">{event.venueName}</div>
-            <div className="text-white/60">{event.venueAddress}</div>
-          </div>
+          <>
+            {event.isAddressHidden ? (
+              <p className="text-white/70">
+                Harap mendaftar untuk melihat lokasi tepat acara ini.
+                <br />
+                <span className="text-white/50">
+                  {event.district ? `${event.district}, ` : ""}
+                  {event.city || "Jakarta"}
+                </span>
+              </p>
+            ) : (
+              <div className="text-white/80 space-y-1">
+                <div className="font-semibold text-white">
+                  {event.venueName}
+                </div>
+                <div className="text-white/60">{event.venueAddress}</div>
+              </div>
+            )}
+
+            {/* Map Preview Box with Maps ↗ Overlay (Luma Screenshot 5 & 8) */}
+            <div className="relative h-44 w-full overflow-hidden rounded-xl border border-white/10 bg-[#161a22]">
+              {/* Simulated OpenStreetMap Vector Background */}
+              <svg className="absolute inset-0 size-full stroke-white/5 [stroke-width:1]">
+                <pattern
+                  id="detail-grid"
+                  width="30"
+                  height="30"
+                  patternUnits="userSpaceOnUse"
+                >
+                  <path d="M 30 0 L 0 0 0 30" fill="none" />
+                </pattern>
+                <rect width="100%" height="100%" fill="url(#detail-grid)" />
+                <path
+                  d="M 0 90 Q 150 70, 400 120"
+                  stroke="#25354d"
+                  strokeWidth="8"
+                  fill="none"
+                />
+                <path
+                  d="M 180 0 L 210 200"
+                  stroke="#1f2c3e"
+                  strokeWidth="6"
+                  fill="none"
+                />
+              </svg>
+
+              {/* Map Pin */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
+                <div className="size-4 rounded-full border-2 border-white bg-red-500 shadow-lg animate-bounce" />
+                <span className="mt-1 rounded bg-black/80 px-1.5 py-0.5 text-[10px] text-white">
+                  {event.isAddressHidden
+                    ? event.city || "Jakarta"
+                    : event.venueName || "Venue"}
+                </span>
+              </div>
+
+              {/* Overlay Button "Maps ↗" (Luma Screenshot 5 & 8) */}
+              <a
+                href={googleMapsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="absolute top-3 left-3 flex items-center gap-1.5 rounded-lg border border-white/20 bg-black/75 px-3 py-1.5 text-xs font-semibold text-white shadow-lg backdrop-blur-xs hover:bg-black transition-colors"
+              >
+                Maps ↗
+              </a>
+            </div>
+          </>
         )}
-
-        {/* Map Preview Box with Maps ↗ Overlay (Luma Screenshot 5 & 8) */}
-        <div className="relative h-44 w-full overflow-hidden rounded-xl border border-white/10 bg-[#161a22]">
-          {/* Simulated OpenStreetMap Vector Background */}
-          <svg className="absolute inset-0 size-full stroke-white/5 [stroke-width:1]">
-            <pattern
-              id="detail-grid"
-              width="30"
-              height="30"
-              patternUnits="userSpaceOnUse"
-            >
-              <path d="M 30 0 L 0 0 0 30" fill="none" />
-            </pattern>
-            <rect width="100%" height="100%" fill="url(#detail-grid)" />
-            <path
-              d="M 0 90 Q 150 70, 400 120"
-              stroke="#25354d"
-              strokeWidth="8"
-              fill="none"
-            />
-            <path
-              d="M 180 0 L 210 200"
-              stroke="#1f2c3e"
-              strokeWidth="6"
-              fill="none"
-            />
-          </svg>
-
-          {/* Map Pin */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-            <div className="size-4 rounded-full border-2 border-white bg-red-500 shadow-lg animate-bounce" />
-            <span className="mt-1 rounded bg-black/80 px-1.5 py-0.5 text-[10px] text-white">
-              {event.isAddressHidden
-                ? event.city || "Jakarta"
-                : event.venueName || "Venue"}
-            </span>
-          </div>
-
-          {/* Overlay Button "Maps ↗" (Luma Screenshot 5 & 8) */}
-          <a
-            href={googleMapsUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="absolute top-3 left-3 flex items-center gap-1.5 rounded-lg border border-white/20 bg-black/75 px-3 py-1.5 text-xs font-semibold text-white shadow-lg backdrop-blur-xs hover:bg-black transition-colors"
-          >
-            Maps ↗
-          </a>
-        </div>
       </div>
 
       {/* Diselenggarakan Oleh (Screenshot 5 & 8) */}
@@ -685,13 +721,26 @@ export function EventDetailView({ event: initialEvent }: EventDetailViewProps) {
         </div>
 
         {event.coHosts && event.coHosts.length > 0 && (
-          <div className="mt-2 space-y-1.5 pl-2">
+          <div className="mt-2 space-y-2 pl-2">
             {event.coHosts.map((ch, idx) => (
-              <div key={idx} className="flex items-center gap-2 text-white/70">
-                <span className="size-1.5 rounded-full bg-amber-400" />
-                <span className="text-white">{ch.name}</span>
+              <div
+                key={idx}
+                className="flex items-center gap-2.5 text-white/70"
+              >
+                {ch.avatarUrl ? (
+                  <img
+                    src={ch.avatarUrl}
+                    alt={ch.name}
+                    className="size-6 rounded-full object-cover border border-white/15 shrink-0"
+                  />
+                ) : (
+                  <span className="flex size-6 items-center justify-center rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold shrink-0">
+                    {ch.name.slice(0, 1).toUpperCase()}
+                  </span>
+                )}
+                <span className="text-white font-medium">{ch.name}</span>
                 {ch.roleLabel && (
-                  <span className="text-[10px] text-white/40">
+                  <span className="text-[10px] text-white/50">
                     ({ch.roleLabel})
                   </span>
                 )}
@@ -808,7 +857,7 @@ export function EventDetailView({ event: initialEvent }: EventDetailViewProps) {
                     variant="outline"
                     size="xs"
                     onClick={() => setReportModalOpen(false)}
-                    className="border-white/20 text-white"
+                    className="bg-transparent border-white/20 text-white hover:bg-white/10 hover:text-white"
                   >
                     Batal
                   </Button>

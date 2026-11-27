@@ -16,6 +16,7 @@ import {
   Check,
   Video,
 } from "lucide-react";
+import type { EventCoHostDto } from "@starter/shared/types";
 import type { CreateEventInput } from "@starter/shared/validators/community";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,7 @@ import {
   type SelectedLocationState,
 } from "./location-picker-popover";
 import { EventDescriptionDialog } from "./event-description-dialog";
+import { EventCoHostsField } from "./event-cohosts-field";
 
 interface CreateEventDialogProps {
   open: boolean;
@@ -153,8 +155,8 @@ export function CreateEventDialog({
   const [workCreator, setWorkCreator] = React.useState("");
   const [workUrl, setWorkUrl] = React.useState("");
 
-  // Settings
-  const [ticketPriceIdr] = React.useState(0);
+  // Settings & Co-Hosts
+  const [coHosts, setCoHosts] = React.useState<EventCoHostDto[]>([]);
   const [requiresApproval, setRequiresApproval] = React.useState(false);
   const [isUnlimitedCapacity, setIsUnlimitedCapacity] = React.useState(true);
   const [capacity, setCapacity] = React.useState<number>(30);
@@ -280,7 +282,7 @@ export function CreateEventDialog({
         capacity: isUnlimitedCapacity ? undefined : Number(capacity),
         requiresApproval,
         allowWaitlist,
-        coHosts: [],
+        coHosts,
       };
 
       if (isLinkingWork && workTitle.trim()) {
@@ -497,7 +499,21 @@ export function CreateEventDialog({
                         </button>
                       ))
                     )}
-                    <div className="mt-1 border-t border-white/10 pt-1">
+                    <div className="mt-1 border-t border-white/10 pt-1 space-y-0.5">
+                      {activeCalendar && (
+                        <Link
+                          to="/c/$slug"
+                          params={{ slug: activeCalendar.slug }}
+                          onClick={() => {
+                            setIsCalendarMenuOpen(false);
+                            onClose();
+                          }}
+                          className="flex w-full items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-white/80 hover:bg-white/10 transition-colors"
+                        >
+                          <Plus className="size-3.5 text-amber-400" />
+                          <span>Kelola Host &amp; Pengurus Komunitas</span>
+                        </Link>
+                      )}
                       <Link
                         to="/partner-program"
                         onClick={() => {
@@ -769,54 +785,70 @@ export function CreateEventDialog({
               )}
             </div>
 
-            {/* Event Options ("Opsi Acara" matching Screenshot 1 & 3) */}
+            <EventCoHostsField
+              coHosts={coHosts}
+              onChange={setCoHosts}
+              calendarSlug={activeCalendar?.slug}
+              calendars={calendars}
+            />
+
+            {/* Event Options */}
             <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-xs space-y-3">
               <div className="text-[11px] font-semibold uppercase tracking-wider text-white/50">
                 Opsi Acara
               </div>
 
-              {/* Harga Tiket matching Screenshot 3 media_1794175722339_653f9914.jpg */}
-              <div className="relative flex items-center justify-between py-1">
+              {/* Harga Tiket */}
+              <div
+                className="relative flex items-center justify-between py-1"
+                onKeyDown={(e) => {
+                  if (e.key === "Escape" && isPaymentPopoverOpen) {
+                    e.stopPropagation();
+                    setIsPaymentPopoverOpen(false);
+                  }
+                }}
+              >
                 <span className="text-white font-medium">Harga Tiket</span>
                 <button
                   type="button"
+                  aria-expanded={isPaymentPopoverOpen}
+                  aria-controls="ticket-coming-soon-popover"
                   onClick={() => setIsPaymentPopoverOpen(!isPaymentPopoverOpen)}
                   className="flex items-center gap-1.5 rounded-md px-2 py-1 text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 >
-                  <span>
-                    {ticketPriceIdr > 0
-                      ? `Rp ${ticketPriceIdr.toLocaleString("id-ID")}`
-                      : "Gratis"}
-                  </span>
+                  <span>Gratis</span>
                   <Pencil className="size-3 text-white/50" />
                 </button>
 
-                {/* Stripe / Payment Popover matching Screenshot 3 */}
                 {isPaymentPopoverOpen && (
                   <div
+                    id="ticket-coming-soon-popover"
+                    role="region"
+                    aria-label="Informasi Tiket Acara"
                     className="absolute right-0 top-8 z-30 w-80 rounded-2xl border border-white/15 bg-[#1a1b1f] p-5 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95"
                     style={{ overscrollBehavior: "contain" }}
                   >
-                    <div className="mb-3 flex size-10 items-center justify-center rounded-xl bg-white/10 text-white">
-                      <Ticket className="size-5 text-amber-400" />
+                    <div className="mb-3 flex items-center justify-between">
+                      <div className="flex size-10 items-center justify-center rounded-xl bg-white/10 text-white">
+                        <Ticket className="size-5 text-amber-400" />
+                      </div>
+                      <span className="rounded-full border border-amber-400/40 bg-amber-400/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-300">
+                        Coming Soon
+                      </span>
                     </div>
                     <h4 className="text-sm font-bold text-white mb-1.5">
-                      Terima Pembayaran
+                      Tiket Acara Berbayar
                     </h4>
-                    <p className="text-[11px] leading-relaxed text-white/60 mb-4">
-                      Kalender ini belum diatur untuk menerima pembayaran. Kami
-                      menggunakan Stripe untuk memproses pembayaran. Hubungkan
-                      atau buat akun Stripe untuk mulai menerima pembayaran.
-                      Biasanya membutuhkan waktu kurang dari 5 menit.
+                    <p className="text-[11px] leading-relaxed text-white/65 mb-4">
+                      Saat ini seluruh acara komunitas bersifat gratis. Fitur
+                      penjualan tiket berbayar sedang disiapkan (Coming Soon).
                     </p>
                     <button
                       type="button"
-                      onClick={() => {
-                        setIsPaymentPopoverOpen(false);
-                      }}
-                      className="w-full rounded-xl bg-white py-2 text-xs font-semibold text-black hover:bg-white/90 transition-all cursor-pointer shadow-sm text-center"
+                      onClick={() => setIsPaymentPopoverOpen(false)}
+                      className="w-full min-h-10 rounded-xl bg-white/15 py-2 text-xs font-semibold text-white hover:bg-white/25 transition-all cursor-pointer text-center"
                     >
-                      Hubungkan Stripe
+                      Mengerti
                     </button>
                   </div>
                 )}
