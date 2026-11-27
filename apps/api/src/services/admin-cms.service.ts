@@ -1,9 +1,11 @@
 import { randomBytes } from "node:crypto";
-import { desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import type {
   AdminOverviewDto,
+  AdminSpotModerationItemDto,
   BookClaimBatchDto,
   PublisherDto,
+  ReadingSpotReportDto,
 } from "@starter/shared/types";
 import type {
   AdminListQueryInput,
@@ -12,6 +14,10 @@ import type {
   AdminVerifyPublisherInput,
 } from "@starter/shared/validators/admin";
 import type { CreateClaimBatchInput } from "@starter/shared/validators/publisher";
+import type {
+  ListAdminSpotsQuery,
+  ModerateSpotInput,
+} from "@starter/shared/validators/spots";
 import { db } from "../db";
 import {
   authorApplications,
@@ -23,10 +29,13 @@ import {
   communityWalletLedgers,
   membershipOrders,
   publishers,
+  readingSpotReports,
+  readingSpots,
   user,
 } from "../db/schema";
 import { HttpError } from "../lib/http-error";
 import { countRecentHighRiskDrmEvents24h } from "./drm.service";
+import { toSpotSummary } from "./spots.service";
 
 function generateClaimCode(): string {
   return `ANZ-${randomBytes(6).toString("hex").toUpperCase()}`;
@@ -37,6 +46,8 @@ export async function getAdminOverview(): Promise<AdminOverviewDto> {
     [pendingCalRow],
     [pendingAuthorRow],
     [pendingPubRow],
+    [pendingSpotsRow],
+    [openSpotReportsRow],
     [membershipRevRow],
     [singlePurchaseRevRow],
     [affiliateRow],
@@ -54,6 +65,14 @@ export async function getAdminOverview(): Promise<AdminOverviewDto> {
       .select({ count: sql<number>`count(*)` })
       .from(publishers)
       .where(eq(publishers.verificationStatus, "pending")),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(readingSpots)
+      .where(eq(readingSpots.status, "pending_review")),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(readingSpotReports)
+      .where(eq(readingSpotReports.status, "open")),
     db
       .select({ total: sql<number>`COALESCE(SUM(price_idr), 0)` })
       .from(membershipOrders)
@@ -85,6 +104,8 @@ export async function getAdminOverview(): Promise<AdminOverviewDto> {
     pendingCalendarsCount: Number(pendingCalRow?.count ?? 0),
     pendingAuthorsCount: Number(pendingAuthorRow?.count ?? 0),
     pendingPublishersCount: Number(pendingPubRow?.count ?? 0),
+    pendingSpotsCount: Number(pendingSpotsRow?.count ?? 0),
+    openSpotReportsCount: Number(openSpotReportsRow?.count ?? 0),
     highRiskDrmEvents24hCount,
     estimatedNakamaRoyaltyPoolIdr,
     totalSinglePurchaseSalesIdr: Number(singlePurchaseRevRow?.totalSales ?? 0),
@@ -476,4 +497,245 @@ export async function getAdminClaimBatchCodes(batchId: string) {
       createdAt: c.createdAt.toISOString(),
     })),
   };
+}
+
+const SPOT_UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function escapeSpotLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
+export async function listAdminSpots(
+  query: ListAdminSpotsQuery,
+): Promise<AdminSpotModerationItemDto[]> {
+  const conditions = [];
+
+  if (query.status) {
+    conditions.push(eq(readingSpots.status, query.status));
+  }
+
+  if (query.hasOpenReports === true) {
+    conditions.push(
+      sql`exists (
+        select 1 from ${readingSpotReports}
+        where ${readingSpotReports.spotId} = ${readingSpots.id}
+          and ${readingSpotReports.status} = 'open'
+      )`,
+    );
+  } else if (query.hasOpenReports === false) {
+    conditions.push(
+      sql`not exists (
+        select 1 from ${readingSpotReports}
+        where ${readingSpotReports.spotId} = ${readingSpots.id}
+          and ${readingSpotReports.status} = 'open'
+      )`,
+    );
+  }
+
+  if (query.q) {
+    const pattern = `%${escapeSpotLikePattern(query.q)}%`;
+    conditions.push(
+      or(
+        ilike(readingSpots.name, pattern),
+        ilike(readingSpots.city, pattern),
+        ilike(readingSpots.address, pattern),
+        ilike(readingSpots.district, pattern),
+      )!,
+    );
+  }
+
+  const rows = await db
+    .select({
+      spot: readingSpots,
+      submitterName: user.name,
+      submitterEmail: user.email,
+    })
+    .from(readingSpots)
+    .leftJoin(user, eq(readingSpots.submittedByUserId, user.id))
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(readingSpots.createdAt))
+    .limit(query.limit)
+    .offset(query.offset);
+
+  if (rows.length === 0) return [];
+
+  const spotIds = rows.map((r) => r.spot.id);
+  const reportRows = await db
+    .select({
+      report: readingSpotReports,
+      reporterName: user.name,
+    })
+    .from(readingSpotReports)
+    .leftJoin(user, eq(readingSpotReports.reporterUserId, user.id))
+    .where(inArray(readingSpotReports.spotId, spotIds))
+    .orderBy(desc(readingSpotReports.createdAt));
+
+  const openCountBySpot = new Map<string, number>();
+  const recentReportsBySpot = new Map<string, ReadingSpotReportDto[]>();
+
+  for (const row of reportRows) {
+    const sid = row.report.spotId;
+    if (row.report.status === "open") {
+      openCountBySpot.set(sid, (openCountBySpot.get(sid) ?? 0) + 1);
+    }
+    const list = recentReportsBySpot.get(sid) ?? [];
+    if (list.length < 10) {
+      list.push({
+        id: row.report.id,
+        spotId: row.report.spotId,
+        reviewId: row.report.reviewId,
+        reporterUserId: row.report.reporterUserId,
+        reporterName: row.reporterName ?? null,
+        reasonType: row.report.reasonType,
+        details: row.report.details,
+        status: row.report.status,
+        createdAt: row.report.createdAt.toISOString(),
+      });
+      recentReportsBySpot.set(sid, list);
+    }
+  }
+
+  return rows.map(({ spot, submitterName, submitterEmail }) => ({
+    ...toSpotSummary(spot),
+    status: spot.status,
+    source: spot.source,
+    rejectionReason: spot.rejectionReason,
+    submittedByUserId: spot.submittedByUserId,
+    submitterName: submitterName ?? null,
+    submitterEmail: submitterEmail ?? null,
+    openReportsCount: openCountBySpot.get(spot.id) ?? 0,
+    recentReports: recentReportsBySpot.get(spot.id) ?? [],
+    createdAt: spot.createdAt.toISOString(),
+    updatedAt: spot.updatedAt.toISOString(),
+  }));
+}
+
+export async function moderateAdminSpot(
+  id: string,
+  input: ModerateSpotInput,
+): Promise<AdminSpotModerationItemDto> {
+  if (!SPOT_UUID_REGEX.test(id)) {
+    throw new HttpError(404, "SPOT_NOT_FOUND", "Sudut baca tidak ditemukan.");
+  }
+
+  return await db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select()
+      .from(readingSpots)
+      .where(eq(readingSpots.id, id))
+      .for("update")
+      .limit(1);
+
+    if (!existing) {
+      throw new HttpError(404, "SPOT_NOT_FOUND", "Sudut baca tidak ditemukan.");
+    }
+
+    const patch: Partial<typeof readingSpots.$inferInsert> = {
+      updatedAt: new Date(),
+    };
+
+    if (input.action === "approve" || input.action === "reopen") {
+      patch.status = "published";
+      patch.rejectionReason = null;
+    } else if (input.action === "reject") {
+      patch.status = "rejected";
+      patch.rejectionReason = input.rejectionReason?.trim() ?? null;
+    } else if (input.action === "mark_closed") {
+      patch.status = "closed";
+      if (input.rejectionReason !== undefined) {
+        patch.rejectionReason = input.rejectionReason.trim() || null;
+      }
+    }
+
+    if (input.verifiedBadge !== undefined)
+      patch.verifiedBadge = input.verifiedBadge;
+    if (input.name !== undefined) patch.name = input.name;
+    if (input.category !== undefined) patch.category = input.category;
+    if (input.description !== undefined) patch.description = input.description;
+    if (input.address !== undefined) patch.address = input.address;
+    if (input.district !== undefined) patch.district = input.district;
+    if (input.city !== undefined) patch.city = input.city;
+    if (input.province !== undefined) patch.province = input.province;
+    if (input.openingHoursText !== undefined)
+      patch.openingHoursText = input.openingHoursText;
+    if (input.priceRange !== undefined) patch.priceRange = input.priceRange;
+    if (input.noiseLevel !== undefined) patch.noiseLevel = input.noiseLevel;
+    if (input.facilities !== undefined) patch.facilities = input.facilities;
+    if (input.googleMapsUrl !== undefined) {
+      patch.googleMapsUrl =
+        input.googleMapsUrl && input.googleMapsUrl.trim() !== ""
+          ? input.googleMapsUrl.trim()
+          : null;
+    }
+    if (input.coverUrl !== undefined) {
+      patch.coverUrl =
+        input.coverUrl && input.coverUrl.trim() !== ""
+          ? input.coverUrl.trim()
+          : null;
+    }
+
+    const [updated] = await tx
+      .update(readingSpots)
+      .set(patch)
+      .where(eq(readingSpots.id, id))
+      .returning();
+
+    await tx
+      .update(readingSpotReports)
+      .set({ status: "resolved" })
+      .where(
+        and(
+          eq(readingSpotReports.spotId, id),
+          eq(readingSpotReports.status, "open"),
+        ),
+      );
+
+    let submitterName: string | null = null;
+    let submitterEmail: string | null = null;
+    if (updated.submittedByUserId) {
+      const [submitter] = await tx
+        .select({ name: user.name, email: user.email })
+        .from(user)
+        .where(eq(user.id, updated.submittedByUserId))
+        .limit(1);
+      submitterName = submitter?.name ?? null;
+      submitterEmail = submitter?.email ?? null;
+    }
+
+    const recentReportRows = await tx
+      .select({
+        report: readingSpotReports,
+        reporterName: user.name,
+      })
+      .from(readingSpotReports)
+      .leftJoin(user, eq(readingSpotReports.reporterUserId, user.id))
+      .where(eq(readingSpotReports.spotId, id))
+      .orderBy(desc(readingSpotReports.createdAt))
+      .limit(10);
+
+    return {
+      ...toSpotSummary(updated),
+      status: updated.status,
+      source: updated.source,
+      rejectionReason: updated.rejectionReason,
+      submittedByUserId: updated.submittedByUserId,
+      submitterName,
+      submitterEmail,
+      openReportsCount: 0,
+      recentReports: recentReportRows.map((r) => ({
+        id: r.report.id,
+        spotId: r.report.spotId,
+        reviewId: r.report.reviewId,
+        reporterUserId: r.report.reporterUserId,
+        reporterName: r.reporterName ?? null,
+        reasonType: r.report.reasonType,
+        details: r.report.details,
+        status: r.report.status,
+        createdAt: r.report.createdAt.toISOString(),
+      })),
+      createdAt: updated.createdAt.toISOString(),
+      updatedAt: updated.updatedAt.toISOString(),
+    };
+  });
 }

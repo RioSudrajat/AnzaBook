@@ -1,3 +1,7 @@
+import {
+  listAdminSpotsQuerySchema,
+  moderateSpotSchema,
+} from "@starter/shared/validators/spots";
 import { Router, type RequestHandler } from "express";
 import {
   adminListQuerySchema,
@@ -28,6 +32,8 @@ import {
   listAdminAuthorApplications,
   listAdminCalendars,
   listAdminPublishers,
+  listAdminSpots,
+  moderateAdminSpot,
   reviewAdminAuthorApplication,
   verifyAdminCalendar,
   verifyAdminPublisher,
@@ -157,6 +163,29 @@ adminRouter.patch("/drm-suspensions/:id/review", jsonBody, async (req, res) => {
   const result = await reviewDrmSuspension(id, getAuth(req).user.id, input);
   res.json({ data: result });
 });
+
+// ---------------- Reading Spots Moderation ---------------- //
+
+adminRouter.get(
+  "/spots",
+  requirePermission({ spots: ["manage-any"] }),
+  async (req, res) => {
+    const query = listAdminSpotsQuerySchema.parse(req.query);
+    const spots = await listAdminSpots(query);
+    res.json({ data: spots });
+  },
+);
+
+adminRouter.patch(
+  "/spots/:id/moderate",
+  requirePermission({ spots: ["manage-any"] }),
+  jsonBody,
+  async (req, res) => {
+    const input = moderateSpotSchema.parse(req.body);
+    const moderated = await moderateAdminSpot(req.params.id as string, input);
+    res.json({ data: moderated });
+  },
+);
 
 // ---------------- Existing Notes Management ---------------- //
 
