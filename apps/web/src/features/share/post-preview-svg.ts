@@ -5,8 +5,25 @@ import {
   resolveSessionCardViewModel,
 } from "./card-helpers";
 
+function stripIllegalXmlChars(value: string): string {
+  let cleaned = "";
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    const isIllegal =
+      (code <= 0x1f && code !== 0x09 && code !== 0x0a && code !== 0x0d) ||
+      code === 0x7f;
+    if (!isIllegal) {
+      cleaned += value[i];
+    }
+  }
+  return cleaned;
+}
+
 function escapeXml(value: string): string {
-  return value.replace(/[<>&"']/g, (char) => `&#${char.charCodeAt(0)};`);
+  return stripIllegalXmlChars(value).replace(
+    /[<>&"']/g,
+    (char) => `&#${char.charCodeAt(0)};`,
+  );
 }
 
 function truncateText(value: string, max: number): string {

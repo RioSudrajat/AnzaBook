@@ -606,6 +606,57 @@ export async function createHighlight(
   userId: string,
   input: CreateHighlightInput,
 ): Promise<BookHighlightDto> {
+  const [book] = await db
+    .select({ id: books.id, digitalPolicy: books.digitalPolicy })
+    .from(books)
+    .where(eq(books.id, input.bookId))
+    .limit(1);
+
+  if (!book) {
+    throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+  }
+
+  const { hasFullAccess } = await getBookReadAccess(book, userId);
+  if (!hasFullAccess && input.chapterNumber !== 1) {
+    throw new HttpError(
+      403,
+      "FORBIDDEN_DIGITAL_ACCESS",
+      "Kutipan ini berada di luar bagian buku yang bisa dibaca.",
+    );
+  }
+
+  if (input.chapterId) {
+    const [chapter] = await db
+      .select({
+        id: bookChapters.id,
+        chapterNumber: bookChapters.chapterNumber,
+      })
+      .from(bookChapters)
+      .where(
+        and(
+          eq(bookChapters.id, input.chapterId),
+          eq(bookChapters.bookId, input.bookId),
+        ),
+      )
+      .limit(1);
+
+    if (!chapter) {
+      throw new HttpError(
+        422,
+        "INVALID_CHAPTER_REFERENCE",
+        "Bab tidak sesuai dengan buku yang dipilih.",
+      );
+    }
+
+    if (!hasFullAccess && chapter.chapterNumber !== 1) {
+      throw new HttpError(
+        403,
+        "FORBIDDEN_DIGITAL_ACCESS",
+        "Kutipan ini berada di luar bagian buku yang bisa dibaca.",
+      );
+    }
+  }
+
   const [created] = await db
     .insert(bookHighlights)
     .values({
@@ -730,13 +781,22 @@ export async function restartBookReading(
   bookId: string,
 ): Promise<{ success: boolean; shelfStatus: string; progressPercent: number }> {
   const [book] = await db
-    .select({ id: books.id })
+    .select({ id: books.id, digitalPolicy: books.digitalPolicy })
     .from(books)
     .where(eq(books.id, bookId))
     .limit(1);
 
   if (!book) {
     throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+  }
+
+  const { hasFullAccess } = await getBookReadAccess(book, userId);
+  if (!hasFullAccess) {
+    throw new HttpError(
+      403,
+      "FORBIDDEN_DIGITAL_ACCESS",
+      "Anda tidak memiliki akses penuh untuk mengulang baca buku ini.",
+    );
   }
 
   const [firstChapter] = await db

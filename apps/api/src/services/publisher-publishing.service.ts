@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { and, asc, desc, eq, ilike, or } from "drizzle-orm";
+import { and, asc, desc, eq, or, sql } from "drizzle-orm";
 import type {
   BookDistributionModel,
   BookSummaryDto,
@@ -595,6 +595,7 @@ export async function addPublisherMember(
   const pub = await resolvePublisherBySlugOrId(publisherSlug);
   await requirePublisherMember(pub.id, userId, ["owner"]);
 
+  const normalizedEmail = input.email.trim().toLowerCase();
   const [targetUser] = await db
     .select({
       id: user.id,
@@ -604,7 +605,7 @@ export async function addPublisherMember(
       image: user.image,
     })
     .from(user)
-    .where(ilike(user.email, input.email.trim()))
+    .where(eq(sql`lower(${user.email})`, normalizedEmail))
     .limit(1);
 
   if (!targetUser) {
@@ -853,7 +854,7 @@ export async function addPublisherApprovedWriter(
   publisherSlug: string,
   input: AddApprovedWriterOutput,
 ): Promise<PublisherApprovedWriterDto> {
-  const identifier = input.identifier.trim().replace(/^@/, "");
+  const normalized = input.identifier.trim().replace(/^@/, "").toLowerCase();
 
   return await db.transaction(async (tx) => {
     const pub = await resolvePublisherBySlugOrId(publisherSlug, tx);
@@ -863,7 +864,10 @@ export async function addPublisherApprovedWriter(
       .select()
       .from(user)
       .where(
-        or(ilike(user.email, identifier), ilike(user.username, identifier)),
+        or(
+          eq(sql`lower(${user.email})`, normalized),
+          eq(sql`lower(${user.username})`, normalized),
+        ),
       )
       .limit(1);
 

@@ -1,8 +1,26 @@
 import { z } from "zod";
 import type { AccessTier, BookDistributionModel } from "../types/api";
+import {
+  isSafeSocialLinkValue,
+  safeVerificationDocumentsSchema,
+} from "./url-safety";
 
 const ROOT_RELATIVE_ASSET_PATH_REGEX = /^\/(?!\/)[^\s]*$/;
 const HTTP_URL_SCHEMA = z.string().url({ protocol: /^https?$/ });
+
+const publisherSocialHandleOrUrlSchema = z
+  .string()
+  .max(500, "Tautan media sosial terlalu panjang")
+  .refine((val) => isSafeSocialLinkValue(val, { allowHandle: true }), {
+    message: "Tautan atau handle media sosial tidak valid",
+  });
+
+const publisherWebsiteSchema = z
+  .string()
+  .max(500, "URL situs web terlalu panjang")
+  .refine((val) => isSafeSocialLinkValue(val, { allowBareDomain: true }), {
+    message: "URL situs web tidak valid",
+  });
 
 export const DEFAULT_DIGITAL_BOOK_PRICE_IDR = 45_000;
 
@@ -94,22 +112,14 @@ export const applyPublisherSchema = z
       .nullable(),
     socialLinks: z
       .object({
-        instagram: z.string().optional(),
-        twitter: z.string().optional(),
-        website: z.string().optional(),
-        whatsapp: z.string().optional(),
+        instagram: publisherSocialHandleOrUrlSchema.optional(),
+        twitter: publisherSocialHandleOrUrlSchema.optional(),
+        website: publisherWebsiteSchema.optional(),
+        whatsapp: publisherSocialHandleOrUrlSchema.optional(),
       })
       .optional()
       .nullable(),
-    verificationDocuments: z
-      .array(
-        z.object({
-          title: z.string().min(1, "Judul berkas wajib diisi"),
-          url: z.string().min(1, "URL berkas wajib diisi"),
-          fileType: z.string().optional(),
-        }),
-      )
-      .optional(),
+    verificationDocuments: safeVerificationDocumentsSchema.optional(),
     topics: z.array(z.string().trim().min(1).max(60)).max(15).optional(),
     isAcceptingSubmissions: z.boolean().optional(),
     submissionGuidelines: z.string().max(2000).optional().nullable(),

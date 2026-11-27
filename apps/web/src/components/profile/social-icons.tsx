@@ -1,4 +1,5 @@
 import { Globe, MessageCircle } from "lucide-react";
+import { safeSocialHref } from "@/lib/safe-url";
 
 export function InstagramIcon({
   className = "size-4",
@@ -65,15 +66,6 @@ function formatHandleLabel(raw: string, prefix: string) {
   return `${prefix}${raw.replace(/^@/, "")}`;
 }
 
-function normalizeHttpUrl(raw: string, base: string) {
-  const trimmed = raw.trim();
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-    return trimmed;
-  }
-  if (!base) return `https://${trimmed}`;
-  return `${base}${trimmed.replace(/^@/, "")}`;
-}
-
 export function ProfileSocialLinks({
   links,
 }: {
@@ -81,7 +73,20 @@ export function ProfileSocialLinks({
 }) {
   if (!links) return null;
   const { instagram, twitter, linkedin, website, whatsapp } = links;
-  if (!instagram && !twitter && !linkedin && !website && !whatsapp) return null;
+  const instagramHref = safeSocialHref(instagram, "instagram");
+  const twitterHref = safeSocialHref(twitter, "twitter");
+  const linkedinHref = safeSocialHref(linkedin, "linkedin");
+  const whatsappHref = safeSocialHref(whatsapp, "whatsapp");
+  const websiteHref = safeSocialHref(website, "website");
+  if (
+    !instagramHref &&
+    !twitterHref &&
+    !linkedinHref &&
+    !whatsappHref &&
+    !websiteHref
+  ) {
+    return null;
+  }
 
   const linkClass =
     "inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 text-xs font-mono text-[var(--color-ink-2)] hover:border-[var(--color-ink)] hover:text-[var(--color-ink)] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]";
@@ -91,9 +96,9 @@ export function ProfileSocialLinks({
       className="flex flex-wrap items-center gap-2 pt-1"
       aria-label="Tautan media sosial"
     >
-      {instagram && (
+      {instagramHref && instagram && (
         <a
-          href={normalizeHttpUrl(instagram, "https://instagram.com/")}
+          href={instagramHref}
           target="_blank"
           rel="noopener noreferrer"
           className={linkClass}
@@ -103,9 +108,9 @@ export function ProfileSocialLinks({
           <span>{formatHandleLabel(instagram, "@")}</span>
         </a>
       )}
-      {twitter && (
+      {twitterHref && twitter && (
         <a
-          href={normalizeHttpUrl(twitter, "https://x.com/")}
+          href={twitterHref}
           target="_blank"
           rel="noopener noreferrer"
           className={linkClass}
@@ -115,9 +120,9 @@ export function ProfileSocialLinks({
           <span>{formatHandleLabel(twitter, "@")}</span>
         </a>
       )}
-      {linkedin && (
+      {linkedinHref && (
         <a
-          href={normalizeHttpUrl(linkedin, "https://linkedin.com/in/")}
+          href={linkedinHref}
           target="_blank"
           rel="noopener noreferrer"
           className={linkClass}
@@ -127,9 +132,9 @@ export function ProfileSocialLinks({
           <span>LinkedIn</span>
         </a>
       )}
-      {whatsapp && (
+      {whatsappHref && (
         <a
-          href={normalizeHttpUrl(whatsapp, "https://wa.me/")}
+          href={whatsappHref}
           target="_blank"
           rel="noopener noreferrer"
           className={linkClass}
@@ -139,9 +144,9 @@ export function ProfileSocialLinks({
           <span>WhatsApp</span>
         </a>
       )}
-      {website && (
+      {websiteHref && website && (
         <a
-          href={normalizeHttpUrl(website, "")}
+          href={websiteHref}
           target="_blank"
           rel="noopener noreferrer"
           className={linkClass}

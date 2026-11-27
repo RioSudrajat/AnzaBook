@@ -22,6 +22,7 @@ import { HttpError } from "../lib/http-error";
 import { getAuth, optionalAuth, requireAuth } from "../middleware/auth";
 import { jsonBody } from "../middleware/body";
 import { requireTrustedOrigin } from "../middleware/origin";
+import { postMemberLookupRateLimit } from "../middleware/spot-rate-limit";
 import {
   applyPublisher,
   createManuscriptDraft,
@@ -354,6 +355,7 @@ publisherRouter.post(
   "/:slug/approved-writers",
   requireAuth,
   requireTrustedOrigin,
+  postMemberLookupRateLimit,
   jsonBody,
   async (req, res) => {
     const userId = getAuth(req).user.id;
@@ -389,6 +391,7 @@ publisherRouter.post(
   "/:slug/members",
   requireAuth,
   requireTrustedOrigin,
+  postMemberLookupRateLimit,
   jsonBody,
   async (req, res) => {
     const userId = getAuth(req).user.id;

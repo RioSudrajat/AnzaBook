@@ -22,6 +22,10 @@ import {
 import { jsonBody } from "../middleware/body";
 import { requireTrustedOrigin } from "../middleware/origin";
 import {
+  postClaimCodeRateLimit,
+  publicCatalogRateLimit,
+} from "../middleware/spot-rate-limit";
+import {
   claimPrintCode,
   getBookBySlug,
   getBookReaderPayload,
@@ -43,7 +47,7 @@ import {
 export const booksRouter = Router();
 
 // Public: List books & catalog
-booksRouter.get("/", async (req, res) => {
+booksRouter.get("/", publicCatalogRateLimit, async (req, res) => {
   const query = listBooksQuerySchema.parse(req.query);
   const result = await listBooks(query);
   res.json(result);
@@ -68,14 +72,19 @@ booksRouter.get("/meta/categories", async (_req, res) => {
 });
 
 // Public with optional auth: Book details
-booksRouter.get("/:slug", optionalAuth, async (req, res) => {
-  const { slug } = bookSlugSchema.parse({ slug: req.params.slug });
-  const auth = getOptionalAuth(req);
-  const book = await getBookBySlug(slug, auth?.user?.id);
-  if (!book)
-    throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
-  res.json({ data: book });
-});
+booksRouter.get(
+  "/:slug",
+  publicCatalogRateLimit,
+  optionalAuth,
+  async (req, res) => {
+    const { slug } = bookSlugSchema.parse({ slug: req.params.slug });
+    const auth = getOptionalAuth(req);
+    const book = await getBookBySlug(slug, auth?.user?.id);
+    if (!book)
+      throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+    res.json({ data: book });
+  },
+);
 
 // Public: Live store stock
 booksRouter.get("/:slug/stock", async (req, res) => {
@@ -109,6 +118,7 @@ booksRouter.post(
   "/:slug/claim-code",
   requireAuth,
   requireTrustedOrigin,
+  postClaimCodeRateLimit,
   jsonBody,
   async (req, res) => {
     const { slug } = bookSlugSchema.parse({ slug: req.params.slug });

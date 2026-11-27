@@ -4,6 +4,7 @@ import {
   createReadingSessionSchema,
   listReadingSessionsQuerySchema,
   readingBookParamsSchema,
+  readingHighlightParamsSchema,
   readingProgressQuerySchema,
   saveReadingProgressSchema,
 } from "@starter/shared/validators/reading";
@@ -14,6 +15,12 @@ import {
 import { getAuth, requireAuth } from "../middleware/auth";
 import { jsonBody } from "../middleware/body";
 import { requireTrustedOrigin } from "../middleware/origin";
+import {
+  postDrmAppealRateLimit,
+  postDrmEventRateLimit,
+  postHighlightRateLimit,
+  postReadingSessionRateLimit,
+} from "../middleware/spot-rate-limit";
 import {
   getReaderDrmStatus,
   recordDrmSecurityEvent,
@@ -42,11 +49,17 @@ readingRouter.get("/", async (req, res) => {
   res.json(result);
 });
 
-readingRouter.post("/", requireTrustedOrigin, jsonBody, async (req, res) => {
-  const input = createReadingSessionSchema.parse(req.body);
-  const session = await createReadingSession(getAuth(req).user.id, input);
-  res.status(201).json({ data: session });
-});
+readingRouter.post(
+  "/",
+  requireTrustedOrigin,
+  postReadingSessionRateLimit,
+  jsonBody,
+  async (req, res) => {
+    const input = createReadingSessionSchema.parse(req.body);
+    const session = await createReadingSession(getAuth(req).user.id, input);
+    res.status(201).json({ data: session });
+  },
+);
 
 // Reading Progress endpoints
 readingRouter.get("/progress/:bookId", async (req, res) => {
@@ -85,7 +98,7 @@ readingRouter.get("/highlights/all", async (req, res) => {
 });
 
 readingRouter.get("/highlights/:bookId", async (req, res) => {
-  const bookId = String(req.params.bookId);
+  const { bookId } = readingBookParamsSchema.parse(req.params);
   const highlights = await listHighlights(getAuth(req).user.id, bookId);
   res.json({ data: highlights });
 });
@@ -93,6 +106,7 @@ readingRouter.get("/highlights/:bookId", async (req, res) => {
 readingRouter.post(
   "/highlights",
   requireTrustedOrigin,
+  postHighlightRateLimit,
   jsonBody,
   async (req, res) => {
     const input = createHighlightSchema.parse(req.body);
@@ -105,7 +119,7 @@ readingRouter.delete(
   "/highlights/:id",
   requireTrustedOrigin,
   async (req, res) => {
-    const id = String(req.params.id);
+    const { id } = readingHighlightParamsSchema.parse(req.params);
     await deleteHighlight(getAuth(req).user.id, id);
     res.json({ success: true });
   },
@@ -138,6 +152,7 @@ readingRouter.get("/drm-status", async (req, res) => {
 readingRouter.post(
   "/drm-appeal",
   requireTrustedOrigin,
+  postDrmAppealRateLimit,
   jsonBody,
   async (req, res) => {
     const { appealMessage } = submitDrmAppealSchema.parse(req.body);
@@ -152,6 +167,7 @@ readingRouter.post(
 readingRouter.post(
   "/drm-events",
   requireTrustedOrigin,
+  postDrmEventRateLimit,
   jsonBody,
   async (req, res) => {
     const auth = getAuth(req);

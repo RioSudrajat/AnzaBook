@@ -1,5 +1,11 @@
 import { z } from "zod";
 import { safeAssetUrlSchema } from "./publisher";
+import {
+  isSafeHttpUrl,
+  isSafeImageOrAssetUrl,
+  isSafeSocialLinkValue,
+  safeVerificationDocumentsSchema,
+} from "./url-safety";
 
 export const upsertShelfSchema = z
   .object({
@@ -112,15 +118,31 @@ export function haversineDistanceMeters(
   return Math.round(R * c);
 }
 
+const communitySocialHandleOrUrlSchema = z
+  .string()
+  .max(500, "Tautan media sosial terlalu panjang")
+  .refine((val) => isSafeSocialLinkValue(val, { allowHandle: true }), {
+    message: "Tautan atau handle media sosial tidak valid",
+  });
+
+const communityWebsiteSchema = z
+  .string()
+  .max(500, "URL situs web terlalu panjang")
+  .refine((val) => isSafeSocialLinkValue(val, { allowBareDomain: true }), {
+    message: "URL situs web tidak valid",
+  });
+
 export const featuredWorkSchema = z.object({
   mediaType: z.enum(["book", "film", "article", "other"]),
   title: z.string().min(1, "Judul karya wajib diisi").max(200),
   creator: z.string().max(160).optional(),
   externalUrl: z
     .string()
-    .url("Tautan karya harus URL valid")
-    .optional()
-    .or(z.literal("")),
+    .trim()
+    .refine((val) => val === "" || isSafeHttpUrl(val), {
+      message: "Tautan karya harus URL HTTP(S) valid",
+    })
+    .optional(),
 });
 
 export const coHostSchema = z
@@ -192,8 +214,36 @@ export const createCalendarSchema = z
       ),
     type: z.enum(calendarTypeValues).default("community"),
     description: z.string().max(2000).default(""),
-    avatarUrl: z.string().optional(),
-    coverUrl: z.string().optional(),
+    avatarUrl: z
+      .string()
+      .refine(
+        (val) =>
+          isSafeImageOrAssetUrl(val, {
+            allowEmpty: true,
+            allowRootRelative: true,
+            allowRasterDataUri: true,
+          }),
+        {
+          message:
+            "URL avatar harus berupa gambar raster valid atau URL HTTP(S)",
+        },
+      )
+      .optional(),
+    coverUrl: z
+      .string()
+      .refine(
+        (val) =>
+          isSafeImageOrAssetUrl(val, {
+            allowEmpty: true,
+            allowRootRelative: true,
+            allowRasterDataUri: true,
+          }),
+        {
+          message:
+            "URL sampul harus berupa gambar raster valid atau URL HTTP(S)",
+        },
+      )
+      .optional(),
     city: z.string().max(80).optional(),
     contactEmail: z
       .string()
@@ -202,23 +252,15 @@ export const createCalendarSchema = z
       .or(z.literal("")),
     socialLinks: z
       .object({
-        instagram: z.string().optional(),
-        twitter: z.string().optional(),
-        website: z.string().optional(),
-        discord: z.string().optional(),
-        telegram: z.string().optional(),
-        whatsapp: z.string().optional(),
+        instagram: communitySocialHandleOrUrlSchema.optional(),
+        twitter: communitySocialHandleOrUrlSchema.optional(),
+        website: communityWebsiteSchema.optional(),
+        discord: communitySocialHandleOrUrlSchema.optional(),
+        telegram: communitySocialHandleOrUrlSchema.optional(),
+        whatsapp: communitySocialHandleOrUrlSchema.optional(),
       })
       .optional(),
-    verificationDocuments: z
-      .array(
-        z.object({
-          title: z.string().min(1, "Judul berkas wajib diisi"),
-          url: z.string().min(1, "URL berkas wajib diisi"),
-          fileType: z.string().optional(),
-        }),
-      )
-      .optional(),
+    verificationDocuments: safeVerificationDocumentsSchema.optional(),
   })
   .strict();
 
@@ -230,9 +272,11 @@ const bannerUrlSchema = z
   .max(90000, "Ukuran berkas banner terlalu besar")
   .refine(
     (val) =>
-      val.startsWith("http://") ||
-      val.startsWith("https://") ||
-      val.startsWith("data:image/"),
+      isSafeImageOrAssetUrl(val, {
+        allowRootRelative: true,
+        allowRasterDataUri: true,
+        maxDataUriLength: 90_000,
+      }),
     {
       message:
         "Format banner harus berupa URL valid atau data gambar terkompresi",
@@ -268,9 +312,11 @@ export const eventBaseSchema = z
     placeSourceLng: z.number().min(-180).max(180).optional(),
     onlineMeetingUrl: z
       .string()
-      .url("Tautan rapat virtual harus berupa URL valid")
-      .optional()
-      .or(z.literal("")),
+      .trim()
+      .refine((val) => val === "" || isSafeHttpUrl(val), {
+        message: "Tautan rapat virtual harus berupa URL HTTP(S) valid",
+      })
+      .optional(),
     startsAt: z
       .string()
       .datetime({ message: "Format waktu mulai harus ISO 8601" }),
