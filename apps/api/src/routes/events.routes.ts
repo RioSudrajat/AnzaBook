@@ -1,12 +1,14 @@
 import { Router } from "express";
 import { z } from "zod";
 import {
+  addCalendarMemberSchema,
   checkInRsvpSchema,
   createCalendarSchema,
   createEventSchema,
   listEventsQuerySchema,
   reportEventSchema,
   rsvpEventSchema,
+  updateCalendarMemberSchema,
   updateCalendarSchema,
   updateEventSchema,
 } from "@starter/shared/validators/community";
@@ -20,6 +22,7 @@ import {
 import { jsonBody } from "../middleware/body";
 import { requireTrustedOrigin } from "../middleware/origin";
 import {
+  addCalendarMember,
   approveRsvp,
   cancelRsvp,
   checkInRsvp,
@@ -37,10 +40,12 @@ import {
   listCalendars,
   listEvents,
   rejectRsvp,
+  removeCalendarMember,
   reportEvent,
   rsvpEvent,
   toggleFollowCalendar,
   updateCalendar,
+  updateCalendarMemberRole,
   updateEvent,
   verifyCalendar,
 } from "../services/events.service";
@@ -162,6 +167,57 @@ eventsRouter.get("/calendars/:slug/members", optionalAuth, async (req, res) => {
   const members = await getCalendarMembers(slug);
   res.json({ data: members });
 });
+
+// Add or promote community calendar host/staff/member
+eventsRouter.post(
+  "/calendars/:slug/members",
+  requireAuth,
+  requireTrustedOrigin,
+  jsonBody,
+  async (req, res) => {
+    const slug = String(req.params.slug);
+    const input = addCalendarMemberSchema.parse(req.body);
+    const member = await addCalendarMember(getAuth(req).user.id, slug, input);
+    res.status(201).json({ data: member });
+  },
+);
+
+// Update community calendar member role
+eventsRouter.patch(
+  "/calendars/:slug/members/:memberId",
+  requireAuth,
+  requireTrustedOrigin,
+  jsonBody,
+  async (req, res) => {
+    const slug = String(req.params.slug);
+    const memberId = String(req.params.memberId);
+    const input = updateCalendarMemberSchema.parse(req.body);
+    const updated = await updateCalendarMemberRole(
+      getAuth(req).user.id,
+      slug,
+      memberId,
+      input,
+    );
+    res.json({ data: updated });
+  },
+);
+
+// Remove community calendar member
+eventsRouter.delete(
+  "/calendars/:slug/members/:memberId",
+  requireAuth,
+  requireTrustedOrigin,
+  async (req, res) => {
+    const slug = String(req.params.slug);
+    const memberId = String(req.params.memberId);
+    const result = await removeCalendarMember(
+      getAuth(req).user.id,
+      slug,
+      memberId,
+    );
+    res.json({ data: result });
+  },
+);
 
 // Community Wallet balance and ledgers (Owner/Admin only)
 eventsRouter.get("/calendars/:slug/wallet", requireAuth, async (req, res) => {

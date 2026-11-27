@@ -329,6 +329,13 @@ export async function purchaseDigitalBook(
   const anzabookNetIdr = priceIdr - publisherShareIdr - affiliateCommissionIdr;
 
   const purchase = await db.transaction(async (tx) => {
+    // Serialize concurrent single-purchase requests per buyer before checking duplicates.
+    await tx
+      .select({ id: user.id })
+      .from(user)
+      .where(eq(user.id, userId))
+      .for("no key update");
+
     const [existing] = await tx
       .select({ id: bookPurchases.id })
       .from(bookPurchases)

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { safeAssetUrlSchema } from "./publisher";
 
 export const upsertShelfSchema = z
   .object({
@@ -122,11 +123,48 @@ export const featuredWorkSchema = z.object({
     .or(z.literal("")),
 });
 
-export const coHostSchema = z.object({
-  name: z.string().min(1).max(100),
-  avatarUrl: z.string().optional(),
-  roleLabel: z.string().max(60).optional(),
-});
+export const coHostSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(1, "Nama kolaborator wajib diisi")
+      .max(100, "Nama kolaborator maksimal 100 karakter"),
+    avatarUrl: safeAssetUrlSchema("URL avatar kolaborator tidak valid")
+      .max(500, "URL avatar terlalu panjang")
+      .optional(),
+    roleLabel: z
+      .string()
+      .trim()
+      .max(60, "Label peran maksimal 60 karakter")
+      .optional(),
+  })
+  .strict();
+
+export const calendarManageableRoleValues = [
+  "admin",
+  "checkin_staff",
+  "member",
+] as const;
+export type CalendarManageableRole =
+  (typeof calendarManageableRoleValues)[number];
+
+export const addCalendarMemberSchema = z
+  .object({
+    identifier: z
+      .string()
+      .trim()
+      .min(2, "Masukkan email atau username pengguna")
+      .max(255, "Identitas pengguna terlalu panjang"),
+    role: z.enum(calendarManageableRoleValues).default("admin"),
+  })
+  .strict();
+
+export const updateCalendarMemberSchema = z
+  .object({
+    role: z.enum(calendarManageableRoleValues),
+  })
+  .strict();
 
 export const createCalendarSchema = z
   .object({
@@ -341,6 +379,11 @@ export type ListParagraphCommentsQuery = z.infer<
 >;
 export type FeaturedWorkInput = z.infer<typeof featuredWorkSchema>;
 export type CoHostInput = z.infer<typeof coHostSchema>;
+export type AddCalendarMemberInput = z.input<typeof addCalendarMemberSchema>;
+export type AddCalendarMemberOutput = z.output<typeof addCalendarMemberSchema>;
+export type UpdateCalendarMemberInput = z.infer<
+  typeof updateCalendarMemberSchema
+>;
 export type CreateCalendarInput = z.infer<typeof createCalendarSchema>;
 export type UpdateCalendarInput = z.infer<typeof updateCalendarSchema>;
 export type CreateEventInput = z.infer<typeof createEventSchema>;

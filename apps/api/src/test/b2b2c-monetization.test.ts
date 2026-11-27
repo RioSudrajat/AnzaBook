@@ -238,6 +238,29 @@ describe("B2B2C Monetization & DRM Engine", () => {
     expect(repeatRes.body.error.code).toBe("BOOK_ALREADY_PURCHASED");
   });
 
+  it("prevents duplicate book purchases under parallel requests from the same user", async () => {
+    const client = agent();
+    await signUp(client, "Concurrent Book Buyer");
+
+    const publisher = await createTestPublisher("Penerbit Concurrency");
+    const bookSlug = `concurrent-book-${randomUUID().slice(0, 8)}`;
+    await createTestBook({
+      slug: bookSlug,
+      title: "Buku Uji Paralel",
+      digitalPolicy: "single_purchase",
+      publisherId: publisher.id,
+      digitalPriceIdr: 45_000,
+    });
+
+    const [res1, res2] = await Promise.all([
+      client.post(`/api/books/${bookSlug}/purchase`).set(originHeader).send({}),
+      client.post(`/api/books/${bookSlug}/purchase`).set(originHeader).send({}),
+    ]);
+
+    const statuses = [res1.status, res2.status].sort((a, b) => a - b);
+    expect(statuses).toEqual([201, 409]);
+  });
+
   it("automatically attributes community commission from user RSVP history within 14 days", async () => {
     const client = agent();
     const email = await signUp(client, "RSVP Attributed Reader");

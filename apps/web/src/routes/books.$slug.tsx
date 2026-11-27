@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import {
   createFileRoute,
   Link,
@@ -338,7 +338,7 @@ function B2B2CActionButtons({
                 className="size-4 text-[var(--color-accent)]"
                 aria-hidden="true"
               />
-              Buka dengan Nakama (Rp39rb/bln)
+              Buka dengan Nakama (mulai Rp16rb/bln)
             </Link>
           </Button>
 
@@ -404,9 +404,22 @@ function BookDetailPage() {
 
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const [purchaseSuccess, setPurchaseSuccess] = useState(false);
+  const [isPurchaseDialogOpen, setIsPurchaseDialogOpen] = useState(false);
+  const purchaseDialogRef = useRef<HTMLDialogElement>(null);
+  const pressedOutsidePurchaseRef = useRef(false);
   const [shareTrigger, setShareTrigger] = useState<HTMLButtonElement | null>(
     null,
   );
+
+  useEffect(() => {
+    const dialogEl = purchaseDialogRef.current;
+    if (!dialogEl) return;
+    if (isPurchaseDialogOpen && !dialogEl.open) {
+      dialogEl.showModal();
+    } else if (!isPurchaseDialogOpen && dialogEl.open) {
+      dialogEl.close();
+    }
+  }, [isPurchaseDialogOpen]);
 
   const upsertShelfMutation = useUpsertShelf();
   const createReviewMutation = useCreateReview(slug);
@@ -439,7 +452,7 @@ function BookDetailPage() {
     });
   };
 
-  const handlePurchaseDigitalBook = async () => {
+  const handlePurchaseDigitalBook = () => {
     if (!isLoggedIn) {
       navigate({
         to: "/sign-in",
@@ -448,6 +461,11 @@ function BookDetailPage() {
       return;
     }
 
+    setPurchaseError(null);
+    setIsPurchaseDialogOpen(true);
+  };
+
+  const handleConfirmSandboxPurchase = async () => {
     setPurchaseError(null);
     try {
       const affiliateRef =
@@ -462,6 +480,7 @@ function BookDetailPage() {
         bookId: book.id,
         affiliateCalendarSlug,
       });
+      setIsPurchaseDialogOpen(false);
       setPurchaseSuccess(true);
       setTimeout(() => {
         navigate({
@@ -469,7 +488,7 @@ function BookDetailPage() {
           params: { slug: book.slug },
           search: {},
         });
-      }, 1000);
+      }, 800);
     } catch (err: unknown) {
       const error = err as { message?: string };
       setPurchaseError(
@@ -1277,6 +1296,120 @@ function BookDetailPage() {
           </div>
         )}
       </div>
+
+      <dialog
+        ref={purchaseDialogRef}
+        closedby="any"
+        aria-labelledby="purchase-confirm-title"
+        onClose={() => {
+          if (purchaseDialogRef.current)
+            purchaseDialogRef.current.returnValue = "";
+          if (isPurchaseDialogOpen) setIsPurchaseDialogOpen(false);
+        }}
+        onPointerDown={(e) => {
+          const el = purchaseDialogRef.current;
+          if (!el) return;
+          const r = el.getBoundingClientRect();
+          pressedOutsidePurchaseRef.current =
+            e.clientX < r.left ||
+            e.clientX > r.right ||
+            e.clientY < r.top ||
+            e.clientY > r.bottom;
+        }}
+        onPointerUp={(e) => {
+          const el = purchaseDialogRef.current;
+          if (!el || "closedBy" in HTMLDialogElement.prototype) return;
+          const r = el.getBoundingClientRect();
+          const releasedOutside =
+            e.clientX < r.left ||
+            e.clientX > r.right ||
+            e.clientY < r.top ||
+            e.clientY > r.bottom;
+          if (pressedOutsidePurchaseRef.current && releasedOutside) {
+            setIsPurchaseDialogOpen(false);
+          }
+          pressedOutsidePurchaseRef.current = false;
+        }}
+        className="m-auto w-[min(92vw,28rem)] rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-6 text-[var(--color-ink)] shadow-2xl backdrop:bg-black/60"
+      >
+        {isPurchaseDialogOpen && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-accent)]/40 bg-[var(--color-accent-soft)] px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink)]">
+                Simulasi Sandbox (Demo)
+              </span>
+            </div>
+
+            <div className="space-y-1">
+              <h1
+                id="purchase-confirm-title"
+                className="font-serif text-xl font-bold text-[var(--color-ink)]"
+              >
+                Konfirmasi Pembelian Akses Digital
+              </h1>
+              <p className="text-xs text-[var(--color-muted)]">
+                {book.title} · {book.author}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-4 flex items-center justify-between">
+              <span className="text-xs font-medium text-[var(--color-ink-2)]">
+                Total Pembayaran
+              </span>
+              <span className="font-mono text-lg font-bold text-[var(--color-ink)] tabular-nums">
+                {book.digitalPriceIdr && book.digitalPriceIdr > 0
+                  ? formatIdr(book.digitalPriceIdr)
+                  : "Rp45.000"}
+              </span>
+            </div>
+
+            <p className="text-xs leading-relaxed text-[var(--color-muted)]">
+              Pembelian buku satuan pada tahap ini berjalan dalam mode simulasi
+              sandbox untuk demo dan langsung membuka akses baca penuh di akun
+              Anda. Pembayaran QRIS Midtrans Sandbox aktif di halaman{" "}
+              <Link
+                to="/membership"
+                className="underline text-[var(--color-ink)]"
+              >
+                Keanggotaan Nakama
+              </Link>
+              .
+            </p>
+
+            {purchaseError && (
+              <p
+                role="alert"
+                className="text-xs text-[var(--color-error)] font-sans"
+              >
+                {purchaseError}
+              </p>
+            )}
+
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-[var(--color-rule)]">
+              <Button
+                type="button"
+                variant="outline"
+                autoFocus
+                disabled={purchaseMutation.isPending}
+                onClick={() => setIsPurchaseDialogOpen(false)}
+                className="min-h-11 px-4 text-xs border-[var(--color-rule)] cursor-pointer"
+              >
+                Batal
+              </Button>
+              <Button
+                type="button"
+                disabled={purchaseMutation.isPending}
+                onClick={() => void handleConfirmSandboxPurchase()}
+                className="min-h-11 px-5 text-xs font-semibold bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:brightness-95 cursor-pointer"
+              >
+                {purchaseMutation.isPending
+                  ? "Memproses..."
+                  : "Konfirmasi Pembelian"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </dialog>
 
       {shareTrigger && (
         <BookShareDialog

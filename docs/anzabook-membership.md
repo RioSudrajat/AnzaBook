@@ -32,3 +32,10 @@ Akun yang dibuat dengan email dan kata sandi bisa mengirim tautan verifikasi dar
 ## Klaim edisi cetak
 
 Kode klaim dari seed hanya berlaku di lingkungan pengembangan dan pengujian. Migrasi menandai kode demo lama, sehingga API produksi hanya menerima kode dari penerbit yang tidak ditandai sebagai demo.
+
+## Standar pembayaran saat ini dan rencana global
+
+- **Keanggotaan Nakama:** Checkout aktif menggunakan **Midtrans Sandbox** (Other QRIS) via `/api/membership/checkout` dan `/api/membership/webhooks/midtrans`.
+- **Pembelian buku satuan (`single_purchase`):** Pada tahap demo saat ini masih berjalan sebagai simulasi sandbox di `POST /api/books/:slug/purchase` sebelum dihubungkan ke checkout gateway penuh bersama sistem escrow.
+- **Tiket acara komunitas:** Seluruh acara saat ini gratis; dukungan tiket berbayar melalui Midtrans berstatus _Coming Soon_.
+- **Rencana ekspansi global:** Dukungan Stripe untuk pembaca internasional disiapkan di fase berikutnya dengan pemisahan secret `STRIPE_SECRET_KEY` dan `STRIPE_WEBHOOK_SECRET` melalui GitHub Environments (`staging` dan `production`).

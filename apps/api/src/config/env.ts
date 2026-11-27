@@ -78,6 +78,7 @@ const schema = z
       .optional()
       .transform((value) => value === "true" || value === "1"),
     MIDTRANS_SERVER_KEY: z.string().min(1).optional(),
+    MIDTRANS_CLIENT_KEY: z.string().min(1).optional(),
     MIDTRANS_ENV: z.enum(["sandbox", "production"]).default("sandbox"),
     MEMBERSHIP_TAX_RATE_BPS: z.preprocess(
       (value) =>

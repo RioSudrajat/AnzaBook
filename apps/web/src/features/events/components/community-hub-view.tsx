@@ -3,6 +3,7 @@ import {
   Calendar as CalendarIcon,
   Check,
   CheckCircle,
+  ChevronDown,
   ChevronRight,
   Clock,
   Coins,
@@ -14,6 +15,7 @@ import {
   Settings2,
   Share2,
   Shield,
+  Trash2,
   TrendingUp,
   Upload,
   UserCheck,
@@ -21,6 +23,8 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
+import type { CalendarManageableRole } from "@starter/shared/validators/community";
+import { authClient } from "@/lib/auth-client";
 import { EntityProfileHeader } from "@/components/profile/entity-profile-header";
 import {
   ProfileTabs,
@@ -36,13 +40,16 @@ import {
   useUploadMediaImage,
 } from "@/features/social/hooks";
 import {
+  useAddCalendarMember,
   useCalendar,
   useCalendarMembers,
   useCommunityWallet,
   useEvents,
   useJoinCalendar,
   useLeaveCalendar,
+  useRemoveCalendarMember,
   useToggleFollowCalendar,
+  useUpdateCalendarMemberRole,
 } from "../hooks";
 import { CreateEventDialog } from "./create-event-dialog";
 import { EventDetailDrawer } from "./event-detail-drawer";
@@ -68,6 +75,8 @@ export function CommunityHubView({
   isInsideApp = false,
   onBack,
 }: CommunityHubViewProps) {
+  const { data: session } = authClient.useSession();
+  const currentUserId = session?.user?.id;
   const { data: calendar, isLoading: isCalendarLoading } = useCalendar(slug);
   const { data: eventsData, isLoading: isEventsLoading } = useEvents({
     calendarSlug: slug,
@@ -75,6 +84,9 @@ export function CommunityHubView({
   const toggleFollowMutation = useToggleFollowCalendar(slug);
   const joinMutation = useJoinCalendar(slug);
   const leaveMutation = useLeaveCalendar(slug);
+  const addMemberMutation = useAddCalendarMember(slug);
+  const updateMemberRoleMutation = useUpdateCalendarMemberRole(slug);
+  const removeMemberMutation = useRemoveCalendarMember(slug);
   const updateProfileMutation = useUpdateCalendarProfile();
   const uploadMediaMutation = useUploadMediaImage();
 
@@ -85,6 +97,13 @@ export function CommunityHubView({
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
   const [copiedLink, setCopiedLink] = React.useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = React.useState(false);
+  const [inviteIdentifier, setInviteIdentifier] = React.useState("");
+  const [inviteRole, setInviteRole] =
+    React.useState<CalendarManageableRole>("admin");
+  const [teamFeedback, setTeamFeedback] = React.useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   const avatarFileRef = React.useRef<HTMLInputElement>(null);
   const bannerFileRef = React.useRef<HTMLInputElement>(null);
@@ -162,11 +181,47 @@ export function CommunityHubView({
     }
   };
 
+  const isOwner = calendar?.memberRole === "owner";
   const isManager = Boolean(
     calendar?.isManager ||
     calendar?.memberRole === "owner" ||
     calendar?.memberRole === "admin",
   );
+
+  const effectiveInviteRole: CalendarManageableRole =
+    !isOwner && inviteRole === "admin" ? "checkin_staff" : inviteRole;
+
+  const handleAddMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTeamFeedback(null);
+    const clean = inviteIdentifier.trim();
+    if (clean.length < 2) {
+      setTeamFeedback({
+        type: "error",
+        text: "Masukkan email atau @username pengguna.",
+      });
+      return;
+    }
+    try {
+      const added = await addMemberMutation.mutateAsync({
+        identifier: clean,
+        role: effectiveInviteRole,
+      });
+      setInviteIdentifier("");
+      setTeamFeedback({
+        type: "success",
+        text: `${added.name} ditambahkan ke tim komunitas.`,
+      });
+    } catch (err: unknown) {
+      setTeamFeedback({
+        type: "error",
+        text:
+          err instanceof Error
+            ? err.message
+            : "Gagal menambahkan anggota pengurus.",
+      });
+    }
+  };
 
   const { data: members = [] } = useCalendarMembers(slug);
   const { data: wallet } = useCommunityWallet(slug);
@@ -215,11 +270,10 @@ export function CommunityHubView({
   const selectedEvent =
     events.find((e) => e.slug === selectedEventSlug) || null;
   const leaders = members.filter(
-    (m) => m.role === "owner" || m.role === "admin",
+    (m) =>
+      m.role === "owner" || m.role === "admin" || m.role === "checkin_staff",
   );
-  const regularMembers = members.filter(
-    (m) => m.role === "member" || m.role === "checkin_staff",
-  );
+  const regularMembers = members.filter((m) => m.role === "member");
 
   const tabs: ProfileTabItem<CommunityTab>[] = [
     {
@@ -618,13 +672,103 @@ export function CommunityHubView({
           aria-labelledby="comm-hub-tab-anggota"
           className="space-y-8"
         >
+          {isManager && (
+            <form
+              onSubmit={handleAddMember}
+              className="rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-5 space-y-4"
+            >
+              <div className="space-y-1">
+                <h3 className="font-serif text-base font-bold">
+                  Tambah Pengurus &amp; Host Acara
+                </h3>
+                <p className="text-xs text-[var(--color-muted)] leading-relaxed">
+                  Undang rekan menggunakan email atau @username AnzaBook agar
+                  mereka dapat membuat acara, menyetujui pendaftar, atau
+                  bertugas sebagai petugas check-in.
+                </p>
+              </div>
+
+              {teamFeedback && (
+                <div
+                  role={teamFeedback.type === "error" ? "alert" : "status"}
+                  className={`rounded-xl border px-4 py-2.5 text-xs ${
+                    teamFeedback.type === "error"
+                      ? "border-[var(--color-error)]/40 bg-[var(--color-error-soft)]"
+                      : "border-[var(--color-green)]/40 bg-[var(--color-green-soft)]"
+                  }`}
+                >
+                  {teamFeedback.text}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_13rem_auto] gap-3 items-end">
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="invite-cal-member-identifier"
+                    className="text-xs font-semibold"
+                  >
+                    Email atau @username
+                  </Label>
+                  <Input
+                    id="invite-cal-member-identifier"
+                    value={inviteIdentifier}
+                    onChange={(e) => setInviteIdentifier(e.target.value)}
+                    placeholder="teman@domain.id atau @username"
+                    autoCorrect="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    required
+                    className="min-h-11 bg-[var(--color-paper)] text-xs"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="invite-cal-member-role"
+                    className="text-xs font-semibold"
+                  >
+                    Peran
+                  </Label>
+                  <div className="relative">
+                    <select
+                      id="invite-cal-member-role"
+                      value={effectiveInviteRole}
+                      onChange={(e) =>
+                        setInviteRole(e.target.value as CalendarManageableRole)
+                      }
+                      className="appearance-none w-full h-11 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] pl-3 pr-9 py-2.5 text-xs leading-normal text-[var(--color-ink)] cursor-pointer"
+                    >
+                      {isOwner && (
+                        <option value="admin">Host Pengelola (Admin)</option>
+                      )}
+                      <option value="checkin_staff">Petugas Check-in</option>
+                      <option value="member">Anggota Biasa</option>
+                    </select>
+                    <ChevronDown
+                      className="pointer-events-none size-4 text-[var(--color-muted)] absolute right-3 top-1/2 -translate-y-1/2"
+                      aria-hidden="true"
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={addMemberMutation.isPending}
+                  className="min-h-11 px-5 text-xs font-semibold bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:brightness-95 cursor-pointer"
+                >
+                  {addMemberMutation.isPending ? "Menambahkan..." : "Tambahkan"}
+                </Button>
+              </div>
+            </form>
+          )}
+
           <div className="space-y-3">
             <h3 className="text-xs uppercase tracking-wider text-[var(--color-muted)] flex items-center gap-1.5 font-semibold">
               <Shield
                 className="size-3.5 text-[var(--color-accent)]"
                 aria-hidden="true"
               />
-              <span>Pengurus Inti Komunitas</span>
+              <span>Pengurus Inti &amp; Tim Acara ({leaders.length})</span>
             </h3>
             {leaders.length === 0 ? (
               <p className="text-xs text-[var(--color-muted)] italic">
@@ -632,36 +776,126 @@ export function CommunityHubView({
               </p>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
-                {leaders.map((leader) => (
-                  <div
-                    key={leader.id}
-                    className="flex items-center gap-3.5 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-4"
-                  >
-                    {leader.image ? (
-                      <img
-                        src={leader.image}
-                        alt={leader.name}
-                        className="size-11 rounded-full object-cover border border-[var(--color-rule)]"
-                      />
-                    ) : (
-                      <div className="size-11 rounded-full bg-[var(--color-paper-3)] text-[var(--color-ink)] font-serif font-bold text-sm flex items-center justify-center border border-[var(--color-rule)]">
-                        {leader.name.slice(0, 1)}
+                {leaders.map((leader) => {
+                  const isSelf = Boolean(
+                    currentUserId && leader.userId === currentUserId,
+                  );
+                  const canManageTarget =
+                    isManager &&
+                    leader.role !== "owner" &&
+                    !isSelf &&
+                    (isOwner || leader.role !== "admin");
+                  return (
+                    <div
+                      key={leader.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-4"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                        {leader.image ? (
+                          <img
+                            src={leader.image}
+                            alt={leader.name}
+                            className="size-11 rounded-full object-cover border border-[var(--color-rule)] shrink-0"
+                          />
+                        ) : (
+                          <div className="size-11 rounded-full bg-[var(--color-paper-3)] text-[var(--color-ink)] font-serif font-bold text-sm flex items-center justify-center border border-[var(--color-rule)] shrink-0">
+                            {leader.name.slice(0, 1)}
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold truncate">
+                            {leader.name}
+                            {isSelf ? " (Anda)" : ""}
+                          </div>
+                          {leader.username && (
+                            <div className="text-[11px] font-mono text-[var(--color-muted)] truncate">
+                              @{leader.username}
+                            </div>
+                          )}
+                          <div className="mt-1">
+                            <span className="text-[11px] px-2 py-0.5 rounded-md border border-[var(--color-rule)] bg-[var(--color-paper)] font-medium">
+                              {leader.role === "owner"
+                                ? "Pemilik Komunitas"
+                                : leader.role === "admin"
+                                  ? "Host Pengelola (Admin)"
+                                  : "Petugas Check-in"}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-semibold truncate">
-                        {leader.name}
-                      </div>
-                      <div className="mt-1">
-                        <span className="text-[11px] px-2 py-0.5 rounded-md border border-[var(--color-rule)] bg-[var(--color-paper)] font-medium">
-                          {leader.role === "owner"
-                            ? "Pemilik Komunitas"
-                            : "Pengurus / Admin"}
-                        </span>
-                      </div>
+
+                      {canManageTarget && (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <select
+                            aria-label={`Ubah peran ${leader.name}`}
+                            value={leader.role}
+                            disabled={updateMemberRoleMutation.isPending}
+                            onChange={async (e) => {
+                              setTeamFeedback(null);
+                              try {
+                                await updateMemberRoleMutation.mutateAsync({
+                                  memberId: leader.id,
+                                  input: {
+                                    role: e.target
+                                      .value as CalendarManageableRole,
+                                  },
+                                });
+                                setTeamFeedback({
+                                  type: "success",
+                                  text: `Peran ${leader.name} diperbarui.`,
+                                });
+                              } catch (err) {
+                                setTeamFeedback({
+                                  type: "error",
+                                  text:
+                                    err instanceof Error
+                                      ? err.message
+                                      : "Gagal memperbarui peran.",
+                                });
+                              }
+                            }}
+                            className="h-11 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] px-2.5 text-xs text-[var(--color-ink)]"
+                          >
+                            {isOwner && (
+                              <option value="admin">Host Pengelola</option>
+                            )}
+                            <option value="checkin_staff">Check-in</option>
+                            <option value="member">Anggota</option>
+                          </select>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={removeMemberMutation.isPending}
+                            aria-label={`Keluarkan ${leader.name}`}
+                            onClick={async () => {
+                              setTeamFeedback(null);
+                              try {
+                                await removeMemberMutation.mutateAsync(
+                                  leader.id,
+                                );
+                                setTeamFeedback({
+                                  type: "success",
+                                  text: `${leader.name} dikeluarkan dari komunitas.`,
+                                });
+                              } catch (err) {
+                                setTeamFeedback({
+                                  type: "error",
+                                  text:
+                                    err instanceof Error
+                                      ? err.message
+                                      : "Gagal mengeluarkan pengurus.",
+                                });
+                              }
+                            }}
+                            className="min-h-11 min-w-11 px-2.5 text-[var(--color-error)] border-[var(--color-rule)] hover:bg-[var(--color-error-soft)] cursor-pointer"
+                          >
+                            <Trash2 className="size-4" aria-hidden="true" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -681,28 +915,103 @@ export function CommunityHubView({
                 {regularMembers.map((member) => (
                   <div
                     key={member.id}
-                    className="flex items-center gap-3 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-3.5"
+                    className="flex flex-col justify-between gap-3 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-3.5"
                   >
-                    {member.image ? (
-                      <img
-                        src={member.image}
-                        alt={member.name}
-                        className="size-10 rounded-full object-cover border border-[var(--color-rule)]"
-                      />
-                    ) : (
-                      <div className="size-10 rounded-full bg-[var(--color-paper-3)] text-[var(--color-ink)] font-serif font-bold text-xs flex items-center justify-center border border-[var(--color-rule)]">
-                        {member.name.slice(0, 1)}
+                    <div className="flex items-center gap-3 min-w-0">
+                      {member.image ? (
+                        <img
+                          src={member.image}
+                          alt={member.name}
+                          className="size-10 rounded-full object-cover border border-[var(--color-rule)] shrink-0"
+                        />
+                      ) : (
+                        <div className="size-10 rounded-full bg-[var(--color-paper-3)] text-[var(--color-ink)] font-serif font-bold text-xs flex items-center justify-center border border-[var(--color-rule)] shrink-0">
+                          {member.name.slice(0, 1)}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-semibold truncate">
+                          {member.name}
+                        </div>
+                        <span className="text-[11px] text-[var(--color-muted)] block truncate">
+                          {member.username ? `@${member.username} · ` : ""}
+                          Bergabung{" "}
+                          {new Date(member.createdAt).toLocaleDateString(
+                            "id-ID",
+                          )}
+                        </span>
+                      </div>
+                    </div>
+
+                    {isManager && member.userId !== currentUserId && (
+                      <div className="flex items-center justify-between gap-2 pt-2 border-t border-[var(--color-rule)]">
+                        <select
+                          aria-label={`Ubah peran ${member.name}`}
+                          value={member.role}
+                          disabled={updateMemberRoleMutation.isPending}
+                          onChange={async (e) => {
+                            setTeamFeedback(null);
+                            try {
+                              await updateMemberRoleMutation.mutateAsync({
+                                memberId: member.id,
+                                input: {
+                                  role: e.target
+                                    .value as CalendarManageableRole,
+                                },
+                              });
+                              setTeamFeedback({
+                                type: "success",
+                                text: `Peran ${member.name} diperbarui.`,
+                              });
+                            } catch (err) {
+                              setTeamFeedback({
+                                type: "error",
+                                text:
+                                  err instanceof Error
+                                    ? err.message
+                                    : "Gagal mengubah peran anggota.",
+                              });
+                            }
+                          }}
+                          className="h-10 flex-1 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] px-2.5 text-xs text-[var(--color-ink)]"
+                        >
+                          <option value="member">Anggota</option>
+                          <option value="checkin_staff">
+                            Petugas Check-in
+                          </option>
+                          {isOwner && (
+                            <option value="admin">Host Pengelola</option>
+                          )}
+                        </select>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={removeMemberMutation.isPending}
+                          aria-label={`Keluarkan ${member.name}`}
+                          onClick={async () => {
+                            setTeamFeedback(null);
+                            try {
+                              await removeMemberMutation.mutateAsync(member.id);
+                              setTeamFeedback({
+                                type: "success",
+                                text: `${member.name} dikeluarkan dari komunitas.`,
+                              });
+                            } catch (err) {
+                              setTeamFeedback({
+                                type: "error",
+                                text:
+                                  err instanceof Error
+                                    ? err.message
+                                    : "Gagal mengeluarkan anggota.",
+                              });
+                            }
+                          }}
+                          className="min-h-10 min-w-10 px-2.5 text-[var(--color-error)] border-[var(--color-rule)] hover:bg-[var(--color-error-soft)] cursor-pointer"
+                        >
+                          <Trash2 className="size-3.5" aria-hidden="true" />
+                        </Button>
                       </div>
                     )}
-                    <div className="min-w-0 flex-1">
-                      <div className="text-xs font-semibold truncate">
-                        {member.name}
-                      </div>
-                      <span className="text-[11px] text-[var(--color-muted)]">
-                        Bergabung{" "}
-                        {new Date(member.createdAt).toLocaleDateString("id-ID")}
-                      </span>
-                    </div>
                   </div>
                 ))}
               </div>
