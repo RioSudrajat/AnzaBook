@@ -141,6 +141,19 @@ export const coHostSchema = z
   })
   .strict();
 
+/**
+ * Keeps only validated HTTP(S) or root-relative avatar URLs within coHostSchema bounds,
+ * discarding base64 data URIs or oversized/unsafe URLs that would trigger 422 on submit.
+ */
+export function sanitizeCoHostAvatarUrl(
+  rawUrl?: string | null,
+): string | undefined {
+  const trimmed = rawUrl?.trim();
+  if (!trimmed) return undefined;
+  const parsed = coHostSchema.shape.avatarUrl.safeParse(trimmed);
+  return parsed.success && parsed.data ? parsed.data : undefined;
+}
+
 export const calendarManageableRoleValues = [
   "admin",
   "checkin_staff",

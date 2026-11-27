@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Plus, Users, X } from "lucide-react";
+import { sanitizeCoHostAvatarUrl } from "@starter/shared/validators/community";
 import type {
   CommunityCalendarDto,
   EventCoHostDto,
@@ -51,7 +52,7 @@ export function EventCoHostsField({
         })`,
         coHost: {
           name: member.name,
-          avatarUrl: member.image || undefined,
+          avatarUrl: sanitizeCoHostAvatarUrl(member.image),
           roleLabel:
             member.role === "owner" || member.role === "admin"
               ? "Co-Host"
@@ -68,7 +69,7 @@ export function EventCoHostsField({
         label: `${cal.name} (Kolaborasi Komunitas)`,
         coHost: {
           name: cal.name,
-          avatarUrl: cal.avatarUrl || undefined,
+          avatarUrl: sanitizeCoHostAvatarUrl(cal.avatarUrl),
           roleLabel: "Kolaborator Komunitas",
         },
       });
@@ -87,11 +88,12 @@ export function EventCoHostsField({
     if (exists) return;
 
     const cleanRole = entry.roleLabel?.trim();
+    const cleanAvatarUrl = sanitizeCoHostAvatarUrl(entry.avatarUrl);
     onChange([
       ...coHosts,
       {
         name: cleanName,
-        ...(entry.avatarUrl ? { avatarUrl: entry.avatarUrl } : {}),
+        ...(cleanAvatarUrl ? { avatarUrl: cleanAvatarUrl } : {}),
         ...(cleanRole ? { roleLabel: cleanRole } : {}),
       },
     ]);

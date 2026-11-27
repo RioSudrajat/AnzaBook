@@ -11,6 +11,7 @@ import { HttpError } from "../lib/http-error";
 import { getAuth, requireAuth } from "../middleware/auth";
 import { jsonBody } from "../middleware/body";
 import { requireTrustedOrigin } from "../middleware/origin";
+import { createUserWindowLimiter } from "../middleware/user-rate-limit";
 import { verifyMidtransNotification } from "../services/membership-payment";
 import {
   cancelMembership,
@@ -80,37 +81,16 @@ membershipRouter.post("/reminders", jsonBody, async (req, res) => {
   });
 });
 
-function membershipRequestLimiter(
-  limit: number,
-  code: string,
-  message: string,
-) {
-  const requests = new Map<string, { count: number; until: number }>();
-  return (userId: string) => {
-    const now = Date.now();
-    for (const [id, bucket] of requests) {
-      if (bucket.until > now) break;
-      requests.delete(id);
-    }
-    const current = requests.get(userId);
-    if (current ? current.count >= limit : requests.size >= 10_000) {
-      throw new HttpError(429, code, message);
-    }
-    if (current) current.count++;
-    else requests.set(userId, { count: 1, until: now + 60_000 });
-  };
-}
-
-const limitRecipientLookups = membershipRequestLimiter(
-  20,
-  "RECIPIENT_RATE_LIMIT",
-  "Terlalu banyak pencarian penerima. Coba lagi nanti.",
-);
-const limitStatusRefresh = membershipRequestLimiter(
-  20,
-  "STATUS_RATE_LIMIT",
-  "Terlalu banyak pemeriksaan pembayaran. Coba lagi nanti.",
-);
+const limitRecipientLookups = createUserWindowLimiter({
+  limit: 20,
+  code: "RECIPIENT_RATE_LIMIT",
+  message: "Terlalu banyak pencarian penerima. Coba lagi nanti.",
+});
+const limitStatusRefresh = createUserWindowLimiter({
+  limit: 20,
+  code: "STATUS_RATE_LIMIT",
+  message: "Terlalu banyak pemeriksaan pembayaran. Coba lagi nanti.",
+});
 
 membershipRouter.post("/recipient", jsonBody, async (req, res) => {
   const userId = getAuth(req).user.id;

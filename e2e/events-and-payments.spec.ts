@@ -185,6 +185,8 @@ test.describe("Issue #6 Payments Alignment & Event Host / Co-Host Flows", () => 
 
     const dialog = page.locator("dialog[open]");
     await expect(dialog).toBeVisible();
+    await expect(dialog.locator("h1")).toHaveCount(0);
+    await expect(dialog.locator("h2#purchase-confirm-title")).toBeVisible();
     await expect(dialog).toContainText("Simulasi Sandbox (Demo)");
     await expect(dialog).toContainText("Rp");
     await expect(dialog).not.toContainText(/75%|10%|15%|bagi hasil/i);

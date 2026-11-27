@@ -1341,12 +1341,12 @@ function BookDetailPage() {
             </div>
 
             <div className="space-y-1">
-              <h1
+              <h2
                 id="purchase-confirm-title"
                 className="font-serif text-xl font-bold text-[var(--color-ink)]"
               >
                 Konfirmasi Pembelian Akses Digital
-              </h1>
+              </h2>
               <p className="text-xs text-[var(--color-muted)]">
                 {book.title} · {book.author}
               </p>
