@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type {
@@ -10,6 +8,7 @@ import type {
   SpotSource,
   SpotVerifiedBadge,
 } from "@starter/shared/types";
+import curatedSpotsJson from "./seeds/reading-spots.json" with { type: "json" };
 import * as schema from "./schema";
 
 type SeedSpotJson = {
@@ -125,8 +124,7 @@ function normalizeBranchCity(rawCity: string): {
 }
 
 function loadCuratedSpotSeeds(): SeedSpotJson[] {
-  const seedPath = resolve(import.meta.dirname, "./seeds/reading-spots.json");
-  return JSON.parse(readFileSync(seedPath, "utf8")) as SeedSpotJson[];
+  return curatedSpotsJson as SeedSpotJson[];
 }
 
 /**

@@ -24,6 +24,9 @@ import type {
 } from "@starter/shared/types";
 import {
   INDONESIA_BBOX,
+  type ListAdminSpotsQueryInput,
+  type ListSpotsQueryInput,
+  type NearbyCheckQueryInput,
   createSpotReportSchema,
   createSpotSubmissionSchema,
   expandSpotCityFilterValues,
@@ -279,6 +282,95 @@ describe("Reading Spots Shared Validators (Issue #19)", () => {
       expect.arrayContaining(["Bali", "Denpasar", "Ubud"]),
     );
     expect(expandSpotCityFilterValues("Bandung")).toEqual(["Bandung"]);
+  });
+
+  it("ignores empty query strings instead of coercing to (0, 0) and exposes typed *Input interfaces", () => {
+    const emptyList = listSpotsQuerySchema.safeParse({
+      lat: "",
+      lng: "",
+      minLat: "",
+      maxLat: "",
+      minLng: "",
+      maxLng: "",
+      radiusKm: "",
+      limit: "",
+      offset: "",
+      city: "",
+      q: "",
+    });
+    expect(emptyList.success).toBe(true);
+    if (emptyList.success) {
+      expect(emptyList.data).toEqual({
+        sort: "nearest",
+        limit: 60,
+        offset: 0,
+        lat: undefined,
+        lng: undefined,
+        minLat: undefined,
+        maxLat: undefined,
+        minLng: undefined,
+        maxLng: undefined,
+        radiusKm: undefined,
+        city: undefined,
+        q: undefined,
+      });
+    }
+
+    const whitespaceCoords = listSpotsQuerySchema.safeParse({
+      lat: "   ",
+      lng: "   ",
+    });
+    expect(whitespaceCoords.success).toBe(true);
+    if (whitespaceCoords.success) {
+      expect(whitespaceCoords.data.lat).toBeUndefined();
+      expect(whitespaceCoords.data.lng).toBeUndefined();
+    }
+
+    expect(nearbyCheckQuerySchema.safeParse({ lat: "", lng: "" }).success).toBe(
+      false,
+    );
+
+    const nearbyDefaultRadius = nearbyCheckQuerySchema.safeParse({
+      lat: "-6.2",
+      lng: "106.8",
+      radiusMeters: "",
+    });
+    expect(nearbyDefaultRadius.success).toBe(true);
+    if (nearbyDefaultRadius.success) {
+      expect(nearbyDefaultRadius.data.radiusMeters).toBe(100);
+    }
+
+    const adminEmpty = listAdminSpotsQuerySchema.safeParse({
+      hasOpenReports: "",
+      limit: "",
+      offset: "",
+    });
+    expect(adminEmpty.success).toBe(true);
+    if (adminEmpty.success) {
+      expect(adminEmpty.data).toEqual({
+        limit: 50,
+        offset: 0,
+        hasOpenReports: undefined,
+      });
+    }
+
+    const sampleListInput: ListSpotsQueryInput = {
+      lat: -6.2,
+      lng: 106.8,
+      limit: 20,
+    };
+    const typedLimit: number | undefined = sampleListInput.limit;
+    const typedNearbyLat: number = (
+      { lat: -6.2, lng: 106.8 } satisfies NearbyCheckQueryInput
+    ).lat;
+    const typedAdminReports: boolean | undefined = (
+      { hasOpenReports: true } satisfies ListAdminSpotsQueryInput
+    ).hasOpenReports;
+    expect([typedLimit, typedNearbyLat, typedAdminReports]).toEqual([
+      20,
+      -6.2,
+      true,
+    ]);
   });
 });
 
@@ -572,6 +664,47 @@ describe("OSM Overpass Reading Spots Importer & Deduplicator (Issue #19)", () =>
     expect(accepted.map((s) => s.slug)).toEqual(["rooma-baca-cidadap"]);
     expect(skipped).toHaveLength(2);
   });
+
+  it("avoids false-positive name similarity on shared Indonesian locality tokens", () => {
+    expect(
+      calculateNameSimilarity("Kineruku", "Kineruku Library & Bookshop"),
+    ).toBeGreaterThanOrEqual(0.6);
+    expect(
+      calculateNameSimilarity("Kafe Buku Tebet", "Perpustakaan Umum Tebet"),
+    ).toBeLessThan(0.6);
+    expect(
+      calculateNameSimilarity("Toko Buku Bandung", "Taman Baca Bandung"),
+    ).toBeLessThan(0.6);
+    expect(
+      calculateNameSimilarity(
+        "Kafe Buku Cibaduyut",
+        "Perpustakaan Umum Cibaduyut",
+      ),
+    ).toBeLessThan(0.6);
+
+    const existing = [
+      {
+        slug: "kafe-buku-tebet",
+        name: "Kafe Buku Tebet",
+        latitude: -6.2297,
+        longitude: 106.8548,
+        city: "Jakarta",
+      },
+    ];
+    const incoming = [
+      {
+        slug: "perpus-umum-tebet",
+        name: "Perpustakaan Umum Tebet",
+        latitude: -6.2305, // ~89m away (>= 50m, <= 150m)
+        longitude: 106.8548,
+        city: "Jakarta",
+      },
+    ];
+
+    const { accepted, skipped } = deduplicateSpots(incoming, existing);
+    expect(accepted.map((s) => s.slug)).toEqual(["perpus-umum-tebet"]);
+    expect(skipped).toHaveLength(0);
+  });
 });
 
 describe("Curated Indonesia Reading Spots Seed Dataset (Issue #19)", () => {
@@ -689,5 +822,16 @@ describe("Curated Indonesia Reading Spots Seed Dataset (Issue #19)", () => {
         ).toBeGreaterThanOrEqual(50);
       }
     }
+  });
+
+  it("imports reading-spots.json statically in seed-spots.ts so tsup bundles dist/migrate.js without ENOENT", () => {
+    const seedSpotsSource = readFileSync(
+      resolve(import.meta.dirname, "../db/seed-spots.ts"),
+      "utf8",
+    );
+    expect(seedSpotsSource).toMatch(
+      /from\s+["']\.\/seeds\/reading-spots\.json["']\s+with\s+\{\s*type:\s*["']json["']\s*\}/,
+    );
+    expect(seedSpotsSource).not.toMatch(/\breadFileSync\b/);
   });
 });

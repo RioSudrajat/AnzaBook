@@ -233,23 +233,48 @@ const optionalTrimmedText = (max: number, label: string) =>
     .transform((val) => (val === "" ? undefined : val))
     .optional();
 
+function normalizeQueryNumberInput(val: unknown): unknown {
+  if (val === undefined) {
+    return undefined;
+  }
+  if (val === null || typeof val === "boolean") {
+    return Number.NaN;
+  }
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    return trimmed === "" ? undefined : trimmed;
+  }
+  return val;
+}
+
+const optionalQueryNumber = (schema: z.ZodType<number, unknown>) =>
+  z.preprocess(normalizeQueryNumberInput, schema.optional());
+
+const defaultedQueryNumber = (
+  schema: z.ZodType<number, unknown>,
+  defaultValue: number,
+) => z.preprocess(normalizeQueryNumberInput, schema.default(defaultValue));
+
+const requiredQueryNumber = (schema: z.ZodType<number, unknown>) =>
+  z.preprocess(normalizeQueryNumberInput, schema);
+
 export const listSpotsQuerySchema = z
   .object({
-    minLat: z.coerce.number().min(-90).max(90).optional(),
-    maxLat: z.coerce.number().min(-90).max(90).optional(),
-    minLng: z.coerce.number().min(-180).max(180).optional(),
-    maxLng: z.coerce.number().min(-180).max(180).optional(),
-    lat: z.coerce.number().min(-90).max(90).optional(),
-    lng: z.coerce.number().min(-180).max(180).optional(),
-    radiusKm: z.coerce.number().min(0.5).max(500).optional(),
+    minLat: optionalQueryNumber(z.coerce.number().min(-90).max(90)),
+    maxLat: optionalQueryNumber(z.coerce.number().min(-90).max(90)),
+    minLng: optionalQueryNumber(z.coerce.number().min(-180).max(180)),
+    maxLng: optionalQueryNumber(z.coerce.number().min(-180).max(180)),
+    lat: optionalQueryNumber(z.coerce.number().min(-90).max(90)),
+    lng: optionalQueryNumber(z.coerce.number().min(-180).max(180)),
+    radiusKm: optionalQueryNumber(z.coerce.number().min(0.5).max(500)),
     city: optionalTrimmedText(100, "Nama kota"),
     province: optionalTrimmedText(100, "Nama provinsi"),
     category: z.enum(spotCategoryValues).optional(),
     facility: z.enum(spotFacilityKeyValues).optional(),
     q: optionalTrimmedText(120, "Kata kunci"),
     sort: z.enum(["nearest", "rating", "popular"]).default("nearest"),
-    limit: z.coerce.number().int().min(1).max(200).default(60),
-    offset: z.coerce.number().int().min(0).default(0),
+    limit: defaultedQueryNumber(z.coerce.number().int().min(1).max(200), 60),
+    offset: defaultedQueryNumber(z.coerce.number().int().min(0), 0),
   })
   .strict()
   .superRefine((data, ctx) => {
@@ -285,10 +310,13 @@ export const listSpotsQuerySchema = z
 
 export const nearbyCheckQuerySchema = z
   .object({
-    lat: z.coerce.number().min(-90).max(90),
-    lng: z.coerce.number().min(-180).max(180),
+    lat: requiredQueryNumber(z.coerce.number().min(-90).max(90)),
+    lng: requiredQueryNumber(z.coerce.number().min(-180).max(180)),
     name: optionalTrimmedText(120, "Nama lokasi"),
-    radiusMeters: z.coerce.number().int().min(20).max(500).default(100),
+    radiusMeters: defaultedQueryNumber(
+      z.coerce.number().int().min(20).max(500),
+      100,
+    ),
   })
   .strict();
 
@@ -439,28 +467,52 @@ export const moderateSpotSchema = z
     }
   });
 
-const optionalBooleanQuery = z
-  .preprocess((val) => {
-    if (val === "true" || val === true) return true;
-    if (val === "false" || val === false) return false;
-    return val;
-  }, z.boolean())
-  .optional();
+const optionalBooleanQuery = z.preprocess((val) => {
+  if (typeof val === "string") {
+    const trimmed = val.trim().toLowerCase();
+    if (trimmed === "") return undefined;
+    if (trimmed === "true") return true;
+    if (trimmed === "false") return false;
+  }
+  return val;
+}, z.boolean().optional());
 
 export const listAdminSpotsQuerySchema = z
   .object({
     status: z.enum(spotStatusValues).optional(),
     hasOpenReports: optionalBooleanQuery,
     q: optionalTrimmedText(120, "Kata kunci"),
-    limit: z.coerce.number().int().min(1).max(100).default(50),
-    offset: z.coerce.number().int().min(0).default(0),
+    limit: defaultedQueryNumber(z.coerce.number().int().min(1).max(100), 50),
+    offset: defaultedQueryNumber(z.coerce.number().int().min(0), 0),
   })
   .strict();
 
+export type SpotSortOption = "nearest" | "rating" | "popular";
 export type SpotFacilitiesInput = z.infer<typeof spotFacilitiesSchema>;
-export type ListSpotsQueryInput = z.input<typeof listSpotsQuerySchema>;
+export type ListSpotsQueryInput = {
+  minLat?: number;
+  maxLat?: number;
+  minLng?: number;
+  maxLng?: number;
+  lat?: number;
+  lng?: number;
+  radiusKm?: number;
+  city?: string;
+  province?: string;
+  category?: SpotCategory;
+  facility?: SpotFacilityKey;
+  q?: string;
+  sort?: SpotSortOption;
+  limit?: number;
+  offset?: number;
+};
 export type ListSpotsQuery = z.infer<typeof listSpotsQuerySchema>;
-export type NearbyCheckQueryInput = z.input<typeof nearbyCheckQuerySchema>;
+export type NearbyCheckQueryInput = {
+  lat: number;
+  lng: number;
+  name?: string;
+  radiusMeters?: number;
+};
 export type NearbyCheckQuery = z.infer<typeof nearbyCheckQuerySchema>;
 export type GeocodeSpotsQuery = z.infer<typeof geocodeSpotsQuerySchema>;
 export type CreateSpotSubmissionInput = z.input<
@@ -471,7 +523,11 @@ export type UpsertSpotReviewInput = z.input<typeof upsertSpotReviewSchema>;
 export type UpsertSpotReview = z.infer<typeof upsertSpotReviewSchema>;
 export type CreateSpotReportInput = z.infer<typeof createSpotReportSchema>;
 export type ModerateSpotInput = z.infer<typeof moderateSpotSchema>;
-export type ListAdminSpotsQueryInput = z.input<
-  typeof listAdminSpotsQuerySchema
->;
+export type ListAdminSpotsQueryInput = {
+  status?: SpotStatus;
+  hasOpenReports?: boolean;
+  q?: string;
+  limit?: number;
+  offset?: number;
+};
 export type ListAdminSpotsQuery = z.infer<typeof listAdminSpotsQuerySchema>;

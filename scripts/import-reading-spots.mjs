@@ -35,12 +35,92 @@ const GENERIC_PLACE_TOKENS = new Set([
   "ruang",
   "rumah",
   "lounge",
+  "corner",
+  "spot",
+  "space",
+  "studio",
+  "hub",
+  "club",
+  "klub",
+  "area",
+  "zona",
+  "zone",
+  "sudut",
+  "pojok",
+  "teras",
+  "pondok",
+  "balai",
+  "sanggar",
+  "saung",
+  "warung",
+  "literasi",
+  "komunitas",
+  "kolektif",
+  "collective",
+  "indie",
+  "independent",
+  "publik",
+  "public",
   "umum",
+  "rakyat",
   "daerah",
   "kota",
   "kabupaten",
+  "provinsi",
+  "nasional",
+  "negeri",
+  "wilayah",
   "indonesia",
+  "dki",
+  "jakarta",
+  "bandung",
+  "yogyakarta",
+  "jogja",
+  "surabaya",
+  "bali",
+  "denpasar",
+  "ubud",
+  "canggu",
+  "sanur",
+  "kuta",
+  "medan",
+  "makassar",
+  "malang",
+  "semarang",
+  "solo",
+  "surakarta",
+  "bogor",
+  "depok",
+  "tangerang",
+  "bekasi",
+  "palembang",
+  "balikpapan",
+  "tebet",
+  "kemang",
+  "menteng",
+  "senopati",
+  "kebayoran",
+  "blok",
+  "cikini",
+  "dago",
+  "cihampelas",
+  "pusat",
+  "selatan",
+  "timur",
+  "barat",
+  "utara",
+  "tengah",
+  "baru",
+  "lama",
+  "raya",
+  "jalan",
+  "jl",
+  "di",
+  "ke",
   "dan",
+  "of",
+  "the",
+  "and",
 ]);
 
 const CITY_PRESET_NORMALIZATION = new Map([
@@ -239,14 +319,15 @@ export function calculateNameSimilarity(a, b) {
   const distinctiveB = new Set(
     [...tokensB].filter((token) => !GENERIC_PLACE_TOKENS.has(token)),
   );
-  let distinctiveContainment = 0;
+  let distinctiveJaccard = 0;
   if (distinctiveA.size > 0 && distinctiveB.size > 0) {
     let sharedDistinctive = 0;
     for (const token of distinctiveA) {
       if (distinctiveB.has(token)) sharedDistinctive++;
     }
-    distinctiveContainment =
-      sharedDistinctive / Math.min(distinctiveA.size, distinctiveB.size);
+    const unionDistinctive = new Set([...distinctiveA, ...distinctiveB]).size;
+    distinctiveJaccard =
+      unionDistinctive > 0 ? sharedDistinctive / unionDistinctive : 0;
   }
 
   const bigramsA = buildBigrams(a);
@@ -260,7 +341,13 @@ export function calculateNameSimilarity(a, b) {
       ? (2 * bigramOverlap) / (bigramsA.size + bigramsB.size)
       : 0;
 
-  return Math.min(1, Math.max(jaccard, dice, distinctiveContainment));
+  const surfaceSimilarity = Math.max(jaccard, dice);
+  const blendedDistinctive =
+    distinctiveJaccard > 0
+      ? 0.35 * distinctiveJaccard + 0.35 * jaccard + 0.3 * dice
+      : 0;
+
+  return Math.min(1, Math.max(surfaceSimilarity, blendedDistinctive));
 }
 
 /**
