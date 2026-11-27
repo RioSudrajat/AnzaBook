@@ -421,7 +421,9 @@ export const moderateSpotSchema = z
     noiseLevel: z.enum(spotNoiseLevelValues).optional(),
     facilities: spotFacilitiesSchema.optional(),
     googleMapsUrl: googleMapsUrlSchema.optional().or(z.literal("")).nullable(),
-    coverUrl: safeAssetUrlSchema("URL sampul tidak valid").optional().nullable(),
+    coverUrl: safeAssetUrlSchema("URL sampul tidak valid")
+      .optional()
+      .nullable(),
   })
   .strict()
   .superRefine((data, ctx) => {

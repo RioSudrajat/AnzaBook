@@ -371,11 +371,7 @@ export function normalizeOverpassElement(element, fallbackCity = "") {
   const category = inferCategory(tags);
   const websiteRaw = (tags.website || tags["contact:website"] || "").trim();
   const websiteUrl = /^https?:\/\//i.test(websiteRaw) ? websiteRaw : null;
-  const igRaw = (
-    tags["contact:instagram"] ||
-    tags.instagram ||
-    ""
-  )
+  const igRaw = (tags["contact:instagram"] || tags.instagram || "")
     .trim()
     .replace(/^@/, "")
     .replace(/^https?:\/\/(www\.)?instagram\.com\//i, "")
@@ -393,8 +389,7 @@ export function normalizeOverpassElement(element, fallbackCity = "") {
     quietZone: category === "library" ? true : undefined,
     hasBookCollection: true,
     outdoorSeating: tags.outdoor_seating === "yes" ? true : undefined,
-    parking:
-      tags.parking && tags.parking !== "no" ? true : undefined,
+    parking: tags.parking && tags.parking !== "no" ? true : undefined,
   };
 
   const elemType = element.type || "node";
@@ -624,7 +619,9 @@ async function runCli() {
     const outPath = resolve(process.cwd(), options.out);
     mkdirSync(dirname(outPath), { recursive: true });
     writeFileSync(outPath, `${JSON.stringify(sorted, null, 2)}\n`, "utf8");
-    console.log(`Wrote ${sorted.length} normalized reading spots to ${outPath}`);
+    console.log(
+      `Wrote ${sorted.length} normalized reading spots to ${outPath}`,
+    );
   }
 }
 

@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   calculateNameSimilarity,
@@ -26,11 +28,13 @@ import {
   createSpotSubmissionSchema,
   expandSpotCityFilterValues,
   geocodeSpotsQuerySchema,
+  googleMapsUrlSchema,
   haversineDistanceMeters,
   listAdminSpotsQuerySchema,
   listSpotsQuerySchema,
   moderateSpotSchema,
   nearbyCheckQuerySchema,
+  spotCategoryValues,
   spotFacilityKeyValues,
   upsertSpotReviewSchema,
 } from "@starter/shared/validators/spots";
@@ -153,7 +157,8 @@ describe("Reading Spots Shared Validators (Issue #19)", () => {
 
     // Reject partial bbox, inverted bbox, or unpaired lat/lng
     expect(
-      listSpotsQuerySchema.safeParse({ minLat: "-7.0", maxLat: "-6.0" }).success,
+      listSpotsQuerySchema.safeParse({ minLat: "-7.0", maxLat: "-6.0" })
+        .success,
     ).toBe(false);
     expect(
       listSpotsQuerySchema.safeParse({
@@ -233,9 +238,9 @@ describe("Reading Spots Shared Validators (Issue #19)", () => {
       }).success,
     ).toBe(true);
 
-    expect(
-      moderateSpotSchema.safeParse({ action: "reject" }).success,
-    ).toBe(false);
+    expect(moderateSpotSchema.safeParse({ action: "reject" }).success).toBe(
+      false,
+    );
 
     expect(
       moderateSpotSchema.safeParse({
@@ -566,5 +571,123 @@ describe("OSM Overpass Reading Spots Importer & Deduplicator (Issue #19)", () =>
     const { accepted, skipped } = deduplicateSpots(incoming, existing);
     expect(accepted.map((s) => s.slug)).toEqual(["rooma-baca-cidadap"]);
     expect(skipped).toHaveLength(2);
+  });
+});
+
+describe("Curated Indonesia Reading Spots Seed Dataset (Issue #19)", () => {
+  type RawSeedSpot = {
+    slug: string;
+    name: string;
+    category: string;
+    description?: string | null;
+    address: string;
+    district?: string | null;
+    city: string;
+    province: string;
+    latitude: number;
+    longitude: number;
+    googleMapsUrl?: string | null;
+    googlePlaceId?: string | null;
+    instagramHandle?: string | null;
+    websiteUrl?: string | null;
+    openingHoursText?: string | null;
+    priceRange: string;
+    noiseLevel: string;
+    facilities: Record<string, boolean>;
+    source: string;
+    externalSourceId?: string | null;
+    verifiedBadge: string;
+  };
+
+  it("contains >= 100 valid, deduplicated Indonesian reading spots across >= 12 cities and all 5 categories", () => {
+    const seedPath = resolve(
+      import.meta.dirname,
+      "../db/seeds/reading-spots.json",
+    );
+    const dataset = JSON.parse(readFileSync(seedPath, "utf8")) as RawSeedSpot[];
+
+    expect(dataset.length).toBeGreaterThanOrEqual(100);
+
+    const slugs = new Set<string>();
+    const cities = new Set<string>();
+    const categories = new Set<string>();
+
+    for (const item of dataset) {
+      expect(slugs.has(item.slug), `Duplicate slug: ${item.slug}`).toBe(false);
+      slugs.add(item.slug);
+      cities.add(item.city);
+      categories.add(item.category);
+
+      const parsed = createSpotSubmissionSchema.safeParse({
+        name: item.name,
+        category: item.category,
+        description: item.description ?? undefined,
+        address: item.address,
+        district: item.district ?? undefined,
+        city: item.city,
+        province: item.province,
+        latitude: item.latitude,
+        longitude: item.longitude,
+        googleMapsUrl: item.googleMapsUrl ?? undefined,
+        googlePlaceId: item.googlePlaceId ?? undefined,
+        instagramHandle: item.instagramHandle ?? undefined,
+        websiteUrl: item.websiteUrl ?? undefined,
+        openingHoursText: item.openingHoursText ?? undefined,
+        priceRange: item.priceRange,
+        noiseLevel: item.noiseLevel,
+        facilities: item.facilities,
+      });
+      expect(
+        parsed.success,
+        `Invalid seed entry "${item.slug}": ${parsed.success ? "" : JSON.stringify(parsed.error.issues)}`,
+      ).toBe(true);
+
+      if (item.googleMapsUrl) {
+        expect(googleMapsUrlSchema.safeParse(item.googleMapsUrl).success).toBe(
+          true,
+        );
+      }
+    }
+
+    // Must cover all 7 PR #37 preset cities plus >= 5 more Indonesian cities (>= 12 total)
+    expect(cities.size).toBeGreaterThanOrEqual(12);
+    for (const presetCity of [
+      "Jakarta",
+      "Bandung",
+      "Yogyakarta",
+      "Surabaya",
+      "Bali",
+      "Medan",
+      "Makassar",
+    ]) {
+      expect(
+        cities.has(presetCity),
+        `Missing PR #37 preset city: ${presetCity}`,
+      ).toBe(true);
+    }
+
+    for (const category of spotCategoryValues) {
+      expect(categories.has(category), `Missing category: ${category}`).toBe(
+        true,
+      );
+    }
+
+    // Verify no duplicate spots within 50m inside curated dataset itself
+    for (let i = 0; i < dataset.length; i++) {
+      for (let j = i + 1; j < dataset.length; j++) {
+        const a = dataset[i]!;
+        const b = dataset[j]!;
+        const dist = haversineDistanceMeters(
+          a.latitude,
+          a.longitude,
+          b.latitude,
+          b.longitude,
+        );
+        expect(
+          dist,
+          `Curated spots "${a.slug}" and "${b.slug}" are only ${dist}m apart`,
+        ).toBeGreaterThanOrEqual(50);
+      }
+    }
   });
 });
