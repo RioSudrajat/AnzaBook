@@ -35,7 +35,9 @@ function ProtectedLayout() {
   const location = useLocation();
   const isReader = location.pathname.startsWith("/read");
   const isApp =
-    location.pathname === "/app" || location.pathname.startsWith("/admin");
+    location.pathname === "/app" ||
+    location.pathname.startsWith("/admin") ||
+    location.pathname.startsWith("/spots");
   const isStandalone =
     isReader ||
     isApp ||

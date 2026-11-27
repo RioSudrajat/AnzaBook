@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { FlagIcon } from "@/components/ui/flag-icon";
 import { BookCover } from "@/features/books/components/book-cover";
 import { useEvents } from "@/features/events/hooks";
+import { HomeSpotsBanner } from "@/features/spots/components/home-spots-banner";
 
 type DashboardHomeProps = {
   books: BookSummaryDto[];
@@ -248,6 +249,8 @@ export function DashboardHome({
           </div>
         )}
       </section>
+
+      <HomeSpotsBanner />
 
       {upcomingEvents.length > 0 && (
         <section

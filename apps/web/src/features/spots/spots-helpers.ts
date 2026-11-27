@@ -1,0 +1,393 @@
+import { haversineDistanceMeters } from "@starter/shared/validators/community";
+import {
+  INDONESIA_BBOX,
+  INDONESIA_CITY_PRESETS,
+  type ReadingSpotSummaryDto,
+  type SavedSpotRegion,
+  type SpotCategory,
+  type SpotFacilitiesDto,
+  type SpotNoiseLevel,
+  type SpotPriceRange,
+  type SpotVerifiedBadge,
+} from "./types";
+
+export const SPOT_REGION_STORAGE_KEY = "anzabook_spot_region";
+
+export const SPOT_CATEGORY_LABELS: Record<SpotCategory, string> = {
+  book_cafe: "Kafe Buku",
+  library: "Perpustakaan",
+  tbm: "TBM",
+  indie_bookstore: "Toko Buku Indie",
+  reading_lounge: "Ruang Baca",
+};
+
+export const SPOT_CATEGORY_STYLES: Record<
+  SpotCategory,
+  {
+    label: string;
+    shortLabel: string;
+    colorHex: string;
+    symbol: string;
+  }
+> = {
+  book_cafe: {
+    label: "Kafe Buku",
+    shortLabel: "Kafe",
+    colorHex: "#D97706",
+    symbol: "coffee",
+  },
+  library: {
+    label: "Perpustakaan",
+    shortLabel: "Perpus",
+    colorHex: "#2563EB",
+    symbol: "library",
+  },
+  tbm: {
+    label: "TBM",
+    shortLabel: "TBM",
+    colorHex: "#0D9488",
+    symbol: "tbm",
+  },
+  indie_bookstore: {
+    label: "Toko Buku Indie",
+    shortLabel: "Toko Indie",
+    colorHex: "#C2410C",
+    symbol: "store",
+  },
+  reading_lounge: {
+    label: "Ruang Baca",
+    shortLabel: "Lounge",
+    colorHex: "#4F46E5",
+    symbol: "lounge",
+  },
+};
+
+export const PARTNER_SPOT_COLOR_HEX = "#F06A24";
+
+const PRICE_RANGE_LABELS: Record<SpotPriceRange, string> = {
+  free: "Gratis",
+  budget: "Terjangkau",
+  moderate: "Menengah",
+  premium: "Premium",
+};
+
+const NOISE_LEVEL_LABELS: Record<SpotNoiseLevel, string> = {
+  quiet: "Tenang",
+  moderate: "Sedang",
+  lively: "Ramai",
+};
+
+export const FACILITY_CHIP_ORDER: ReadonlyArray<{
+  key: keyof SpotFacilitiesDto;
+  label: string;
+}> = [
+  { key: "wifi", label: "Wi-Fi" },
+  { key: "powerOutlets", label: "Colokan" },
+  { key: "airConditioned", label: "AC" },
+  { key: "quietZone", label: "Zona Tenang" },
+  { key: "hasBookCollection", label: "Koleksi Buku" },
+  { key: "outdoorSeating", label: "Outdoor" },
+  { key: "prayerRoom", label: "Mushola" },
+  { key: "parking", label: "Parkir" },
+];
+
+export function sanitizeExternalHttpUrl(
+  rawUrl: string | null | undefined,
+): string | null {
+  if (!rawUrl) {
+    return null;
+  }
+  const trimmed = rawUrl.trim();
+  if (!trimmed) {
+    return null;
+  }
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      return parsed.toString();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function buildGoogleMapsDirectionsUrl(
+  spot: Pick<ReadingSpotSummaryDto, "latitude" | "longitude" | "googlePlaceId">,
+): string {
+  const base = `https://www.google.com/maps/dir/?api=1&destination=${spot.latitude},${spot.longitude}`;
+  if (spot.googlePlaceId && spot.googlePlaceId.trim().length > 0) {
+    return `${base}&destination_place_id=${encodeURIComponent(spot.googlePlaceId.trim())}`;
+  }
+  return base;
+}
+
+export function buildGoogleMapsPlaceUrl(
+  spot: Pick<ReadingSpotSummaryDto, "googleMapsUrl" | "name" | "city">,
+): string {
+  const safeDirect = sanitizeExternalHttpUrl(spot.googleMapsUrl);
+  if (safeDirect) {
+    return safeDirect;
+  }
+  const query = `${spot.name} ${spot.city}`.trim();
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
+export function formatDistanceMeters(
+  meters: number | null | undefined,
+): string | null {
+  if (meters == null || !Number.isFinite(meters) || meters < 0) {
+    return null;
+  }
+  if (meters < 1000) {
+    const rounded =
+      meters >= 20 ? Math.round(meters / 10) * 10 : Math.round(meters);
+    return `${rounded} m`;
+  }
+  const km = (meters / 1000).toFixed(1).replace(".", ",");
+  return `${km} km`;
+}
+
+export function formatSpotCategory(category: SpotCategory): string {
+  return SPOT_CATEGORY_LABELS[category];
+}
+
+export function formatPriceRange(priceRange: SpotPriceRange): string {
+  return PRICE_RANGE_LABELS[priceRange];
+}
+
+export function formatNoiseLevel(noiseLevel: SpotNoiseLevel): string {
+  return NOISE_LEVEL_LABELS[noiseLevel];
+}
+
+export function formatVerifiedBadge(badge: SpotVerifiedBadge): string | null {
+  if (badge === "partner") return "Mitra AnzaBook";
+  if (badge === "curated") return "Terkurasi";
+  return null;
+}
+
+export function getActiveFacilityChips(
+  facilities: SpotFacilitiesDto | null | undefined,
+): Array<{ key: keyof SpotFacilitiesDto; label: string }> {
+  if (!facilities) {
+    return [];
+  }
+  return FACILITY_CHIP_ORDER.filter(({ key }) => facilities[key] === true);
+}
+
+export type SpotGeoJsonFeature = {
+  type: "Feature";
+  geometry: {
+    type: "Point";
+    coordinates: [number, number];
+  };
+  properties: {
+    id: string;
+    slug: string;
+    name: string;
+    category: SpotCategory;
+    isPartner: boolean;
+    verifiedBadge: SpotVerifiedBadge;
+    ratingAvg: number;
+    markerColor: string;
+  };
+};
+
+export type SpotGeoJsonCollection = {
+  type: "FeatureCollection";
+  features: SpotGeoJsonFeature[];
+};
+
+export function spotsToGeoJson(
+  spots: readonly ReadingSpotSummaryDto[],
+): SpotGeoJsonCollection {
+  return {
+    type: "FeatureCollection",
+    features: spots.map((spot) => {
+      const isPartner =
+        spot.verifiedBadge === "partner" || Boolean(spot.linkedBranchId);
+      const markerColor = isPartner
+        ? PARTNER_SPOT_COLOR_HEX
+        : SPOT_CATEGORY_STYLES[spot.category].colorHex;
+      return {
+        type: "Feature",
+        geometry: {
+          type: "Point",
+          coordinates: [spot.longitude, spot.latitude],
+        },
+        properties: {
+          id: spot.id,
+          slug: spot.slug,
+          name: spot.name,
+          category: spot.category,
+          isPartner,
+          verifiedBadge: spot.verifiedBadge,
+          ratingAvg: spot.ratingAvg,
+          markerColor,
+        },
+      };
+    }),
+  };
+}
+
+export function isWithinIndonesiaBbox(lat: number, lng: number): boolean {
+  return (
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    lat >= INDONESIA_BBOX.minLat &&
+    lat <= INDONESIA_BBOX.maxLat &&
+    lng >= INDONESIA_BBOX.minLng &&
+    lng <= INDONESIA_BBOX.maxLng
+  );
+}
+
+export function serializeSavedSpotRegion(region: SavedSpotRegion): string {
+  return JSON.stringify(region);
+}
+
+export function parseSavedSpotRegion(
+  raw: string | null | undefined,
+): SavedSpotRegion | null {
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw) as Partial<SavedSpotRegion>;
+    if (
+      !parsed ||
+      typeof parsed.city !== "string" ||
+      !parsed.city.trim() ||
+      typeof parsed.lat !== "number" ||
+      typeof parsed.lng !== "number" ||
+      typeof parsed.zoom !== "number" ||
+      (parsed.source !== "preset" && parsed.source !== "geolocation") ||
+      !isWithinIndonesiaBbox(parsed.lat, parsed.lng)
+    ) {
+      return null;
+    }
+    return {
+      city: parsed.city.trim(),
+      lat: parsed.lat,
+      lng: parsed.lng,
+      zoom: Math.min(18, Math.max(4, parsed.zoom)),
+      source: parsed.source,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function findNearestIndonesianCityPreset(lat: number, lng: number) {
+  let nearest = INDONESIA_CITY_PRESETS[0]!;
+  let minDistance = Number.POSITIVE_INFINITY;
+  for (const preset of INDONESIA_CITY_PRESETS) {
+    const distance = haversineDistanceMeters(lat, lng, preset.lat, preset.lng);
+    if (distance < minDistance) {
+      minDistance = distance;
+      nearest = preset;
+    }
+  }
+  return { preset: nearest, distanceMeters: minDistance };
+}
+
+export function calculateDistanceMeters(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number {
+  return haversineDistanceMeters(lat1, lng1, lat2, lng2);
+}
+
+export function hasViewportShiftedSignificantly(
+  prev: { lat: number; lng: number; zoom: number },
+  next: { lat: number; lng: number; zoom: number },
+): boolean {
+  if (Math.abs(prev.zoom - next.zoom) >= 1.5) {
+    return true;
+  }
+  const distanceMeters = haversineDistanceMeters(
+    prev.lat,
+    prev.lng,
+    next.lat,
+    next.lng,
+  );
+  return distanceMeters >= 1500;
+}
+
+export type PreviewCanvasPin = {
+  id: string;
+  slug: string;
+  name: string;
+  category: SpotCategory;
+  isPartner: boolean;
+  x: number;
+  y: number;
+};
+
+export function projectSpotsToPreviewCanvas(
+  spots: readonly ReadingSpotSummaryDto[],
+  center: { lat: number; lng: number },
+): PreviewCanvasPin[] {
+  if (spots.length === 0) {
+    return [];
+  }
+
+  let minLat = center.lat;
+  let maxLat = center.lat;
+  let minLng = center.lng;
+  let maxLng = center.lng;
+
+  for (const spot of spots) {
+    if (spot.latitude < minLat) minLat = spot.latitude;
+    if (spot.latitude > maxLat) maxLat = spot.latitude;
+    if (spot.longitude < minLng) minLng = spot.longitude;
+    if (spot.longitude > maxLng) maxLng = spot.longitude;
+  }
+
+  const latSpan = maxLat - minLat;
+  const lngSpan = maxLng - minLng;
+  const effectiveSpan = Math.max(latSpan, lngSpan);
+
+  if (effectiveSpan < 1e-6) {
+    return spots.map((spot, index) => {
+      const offset = index === 0 ? 0 : ((index % 5) - 2) * 4;
+      return {
+        id: spot.id,
+        slug: spot.slug,
+        name: spot.name,
+        category: spot.category,
+        isPartner:
+          spot.verifiedBadge === "partner" || Boolean(spot.linkedBranchId),
+        x: Math.min(88, Math.max(12, 50 + offset)),
+        y: Math.min(82, Math.max(18, 50 - offset)),
+      };
+    });
+  }
+
+  const midLat = (minLat + maxLat) / 2;
+  const midLng = (minLng + maxLng) / 2;
+
+  return spots.map((spot) => {
+    const normalizedX = (spot.longitude - midLng) / effectiveSpan;
+    const normalizedY = (midLat - spot.latitude) / effectiveSpan;
+    const x = Math.min(
+      88,
+      Math.max(12, Math.round((50 + normalizedX * 68) * 10) / 10),
+    );
+    const y = Math.min(
+      82,
+      Math.max(18, Math.round((50 + normalizedY * 56) * 10) / 10),
+    );
+    return {
+      id: spot.id,
+      slug: spot.slug,
+      name: spot.name,
+      category: spot.category,
+      isPartner:
+        spot.verifiedBadge === "partner" || Boolean(spot.linkedBranchId),
+      x,
+      y,
+    };
+  });
+}

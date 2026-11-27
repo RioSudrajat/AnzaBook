@@ -39,6 +39,8 @@ type AppShellProps = {
   children: ReactNode;
   /** Page content width; detail pages read better a bit narrower. */
   wide?: boolean;
+  /** Disables container padding and footer for fullscreen workspace views like /spots. */
+  fullBleed?: boolean;
 };
 
 const MOBILE_TABS: { tab: SidebarTab; label: string; icon: typeof Home }[] = [
@@ -55,6 +57,7 @@ export function AppShell({
   title,
   children,
   wide = false,
+  fullBleed = false,
 }: AppShellProps) {
   const navigate = useNavigate();
   const { data: membership } = useMembershipSummary();
@@ -97,7 +100,13 @@ export function AppShell({
     "p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring";
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row">
+    <div
+      className={
+        fullBleed
+          ? "h-dvh overflow-hidden bg-background text-foreground flex flex-col md:flex-row"
+          : "min-h-screen bg-background text-foreground flex flex-col md:flex-row"
+      }
+    >
       <AppSidebar
         activeTab={activeTab}
         onTabChange={handleTabChange}
@@ -110,8 +119,10 @@ export function AppShell({
         onOpenProfile={() => handleTabChange("profile")}
       />
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-30 border-b border-border/80 bg-background/95 backdrop-blur-md px-6 py-3.5 flex items-center justify-between select-none">
+      <div
+        className={`flex-1 flex flex-col min-w-0 ${fullBleed ? "min-h-0" : ""}`}
+      >
+        <header className="sticky top-0 z-30 border-b border-border/80 bg-background/95 backdrop-blur-md px-6 py-3.5 flex items-center justify-between select-none shrink-0">
           <div className="flex items-center gap-3">
             <AnzaLogoMark className="size-6 text-foreground md:hidden shrink-0" />
             <h1 className="font-serif text-xl sm:text-2xl font-bold">
@@ -178,16 +189,22 @@ export function AppShell({
 
         <main
           id="main-content"
-          className={`flex-1 w-full mx-auto px-4 sm:px-8 pt-6 pb-24 md:pb-8 ${
-            wide ? "max-w-6xl" : "max-w-5xl"
-          }`}
+          className={
+            fullBleed
+              ? "flex-1 min-h-0 w-full flex flex-col pb-[61px] md:pb-0"
+              : `flex-1 w-full mx-auto px-4 sm:px-8 pt-6 pb-24 md:pb-8 ${
+                  wide ? "max-w-6xl" : "max-w-5xl"
+                }`
+          }
         >
           {children}
         </main>
 
-        <div className="pb-20 md:pb-0">
-          <SiteFooter />
-        </div>
+        {!fullBleed && (
+          <div className="pb-20 md:pb-0">
+            <SiteFooter />
+          </div>
+        )}
       </div>
 
       <nav
