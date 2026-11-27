@@ -15,6 +15,7 @@ export const statement = {
   books: ["manage-any"],
   stores: ["manage-any"],
   events: ["manage-any"],
+  spots: ["manage-any"],
 } as const;
 
 export const ac = createAccessControl(statement);
@@ -22,13 +23,20 @@ export const ac = createAccessControl(statement);
 // A role is a subset of the statement. Keep `user` deliberately empty: the
 // signed-in default should be able to do nothing beyond its own records.
 export const roles = {
-  user: ac.newRole({ notes: [], books: [], stores: [], events: [] }),
+  user: ac.newRole({
+    notes: [],
+    books: [],
+    stores: [],
+    events: [],
+    spots: [],
+  }),
   admin: ac.newRole({
     ...adminAc.statements,
     notes: ["read-any", "delete-any"],
     books: ["manage-any"],
     stores: ["manage-any"],
     events: ["manage-any"],
+    spots: ["manage-any"],
   }),
 } as const;
 

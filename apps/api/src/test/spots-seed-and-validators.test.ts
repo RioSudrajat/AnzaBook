@@ -1,5 +1,20 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { roleHasPermission } from "@starter/shared/permissions";
+import type {
+  AdminOverviewDto,
+  AdminSpotModerationItemDto,
+  ListSpotsResponseDto,
+  ReadingSpotDetailDto,
+  ReadingSpotReportDto,
+  ReadingSpotReviewDto,
+  ReadingSpotSummaryDto,
+  ReadingSpotUpcomingEventDto,
+  SpotCitySummaryDto,
+  SpotFacilitiesDto,
+  SpotGeocodeResultDto,
+  SpotNearbyMatchDto,
+} from "@starter/shared/types";
 import {
   INDONESIA_BBOX,
   createSpotReportSchema,
@@ -254,5 +269,171 @@ describe("Reading Spots Shared Validators (Issue #19)", () => {
       expect.arrayContaining(["Bali", "Denpasar", "Ubud"]),
     );
     expect(expandSpotCityFilterValues("Bandung")).toEqual(["Bandung"]);
+  });
+});
+
+describe("Reading Spots RBAC & Shared DTO Contracts (Issue #19)", () => {
+  it("grants spots:manage-any strictly to admin role and denies regular user", () => {
+    expect(roleHasPermission("user", { spots: ["manage-any"] })).toBe(false);
+    expect(roleHasPermission("admin", { spots: ["manage-any"] })).toBe(true);
+  });
+
+  it("aligns shared Reading Spots DTO shapes with PR #37 (#22) and staged AdminOverviewDto", () => {
+    const facilities: SpotFacilitiesDto = {
+      wifi: true,
+      powerOutlets: true,
+      quietZone: true,
+      hasBookCollection: true,
+      outdoorSeating: false,
+      airConditioned: true,
+      prayerRoom: true,
+      parking: false,
+    };
+
+    const summary: ReadingSpotSummaryDto = {
+      id: "spot-1",
+      slug: "kineruku-bandung",
+      name: "Kineruku",
+      category: "book_cafe",
+      description: "Perpustakaan dan kedai buku independen.",
+      address: "Jl. Hegarmanah No. 52",
+      district: "Cidadap",
+      city: "Bandung",
+      province: "Jawa Barat",
+      latitude: -6.8832,
+      longitude: 107.6054,
+      googleMapsUrl: null,
+      googlePlaceId: null,
+      instagramHandle: "kineruku",
+      websiteUrl: "https://kineruku.com",
+      openingHoursText: "Sel-Min 11:30-17:30",
+      priceRange: "budget",
+      noiseLevel: "quiet",
+      facilities,
+      coverUrl: null,
+      verifiedBadge: "partner",
+      linkedBranchId: "branch-1",
+      linkedCalendarId: null,
+      ratingAvg: 4.8,
+      ratingCount: 12,
+      bookmarkCount: 5,
+      distanceMeters: 1420,
+      isBookmarked: false,
+    };
+
+    const upcomingEvent: ReadingSpotUpcomingEventDto = {
+      id: "evt-1",
+      slug: "diskusi-buku-senja",
+      title: "Diskusi Buku Senja",
+      startAt: "2026-12-01T10:00:00.000Z",
+    };
+
+    const review: ReadingSpotReviewDto = {
+      id: "rev-1",
+      spotId: "spot-1",
+      userId: "user-1",
+      userName: "Pembaca",
+      userUsername: "pembaca",
+      userImage: null,
+      rating: 5,
+      content: "Nyaman sekali untuk membaca berjam-jam.",
+      tags: ["tenang_fokus", "koleksi_bagus"],
+      helpfulCount: 3,
+      createdAt: "2026-11-27T10:00:00.000Z",
+      updatedAt: "2026-11-27T10:00:00.000Z",
+    };
+
+    const detail: ReadingSpotDetailDto = {
+      ...summary,
+      linkedBranchName: "Kineruku & Kolektif Buku Hegarmanah",
+      linkedCalendarSlug: "lingkar-aksara-bandung",
+      linkedCalendarName: "Lingkar Aksara",
+      upcomingEvents: [upcomingEvent],
+      myReview: review,
+      status: "published",
+      source: "curated",
+    };
+
+    const listResponse: ListSpotsResponseDto = {
+      data: [summary],
+      meta: { total: 1, limit: 60, offset: 0 },
+    };
+
+    const citySummary: SpotCitySummaryDto = {
+      city: "Jakarta",
+      province: "DKI Jakarta",
+      count: 24,
+      latitude: -6.2088,
+      longitude: 106.8456,
+    };
+
+    const nearbyMatch: SpotNearbyMatchDto = {
+      id: summary.id,
+      slug: summary.slug,
+      name: summary.name,
+      category: summary.category,
+      address: summary.address,
+      city: summary.city,
+      latitude: summary.latitude,
+      longitude: summary.longitude,
+      distanceMeters: 42,
+      status: "published",
+    };
+
+    const geocode: SpotGeocodeResultDto = {
+      displayName: "Jl. Hegarmanah, Bandung",
+      address: "Jl. Hegarmanah",
+      district: "Cidadap",
+      city: "Bandung",
+      province: "Jawa Barat",
+      latitude: -6.8832,
+      longitude: 107.6054,
+    };
+
+    const report: ReadingSpotReportDto = {
+      id: "rep-1",
+      spotId: "spot-1",
+      reviewId: null,
+      reporterUserId: "user-1",
+      reporterName: "Pelapor",
+      reasonType: "wrong_info",
+      details: "Jam buka berubah pada hari Senin.",
+      status: "open",
+      createdAt: "2026-11-27T10:00:00.000Z",
+    };
+
+    const adminItem: AdminSpotModerationItemDto = {
+      ...detail,
+      submittedByUserId: "user-1",
+      submitterName: "Pengusul",
+      submitterEmail: "pengusul@example.com",
+      openReportsCount: 1,
+      recentReports: [report],
+      createdAt: "2026-11-27T10:00:00.000Z",
+      updatedAt: "2026-11-27T10:00:00.000Z",
+    };
+
+    // Staged AdminOverviewDto keeps existing non-spot producers compiling while exposing optional spot counters
+    const existingOverview: AdminOverviewDto = {
+      pendingCalendarsCount: 1,
+      pendingAuthorsCount: 2,
+      pendingPublishersCount: 0,
+      highRiskDrmEvents24hCount: 0,
+      estimatedNakamaRoyaltyPoolIdr: 0,
+      totalSinglePurchaseSalesIdr: 0,
+      totalPublisherShareIdr: 0,
+      totalAffiliateCommissionsIdr: 0,
+      totalNetAnzabookIdr: 0,
+    };
+
+    expect(detail.upcomingEvents?.[0]?.startAt).toBe(
+      "2026-12-01T10:00:00.000Z",
+    );
+    expect(listResponse.meta.total).toBe(1);
+    expect(citySummary.city).toBe("Jakarta");
+    expect(nearbyMatch.distanceMeters).toBe(42);
+    expect(geocode.city).toBe("Bandung");
+    expect(adminItem.openReportsCount).toBe(1);
+    expect(existingOverview.pendingSpotsCount).toBeUndefined();
   });
 });
