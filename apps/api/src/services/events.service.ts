@@ -1614,7 +1614,18 @@ export async function addCalendarMember(
   slug: string,
   input: AddCalendarMemberOutput,
 ): Promise<CommunityCalendarMemberDto> {
-  const identifier = input.identifier.trim().replace(/^@/, "");
+  const normalizedIdentifier = input.identifier
+    .trim()
+    .replace(/^@/, "")
+    .toLowerCase();
+
+  if (!normalizedIdentifier) {
+    throw new HttpError(
+      404,
+      "USER_NOT_FOUND",
+      "Pengguna dengan email atau username tersebut tidak ditemukan.",
+    );
+  }
 
   return await db.transaction(async (tx) => {
     const { cal, members, actor } = await requireCalendarMemberContext(
@@ -1640,7 +1651,10 @@ export async function addCalendarMember(
       })
       .from(user)
       .where(
-        or(ilike(user.email, identifier), ilike(user.username, identifier)),
+        or(
+          eq(sql`lower(${user.email})`, normalizedIdentifier),
+          eq(sql`lower(${user.username})`, normalizedIdentifier),
+        ),
       )
       .limit(1);
 

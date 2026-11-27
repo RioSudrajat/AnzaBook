@@ -1,5 +1,15 @@
 // The JSON contract between the API and the web app. Timestamps cross the wire
 // as ISO strings, so these are the shapes the browser actually receives.
+import type {
+  SpotCategory,
+  SpotNoiseLevel,
+  SpotPriceRange,
+  SpotReportReason,
+  SpotReviewTag,
+  SpotSource,
+  SpotStatus,
+  SpotVerifiedBadge,
+} from "../validators/spots";
 
 export type ApiErrorBody = {
   error: {
@@ -867,6 +877,8 @@ export type AdminOverviewDto = {
   pendingCalendarsCount: number;
   pendingAuthorsCount: number;
   pendingPublishersCount: number;
+  pendingSpotsCount?: number;
+  openSpotReportsCount?: number;
   highRiskDrmEvents24hCount: number;
   estimatedNakamaRoyaltyPoolIdr: number;
   totalSinglePurchaseSalesIdr: number;
@@ -1046,6 +1058,156 @@ export type AdminClaimBatchCodesDto = {
     claimedAt: string | null;
     createdAt: string;
   }[];
+};
+
+// ---------------- Reading Spots DTOs ---------------- //
+
+export type {
+  SpotCategory,
+  SpotNoiseLevel,
+  SpotPriceRange,
+  SpotReportReason,
+  SpotReviewTag,
+  SpotSource,
+  SpotStatus,
+  SpotVerifiedBadge,
+} from "../validators/spots";
+
+export type SpotFacilitiesDto = {
+  wifi?: boolean;
+  powerOutlets?: boolean;
+  airConditioned?: boolean;
+  quietZone?: boolean;
+  hasBookCollection?: boolean;
+  outdoorSeating?: boolean;
+  prayerRoom?: boolean;
+  parking?: boolean;
+};
+
+export type ReadingSpotSummaryDto = {
+  id: string;
+  slug: string;
+  name: string;
+  category: SpotCategory;
+  description: string | null;
+  address: string;
+  district: string | null;
+  city: string;
+  province: string | null;
+  latitude: number;
+  longitude: number;
+  googleMapsUrl: string | null;
+  googlePlaceId: string | null;
+  instagramHandle: string | null;
+  websiteUrl: string | null;
+  openingHoursText: string | null;
+  priceRange: SpotPriceRange;
+  noiseLevel: SpotNoiseLevel;
+  facilities: SpotFacilitiesDto;
+  coverUrl: string | null;
+  verifiedBadge: SpotVerifiedBadge;
+  linkedBranchId: string | null;
+  linkedCalendarId: string | null;
+  ratingAvg: number;
+  ratingCount: number;
+  bookmarkCount: number;
+  distanceMeters?: number | null;
+  isBookmarked?: boolean;
+};
+
+export type ReadingSpotUpcomingEventDto = {
+  id: string;
+  slug: string;
+  title: string;
+  startAt: string;
+};
+
+export type ReadingSpotReviewDto = {
+  id: string;
+  spotId: string;
+  userId: string;
+  userName: string;
+  userUsername: string | null;
+  userImage: string | null;
+  rating: number;
+  content: string;
+  tags: SpotReviewTag[];
+  helpfulCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ReadingSpotDetailDto = ReadingSpotSummaryDto & {
+  linkedBranchName?: string | null;
+  linkedCalendarSlug?: string | null;
+  linkedCalendarName?: string | null;
+  upcomingEvents?: ReadingSpotUpcomingEventDto[];
+  myReview?: ReadingSpotReviewDto | null;
+  status?: SpotStatus;
+  source?: SpotSource;
+  rejectionReason?: string | null;
+};
+
+export type ListSpotsResponseDto = {
+  data: ReadingSpotSummaryDto[];
+  meta: {
+    total: number;
+    limit?: number;
+    offset?: number;
+  };
+};
+
+export type SpotCitySummaryDto = {
+  city: string;
+  province: string | null;
+  count: number;
+  latitude: number;
+  longitude: number;
+};
+
+export type SpotNearbyMatchDto = {
+  id: string;
+  slug: string;
+  name: string;
+  category: SpotCategory;
+  address: string;
+  city: string;
+  latitude: number;
+  longitude: number;
+  distanceMeters: number;
+  status: SpotStatus;
+};
+
+export type SpotGeocodeResultDto = {
+  displayName: string;
+  address: string;
+  district: string | null;
+  city: string;
+  province: string | null;
+  latitude: number;
+  longitude: number;
+};
+
+export type ReadingSpotReportDto = {
+  id: string;
+  spotId: string;
+  reviewId: string | null;
+  reporterUserId: string;
+  reporterName: string | null;
+  reasonType: SpotReportReason;
+  details: string;
+  status: "open" | "resolved" | "dismissed";
+  createdAt: string;
+};
+
+export type AdminSpotModerationItemDto = ReadingSpotDetailDto & {
+  submittedByUserId: string | null;
+  submitterName: string | null;
+  submitterEmail: string | null;
+  openReportsCount: number;
+  recentReports: ReadingSpotReportDto[];
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type {

@@ -21,6 +21,7 @@ import {
 } from "../middleware/auth";
 import { jsonBody } from "../middleware/body";
 import { requireTrustedOrigin } from "../middleware/origin";
+import { createUserWindowLimiter } from "../middleware/user-rate-limit";
 import {
   addCalendarMember,
   approveRsvp,
@@ -168,6 +169,13 @@ eventsRouter.get("/calendars/:slug/members", optionalAuth, async (req, res) => {
   res.json({ data: members });
 });
 
+const limitCalendarMemberLookups = createUserWindowLimiter({
+  limit: 20,
+  code: "CALENDAR_MEMBER_RATE_LIMIT",
+  message:
+    "Terlalu banyak permintaan pengelolaan anggota komunitas. Coba lagi nanti.",
+});
+
 // Add or promote community calendar host/staff/member
 eventsRouter.post(
   "/calendars/:slug/members",
@@ -175,9 +183,11 @@ eventsRouter.post(
   requireTrustedOrigin,
   jsonBody,
   async (req, res) => {
+    const actorUserId = getAuth(req).user.id;
+    limitCalendarMemberLookups(actorUserId);
     const slug = String(req.params.slug);
     const input = addCalendarMemberSchema.parse(req.body);
-    const member = await addCalendarMember(getAuth(req).user.id, slug, input);
+    const member = await addCalendarMember(actorUserId, slug, input);
     res.status(201).json({ data: member });
   },
 );

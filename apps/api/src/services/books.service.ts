@@ -276,6 +276,14 @@ export async function purchaseDigitalBook(
   slug: string,
   input?: PurchaseBookInput,
 ): Promise<BookPurchaseDto> {
+  if (env.MIDTRANS_ENV === "production") {
+    throw new HttpError(
+      503,
+      "PAYMENT_UNAVAILABLE",
+      "Pembelian buku satuan langsung belum tersedia pada mode produksi.",
+    );
+  }
+
   const [book] = await db
     .select()
     .from(books)

@@ -2,11 +2,13 @@ import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { agent, originHeader, signUp } from "./helpers";
+import { env } from "../config/env";
 import { db } from "../db";
 import {
   books,
   bookChapters,
   bookClaimCodes,
+  bookPurchases,
   communityCalendars,
   communityEvents,
   communityWalletLedgers,
@@ -554,5 +556,53 @@ describe("B2B2C Monetization & DRM Engine", () => {
       .from(readingSessions)
       .where(eq(readingSessions.id, shortSession.body.data.id));
     expect(shortDb.isValidForRoyalty).toBe(false);
+  });
+
+  it("blocks simulated single-book purchase with 503 PAYMENT_UNAVAILABLE when MIDTRANS_ENV is production", async () => {
+    const buyer = agent();
+    const email = await signUp(buyer, "Prod Guard Buyer");
+    const [usr] = await db
+      .select({ id: user.id })
+      .from(user)
+      .where(eq(user.email, email));
+
+    const publisher = await createTestPublisher("Penerbit Prod Guard");
+    const bookSlug = `prod-guard-book-${randomUUID().slice(0, 8)}`;
+    const book = await createTestBook({
+      slug: bookSlug,
+      title: "Buku Dilindungi Mode Produksi",
+      digitalPolicy: "single_purchase",
+      publisherId: publisher.id,
+      digitalPriceIdr: 49_000,
+    });
+
+    const previousMidtransEnv = env.MIDTRANS_ENV;
+    env.MIDTRANS_ENV = "production";
+    try {
+      const res = await buyer
+        .post(`/api/books/${bookSlug}/purchase`)
+        .set(originHeader)
+        .send({});
+      expect(res.status).toBe(503);
+      expect(res.body.error.code).toBe("PAYMENT_UNAVAILABLE");
+    } finally {
+      env.MIDTRANS_ENV = previousMidtransEnv;
+    }
+
+    const recorded = await db
+      .select({ id: bookPurchases.id })
+      .from(bookPurchases)
+      .where(
+        and(
+          eq(bookPurchases.bookId, book.id),
+          eq(bookPurchases.userId, usr.id),
+        ),
+      );
+    expect(recorded).toHaveLength(0);
+
+    const ch2 = await buyer.get(
+      `/api/books/${bookSlug}/read?chapter=2&mode=full`,
+    );
+    expect(ch2.status).toBe(403);
   });
 });

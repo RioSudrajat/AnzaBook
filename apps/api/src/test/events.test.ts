@@ -1006,4 +1006,76 @@ describe("Community Calendars & Events API", () => {
     const afterRemoveDetail = await coHostUser.get(`/api/events/${eventSlug}`);
     expect(afterRemoveDetail.body.data.canManage).toBe(false);
   });
+
+  it("rejects SQL wildcard enumeration (% / _) in addCalendarMember and rate limits excessive lookups", async () => {
+    const owner = agent();
+    await signUp(owner, "Pemilik Audit Wildcard");
+
+    const lookalike = agent();
+    await signUp(lookalike, "Pemilik Akun Lookalike");
+    const suffix = Date.now().toString(36);
+    const lookalikeUsername = `hostXalpha_${suffix}`;
+    await lookalike
+      .post("/api/membership/username")
+      .set(originHeader)
+      .send({ username: lookalikeUsername });
+
+    const caseUser = agent();
+    await signUp(caseUser, "Rekan Case Exact");
+    const exactUsername = `host_case_${suffix}`;
+    await caseUser
+      .post("/api/membership/username")
+      .set(originHeader)
+      .send({ username: exactUsername });
+
+    const adminVerifier = agent();
+    const adminEmail = await signUp(adminVerifier, "Admin Verifier Wildcard");
+    await setRole(adminEmail, "admin");
+
+    const calSlug = `cal-wildcard-${suffix}`;
+    const calRes = await owner
+      .post("/api/events/calendars")
+      .set(originHeader)
+      .send({ name: "Komunitas Wildcard Guard", slug: calSlug });
+    expect(calRes.status).toBe(201);
+
+    await adminVerifier
+      .patch(`/api/events/calendars/${calSlug}/verify`)
+      .set(originHeader)
+      .send({ status: "verified" });
+
+    // SQL wildcard %%, %@%, and _ must never match arbitrary accounts
+    for (const probe of ["%%", "%@%", `host_alpha_${suffix}`]) {
+      const res = await owner
+        .post(`/api/events/calendars/${calSlug}/members`)
+        .set(originHeader)
+        .send({ identifier: probe, role: "member" });
+      expect(res.status, `Probe "${probe}" should return 404`).toBe(404);
+      expect(res.body.error.code).toBe("USER_NOT_FOUND");
+    }
+
+    // Case-insensitive exact match works cleanly
+    const exactRes = await owner
+      .post(`/api/events/calendars/${calSlug}/members`)
+      .set(originHeader)
+      .send({ identifier: `@${exactUsername.toUpperCase()}`, role: "member" });
+    expect(exactRes.status).toBe(201);
+
+    // Rate limit per actor on >20 lookups/minute
+    let rateLimitedStatus: number | undefined;
+    let rateLimitedCode: string | undefined;
+    for (let i = 0; i < 22; i++) {
+      const res = await owner
+        .post(`/api/events/calendars/${calSlug}/members`)
+        .set(originHeader)
+        .send({ identifier: `missing-member-${i}`, role: "member" });
+      if (res.status === 429) {
+        rateLimitedStatus = res.status;
+        rateLimitedCode = res.body.error?.code;
+        break;
+      }
+    }
+    expect(rateLimitedStatus).toBe(429);
+    expect(rateLimitedCode).toBe("CALENDAR_MEMBER_RATE_LIMIT");
+  });
 });

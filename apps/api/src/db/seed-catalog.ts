@@ -3,6 +3,7 @@ import { hashPassword } from "better-auth/crypto";
 import { and, asc, eq, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "./schema";
+import { seedSpots } from "./seed-spots";
 import { allBooksData } from "./seeds/books-data";
 import type { SeedAuthorUsername } from "./seeds/types";
 
@@ -910,6 +911,9 @@ export async function seedCatalog(
       .set({ role: "admin" })
       .where(eq(schema.user.id, existingAdmin.id));
   }
+
+  // 5. Selaraskan Peta Sudut Baca Indonesia (100+ spot terkurasi + mitra toko)
+  await seedSpots(db, allBranches);
 
   console.log("Penyelarasan katalog AnzaBook selesai.");
 }

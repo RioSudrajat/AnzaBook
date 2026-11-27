@@ -1,7 +1,10 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   createEventSchema,
   haversineDistanceMeters,
+  sanitizeCoHostAvatarUrl,
 } from "@starter/shared/validators/community";
 
 describe("Events & Calendars Validators", () => {
@@ -125,5 +128,40 @@ describe("Events & Calendars Validators", () => {
       coverUrl: oversizedDataUrl,
     });
     expect(invalidResult.success).toBe(false);
+  });
+
+  it("sanitizes co-host quick-pick avatarUrl to reject data URIs, protocol-relative URLs, and >500 char strings", () => {
+    expect(
+      sanitizeCoHostAvatarUrl(`data:image/png;base64,${"A".repeat(600)}`),
+    ).toBeUndefined();
+    expect(
+      sanitizeCoHostAvatarUrl("data:image/png;base64,abc"),
+    ).toBeUndefined();
+    expect(sanitizeCoHostAvatarUrl("//evil.com/avatar.png")).toBeUndefined();
+    expect(sanitizeCoHostAvatarUrl("javascript:alert(1)")).toBeUndefined();
+    expect(
+      sanitizeCoHostAvatarUrl(`https://example.com/${"a".repeat(500)}`),
+    ).toBeUndefined();
+    expect(sanitizeCoHostAvatarUrl("   ")).toBeUndefined();
+    expect(sanitizeCoHostAvatarUrl(null)).toBeUndefined();
+
+    expect(sanitizeCoHostAvatarUrl("https://example.com/avatar.jpg")).toBe(
+      "https://example.com/avatar.jpg",
+    );
+    expect(sanitizeCoHostAvatarUrl("http://localhost:4000/a.png")).toBe(
+      "http://localhost:4000/a.png",
+    );
+    expect(sanitizeCoHostAvatarUrl("/covers/community.svg")).toBe(
+      "/covers/community.svg",
+    );
+
+    const coHostFieldSource = readFileSync(
+      resolve(
+        import.meta.dirname,
+        "../../../web/src/features/events/components/event-cohosts-field.tsx",
+      ),
+      "utf8",
+    );
+    expect(coHostFieldSource).toContain("sanitizeCoHostAvatarUrl");
   });
 });
