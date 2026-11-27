@@ -10,3 +10,4 @@ export * from "./events";
 export * from "./publishers";
 export * from "./social";
 export * from "./drm";
+export * from "./spots";
