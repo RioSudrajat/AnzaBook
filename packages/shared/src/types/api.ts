@@ -319,6 +319,7 @@ export type CommunityCalendarMemberDto = {
   id: string;
   userId: string;
   name: string;
+  username?: string | null;
   image: string | null;
   role: "owner" | "admin" | "checkin_staff" | "member";
   createdAt: string;
