@@ -54,7 +54,9 @@ describe("Peta Sudut Baca Indonesia - Security & Privacy Guardrails (Issue #21)"
     it("accepts valid HTTPS Google Maps canonical links and universal deep links", () => {
       const validUrls = [
         "https://maps.google.com/?q=loc:-6.2088,106.8456",
+        "https://maps.google.co.id/?q=-6.8832,107.6054",
         "https://www.google.com/maps/dir/?api=1&destination=-6.2088,106.8456",
+        "https://www.google.co.id/maps/place/Kineruku",
         "https://maps.app.goo.gl/abC123XyZ",
         "https://goo.gl/maps/deF456UvW",
       ];
@@ -85,12 +87,16 @@ describe("Peta Sudut Baca Indonesia - Security & Privacy Guardrails (Issue #21)"
       }
     });
 
-    it("strictly rejects non-Google domains and subdomain spoofing attempts", () => {
+    it("strictly rejects non-Google domains, non-Maps Google subdomains, and non-Maps paths", () => {
       const spoofedUrls = [
         "https://evil-maps.com/maps/dir",
         "https://google.com.attacker.com/maps",
         "https://phishing-anzabook.id/maps",
         "https://google.com/not-maps",
+        "https://accounts.google.com/Logout",
+        "https://drive.google.com/file/d/123",
+        "https://goo.gl/random123",
+        "https://www.google.com/maps-phishing",
       ];
 
       for (const url of spoofedUrls) {
