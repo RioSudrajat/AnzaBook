@@ -12,6 +12,12 @@ import { getAuth, optionalAuth, requireAuth } from "../middleware/auth";
 import { jsonBody } from "../middleware/body";
 import { requireTrustedOrigin } from "../middleware/origin";
 import {
+  postAuthorApplicationRateLimit,
+  postFollowRateLimit,
+  postSocialPublishRateLimit,
+  publicExploreRateLimit,
+} from "../middleware/spot-rate-limit";
+import {
   applyOfficialAuthor,
   exploreAuthors,
   exploreReaders,
@@ -63,38 +69,54 @@ socialRouter.patch(
 );
 
 // Unified Explore Search Engine (Substack / Instagram style)
-socialRouter.get("/explore", optionalAuth, async (req, res) => {
-  const currentUserId = req.auth?.user.id;
-  const q = typeof req.query.q === "string" ? req.query.q : undefined;
-  const category =
-    typeof req.query.category === "string" ? req.query.category : undefined;
-  const sort = req.query.sort === "latest" ? "latest" : "top";
-  const result = await unifiedExplore(currentUserId, { q, category, sort });
-  res.json({ data: result });
-});
+socialRouter.get(
+  "/explore",
+  publicExploreRateLimit,
+  optionalAuth,
+  async (req, res) => {
+    const currentUserId = req.auth?.user.id;
+    const q = typeof req.query.q === "string" ? req.query.q : undefined;
+    const category =
+      typeof req.query.category === "string" ? req.query.category : undefined;
+    const sort = req.query.sort === "latest" ? "latest" : "top";
+    const result = await unifiedExplore(currentUserId, { q, category, sort });
+    res.json({ data: result });
+  },
+);
 
 // 4D Explore Directories: Authors & Readers
-socialRouter.get("/explore/authors", optionalAuth, async (req, res) => {
-  const currentUserId = req.auth?.user.id;
-  const query =
-    typeof req.query.query === "string" ? req.query.query : undefined;
-  const authors = await exploreAuthors(currentUserId, query);
-  res.json({ data: authors });
-});
+socialRouter.get(
+  "/explore/authors",
+  publicExploreRateLimit,
+  optionalAuth,
+  async (req, res) => {
+    const currentUserId = req.auth?.user.id;
+    const query =
+      typeof req.query.query === "string" ? req.query.query : undefined;
+    const authors = await exploreAuthors(currentUserId, query);
+    res.json({ data: authors });
+  },
+);
 
-socialRouter.get("/explore/readers", optionalAuth, async (req, res) => {
-  const currentUserId = req.auth?.user.id;
-  const query =
-    typeof req.query.query === "string" ? req.query.query : undefined;
-  const readers = await exploreReaders(currentUserId, query);
-  res.json({ data: readers });
-});
+socialRouter.get(
+  "/explore/readers",
+  publicExploreRateLimit,
+  optionalAuth,
+  async (req, res) => {
+    const currentUserId = req.auth?.user.id;
+    const query =
+      typeof req.query.query === "string" ? req.query.query : undefined;
+    const readers = await exploreReaders(currentUserId, query);
+    res.json({ data: readers });
+  },
+);
 
 // Official Author Application
 socialRouter.post(
   "/author-applications",
   requireAuth,
   requireTrustedOrigin,
+  postAuthorApplicationRateLimit,
   jsonBody,
   async (req, res) => {
     const userId = getAuth(req).user.id;
@@ -141,6 +163,7 @@ socialRouter.post(
   "/users/:userId/follow",
   requireAuth,
   requireTrustedOrigin,
+  postFollowRateLimit,
   jsonBody,
   async (req, res) => {
     const currentUserId = getAuth(req).user.id;
@@ -172,17 +195,23 @@ socialRouter.delete(
 );
 
 // Public shareable post detail (quote or session, only if isPosted === true)
-socialRouter.get("/posts/:type/:id", optionalAuth, async (req, res) => {
-  const { type, id } = publicSocialPostParamsSchema.parse(req.params);
-  const post = await getPublicSocialPost(type, id);
-  res.json({ data: post });
-});
+socialRouter.get(
+  "/posts/:type/:id",
+  publicExploreRateLimit,
+  optionalAuth,
+  async (req, res) => {
+    const { type, id } = publicSocialPostParamsSchema.parse(req.params);
+    const post = await getPublicSocialPost(type, id);
+    res.json({ data: post });
+  },
+);
 
 // Toggle post highlight/quote to public feed
 socialRouter.post(
   "/highlights/:id/toggle-post",
   requireAuth,
   requireTrustedOrigin,
+  postSocialPublishRateLimit,
   jsonBody,
   async (req, res) => {
     const userId = getAuth(req).user.id;
@@ -198,6 +227,7 @@ socialRouter.post(
   "/sessions/:id/toggle-post",
   requireAuth,
   requireTrustedOrigin,
+  postSocialPublishRateLimit,
   jsonBody,
   async (req, res) => {
     const userId = getAuth(req).user.id;

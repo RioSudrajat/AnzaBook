@@ -36,6 +36,7 @@ import type {
 import { roleHasPermission } from "@starter/shared/permissions";
 import { formatDigitalPolicy } from "@/lib/formatters";
 import { ApiError } from "@/lib/api/client";
+import { safeExternalHref } from "@/lib/safe-url";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -524,33 +525,42 @@ function AdminReviewDossierModal({
               {cal.verificationDocuments &&
               cal.verificationDocuments.length > 0 ? (
                 <div className="space-y-2">
-                  {cal.verificationDocuments.map((doc, idx) => (
-                    <div
-                      key={idx}
-                      className="p-3 rounded-xl border border-border bg-card flex items-center justify-between text-xs"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <FileText className="size-4 text-[var(--color-accent)] shrink-0" />
-                        <div>
-                          <p className="font-semibold text-foreground">
-                            {doc.title}
-                          </p>
-                          <p className="text-[11px] font-mono text-muted-foreground">
-                            {doc.fileType || "Dokumen Pendukung"}
-                          </p>
-                        </div>
-                      </div>
-                      <a
-                        href={doc.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-[var(--color-accent)] hover:underline font-semibold text-xs"
+                  {cal.verificationDocuments.map((doc, idx) => {
+                    const safeDocHref = safeExternalHref(doc.url);
+                    return (
+                      <div
+                        key={idx}
+                        className="p-3 rounded-xl border border-border bg-card flex items-center justify-between text-xs"
                       >
-                        <span>Lihat Dokumen</span>
-                        <ExternalLink className="size-3" />
-                      </a>
-                    </div>
-                  ))}
+                        <div className="flex items-center gap-2.5">
+                          <FileText className="size-4 text-[var(--color-accent)] shrink-0" />
+                          <div>
+                            <p className="font-semibold text-foreground">
+                              {doc.title}
+                            </p>
+                            <p className="text-[11px] font-mono text-muted-foreground">
+                              {doc.fileType || "Dokumen Pendukung"}
+                            </p>
+                          </div>
+                        </div>
+                        {safeDocHref ? (
+                          <a
+                            href={safeDocHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[var(--color-accent)] hover:underline font-semibold text-xs"
+                          >
+                            <span>Lihat Dokumen</span>
+                            <ExternalLink className="size-3" />
+                          </a>
+                        ) : (
+                          <span className="text-[11px] font-mono text-muted-foreground">
+                            Tautan tidak valid
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="p-4 rounded-xl border border-dashed border-border text-center text-xs text-muted-foreground">
@@ -645,33 +655,42 @@ function AdminReviewDossierModal({
               {pub.verificationDocuments &&
               pub.verificationDocuments.length > 0 ? (
                 <div className="space-y-2">
-                  {pub.verificationDocuments.map((doc, idx) => (
-                    <div
-                      key={idx}
-                      className="p-3 rounded-xl border border-border bg-card flex items-center justify-between text-xs"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <FileText className="size-4 text-[var(--color-accent)] shrink-0" />
-                        <div>
-                          <p className="font-semibold text-foreground">
-                            {doc.title}
-                          </p>
-                          <p className="text-[11px] font-mono text-muted-foreground">
-                            {doc.fileType || "Dokumen Pendukung"}
-                          </p>
-                        </div>
-                      </div>
-                      <a
-                        href={doc.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-[var(--color-accent)] hover:underline font-semibold text-xs"
+                  {pub.verificationDocuments.map((doc, idx) => {
+                    const safeDocHref = safeExternalHref(doc.url);
+                    return (
+                      <div
+                        key={idx}
+                        className="p-3 rounded-xl border border-border bg-card flex items-center justify-between text-xs"
                       >
-                        <span>Lihat Dokumen</span>
-                        <ExternalLink className="size-3" />
-                      </a>
-                    </div>
-                  ))}
+                        <div className="flex items-center gap-2.5">
+                          <FileText className="size-4 text-[var(--color-accent)] shrink-0" />
+                          <div>
+                            <p className="font-semibold text-foreground">
+                              {doc.title}
+                            </p>
+                            <p className="text-[11px] font-mono text-muted-foreground">
+                              {doc.fileType || "Dokumen Pendukung"}
+                            </p>
+                          </div>
+                        </div>
+                        {safeDocHref ? (
+                          <a
+                            href={safeDocHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[var(--color-accent)] hover:underline font-semibold text-xs"
+                          >
+                            <span>Lihat Dokumen</span>
+                            <ExternalLink className="size-3" />
+                          </a>
+                        ) : (
+                          <span className="text-[11px] font-mono text-muted-foreground">
+                            Tautan tidak valid
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="p-4 rounded-xl border border-dashed border-border text-center text-xs text-muted-foreground">
@@ -711,17 +730,20 @@ function AdminReviewDossierModal({
                   </p>
                 </div>
 
-                {auth.portfolioUrl && (
-                  <a
-                    href={auth.portfolioUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-card text-xs font-semibold text-[var(--color-accent)] hover:underline"
-                  >
-                    <span>Portofolio / Karya</span>
-                    <ExternalLink className="size-3" />
-                  </a>
-                )}
+                {(() => {
+                  const portfolioHref = safeExternalHref(auth.portfolioUrl);
+                  return portfolioHref ? (
+                    <a
+                      href={portfolioHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-card text-xs font-semibold text-[var(--color-accent)] hover:underline"
+                    >
+                      <span>Portofolio / Karya</span>
+                      <ExternalLink className="size-3" />
+                    </a>
+                  ) : null;
+                })()}
               </div>
 
               <div className="space-y-1.5 pt-2 border-t border-border/60 text-xs">
@@ -753,33 +775,42 @@ function AdminReviewDossierModal({
               {auth.verificationDocuments &&
               auth.verificationDocuments.length > 0 ? (
                 <div className="space-y-2">
-                  {auth.verificationDocuments.map((doc, idx) => (
-                    <div
-                      key={idx}
-                      className="p-3 rounded-xl border border-border bg-card flex items-center justify-between text-xs"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <FileText className="size-4 text-[var(--color-accent)] shrink-0" />
-                        <div>
-                          <p className="font-semibold text-foreground">
-                            {doc.title}
-                          </p>
-                          <p className="text-[11px] font-mono text-muted-foreground">
-                            {doc.fileType || "Dokumen Pendukung"}
-                          </p>
-                        </div>
-                      </div>
-                      <a
-                        href={doc.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-[var(--color-accent)] hover:underline font-semibold text-xs"
+                  {auth.verificationDocuments.map((doc, idx) => {
+                    const safeDocHref = safeExternalHref(doc.url);
+                    return (
+                      <div
+                        key={idx}
+                        className="p-3 rounded-xl border border-border bg-card flex items-center justify-between text-xs"
                       >
-                        <span>Lihat Dokumen</span>
-                        <ExternalLink className="size-3" />
-                      </a>
-                    </div>
-                  ))}
+                        <div className="flex items-center gap-2.5">
+                          <FileText className="size-4 text-[var(--color-accent)] shrink-0" />
+                          <div>
+                            <p className="font-semibold text-foreground">
+                              {doc.title}
+                            </p>
+                            <p className="text-[11px] font-mono text-muted-foreground">
+                              {doc.fileType || "Dokumen Pendukung"}
+                            </p>
+                          </div>
+                        </div>
+                        {safeDocHref ? (
+                          <a
+                            href={safeDocHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[var(--color-accent)] hover:underline font-semibold text-xs"
+                          >
+                            <span>Lihat Dokumen</span>
+                            <ExternalLink className="size-3" />
+                          </a>
+                        ) : (
+                          <span className="text-[11px] font-mono text-muted-foreground">
+                            Tautan tidak valid
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="p-4 rounded-xl border border-dashed border-border text-center text-xs text-muted-foreground">
@@ -1040,43 +1071,57 @@ function TabCalendars() {
                   <span>Dibuat: {formatDate(cal.createdAt)}</span>
                 </div>
 
-                {cal.socialLinks && Object.keys(cal.socialLinks).length > 0 && (
-                  <div className="flex flex-wrap gap-3 pt-1 text-xs">
-                    {cal.socialLinks.instagram && (
-                      <a
-                        href={cal.socialLinks.instagram}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-primary hover:underline"
-                      >
-                        <ExternalLink className="size-3" aria-hidden="true" />
-                        Instagram
-                      </a>
-                    )}
-                    {cal.socialLinks.twitter && (
-                      <a
-                        href={cal.socialLinks.twitter}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-primary hover:underline"
-                      >
-                        <ExternalLink className="size-3" aria-hidden="true" />X
-                        / Twitter
-                      </a>
-                    )}
-                    {cal.socialLinks.website && (
-                      <a
-                        href={cal.socialLinks.website}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-primary hover:underline"
-                      >
-                        <ExternalLink className="size-3" aria-hidden="true" />
-                        Website
-                      </a>
-                    )}
-                  </div>
-                )}
+                {(() => {
+                  const instagramHref = safeExternalHref(
+                    cal.socialLinks?.instagram,
+                  );
+                  const twitterHref = safeExternalHref(
+                    cal.socialLinks?.twitter,
+                  );
+                  const websiteHref = safeExternalHref(
+                    cal.socialLinks?.website,
+                  );
+                  if (!instagramHref && !twitterHref && !websiteHref) {
+                    return null;
+                  }
+                  return (
+                    <div className="flex flex-wrap gap-3 pt-1 text-xs">
+                      {instagramHref && (
+                        <a
+                          href={instagramHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-primary hover:underline"
+                        >
+                          <ExternalLink className="size-3" aria-hidden="true" />
+                          Instagram
+                        </a>
+                      )}
+                      {twitterHref && (
+                        <a
+                          href={twitterHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-primary hover:underline"
+                        >
+                          <ExternalLink className="size-3" aria-hidden="true" />
+                          X / Twitter
+                        </a>
+                      )}
+                      {websiteHref && (
+                        <a
+                          href={websiteHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-primary hover:underline"
+                        >
+                          <ExternalLink className="size-3" aria-hidden="true" />
+                          Website
+                        </a>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Actions */}
@@ -1340,17 +1385,20 @@ function AuthorsSection() {
                   </p>
                 </div>
 
-                {app.portfolioUrl && (
-                  <a
-                    href={app.portfolioUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
-                  >
-                    <ExternalLink className="size-3.5" aria-hidden="true" />
-                    Tautan Portofolio / Bukti Karya
-                  </a>
-                )}
+                {(() => {
+                  const portfolioHref = safeExternalHref(app.portfolioUrl);
+                  return portfolioHref ? (
+                    <a
+                      href={portfolioHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+                    >
+                      <ExternalLink className="size-3.5" aria-hidden="true" />
+                      Tautan Portofolio / Bukti Karya
+                    </a>
+                  ) : null;
+                })()}
               </div>
 
               {app.bio && (

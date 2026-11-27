@@ -32,6 +32,7 @@ import {
 } from "../hooks";
 import { EventAttendeesDialog } from "./event-attendees-dialog";
 import { EditEventDialog } from "./edit-event-dialog";
+import { safeExternalHref } from "@/lib/safe-url";
 
 interface EventDetailViewProps {
   event: CommunityEventDetailDto | CommunityEventSummaryDto;
@@ -419,28 +420,34 @@ export function EventDetailView({ event: initialEvent }: EventDetailViewProps) {
                   )}
 
                   {/* Tautan Rapat Virtual */}
-                  {detail.onlineMeetingUrl && (
-                    <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-3.5 space-y-2">
-                      <div className="flex items-center justify-between text-xs font-semibold text-blue-300">
-                        <span className="flex items-center gap-1.5">
-                          <Video className="size-4 text-blue-400" />
-                          Tautan Sesi Virtual
-                        </span>
+                  {(() => {
+                    const meetingHref = safeExternalHref(
+                      detail.onlineMeetingUrl,
+                    );
+                    if (!meetingHref) return null;
+                    return (
+                      <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-3.5 space-y-2">
+                        <div className="flex items-center justify-between text-xs font-semibold text-blue-300">
+                          <span className="flex items-center gap-1.5">
+                            <Video className="size-4 text-blue-400" />
+                            Tautan Sesi Virtual
+                          </span>
+                        </div>
+                        <a
+                          href={meetingHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 py-2 px-3 text-xs font-semibold text-white transition-colors shadow-sm"
+                        >
+                          <span>Gabung Ruang Rapat</span>
+                          <ExternalLink className="size-3.5" />
+                        </a>
+                        <p className="text-[10px] text-blue-200/60 truncate text-center">
+                          {meetingHref}
+                        </p>
                       </div>
-                      <a
-                        href={detail.onlineMeetingUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 py-2 px-3 text-xs font-semibold text-white transition-colors shadow-sm"
-                      >
-                        <span>Gabung Ruang Rapat</span>
-                        <ExternalLink className="size-3.5" />
-                      </a>
-                      <p className="text-[10px] text-blue-200/60 truncate text-center">
-                        {detail.onlineMeetingUrl}
-                      </p>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* Catatan Logistik Peserta */}
                   {detail.logisticsNotes && (
@@ -591,16 +598,21 @@ export function EventDetailView({ event: initialEvent }: EventDetailViewProps) {
                   {event.featuredWork.creator}
                 </div>
               )}
-              {event.featuredWork?.externalUrl && (
-                <a
-                  href={event.featuredWork.externalUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-amber-300 hover:underline pt-1"
-                >
-                  Buka Tautan Karya ↗
-                </a>
-              )}
+              {(() => {
+                const featuredHref = safeExternalHref(
+                  event.featuredWork?.externalUrl,
+                );
+                return featuredHref ? (
+                  <a
+                    href={featuredHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-amber-300 hover:underline pt-1"
+                  >
+                    Buka Tautan Karya ↗
+                  </a>
+                ) : null;
+              })()}
             </div>
           )}
         </div>

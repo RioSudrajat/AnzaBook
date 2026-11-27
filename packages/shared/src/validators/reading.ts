@@ -100,6 +100,10 @@ export const readingBookParamsSchema = z
   .object({ bookId: z.string().uuid() })
   .strict();
 
+export const readingHighlightParamsSchema = z
+  .object({ id: z.string().uuid("ID kutipan harus berupa UUID valid") })
+  .strict();
+
 export const readingProgressQuerySchema = z
   .object({ scope: z.enum(["full", "preview"]).default("full") })
   .strict();

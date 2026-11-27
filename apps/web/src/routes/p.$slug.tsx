@@ -45,6 +45,7 @@ import {
 } from "@/features/social/hooks";
 import { publisherDetailQuery } from "@/features/social/queries";
 import { ApiError } from "@/lib/api/client";
+import { safeSocialHref } from "@/lib/safe-url";
 
 export const Route = createFileRoute("/p/$slug")({
   loader: async ({ context, params }) => {
@@ -660,22 +661,31 @@ function PublisherPublicProfilePage() {
                   <span className="font-medium">{publisher.address}</span>
                 </div>
               )}
-              {publisher.socialLinks?.website && (
-                <div>
-                  <span className="font-mono text-[var(--color-muted)] block">
-                    Situs Web
-                  </span>
-                  <a
-                    href={publisher.socialLinks.website}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 font-medium underline underline-offset-4 hover:text-[var(--color-accent)]"
-                  >
-                    <Globe className="size-3.5" aria-hidden="true" />
-                    <span>{publisher.socialLinks.website}</span>
-                  </a>
-                </div>
-              )}
+              {(() => {
+                const websiteHref = safeSocialHref(
+                  publisher.socialLinks?.website,
+                  "website",
+                );
+                if (!websiteHref || !publisher.socialLinks?.website) {
+                  return null;
+                }
+                return (
+                  <div>
+                    <span className="font-mono text-[var(--color-muted)] block">
+                      Situs Web
+                    </span>
+                    <a
+                      href={websiteHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 font-medium underline underline-offset-4 hover:text-[var(--color-accent)]"
+                    >
+                      <Globe className="size-3.5" aria-hidden="true" />
+                      <span>{publisher.socialLinks.website}</span>
+                    </a>
+                  </div>
+                );
+              })()}
             </div>
 
             {approvedWritersShowcase.length > 0 && (

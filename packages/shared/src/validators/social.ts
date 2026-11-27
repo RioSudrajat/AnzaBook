@@ -1,13 +1,47 @@
 import { z } from "zod";
+import {
+  isSafeHttpUrl,
+  isSafeImageOrAssetUrl,
+  isSafeSocialLinkValue,
+  safeVerificationDocumentsSchema,
+} from "./url-safety";
+
+const socialHandleOrUrlSchema = z
+  .string()
+  .max(500, "Tautan media sosial terlalu panjang")
+  .refine((val) => isSafeSocialLinkValue(val, { allowHandle: true }), {
+    message: "Tautan atau handle media sosial tidak valid",
+  });
+
+const socialWebsiteSchema = z
+  .string()
+  .max(500, "URL situs web terlalu panjang")
+  .refine((val) => isSafeSocialLinkValue(val, { allowBareDomain: true }), {
+    message: "URL situs web tidak valid",
+  });
 
 export const socialLinksSchema = z
   .object({
-    instagram: z.string().optional(),
-    twitter: z.string().optional(),
-    website: z.string().optional(),
-    goodreads: z.string().optional(),
-    linkedin: z.string().optional(),
-    headerImage: z.string().optional(),
+    instagram: socialHandleOrUrlSchema.optional(),
+    twitter: socialHandleOrUrlSchema.optional(),
+    website: socialWebsiteSchema.optional(),
+    goodreads: socialWebsiteSchema.optional(),
+    linkedin: socialHandleOrUrlSchema.optional(),
+    headerImage: z
+      .string()
+      .refine(
+        (val) =>
+          isSafeImageOrAssetUrl(val, {
+            allowEmpty: true,
+            allowRootRelative: true,
+            allowRasterDataUri: true,
+          }),
+        {
+          message:
+            "Format gambar header harus berupa URL HTTP(S) atau gambar raster valid (maks 90 KB)",
+        },
+      )
+      .optional(),
   })
   .strict();
 
@@ -31,13 +65,14 @@ export const updateProfileBioSchema = z
       .string()
       .refine(
         (val) =>
-          val === "" ||
-          val.startsWith("http://") ||
-          val.startsWith("https://") ||
-          val.startsWith("data:image/"),
+          isSafeImageOrAssetUrl(val, {
+            allowEmpty: true,
+            allowRootRelative: true,
+            allowRasterDataUri: true,
+          }),
         {
           message:
-            "Format foto profil harus berupa URL atau Data Image yang valid",
+            "Format foto profil harus berupa URL HTTP(S) atau gambar raster valid (maks 90 KB)",
         },
       )
       .optional()
@@ -46,13 +81,14 @@ export const updateProfileBioSchema = z
       .string()
       .refine(
         (val) =>
-          val === "" ||
-          val.startsWith("http://") ||
-          val.startsWith("https://") ||
-          val.startsWith("data:image/"),
+          isSafeImageOrAssetUrl(val, {
+            allowEmpty: true,
+            allowRootRelative: true,
+            allowRasterDataUri: true,
+          }),
         {
           message:
-            "Format gambar header harus berupa URL atau Data Image yang valid",
+            "Format gambar header harus berupa URL HTTP(S) atau gambar raster valid (maks 90 KB)",
         },
       )
       .optional()
@@ -84,20 +120,14 @@ export const applyAuthorSchema = z
       .max(2000, "Bio kepenulisan maksimal 2000 karakter"),
     portfolioUrl: z
       .string()
-      .url("URL portofolio tidak valid")
+      .trim()
+      .refine((val) => val === "" || isSafeHttpUrl(val), {
+        message: "URL portofolio harus berupa tautan HTTP(S) valid",
+      })
       .optional()
-      .nullable()
-      .or(z.literal("")),
+      .nullable(),
     claimedBookId: z.string().uuid("ID buku tidak valid").optional().nullable(),
-    verificationDocuments: z
-      .array(
-        z.object({
-          title: z.string().min(1, "Judul berkas wajib diisi"),
-          url: z.string().min(1, "URL berkas wajib diisi"),
-          fileType: z.string().optional(),
-        }),
-      )
-      .optional(),
+    verificationDocuments: safeVerificationDocumentsSchema.optional(),
   })
   .strict();
 

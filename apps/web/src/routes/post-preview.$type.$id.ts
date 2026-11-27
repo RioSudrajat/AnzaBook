@@ -2,11 +2,23 @@ import { createFileRoute } from "@tanstack/react-router";
 import type { DataResponse, ExplorePostItemDto } from "@starter/shared/types";
 import { publicSocialPostParamsSchema } from "@starter/shared/validators/social";
 import { apiBaseUrl } from "@/lib/api/upstream.server";
+import { checkPreviewRateLimit } from "@/lib/preview-rate-limit.server";
 
 export const Route = createFileRoute("/post-preview/$type/$id")({
   server: {
     handlers: {
       GET: async ({ params, request }) => {
+        const limit = checkPreviewRateLimit(request);
+        if (!limit.allowed) {
+          return new Response("Too Many Requests", {
+            status: 429,
+            headers: {
+              "Retry-After": String(limit.retryAfterSeconds),
+              "Cache-Control": "no-store",
+            },
+          });
+        }
+
         const parsed = publicSocialPostParamsSchema.safeParse(params);
         if (!parsed.success) {
           return new Response(null, { status: 404 });
@@ -14,7 +26,10 @@ export const Route = createFileRoute("/post-preview/$type/$id")({
 
         const path = `/api/social/posts/${encodeURIComponent(parsed.data.type)}/${encodeURIComponent(parsed.data.id)}`;
         const response = await fetch(new URL(path, apiBaseUrl()), {
-          signal: request.signal,
+          signal: AbortSignal.any([
+            request.signal,
+            AbortSignal.timeout(10_000),
+          ]),
         });
 
         if (!response.ok) {

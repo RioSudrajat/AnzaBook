@@ -3,6 +3,7 @@ import { HttpError } from "../lib/http-error";
 import { getStorageService, storeValidatedImage } from "../lib/storage";
 import { requireAuth } from "../middleware/auth";
 import { requireTrustedOrigin } from "../middleware/origin";
+import { postMediaUploadRateLimit } from "../middleware/spot-rate-limit";
 
 const SAFE_IMAGE_FILENAME_REGEX = /^[0-9a-f-]{36}\.(jpg|png|webp)$/i;
 
@@ -18,6 +19,7 @@ mediaRouter.post(
   "/upload-image",
   requireAuth,
   requireTrustedOrigin,
+  postMediaUploadRateLimit,
   express.raw({
     type: ["image/jpeg", "image/png", "image/webp", "application/octet-stream"],
     limit: "5mb",
@@ -44,6 +46,7 @@ mediaRouter.get("/images/:filename", async (req, res) => {
 
   res.setHeader("Content-Type", mime);
   res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
   res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
   res.send(buffer);
 });

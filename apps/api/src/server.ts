@@ -3,6 +3,7 @@ import { createApp } from "./app";
 import { env } from "./config/env";
 import { checkDatabase, pool } from "./db";
 import { logger } from "./lib/logger";
+import { applyServerSecurityTimeouts } from "./lib/server-timeouts";
 import { startMembershipReminderWorker } from "./services/membership-reminders";
 
 const app = createApp();
@@ -30,6 +31,7 @@ const server = app.listen(env.PORT, env.HOST, async (error) => {
   );
   stopMembershipReminders = startMembershipReminderWorker();
 });
+applyServerSecurityTimeouts(server);
 
 // Graceful shutdown. `pnpm dev` (tsx watch) restarts on every file change;
 // closing the server and the pool here frees the port and the PostgreSQL
