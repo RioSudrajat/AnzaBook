@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import {
+  calculateNameSimilarity,
+  deduplicateSpots,
+  normalizeOverpassElement,
+} from "../../../../scripts/import-reading-spots.mjs";
 import { roleHasPermission } from "@starter/shared/permissions";
 import type {
   AdminOverviewDto,
@@ -435,5 +440,131 @@ describe("Reading Spots RBAC & Shared DTO Contracts (Issue #19)", () => {
     expect(geocode.city).toBe("Bandung");
     expect(adminItem.openReportsCount).toBe(1);
     expect(existingOverview.pendingSpotsCount).toBeUndefined();
+  });
+});
+
+describe("OSM Overpass Reading Spots Importer & Deduplicator (Issue #19)", () => {
+  it("normalizes valid OSM node and way elements inside Indonesia and rejects outside/unnamed elements", () => {
+    const libraryNode = normalizeOverpassElement({
+      type: "node",
+      id: 123456789,
+      lat: -6.9147,
+      lon: 107.6098,
+      tags: {
+        amenity: "library",
+        name: "Perpustakaan Daerah Bandung",
+        "addr:street": "Jl. Wastukencana",
+        "addr:housenumber": "11",
+        "addr:city": "Bandung",
+        "addr:state": "Jawa Barat",
+        internet_access: "wlan",
+        opening_hours: "Mo-Fr 08:00-16:00",
+        air_conditioning: "yes",
+      },
+    });
+
+    expect(libraryNode).not.toBeNull();
+    expect(libraryNode).toMatchObject({
+      slug: "perpustakaan-daerah-bandung-bandung",
+      name: "Perpustakaan Daerah Bandung",
+      category: "library",
+      city: "Bandung",
+      province: "Jawa Barat",
+      address: "Jl. Wastukencana No. 11",
+      source: "osm",
+      externalSourceId: "osm:node/123456789",
+      priceRange: "free",
+      facilities: {
+        wifi: true,
+        airConditioned: true,
+        hasBookCollection: true,
+      },
+    });
+
+    const bookCafeWay = normalizeOverpassElement({
+      type: "way",
+      id: 987654321,
+      center: { lat: -7.7956, lon: 110.3695 },
+      tags: {
+        shop: "books",
+        cafe: "yes",
+        name: "Kedai Aksara Jogja",
+        "addr:city": "Yogyakarta",
+        "addr:state": "DI Yogyakarta",
+      },
+    });
+
+    expect(bookCafeWay).not.toBeNull();
+    expect(bookCafeWay?.category).toBe("book_cafe");
+    expect(bookCafeWay?.externalSourceId).toBe("osm:way/987654321");
+
+    // Outside INDONESIA_BBOX (Tokyo) -> null
+    expect(
+      normalizeOverpassElement({
+        type: "node",
+        id: 555,
+        lat: 35.6762,
+        lon: 139.6503,
+        tags: { amenity: "library", name: "Tokyo Library" },
+      }),
+    ).toBeNull();
+
+    // Missing name -> null
+    expect(
+      normalizeOverpassElement({
+        type: "node",
+        id: 556,
+        lat: -6.2,
+        lon: 106.8,
+        tags: { amenity: "library" },
+      }),
+    ).toBeNull();
+  });
+
+  it("deduplicates spots within 50m or within 150m with similar names while preserving distinct spots >= 200m apart", () => {
+    expect(
+      calculateNameSimilarity("Kineruku", "Kineruku Bookshop"),
+    ).toBeGreaterThanOrEqual(0.5);
+
+    const existing = [
+      {
+        slug: "kineruku-bandung",
+        name: "Kineruku",
+        latitude: -6.8775,
+        longitude: 107.5991,
+        city: "Bandung",
+      },
+    ];
+
+    const incoming = [
+      // ~20m away with completely different name -> still duplicate (<50m)
+      {
+        slug: "spot-dekat-sekali",
+        name: "Teras Baca Hegarmanah",
+        latitude: -6.8776,
+        longitude: 107.5992,
+        city: "Bandung",
+      },
+      // ~110m away with similar name -> duplicate (<=150m + fuzzy name)
+      {
+        slug: "kineruku-library-bandung",
+        name: "Kineruku Library & Bookshop",
+        latitude: -6.8784,
+        longitude: 107.5991,
+        city: "Bandung",
+      },
+      // ~350m away with different name -> preserved
+      {
+        slug: "rooma-baca-cidadap",
+        name: "Rooma Baca Cidadap",
+        latitude: -6.8806,
+        longitude: 107.5991,
+        city: "Bandung",
+      },
+    ];
+
+    const { accepted, skipped } = deduplicateSpots(incoming, existing);
+    expect(accepted.map((s) => s.slug)).toEqual(["rooma-baca-cidadap"]);
+    expect(skipped).toHaveLength(2);
   });
 });
