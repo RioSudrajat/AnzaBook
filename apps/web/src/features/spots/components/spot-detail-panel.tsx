@@ -19,7 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { copyTextToClipboard } from "@/features/share/web-share";
 import { isUsableAssetUrl } from "@/lib/media-url";
-import { safeSocialHref } from "@/lib/safe-url";
+import { safeExternalHref, safeSocialHref } from "@/lib/safe-url";
 import { useToggleSpotBookmark } from "../hooks";
 import {
   SPOT_CATEGORY_STYLES,
@@ -28,10 +28,10 @@ import {
   formatDistanceMeters,
   formatNoiseLevel,
   formatPriceRange,
+  formatSpotApiError,
   formatSpotCategory,
   formatVerifiedBadge,
   getActiveFacilityChips,
-  sanitizeExternalHttpUrl,
 } from "../spots-helpers";
 import type { ReadingSpotDetailDto, ReadingSpotSummaryDto } from "../types";
 
@@ -69,7 +69,7 @@ export function SpotDetailPanel({
   const facilityChips = getActiveFacilityChips(spot.facilities);
   const directionsUrl = buildGoogleMapsDirectionsUrl(spot);
   const placeUrl = buildGoogleMapsPlaceUrl(spot);
-  const safeWebsiteUrl = sanitizeExternalHttpUrl(spot.websiteUrl);
+  const safeWebsiteUrl = safeExternalHref(spot.websiteUrl);
   const safeInstagramUrl = safeSocialHref(spot.instagramHandle, "instagram");
   const safeCoverUrl = isUsableAssetUrl(spot.coverUrl)
     ? spot.coverUrl.trim()
@@ -79,8 +79,10 @@ export function SpotDetailPanel({
   const handleToggleBookmark = () => {
     setActionError(null);
     bookmarkMutation.mutate(spot.slug, {
-      onError: () => {
-        setActionError("Gagal memperbarui simpanan sudut baca.");
+      onError: (err) => {
+        setActionError(
+          formatSpotApiError(err, "Gagal memperbarui simpanan sudut baca."),
+        );
       },
     });
   };
@@ -359,7 +361,7 @@ export function SpotDetailPanel({
                   {spot.instagramHandle
                     .trim()
                     .replace(/^https?:\/\/(www\.)?instagram\.com\//i, "")
-                    .replace(/^@/, "")
+                    .replace(/^@+/, "")
                     .replace(/\/+$/, "")}
                 </span>
               </a>
