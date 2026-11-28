@@ -14,6 +14,10 @@ import { requireTrustedOrigin } from "../middleware/origin";
 import { createUserWindowLimiter } from "../middleware/user-rate-limit";
 import { verifyMidtransNotification } from "../services/membership-payment";
 import {
+  bookPurchaseOrderExists,
+  reconcileBookPurchasePayment,
+} from "../services/books.service";
+import {
   cancelMembership,
   getMembershipOrder,
   getMembershipRecipient,
@@ -47,9 +51,14 @@ membershipRouter.post("/webhooks/midtrans", jsonBody, async (req, res) => {
     env.MIDTRANS_SERVER_KEY,
   );
   const result = membershipOrderId.safeParse(providerOrderId);
-  if (result.success && (await membershipOrderExists(result.data))) {
-    const payment = await membershipGateway().getPayment(result.data);
-    if (payment) await reconcileMembershipPayment(payment);
+  if (result.success) {
+    if (await membershipOrderExists(result.data)) {
+      const payment = await membershipGateway().getPayment(result.data);
+      if (payment) await reconcileMembershipPayment(payment);
+    } else if (await bookPurchaseOrderExists(result.data)) {
+      const payment = await membershipGateway().getPayment(result.data);
+      if (payment) await reconcileBookPurchasePayment(payment);
+    }
   }
   res.json({ received: true });
 });

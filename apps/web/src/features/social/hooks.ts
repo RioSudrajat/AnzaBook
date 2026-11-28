@@ -31,6 +31,10 @@ import {
   applyAuthor,
   applyPublisher,
   createManuscriptDraft,
+  createOrGetBookRevisionDraft,
+  deleteAuthorManuscript,
+  deletePublisherBook,
+  deletePublisherManuscript,
   editPublisherManuscript,
   followPublisher,
   followUser,
@@ -420,16 +424,22 @@ export function useEditPublisherManuscript() {
       idOrSlug: string;
       input: PublisherEditManuscriptInput;
     }) => editPublisherManuscript(slug, idOrSlug, input),
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: publisherKeys.manuscriptDetail(variables.idOrSlug),
-      });
-      queryClient.invalidateQueries({
-        queryKey: publisherKeys.publisherManuscripts(variables.slug),
-      });
-      queryClient.invalidateQueries({
-        queryKey: publisherKeys.myManuscripts(),
-      });
+    onSuccess: (updated, variables) => {
+      queryClient.setQueryData(
+        publisherKeys.manuscriptDetail(variables.idOrSlug),
+        updated,
+      );
+      return Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: publisherKeys.manuscriptDetail(variables.idOrSlug),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: publisherKeys.publisherManuscripts(variables.slug),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: publisherKeys.myManuscripts(),
+        }),
+      ]);
     },
   });
 }
@@ -446,16 +456,22 @@ export function useReviewPublisherManuscript() {
       idOrSlug: string;
       input: PublisherReviewManuscriptInput;
     }) => reviewPublisherManuscript(slug, idOrSlug, input),
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: publisherKeys.manuscriptDetail(variables.idOrSlug),
-      });
-      queryClient.invalidateQueries({
-        queryKey: publisherKeys.publisherManuscripts(variables.slug),
-      });
-      queryClient.invalidateQueries({
-        queryKey: publisherKeys.myManuscripts(),
-      });
+    onSuccess: (updated, variables) => {
+      queryClient.setQueryData(
+        publisherKeys.manuscriptDetail(variables.idOrSlug),
+        updated,
+      );
+      return Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: publisherKeys.manuscriptDetail(variables.idOrSlug),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: publisherKeys.publisherManuscripts(variables.slug),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: publisherKeys.myManuscripts(),
+        }),
+      ]);
     },
   });
 }
@@ -546,13 +562,19 @@ export function useUpdateManuscript() {
       idOrSlug: string;
       input: AuthorUpdateManuscriptInput;
     }) => updateManuscript(idOrSlug, input),
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: publisherKeys.manuscriptDetail(variables.idOrSlug),
-      });
-      queryClient.invalidateQueries({
-        queryKey: publisherKeys.myManuscripts(),
-      });
+    onSuccess: (updated, variables) => {
+      queryClient.setQueryData(
+        publisherKeys.manuscriptDetail(variables.idOrSlug),
+        updated,
+      );
+      return Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: publisherKeys.manuscriptDetail(variables.idOrSlug),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: publisherKeys.myManuscripts(),
+        }),
+      ]);
     },
   });
 }
@@ -567,13 +589,19 @@ export function useSubmitManuscriptDraft() {
       idOrSlug: string;
       publisherId?: string | null;
     }) => submitManuscriptDraft(idOrSlug, publisherId),
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: publisherKeys.manuscriptDetail(variables.idOrSlug),
-      });
-      queryClient.invalidateQueries({
-        queryKey: publisherKeys.myManuscripts(),
-      });
+    onSuccess: (updated, variables) => {
+      queryClient.setQueryData(
+        publisherKeys.manuscriptDetail(variables.idOrSlug),
+        updated,
+      );
+      return Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: publisherKeys.manuscriptDetail(variables.idOrSlug),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: publisherKeys.myManuscripts(),
+        }),
+      ]);
     },
   });
 }
@@ -589,6 +617,80 @@ export function useWithdrawManuscript() {
       queryClient.invalidateQueries({
         queryKey: publisherKeys.myManuscripts(),
       });
+    },
+  });
+}
+
+export function useDeleteAuthorManuscript() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      idOrSlug,
+      withdrawFirst = false,
+    }: {
+      idOrSlug: string;
+      withdrawFirst?: boolean;
+    }) => deleteAuthorManuscript(idOrSlug, withdrawFirst),
+    onSuccess: (_data, variables) => {
+      queryClient.removeQueries({
+        queryKey: publisherKeys.manuscriptDetail(variables.idOrSlug),
+      });
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.myManuscripts(),
+      });
+    },
+  });
+}
+
+export function useDeletePublisherManuscript() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ slug, idOrSlug }: { slug: string; idOrSlug: string }) =>
+      deletePublisherManuscript(slug, idOrSlug),
+    onSuccess: (_data, variables) => {
+      queryClient.removeQueries({
+        queryKey: publisherKeys.manuscriptDetail(variables.idOrSlug),
+      });
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.publisherManuscripts(variables.slug),
+      });
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.books(variables.slug),
+      });
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.myManuscripts(),
+      });
+    },
+  });
+}
+
+export function useCreateBookRevisionDraft() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ slug, bookId }: { slug: string; bookId: string }) =>
+      createOrGetBookRevisionDraft(slug, bookId),
+    onSuccess: (draft, variables) => {
+      queryClient.setQueryData(publisherKeys.manuscriptDetail(draft.id), draft);
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.books(variables.slug),
+      });
+    },
+  });
+}
+
+export function useDeletePublisherBook() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ slug, bookId }: { slug: string; bookId: string }) =>
+      deletePublisherBook(slug, bookId),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.books(variables.slug),
+      });
+      queryClient.invalidateQueries({
+        queryKey: publisherKeys.detail(variables.slug),
+      });
+      queryClient.invalidateQueries({ queryKey: booksKeys.all });
     },
   });
 }

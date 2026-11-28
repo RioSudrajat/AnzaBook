@@ -2,6 +2,7 @@ import * as React from "react";
 import { Camera, Check, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BookCover } from "@/features/books/components/book-cover";
+import { ManuscriptCoverPlaceholder } from "@/features/books/components/manuscript-cover-placeholder";
 import { useUploadMediaImage } from "@/features/social/hooks";
 import { isUsableAssetUrl } from "@/lib/media-url";
 
@@ -23,6 +24,7 @@ interface ReaderBookHeaderProps {
   title: string;
   synopsis?: string;
   canEditSynopsis?: boolean;
+  isDraftManuscript?: boolean;
   totalChapters?: number;
   coverUrl?: string | null;
   coverColor?: string | null;
@@ -34,6 +36,7 @@ interface ReaderBookHeaderProps {
   onSynopsisChange?: (newSynopsis: string) => void;
   onCoverUrlChange?: (newCoverUrl: string | null) => void;
   onCoverColorChange?: (newCoverColor: string) => void;
+  onCoverModalClose?: () => void;
   className?: string;
 }
 
@@ -42,6 +45,7 @@ export function ReaderBookHeader({
   title,
   synopsis = "",
   canEditSynopsis = true,
+  isDraftManuscript = false,
   coverUrl,
   coverColor = "#181614",
   publishedYear,
@@ -52,6 +56,7 @@ export function ReaderBookHeader({
   onSynopsisChange,
   onCoverUrlChange,
   onCoverColorChange,
+  onCoverModalClose,
   className = "",
 }: ReaderBookHeaderProps) {
   const [isCoverModalOpen, setIsCoverModalOpen] = React.useState(false);
@@ -63,13 +68,23 @@ export function ReaderBookHeader({
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const coverDialogRef = React.useRef<HTMLDialogElement>(null);
+  const pressedOutsideRef = React.useRef(false);
   const synopsisPreviewRef = React.useRef<HTMLParagraphElement>(null);
   const synopsisId = React.useId();
   const coverTitleId = React.useId();
 
   const uploadMediaMutation = useUploadMediaImage();
   const isCustomImage = isUsableAssetUrl(coverUrl);
+  const hasTemplateCover = coverUrl === "template";
+  const hasConfiguredCover = isCustomImage || hasTemplateCover;
+  const showBookCover = !isDraftManuscript || hasConfiguredCover;
+  const trimmedTitle = title.trim();
   const trimmedSynopsis = synopsis.trim();
+
+  const closeCoverModal = () => {
+    setIsCoverModalOpen(false);
+    onCoverModalClose?.();
+  };
 
   React.useEffect(() => {
     const dialog = coverDialogRef.current;
@@ -135,20 +150,17 @@ export function ReaderBookHeader({
     onCoverUrlChange?.("template");
   };
 
-  const handleCoverDialogBackdropClick = (
+  const isPointerOutside = (
     e: React.PointerEvent<HTMLDialogElement>,
+    dialog: HTMLDialogElement,
   ) => {
-    const dialog = coverDialogRef.current;
-    if (!dialog) return;
     const rect = dialog.getBoundingClientRect();
-    const isOutside =
+    return (
       e.clientX < rect.left ||
       e.clientX > rect.right ||
       e.clientY < rect.top ||
-      e.clientY > rect.bottom;
-    if (isOutside) {
-      setIsCoverModalOpen(false);
-    }
+      e.clientY > rect.bottom
+    );
   };
 
   return (
@@ -167,7 +179,7 @@ export function ReaderBookHeader({
         className="hidden"
       />
 
-      {/* Left: Author, Title, and Substack/Medium Inline Synopsis */}
+      {/* Left: Author, Title, and Inline Synopsis */}
       <div className="flex-1 space-y-3 min-w-0">
         <p className="text-xs sm:text-sm font-sans tracking-wide text-[var(--color-muted)] uppercase font-medium">
           {authorOrPublisher || "Penulis Resmi AnzaBook"}
@@ -196,7 +208,11 @@ export function ReaderBookHeader({
           </div>
         ) : (
           <h1 className="font-serif font-bold text-2xl sm:text-3xl md:text-4xl text-[var(--color-ink)] leading-tight">
-            {title || "Naskah Tanpa Judul"}
+            {trimmedTitle || (
+              <span className="italic text-[var(--color-muted)]">
+                Naskah Tanpa Judul
+              </span>
+            )}
           </h1>
         )}
 
@@ -220,7 +236,7 @@ export function ReaderBookHeader({
                 onChange={(e) =>
                   onSynopsisChange(e.target.value.slice(0, 5000))
                 }
-                placeholder="Tulis sinopsis atau ringkasan singkat buku di sini..."
+                placeholder="Tulis sinopsis atau ringkasan buku di sini..."
                 className="editorial-synopsis-textarea bg-transparent font-sans text-[15px] sm:text-base leading-relaxed text-[var(--color-ink-2)] placeholder:text-[var(--color-muted)]/60 border-b border-dashed border-[var(--color-rule)] focus:border-[var(--color-accent)] outline-none py-1 transition-colors"
               />
             </div>
@@ -259,33 +275,59 @@ export function ReaderBookHeader({
         ) : null}
       </div>
 
-      {/* Right: Book Cover Preview & Edit Trigger */}
+      {/* Right: 2:3 Book Cover Preview / Clickable Placeholder */}
       <div className="shrink-0 self-start sm:self-center">
-        <div className="relative group w-24 sm:w-28 md:w-32 aspect-[7/10]">
-          <BookCover
-            book={{
-              title: title || "Naskah Buku",
-              author: authorOrPublisher || "Penulis",
-              coverUrl,
-              coverColor: coverColor || "#181614",
-              publishedYear: publishedYear ?? new Date().getFullYear(),
-              genres: genres && genres.length > 0 ? genres : ["Sastra"],
-              pageCount: pageCount ?? 120,
-            }}
-            className="w-full h-full"
-            decorative
-          />
+        <div className="relative group w-24 sm:w-28 md:w-32 aspect-[2/3]">
+          {showBookCover ? (
+            <>
+              <BookCover
+                book={{
+                  title: trimmedTitle || "Naskah Tanpa Judul",
+                  author: authorOrPublisher || "Penulis",
+                  coverUrl,
+                  coverColor: coverColor || "#181614",
+                  publishedYear: publishedYear ?? new Date().getFullYear(),
+                  genres: genres && genres.length > 0 ? genres : ["Sastra"],
+                  pageCount: pageCount ?? 120,
+                }}
+                className="w-full h-full aspect-[2/3]"
+                decorative
+              />
 
-          {isEditMode && (
+              {isEditMode && (
+                <button
+                  type="button"
+                  onClick={() => setIsCoverModalOpen(true)}
+                  className="absolute inset-0 z-30 rounded-[6px] bg-black/65 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 flex flex-col items-center justify-center gap-1.5 text-white text-xs font-medium transition-opacity cursor-pointer p-2 text-center"
+                  title="Atur warna template atau unggah gambar sampul"
+                >
+                  <Camera className="size-4" aria-hidden="true" />
+                  <span>Ganti Sampul</span>
+                </button>
+              )}
+            </>
+          ) : isEditMode ? (
             <button
               type="button"
               onClick={() => setIsCoverModalOpen(true)}
-              className="absolute inset-0 z-30 rounded-[2%_5%_5%_2%] bg-black/65 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 flex flex-col items-center justify-center gap-1.5 text-white text-xs font-medium transition-opacity cursor-pointer p-2 text-center"
-              title="Atur warna template atau unggah gambar sampul"
+              aria-label="Pilih atau unggah sampul buku"
+              className="relative block size-full rounded-[6px] cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)]"
+              title="Klik untuk mengunggah gambar atau memilih warna sampul"
             >
-              <Camera className="size-4" aria-hidden="true" />
-              <span>Ganti Sampul</span>
+              <ManuscriptCoverPlaceholder
+                title={trimmedTitle}
+                className="size-full group-hover:border-[var(--color-accent)] group-hover:text-[var(--color-ink)] transition-colors"
+              />
+              <span className="absolute inset-x-1.5 bottom-2 flex items-center justify-center gap-1 rounded-md bg-[var(--color-paper-2)]/90 px-1.5 py-1 text-[10px] font-medium text-[var(--color-ink)] opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity shadow-xs">
+                <Camera className="size-3" aria-hidden="true" />
+                <span>Atur Sampul</span>
+              </span>
             </button>
+          ) : (
+            <ManuscriptCoverPlaceholder
+              title={trimmedTitle}
+              className="size-full"
+            />
           )}
         </div>
       </div>
@@ -294,11 +336,24 @@ export function ReaderBookHeader({
       <dialog
         ref={coverDialogRef}
         aria-labelledby={coverTitleId}
-        onPointerUp={handleCoverDialogBackdropClick}
+        {...({ closedby: "any" } as Record<string, string>)}
+        onPointerDown={(e) => {
+          const dialog = coverDialogRef.current;
+          if (!dialog) return;
+          pressedOutsideRef.current = isPointerOutside(e, dialog);
+        }}
+        onPointerUp={(e) => {
+          const dialog = coverDialogRef.current;
+          if (!dialog) return;
+          if (pressedOutsideRef.current && isPointerOutside(e, dialog)) {
+            closeCoverModal();
+          }
+          pressedOutsideRef.current = false;
+        }}
         onClose={() => {
           if (coverDialogRef.current) coverDialogRef.current.returnValue = "";
           setUploadError(null);
-          if (isCoverModalOpen) setIsCoverModalOpen(false);
+          if (isCoverModalOpen) closeCoverModal();
         }}
         className="m-auto w-[min(94vw,30rem)] max-h-[90vh] overflow-y-auto overscroll-contain rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-0 text-[var(--color-ink)] shadow-2xl backdrop:bg-black/65 backdrop:overflow-hidden backdrop:overscroll-contain"
       >
@@ -319,7 +374,7 @@ export function ReaderBookHeader({
               </div>
               <button
                 type="button"
-                onClick={() => setIsCoverModalOpen(false)}
+                onClick={closeCoverModal}
                 aria-label="Tutup pengaturan sampul"
                 className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-[var(--color-muted)] hover:bg-[var(--color-paper-3)] hover:text-[var(--color-ink)] cursor-pointer"
               >
@@ -337,28 +392,43 @@ export function ReaderBookHeader({
             )}
 
             <div className="flex items-center gap-4 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-3.5">
-              <div className="w-16 shrink-0">
-                <BookCover
-                  book={{
-                    title: title || "Naskah Buku",
-                    author: authorOrPublisher || "Penulis",
-                    coverUrl,
-                    coverColor: coverColor || "#181614",
-                    publishedYear: publishedYear ?? new Date().getFullYear(),
-                    genres: genres && genres.length > 0 ? genres : ["Sastra"],
-                    pageCount: pageCount ?? 120,
-                  }}
-                  decorative
-                />
+              <div className="w-16 shrink-0 aspect-[2/3]">
+                {hasConfiguredCover ? (
+                  <BookCover
+                    book={{
+                      title: trimmedTitle || "Naskah Tanpa Judul",
+                      author: authorOrPublisher || "Penulis",
+                      coverUrl,
+                      coverColor: coverColor || "#181614",
+                      publishedYear: publishedYear ?? new Date().getFullYear(),
+                      genres: genres && genres.length > 0 ? genres : ["Sastra"],
+                      pageCount: pageCount ?? 120,
+                    }}
+                    className="w-full h-full aspect-[2/3]"
+                    decorative
+                  />
+                ) : (
+                  <ManuscriptCoverPlaceholder
+                    title={trimmedTitle}
+                    compact
+                    className="size-full"
+                  />
+                )}
               </div>
               <div className="min-w-0 space-y-1">
                 <p className="font-serif text-sm font-bold truncate">
-                  {title || "Naskah Buku"}
+                  {trimmedTitle || (
+                    <span className="italic text-[var(--color-muted)]">
+                      Naskah Tanpa Judul
+                    </span>
+                  )}
                 </p>
                 <p className="font-mono text-[11px] text-[var(--color-muted)]">
                   {isCustomImage
                     ? "Menggunakan gambar sampul unggahan"
-                    : "Menggunakan sampul template AnzaBook"}
+                    : hasTemplateCover
+                      ? "Menggunakan sampul template AnzaBook"
+                      : "Belum ada sampul dipilih"}
                 </p>
               </div>
             </div>
@@ -372,7 +442,9 @@ export function ReaderBookHeader({
               <div className="grid grid-cols-4 gap-2">
                 {COVER_PALETTES.map((palette) => {
                   const isSelected =
-                    !isCustomImage && coverColor === palette.color;
+                    !isCustomImage &&
+                    hasTemplateCover &&
+                    coverColor === palette.color;
                   return (
                     <button
                       key={palette.color}
@@ -418,16 +490,16 @@ export function ReaderBookHeader({
                   </span>
                 </Button>
 
-                {isCustomImage && (
+                {hasConfiguredCover && (
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => {
-                      onCoverUrlChange?.("template");
+                      onCoverUrlChange?.(null);
                     }}
                     className="w-full text-xs text-[var(--color-muted)] hover:text-[var(--color-ink)] min-h-11 border-[var(--color-rule)] rounded-xl cursor-pointer"
                   >
-                    Kembalikan ke sampul template
+                    Hapus sampul (kembali ke placeholder)
                   </Button>
                 )}
               </div>
@@ -437,7 +509,7 @@ export function ReaderBookHeader({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setIsCoverModalOpen(false)}
+                onClick={closeCoverModal}
                 className="min-h-11 px-5 text-xs font-medium cursor-pointer"
               >
                 Selesai

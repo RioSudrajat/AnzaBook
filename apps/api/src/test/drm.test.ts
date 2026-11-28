@@ -237,7 +237,7 @@ describe("DRM Policy, Opaque Session Watermarks, & Admin Audit Logging", () => {
 
     const scraper = agent();
     const scraperEmail = await signUp(scraper, "Penyedot Naskah API");
-    const slug = "revolusi-cetak-kedaulatan-membaca";
+    const slug = "madilog-tan-malaka";
 
     const invalidWindow = await scraper.get(
       `/api/books/${slug}/read?continuous=true&windowSize=5`,

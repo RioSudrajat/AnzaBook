@@ -41,9 +41,11 @@ test("Home and Library use the same books and show history only for the selected
     home.getByRole("heading", { name: titles[1], exact: true }),
   ).toBeVisible();
   await expect(home.locator("[data-book-cover]")).toHaveCount(2);
-  await expect(
-    home.getByRole("link", { name: "Lanjut" }).first(),
-  ).toHaveAttribute("href", "/read/kecerdasan-sosial-homo-sapiens");
+  await expect(home.locator("progress")).toHaveCount(2);
+  await expect(home.locator('a[href^="/read/"]').first()).toHaveAttribute(
+    "href",
+    "/read/kecerdasan-sosial-homo-sapiens",
+  );
   await home.getByRole("link", { name: "Rak Saya" }).click();
 
   const reading = page.getByRole("region", { name: "Sedang Dibaca" });
@@ -93,7 +95,7 @@ test("Post-Reading Exit Prompt skips immediate exit and shows real metrics after
   // 1. Immediate exit (< 15s and no forward progress) navigates straight home without modal or session record.
   await page.goto(`/read/${slug}`);
   await expect(page.locator("#chapter-sec-1")).toBeVisible();
-  await page.getByRole("button", { name: "Keluar ke Home" }).click();
+  await page.getByRole("button", { name: "Kembali" }).click();
   await expect(
     page.getByRole("dialog", { name: "Ringkasan Sesi Baca" }),
   ).toHaveCount(0);
@@ -107,7 +109,13 @@ test("Post-Reading Exit Prompt skips immediate exit and shows real metrics after
   expect(immediateSessions).toHaveLength(0);
 
   // 2. Forward progress into chapter 2 triggers the exit sheet with real telemetry.
-  await page.goto(`/read/${slug}`);
+  // Wait for the brand preloader to dismiss first so scroll lock doesn't reset scroll before Kembali clicks.
+  await page.goto(`/read/${slug}`, { waitUntil: "networkidle" });
+  await expect(
+    page.getByRole("dialog", { name: "Prapemuat Literasi AnzaBook" }),
+  ).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.locator("#chapter-sec-1")).toBeVisible();
+  await expect(page.getByText(/^1\/\d+$/)).toBeVisible();
   const secondChapter = page.locator("#chapter-sec-2");
   await expect(secondChapter).toBeVisible();
   await secondChapter.evaluate((section) =>
@@ -115,7 +123,7 @@ test("Post-Reading Exit Prompt skips immediate exit and shows real metrics after
   );
   await expect(page.getByText(/^2\/\d+$/)).toBeVisible();
 
-  await page.getByRole("button", { name: "Keluar ke Home" }).click();
+  await page.getByRole("button", { name: "Kembali" }).click();
   const exitDialog = page.getByRole("dialog", { name: "Ringkasan Sesi Baca" });
   await expect(exitDialog).toBeVisible();
   await expect(exitDialog.getByText("Durasi Aktif")).toBeVisible();
@@ -134,7 +142,7 @@ test("Post-Reading Exit Prompt skips immediate exit and shows real metrics after
     .locator("[data-reader-paragraph]")
     .last()
     .evaluate((el) => el.scrollIntoView({ block: "start" }));
-  await page.getByRole("button", { name: "Keluar ke Home" }).click();
+  await page.getByRole("button", { name: "Kembali" }).click();
   await expect(exitDialog).toBeVisible();
 
   // 4. 1-click Lewati & Keluar exits home while keeping the session private by default.

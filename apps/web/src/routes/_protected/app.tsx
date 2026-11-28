@@ -53,6 +53,17 @@ const appSearchSchema = z.object({
     .optional(),
   slug: z.string().optional(),
   view: z.string().optional(),
+  subtab: z
+    .enum([
+      "activity",
+      "reviews",
+      "community",
+      "works",
+      "author_studio",
+      "publisher_studio",
+    ])
+    .optional()
+    .catch(undefined),
   category: z.string().min(1).max(50).optional().catch(undefined),
   collection: z.string().min(1).max(120).optional().catch(undefined),
   q: z.string().max(120).optional().catch(undefined),
@@ -165,7 +176,7 @@ function AppPage() {
   const title =
     activeTab === "profile"
       ? search.view === "edit"
-        ? "Edit Profile"
+        ? "Sunting Profil"
         : "Profil Saya"
       : (TAB_TITLES[activeTab] ?? "Settings");
 
@@ -216,7 +227,11 @@ function AppPage() {
 
       {activeTab === "community" &&
         (search.slug ? (
-          <CommunityHubView slug={search.slug} isInsideApp />
+          <CommunityHubView
+            slug={search.slug}
+            isInsideApp
+            returnTo="/app?tab=events"
+          />
         ) : (
           <DashboardEvents
             key={search.view === "hosting" ? "hosting" : "default"}
@@ -240,16 +255,36 @@ function AppPage() {
         <DashboardProfile
           isOwnProfile
           isEditing={search.view === "edit"}
+          subtab={search.subtab}
+          onSubTabChange={(nextSubTab) => {
+            void navigate({
+              to: "/app",
+              search: (prev) => ({
+                ...prev,
+                tab: "profile",
+                subtab: nextSubTab,
+              }),
+              replace: true,
+              resetScroll: false,
+            });
+          }}
           onStartEdit={() => {
             navigate({
               to: "/app",
-              search: { tab: "profile", view: "edit" },
+              search: {
+                tab: "profile",
+                view: "edit",
+                subtab: search.subtab,
+              },
             });
           }}
           onFinishEdit={() => {
             navigate({
               to: "/app",
-              search: { tab: "profile" },
+              search: {
+                tab: "profile",
+                subtab: search.subtab,
+              },
             });
           }}
           onNavigateSettings={() => handleTabChange("settings")}

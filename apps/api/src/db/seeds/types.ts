@@ -43,8 +43,9 @@ export type BookSeed = {
   totalChapters: number;
   readingMinutes: number;
   audioDurationMinutes: number;
-  digitalPolicy: "free_open" | "nakama_subscription";
-  accessTier: "free" | "premium" | "premium_physical";
+  digitalPolicy: "free_open" | "nakama_subscription" | "single_purchase";
+  accessTier: "free" | "premium";
+  digitalPriceIdr?: number | null;
   hasPhysical: boolean;
   securityLevel: string;
   isWeeklyBulletin: boolean;

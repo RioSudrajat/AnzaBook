@@ -3,7 +3,6 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowRight,
   BookOpen,
-  CheckCircle,
   ExternalLink,
   Heart,
   MessageSquare,
@@ -20,6 +19,7 @@ import type {
   ManagedPublisherSummaryDto,
 } from "@starter/shared/types";
 import { EntityDirectoryCard } from "@/components/profile/entity-directory-card";
+import { VerifiedBadge } from "@/components/profile/verified-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BookCatalogCard } from "@/features/books/components/book-catalog-card";
@@ -358,7 +358,7 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
                       </button>
                     )}
                   </div>
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
                     {result.books.slice(0, 4).map((book) => (
                       <BookCatalogCard key={book.id} book={book} />
                     ))}
@@ -525,16 +525,10 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
                     }}
                   >
                     <option value="all">Semua Skema</option>
-                    <option value="print_code_only">
-                      Eksklusif Pembeli Buku Cetak
-                    </option>
                     <option value="nakama_subscription">
-                      Khusus Anggota Nakama
+                      Langganan Nakama
                     </option>
-                    <option value="single_purchase">Beli Satuan</option>
-                    <option value="nakama_or_purchase">
-                      Nakama &amp; Beli Satuan
-                    </option>
+                    <option value="single_purchase">Beli Satuan Digital</option>
                     <option value="free_open">Gratis Terbuka</option>
                   </select>
                 </label>
@@ -584,7 +578,7 @@ export function DashboardExplore({ category, collection }: ExploreFilters) {
                 </p>
               ) : (
                 <>
-                  <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
                     {catalog.data.data.map((book) => (
                       <li key={book.id}>
                         <BookCatalogCard book={book} />
@@ -735,15 +729,7 @@ function UserSearchRow({
             <span className="font-medium text-sm text-foreground group-hover:text-[var(--color-accent)] transition-colors truncate">
               {user.name}
             </span>
-            {isAuthor && (
-              <span
-                className="inline-flex items-center gap-1 text-[10px] font-mono font-medium text-[var(--color-ink)] bg-[var(--color-green-soft)] px-1.5 py-0.5 rounded shrink-0"
-                title="Penulis Resmi AnzaBook"
-              >
-                <CheckCircle className="size-3 shrink-0" aria-hidden="true" />
-                Penulis
-              </span>
-            )}
+            {isAuthor && <VerifiedBadge entityType="author" size="sm" />}
           </div>
 
           <div className="flex flex-wrap items-center gap-x-2 text-xs font-mono text-muted-foreground truncate">

@@ -50,16 +50,14 @@ export function ChapterBreakNodeView({
       <div className="relative" role="heading" aria-level={isFirst ? 1 : 2}>
         <NodeViewContent
           data-chapter-title-editable="true"
-          data-placeholder={
-            isEditable ? `Tulis judul Bab ${chapterNumber}...` : undefined
-          }
+          data-placeholder={isEditable ? "Judul Chapter..." : undefined}
           className={`tiptap-chapter-title font-serif font-bold tracking-tight text-foreground outline-none ${
             isFirst ? "text-2xl sm:text-3xl" : "text-xl sm:text-2xl"
           } ${isEmpty ? "is-chapter-title-empty" : ""}`}
         />
         {!isEditable && isEmpty && (
-          <div className="font-serif text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-            Bab {chapterNumber}
+          <div className="font-serif text-xl sm:text-2xl font-bold tracking-tight text-[var(--color-muted)] italic">
+            Chapter {chapterNumber}
           </div>
         )}
       </div>

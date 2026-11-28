@@ -37,12 +37,7 @@ async function createTestPublisher(name = "Penerbit Uji Coba") {
 async function createTestBook(params: {
   slug: string;
   title: string;
-  digitalPolicy:
-    | "free_open"
-    | "print_code_only"
-    | "nakama_subscription"
-    | "single_purchase"
-    | "nakama_or_purchase";
+  digitalPolicy: "free_open" | "nakama_subscription" | "single_purchase";
   publisherId?: string;
   digitalPriceIdr?: number | null;
 }) {
@@ -88,7 +83,7 @@ async function createTestBook(params: {
 }
 
 describe("B2B2C Monetization & DRM Engine", () => {
-  it("denies chapter 2 of print_code_only book to Nakama member without claimed code", async () => {
+  it("denies chapter 2 of single_purchase book to Nakama member without purchase or claimed code", async () => {
     const client = agent();
     const email = await signUp(client, "Nakama Member Only");
     const [usr] = await db
@@ -102,11 +97,12 @@ describe("B2B2C Monetization & DRM Engine", () => {
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });
 
-    const slug = `print-book-${randomUUID().slice(0, 8)}`;
+    const slug = `single-only-book-${randomUUID().slice(0, 8)}`;
     await createTestBook({
       slug,
-      title: "Buku Khusus Fisik",
-      digitalPolicy: "print_code_only",
+      title: "Buku Satuan Tanpa Nakama",
+      digitalPolicy: "single_purchase",
+      digitalPriceIdr: 99_000,
     });
 
     // Chapter 1 is allowed as preview
@@ -120,15 +116,16 @@ describe("B2B2C Monetization & DRM Engine", () => {
     expect(ch2.body.error.code).toBe("FORBIDDEN_DIGITAL_ACCESS");
   });
 
-  it("unlocks full access when physical claim code is redeemed on print_code_only book", async () => {
+  it("unlocks full access when physical claim code is redeemed on single_purchase or nakama_subscription book", async () => {
     const client = agent();
     await signUp(client, "Claimer Reader");
 
     const slug = `claimable-book-${randomUUID().slice(0, 8)}`;
     const book = await createTestBook({
       slug,
-      title: "Buku Cetak Berkode",
-      digitalPolicy: "print_code_only",
+      title: "Buku Berkode Klaim",
+      digitalPolicy: "single_purchase",
+      digitalPriceIdr: 99_000,
     });
 
     const claimCode = `PHY-${randomUUID().slice(0, 8).toUpperCase()}`;
@@ -339,9 +336,9 @@ describe("B2B2C Monetization & DRM Engine", () => {
     expect(ledger.amountIdr).toBe(4_000);
   });
 
-  it("supports nakama_or_purchase for both Nakama members and single purchase buyers", async () => {
+  it("keeps Nakama members and single purchase buyers strictly separated by distribution model", async () => {
     const nakamaClient = agent();
-    const nakamaEmail = await signUp(nakamaClient, "Hybrid Nakama Member");
+    const nakamaEmail = await signUp(nakamaClient, "Nakama Model Member");
     const [nakamaUser] = await db
       .select({ id: user.id })
       .from(user)
@@ -353,40 +350,52 @@ describe("B2B2C Monetization & DRM Engine", () => {
     });
 
     const buyerClient = agent();
-    await signUp(buyerClient, "Hybrid Direct Buyer");
+    await signUp(buyerClient, "Direct Model Buyer");
 
-    const publisher = await createTestPublisher("Penerbit Hybrid");
-    const bookSlug = `hybrid-book-${randomUUID().slice(0, 8)}`;
+    const publisher = await createTestPublisher("Penerbit Tiga Model");
+    const nakamaBookSlug = `nakama-book-${randomUUID().slice(0, 8)}`;
     await createTestBook({
-      slug: bookSlug,
-      title: "Buku Hibrida Terpadu",
-      digitalPolicy: "nakama_or_purchase",
+      slug: nakamaBookSlug,
+      title: "Buku Khusus Nakama",
+      digitalPolicy: "nakama_subscription",
       publisherId: publisher.id,
-      digitalPriceIdr: 30_000,
     });
 
-    // 1. Nakama member can read chapter 2 directly via subscription
+    const singleBookSlug = `single-book-${randomUUID().slice(0, 8)}`;
+    await createTestBook({
+      slug: singleBookSlug,
+      title: "Buku Khusus Satuan",
+      digitalPolicy: "single_purchase",
+      publisherId: publisher.id,
+      digitalPriceIdr: 99_000,
+    });
+
+    // 1. Nakama member reads nakama_subscription chapter 2, but cannot read single_purchase chapter 2
     const nakamaCh2 = await nakamaClient.get(
-      `/api/books/${bookSlug}/read?chapter=2&mode=full`,
+      `/api/books/${nakamaBookSlug}/read?chapter=2&mode=full`,
     );
     expect(nakamaCh2.status).toBe(200);
     expect(nakamaCh2.body.data.hasFullAccess).toBe(true);
 
-    // 2. Non-member buyer initially locked
+    const nakamaOnSingle = await nakamaClient.get(
+      `/api/books/${singleBookSlug}/read?chapter=2&mode=full`,
+    );
+    expect(nakamaOnSingle.status).toBe(403);
+
+    // 2. Non-member buyer initially locked on single_purchase, unlocks after purchase
     const buyerLocked = await buyerClient.get(
-      `/api/books/${bookSlug}/read?chapter=2&mode=full`,
+      `/api/books/${singleBookSlug}/read?chapter=2&mode=full`,
     );
     expect(buyerLocked.status).toBe(403);
 
-    // 3. Buyer purchases digitally -> unlocks chapter 2
     const buyRes = await buyerClient
-      .post(`/api/books/${bookSlug}/purchase`)
+      .post(`/api/books/${singleBookSlug}/purchase`)
       .set(originHeader)
       .send({});
     expect([200, 201]).toContain(buyRes.status);
 
     const buyerUnlocked = await buyerClient.get(
-      `/api/books/${bookSlug}/read?chapter=2&mode=full`,
+      `/api/books/${singleBookSlug}/read?chapter=2&mode=full`,
     );
     expect(buyerUnlocked.status).toBe(200);
     expect(buyerUnlocked.body.data.hasFullAccess).toBe(true);

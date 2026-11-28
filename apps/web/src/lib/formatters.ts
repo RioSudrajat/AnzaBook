@@ -30,14 +30,10 @@ export function formatDigitalPolicy(
 ): string {
   if (!policy) return "Standar";
   switch (policy) {
-    case "nakama_or_purchase":
-      return "Nakama & Beli Satuan";
     case "single_purchase":
-      return "Beli Satuan";
+      return "Beli Satuan Digital";
     case "nakama_subscription":
-      return "Khusus Anggota Nakama";
-    case "print_code_only":
-      return "Eksklusif Pembeli Buku Cetak";
+      return "Langganan Nakama";
     case "free_open":
     case "free":
       return "Gratis Terbuka";

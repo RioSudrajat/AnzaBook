@@ -50,17 +50,17 @@ export const INSERT_CONFIGS: Record<SubstackInsertType, SubstackInsertConfig> =
   {
     chapter: {
       type: "chapter",
-      title: "Tambah Bab Baru Naskah",
+      title: "Tambah Chapter Baru Naskah",
       description:
-        "Tentukan nomor bab dan judul untuk memecah alur naskah secara terstruktur.",
+        "Tentukan nomor chapter dan judul untuk memecah alur naskah secara terstruktur.",
       icon: <BookOpen className="size-5 text-[var(--color-accent)]" />,
-      field1Label: "Nomor Bab (Angka)",
+      field1Label: "Nomor Chapter (Angka)",
       field1Placeholder: "misal: 2",
       field1Default: "2",
-      field2Label: "Judul Bab",
+      field2Label: "Judul Chapter",
       field2Placeholder: "misal: Percakapan dengan Batu Karang di Pantai Sepi",
       field2Default: "Percakapan dengan Batu Karang di Pantai Sepi",
-      confirmLabel: "Sisipkan Bab Baru",
+      confirmLabel: "Sisipkan Chapter Baru",
     },
     link: {
       type: "link",

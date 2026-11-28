@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { CheckCircle, MapPin } from "lucide-react";
+import { MapPin } from "lucide-react";
+import { VerifiedBadge } from "@/components/profile/verified-badge";
 import { isUsableAssetUrl } from "@/lib/media-url";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +40,7 @@ export function EntityDirectoryCard({
 }: EntityDirectoryCardProps) {
   const [failedBanner, setFailedBanner] = useState<string | null>(null);
   const [failedAvatar, setFailedAvatar] = useState<string | null>(null);
+  const [topicsExpanded, setTopicsExpanded] = useState(false);
 
   const showBanner = isUsableAssetUrl(bannerUrl) && failedBanner !== bannerUrl;
   const showAvatar = isUsableAssetUrl(avatarUrl) && failedAvatar !== avatarUrl;
@@ -46,6 +48,10 @@ export function EntityDirectoryCard({
   const isVerified =
     verificationStatus === "verified" || verificationStatus === "trusted";
   const isRejected = verificationStatus === "rejected";
+  const isPending = verificationStatus === "pending";
+  const hasExtraTopics = topics.length > 3;
+  const displayedTopics =
+    hasExtraTopics && !topicsExpanded ? topics.slice(0, 3) : topics;
 
   return (
     <article className="flex flex-col justify-between overflow-hidden rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] text-[var(--color-ink)] hover:border-[var(--color-ink)]/30 transition-colors">
@@ -102,36 +108,30 @@ export function EntityDirectoryCard({
               )}
             </Link>
 
-            {verificationStatus && (
+            {(isPending || isRejected) && (
               <span
                 className={cn(
-                  "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide",
-                  isVerified
-                    ? "border-[var(--color-green)]/40 bg-[var(--color-green-soft)] text-[var(--color-ink)]"
-                    : isRejected
-                      ? "border-[var(--color-error)]/40 bg-[var(--color-error-soft)] text-[var(--color-ink)]"
-                      : "border-[var(--color-accent)]/40 bg-[var(--color-accent-soft)] text-[var(--color-ink)]",
+                  "inline-flex items-center rounded-md border px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide",
+                  isRejected
+                    ? "border-[var(--color-error)]/40 bg-[var(--color-error-soft)] text-[var(--color-ink)]"
+                    : "border-[var(--color-accent)]/40 bg-[var(--color-accent-soft)] text-[var(--color-ink)]",
                 )}
               >
-                {isVerified && (
-                  <CheckCircle className="size-3 shrink-0" aria-hidden="true" />
-                )}
-                <span>
-                  {isVerified
-                    ? "Terverifikasi"
-                    : isRejected
-                      ? "Ditolak"
-                      : "Menunggu Verifikasi"}
-                </span>
+                {isRejected ? "Ditolak" : "Menunggu Verifikasi"}
               </span>
             )}
           </div>
 
           <div className="space-y-1.5">
-            <h3 className="font-serif text-base font-bold leading-snug text-[var(--color-ink)] truncate">
-              <Link to={to} params={params} className="hover:underline">
+            <h3 className="flex items-center gap-1.5 font-serif text-base font-bold leading-snug text-[var(--color-ink)]">
+              <Link
+                to={to}
+                params={params}
+                className="truncate hover:underline"
+              >
                 {name}
               </Link>
+              {isVerified && <VerifiedBadge entityType={kind} size="sm" />}
             </h3>
 
             <p className="flex items-center gap-1.5 text-xs font-mono text-[var(--color-muted)]">
@@ -149,8 +149,8 @@ export function EntityDirectoryCard({
             )}
 
             {topics.length > 0 && (
-              <ul className="flex flex-wrap gap-1.5 pt-1">
-                {topics.slice(0, 3).map((topic) => (
+              <ul className="flex flex-wrap items-center gap-1.5 pt-1">
+                {displayedTopics.map((topic) => (
                   <li
                     key={topic}
                     className="rounded border border-[var(--color-rule)] bg-[var(--color-paper)] px-2 py-0.5 text-[11px] text-[var(--color-ink-2)]"
@@ -158,6 +158,18 @@ export function EntityDirectoryCard({
                     {topic}
                   </li>
                 ))}
+                {hasExtraTopics && (
+                  <li>
+                    <button
+                      type="button"
+                      aria-expanded={topicsExpanded}
+                      onClick={() => setTopicsExpanded((prev) => !prev)}
+                      className="rounded border border-[var(--color-rule)] bg-[var(--color-paper-3)] px-2 py-0.5 font-mono text-[11px] font-semibold text-[var(--color-ink)] hover:border-[var(--color-ink)]/40 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+                    >
+                      {topicsExpanded ? "Ringkas" : `+${topics.length - 3}`}
+                    </button>
+                  </li>
+                )}
               </ul>
             )}
 

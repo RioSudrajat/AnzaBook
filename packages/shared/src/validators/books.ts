@@ -7,14 +7,7 @@ export const listBooksQuerySchema = z
     language: z.string().max(10).optional(),
     accessTier: z.enum(["all", "free", "premium"]).optional().default("all"),
     digitalPolicy: z
-      .enum([
-        "all",
-        "free_open",
-        "print_code_only",
-        "nakama_subscription",
-        "single_purchase",
-        "nakama_or_purchase",
-      ])
+      .enum(["all", "free_open", "nakama_subscription", "single_purchase"])
       .optional()
       .default("all"),
     publisher: z.string().max(100).optional(),
@@ -76,12 +69,7 @@ export type ListBooksInput = {
   language?: string;
   accessTier?: "all" | "free" | "premium";
   digitalPolicy?:
-    | "all"
-    | "free_open"
-    | "print_code_only"
-    | "nakama_subscription"
-    | "single_purchase"
-    | "nakama_or_purchase";
+    "all" | "free_open" | "nakama_subscription" | "single_purchase";
   publisher?: string;
   collection?: string;
   paperTier?:
@@ -105,5 +93,16 @@ export type StockInput = {
 };
 export type StockQuery = z.infer<typeof stockQuerySchema>;
 
+export const bookPurchaseOrderId = z.uuid();
+
+export const bookCheckoutSchema = z
+  .object({
+    requestId: z.uuid(),
+    affiliateCalendarId: z.string().uuid().optional().nullable(),
+    affiliateCalendarSlug: z.string().trim().max(120).optional().nullable(),
+  })
+  .strict();
+
 export type ClaimPrintCodeInput = z.input<typeof claimPrintCodeSchema>;
 export type ClaimPrintCodeOutput = z.infer<typeof claimPrintCodeSchema>;
+export type BookCheckoutInput = z.infer<typeof bookCheckoutSchema>;

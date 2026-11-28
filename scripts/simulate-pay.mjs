@@ -50,9 +50,15 @@ async function main() {
   if (!orderId && dbUrl) {
     const pool = new pg.Pool({ connectionString: dbUrl });
     try {
-      const res = await pool.query(
-        "SELECT id FROM membership_orders WHERE status = 'pending' AND checkout_url IS NOT NULL ORDER BY created_at DESC LIMIT 1",
-      );
+      const res = await pool.query(`
+        SELECT id FROM (
+          SELECT id, created_at FROM membership_orders WHERE status = 'pending' AND checkout_url IS NOT NULL
+          UNION ALL
+          SELECT id, created_at FROM book_purchases WHERE status = 'pending' AND checkout_url IS NOT NULL
+        ) pending_orders
+        ORDER BY created_at DESC
+        LIMIT 1
+      `);
       if (res.rows.length > 0) {
         orderId = res.rows[0].id;
       }

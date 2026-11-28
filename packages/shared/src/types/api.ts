@@ -44,16 +44,12 @@ export type AdminNoteDto = NoteDto & { ownerName: string; ownerEmail: string };
 // ---------------- AnzaBook DTOs ---------------- //
 
 export type BookDistributionModel =
-  | "free_open"
-  | "print_code_only"
-  | "nakama_subscription"
-  | "single_purchase"
-  | "nakama_or_purchase";
+  "free_open" | "nakama_subscription" | "single_purchase";
 export type ManuscriptSourceLanguage = "id" | "en";
 export type ManuscriptTargetAudience =
   "general" | "young_adult" | "mature_academic";
 export type AuthorStatus = "none" | "pending" | "verified" | "rejected";
-export type AccessTier = "free" | "premium" | "premium_physical";
+export type AccessTier = "free" | "premium";
 export type EditionTier =
   "rakyat_economy" | "standard_trade" | "kolektor_hardcover";
 export type PartnerType =
@@ -158,6 +154,9 @@ export type BookDetailDto = BookSummaryDto & {
   editions: BookPrintEditionDto[];
   storeStocks: StoreStockItemDto[];
   hasClaimedDigital: boolean;
+  hasPurchasedDigital?: boolean;
+  checkoutAvailable?: boolean;
+  isArchived?: boolean;
   totalShelved: number;
   upcomingEvents?: CommunityEventSummaryDto[];
 };
@@ -812,11 +811,18 @@ export type ManuscriptSubmissionDto = {
   status: ManuscriptSubmissionStatus;
   rejectionReason: string | null;
   publishedBookId: string | null;
+  isCatalogRevision?: boolean;
   isApprovedWriter?: boolean;
   chapters?: ManuscriptChapterDto[];
   totalChapters?: number;
   createdAt: string;
   updatedAt: string;
+};
+
+export type PublisherCatalogBookDto = BookSummaryDto & {
+  activeRevisionManuscriptId: string | null;
+  activeRevisionUpdatedAt: string | null;
+  paidPurchaseCount: number;
 };
 
 export type BookClaimBatchDto = {
@@ -842,16 +848,42 @@ export type BookPurchaseDto = {
   id: string;
   userId: string;
   bookId: string;
+  bookSlug?: string;
   bookTitle?: string;
   bookCoverUrl?: string;
   priceIdr: number;
+  tax?: {
+    subtotalIdr: number;
+    taxIdr: number;
+    rateBps: number;
+  } | null;
   publisherShareIdr: number;
   affiliateCalendarId: string | null;
   affiliateCommissionIdr: number;
   anzabookNetIdr: number;
-  status: "pending" | "paid" | "failed";
+  status: "pending" | "paid" | "failed" | "canceled" | "expired" | "refunded";
   paymentMethod: string;
+  checkoutUrl?: string | null;
   createdAt: string;
+  paidAt?: string | null;
+};
+
+export type BookPurchaseOrderDto = {
+  id: string;
+  bookId: string;
+  bookSlug: string;
+  bookTitle: string;
+  bookCoverUrl: string;
+  priceIdr: number;
+  tax: {
+    subtotalIdr: number;
+    taxIdr: number;
+    rateBps: number;
+  } | null;
+  status: "pending" | "paid" | "failed" | "canceled" | "expired" | "refunded";
+  checkoutUrl: string | null;
+  createdAt: string;
+  paidAt: string | null;
 };
 
 export type CommunityWalletLedgerDto = {

@@ -1,11 +1,12 @@
 import { useDeferredValue, useMemo, useState, type FormEvent } from "react";
 import {
+  AlertCircle,
   Check,
   Globe,
   Layers,
   LoaderCircle,
   MapPin,
-  Printer,
+  PenTool,
   Search,
   Send,
   ShieldCheck,
@@ -17,24 +18,30 @@ import type {
   ManuscriptTargetAudience,
 } from "@starter/shared/types";
 import { DEFAULT_DIGITAL_BOOK_PRICE_IDR } from "@starter/shared/validators/publisher";
-import { calculatePrintEconomics } from "@starter/shared/print-economics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { BookCover } from "@/features/books/components/book-cover";
+import { ManuscriptCoverPlaceholder } from "@/features/books/components/manuscript-cover-placeholder";
 import { isOfficialAnzaBookPublisher } from "@/features/publisher/publisher-helpers";
 import { useSubmissionTargets } from "@/features/social/hooks";
+import { isUsableAssetUrl } from "@/lib/media-url";
 
 export interface ManuscriptConfigData {
   title: string;
   synopsis: string;
+  authorName?: string;
+  coverUrl?: string | null;
+  coverColor?: string | null;
+  chapterCount?: number;
+  hasBodyContent?: boolean;
   category: string;
   sourceLanguage: ManuscriptSourceLanguage;
   availableLanguages: string[];
-  accessTier: "free" | "premium" | "premium_physical";
+  accessTier: "free" | "premium";
   digitalPolicy: BookDistributionModel;
   proposedDigitalPriceIdr: number | null;
-  hasPhysicalPrint: boolean;
   targetAudience: ManuscriptTargetAudience;
   estimatedPages: number;
   isbn?: string;
@@ -54,46 +61,27 @@ const DISTRIBUTION_MODELS: ReadonlyArray<{
   policy: BookDistributionModel;
   title: string;
   description: string;
-  accessTier: "free" | "premium" | "premium_physical";
-  hasPhysical: boolean;
+  accessTier: "free" | "premium";
 }> = [
   {
-    policy: "nakama_or_purchase",
-    title: "Nakama & Beli Satuan",
+    policy: "nakama_subscription",
+    title: "Langganan Nakama",
     description:
-      "Bisa dibaca anggota Nakama sekaligus tersedia untuk pembelian satuan.",
-    accessTier: "premium_physical",
-    hasPhysical: true,
+      "Eksklusif bagi anggota Nakama dengan pembagian royalti berbasis baca.",
+    accessTier: "premium",
   },
   {
     policy: "single_purchase",
-    title: "Beli Satuan",
+    title: "Beli Satuan Digital",
     description:
-      "Pembaca membeli akses digital selamanya (tidak masuk paket Nakama).",
+      "Pembaca membeli akses digital permanen dengan harga satuan (IDR).",
     accessTier: "premium",
-    hasPhysical: false,
-  },
-  {
-    policy: "nakama_subscription",
-    title: "Khusus Anggota Nakama",
-    description:
-      "Eksklusif bagi pelanggan aktif Nakama dengan sistem bagi hasil.",
-    accessTier: "premium",
-    hasPhysical: false,
-  },
-  {
-    policy: "print_code_only",
-    title: "Eksklusif Pembeli Buku Cetak",
-    description: "Akses digital dibuka lewat kode klaim pada buku fisik.",
-    accessTier: "premium_physical",
-    hasPhysical: true,
   },
   {
     policy: "free_open",
     title: "Gratis Terbuka",
     description: "Gratis dan terbuka untuk seluruh pembaca AnzaBook.",
     accessTier: "free",
-    hasPhysical: false,
   },
 ];
 
@@ -103,8 +91,14 @@ function ManuscriptConfigFormContent({
   onSubmit,
   isSubmitting = false,
 }: Omit<ManuscriptConfigDialogProps, "isOpen">) {
-  const [title, setTitle] = useState(initialData?.title || "");
-  const [synopsis, setSynopsis] = useState(initialData?.synopsis || "");
+  const title = initialData?.title || "";
+  const synopsis = initialData?.synopsis || "";
+  const authorName = initialData?.authorName || "Penulis AnzaBook";
+  const coverUrl = initialData?.coverUrl ?? null;
+  const coverColor = initialData?.coverColor || "#181614";
+  const chapterCount = initialData?.chapterCount ?? 1;
+  const hasBodyContent = Boolean(initialData?.hasBodyContent);
+
   const [category, setCategory] = useState(
     initialData?.category || "Fiksi Sastra",
   );
@@ -114,7 +108,7 @@ function ManuscriptConfigFormContent({
     Boolean(initialData?.availableLanguages?.includes("en")),
   );
   const [digitalPolicy, setDigitalPolicy] = useState<BookDistributionModel>(
-    initialData?.digitalPolicy || "nakama_or_purchase",
+    initialData?.digitalPolicy || "nakama_subscription",
   );
   const [proposedDigitalPriceIdr, setProposedDigitalPriceIdr] =
     useState<string>(
@@ -122,11 +116,6 @@ function ManuscriptConfigFormContent({
         ? String(initialData.proposedDigitalPriceIdr)
         : String(DEFAULT_DIGITAL_BOOK_PRICE_IDR),
     );
-  const [hasPhysicalPrint, setHasPhysicalPrint] = useState(
-    initialData?.hasPhysicalPrint ??
-      (digitalPolicy === "print_code_only" ||
-        digitalPolicy === "nakama_or_purchase"),
-  );
   const [targetAudience, setTargetAudience] =
     useState<ManuscriptTargetAudience>(
       initialData?.targetAudience || "general",
@@ -170,32 +159,35 @@ function ManuscriptConfigFormContent({
     return submissionTargets[0]?.id || publisherId || "";
   }, [publisherId, submissionTargets, isTargetsLoading]);
 
-  const printCalc = calculatePrintEconomics({
-    pageCount: estimatedPages,
-    printRun: 1000,
-    authorRoyaltyPct: 12,
-  });
-  const standardTier = printCalc.tiers.find(
-    (t) => t.editionTier === "standard_trade",
-  );
+  const readinessItems = [
+    {
+      label: "Judul naskah terisi (minimal 2 karakter)",
+      ready: title.trim().length >= 2,
+    },
+    {
+      label: "Sinopsis terisi (minimal 10 karakter)",
+      ready: synopsis.trim().length >= 10,
+    },
+    {
+      label: "Isi chapter naskah sudah ditulis",
+      ready: hasBodyContent,
+    },
+  ];
+  const isManuscriptReady = readinessItems.every((item) => item.ready);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setValidationError(null);
 
-    if (title.trim().length < 2) {
-      setValidationError("Judul naskah minimal 2 karakter.");
+    if (!isManuscriptReady) {
+      setValidationError(
+        "Lengkapi judul, sinopsis, dan isi chapter di Editor sebelum mengajukan naskah.",
+      );
       return;
     }
     if (!selectedPublisherId) {
       setValidationError(
         "Pilih mitra penerbit tujuan yang terverifikasi terlebih dahulu.",
-      );
-      return;
-    }
-    if (synopsis.trim().length < 10) {
-      setValidationError(
-        "Sinopsis naskah minimal 10 karakter agar editor redaksi dapat meninjaunya.",
       );
       return;
     }
@@ -207,9 +199,7 @@ function ManuscriptConfigFormContent({
           ? ["id", "en"]
           : ["id"];
 
-    const requiresPrice =
-      digitalPolicy === "single_purchase" ||
-      digitalPolicy === "nakama_or_purchase";
+    const requiresPrice = digitalPolicy === "single_purchase";
     const parsedPrice = requiresPrice
       ? Number.parseInt(proposedDigitalPriceIdr.trim(), 10)
       : null;
@@ -217,11 +207,11 @@ function ManuscriptConfigFormContent({
     if (
       requiresPrice &&
       (Number.isNaN(parsedPrice ?? Number.NaN) ||
-        (parsedPrice ?? 0) < 0 ||
+        (parsedPrice ?? 0) <= 0 ||
         (parsedPrice ?? 0) > 10_000_000)
     ) {
       setValidationError(
-        "Usulan harga beli satuan harus antara Rp0 - Rp10.000.000.",
+        "Usulan harga beli satuan harus antara Rp1 hingga Rp10.000.000.",
       );
       return;
     }
@@ -240,7 +230,6 @@ function ManuscriptConfigFormContent({
         accessTier: selectedModel.accessTier,
         digitalPolicy,
         proposedDigitalPriceIdr: parsedPrice,
-        hasPhysicalPrint,
         targetAudience,
         estimatedPages: Math.min(
           3000,
@@ -270,12 +259,11 @@ function ManuscriptConfigFormContent({
     DISTRIBUTION_MODELS.find((m) => m.policy === digitalPolicy) ??
     DISTRIBUTION_MODELS[0];
 
+  const hasCover = isUsableAssetUrl(coverUrl) || coverUrl === "template";
   const isDirty =
-    title !== (initialData?.title || "") ||
-    synopsis !== (initialData?.synopsis || "") ||
     category !== (initialData?.category || "Fiksi Sastra") ||
     sourceLanguage !== (initialData?.sourceLanguage || "id") ||
-    digitalPolicy !== (initialData?.digitalPolicy || "nakama_or_purchase") ||
+    digitalPolicy !== (initialData?.digitalPolicy || "nakama_subscription") ||
     authorNotes !== (initialData?.authorNotes || "") ||
     isbn !== (initialData?.isbn || "");
 
@@ -284,27 +272,118 @@ function ManuscriptConfigFormContent({
       isOpen
       onClose={onClose}
       title="Konfigurasi & Pengajuan Naskah"
-      subtitle="Cari penerbit berdasarkan fokus topik kurasi, lengkapi metadata, dan ajukan draf Anda ke redaksi resmi."
+      subtitle="Periksa pratinjau buku dari Editor, pilih penerbit tujuan, dan tentukan model distribusi digital."
       titleId="ms-config-drawer-title"
       widthClass="max-w-2xl"
       isDirty={isDirty}
     >
       <div className="space-y-5 text-[var(--color-ink)]">
-        {/* Live Submission Summary Strip */}
-        <div className="rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-3.5 py-2.5 text-xs flex flex-wrap items-center justify-between gap-2">
-          <div className="min-w-0">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--color-muted)] block">
-              Ringkasan Pengajuan
-            </span>
-            <p className="font-semibold text-[var(--color-ink)] truncate">
-              {selectedTarget ? selectedTarget.name : "Pilih penerbit tujuan"} —{" "}
-              {selectedModel.title}
-            </p>
+        {/* Top Section: Read-Only Book Card Preview + Readiness Checklist */}
+        <section
+          aria-label="Pratinjau dan kesiapan naskah"
+          className="rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-4 space-y-4"
+        >
+          <div className="flex items-start gap-4">
+            <div className="w-20 shrink-0 aspect-[2/3]">
+              {hasCover ? (
+                <BookCover
+                  book={{
+                    title: title.trim() || "Naskah Tanpa Judul",
+                    author: authorName,
+                    coverUrl,
+                    coverColor,
+                    genres: [category],
+                    pageCount: estimatedPages,
+                  }}
+                  className="w-full h-full aspect-[2/3]"
+                  decorative
+                />
+              ) : (
+                <ManuscriptCoverPlaceholder
+                  title={title}
+                  compact
+                  className="size-full"
+                />
+              )}
+            </div>
+
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--color-muted)]">
+                Pratinjau Kartu Buku (Dari Editor)
+              </p>
+              <h2 className="font-serif text-base font-bold text-[var(--color-ink)] break-words">
+                {title.trim() || (
+                  <span className="italic font-normal text-[var(--color-muted)]">
+                    Naskah Tanpa Judul
+                  </span>
+                )}
+              </h2>
+              <p className="font-mono text-[11px] text-[var(--color-muted)]">
+                {authorName} &bull; {chapterCount} chapter &bull;{" "}
+                {selectedTarget ? selectedTarget.name : "Pilih penerbit"} —{" "}
+                {selectedModel.title}
+              </p>
+              <p className="text-xs leading-relaxed text-[var(--color-ink-2)] line-clamp-3">
+                {synopsis.trim() || (
+                  <span className="italic text-[var(--color-muted)]">
+                    Sinopsis belum diisi di Editor.
+                  </span>
+                )}
+              </p>
+            </div>
           </div>
-          <span className="font-mono text-[11px] text-[var(--color-muted)] shrink-0">
-            {hasPhysicalPrint ? "Digital + Cetak Fisik" : "Khusus Digital"}
-          </span>
-        </div>
+
+          {/* Checklist Kesiapan Naskah */}
+          <div className="border-t border-[var(--color-rule)] pt-3 space-y-2.5">
+            <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--color-muted)]">
+              Checklist Kesiapan Naskah
+            </p>
+            <ul className="space-y-1.5 text-xs">
+              {readinessItems.map((item) => (
+                <li key={item.label} className="flex items-center gap-2">
+                  <span
+                    className={`inline-flex size-4 shrink-0 items-center justify-center rounded-full border ${
+                      item.ready
+                        ? "border-[var(--color-green)] bg-[var(--color-green-soft)] text-[var(--color-green)]"
+                        : "border-[var(--color-error)]/50 bg-[var(--color-error-soft)] text-[var(--color-error)]"
+                    }`}
+                  >
+                    {item.ready ? (
+                      <Check className="size-2.5" aria-hidden="true" />
+                    ) : (
+                      <AlertCircle className="size-2.5" aria-hidden="true" />
+                    )}
+                  </span>
+                  <span
+                    className={
+                      item.ready
+                        ? "text-[var(--color-ink)]"
+                        : "text-[var(--color-ink-2)] font-medium"
+                    }
+                  >
+                    {item.label}
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            {!isManuscriptReady && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--color-accent)]/40 bg-[var(--color-accent-soft)] px-3.5 py-2.5 text-xs">
+                <span className="text-[var(--color-ink)]">
+                  Judul, sinopsis, dan isi chapter hanya disunting di Editor.
+                </span>
+                <Button
+                  type="button"
+                  onClick={onClose}
+                  className="min-h-10 px-3.5 text-xs font-semibold bg-[var(--color-ink)] text-[var(--color-paper)] hover:opacity-90 cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <PenTool className="size-3.5" aria-hidden="true" />
+                  <span>Lengkapi di Editor</span>
+                </Button>
+              </div>
+            )}
+          </div>
+        </section>
 
         {validationError && (
           <div
@@ -316,58 +395,34 @@ function ManuscriptConfigFormContent({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5 text-xs" noValidate>
-          {/* 1. Metadata: Judul & Kategori */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label
-                htmlFor="ms-config-title"
-                className="text-xs font-semibold"
-              >
-                Judul Naskah
-              </Label>
-              <Input
-                id="ms-config-title"
-                name="title"
-                value={title}
-                onChange={(e) => {
-                  setTitle(e.target.value);
-                  if (validationError) setValidationError(null);
-                }}
-                placeholder="Judul buku..."
-                required
-                autoFocus
-                className="min-h-11 text-xs font-serif bg-[var(--color-paper)]"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label
-                htmlFor="ms-config-category"
-                className="text-xs font-semibold"
-              >
-                Kategori / Genre Utama
-              </Label>
-              <select
-                id="ms-config-category"
-                name="category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full h-11 px-3 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] text-xs text-[var(--color-ink)]"
-              >
-                <option value="Fiksi Sastra">Fiksi Sastra &amp; Roman</option>
-                <option value="Filsafat & Pemikiran">
-                  Filsafat &amp; Pemikiran
-                </option>
-                <option value="Sejarah & Arsip">Sejarah &amp; Arsip</option>
-                <option value="Sosial Politik">Sosial Politik</option>
-                <option value="Sains Populer">Sains Populer</option>
-                <option value="Puisi & Prosa">Puisi &amp; Prosa</option>
-                <option value="Esai Kritis">Esai Kritis</option>
-              </select>
-            </div>
+          {/* 1. Kategori */}
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="ms-config-category"
+              className="text-xs font-semibold"
+            >
+              Kategori / Genre Utama
+            </Label>
+            <select
+              id="ms-config-category"
+              name="category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full h-11 px-3 rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper)] text-xs text-[var(--color-ink)]"
+            >
+              <option value="Fiksi Sastra">Fiksi Sastra &amp; Roman</option>
+              <option value="Filsafat & Pemikiran">
+                Filsafat &amp; Pemikiran
+              </option>
+              <option value="Sejarah & Arsip">Sejarah &amp; Arsip</option>
+              <option value="Sosial Politik">Sosial Politik</option>
+              <option value="Sains Populer">Sains Populer</option>
+              <option value="Puisi & Prosa">Puisi &amp; Prosa</option>
+              <option value="Esai Kritis">Esai Kritis</option>
+            </select>
           </div>
 
-          {/* 2. Searchable Topic-Ranked Publisher Picker (Path 2) */}
+          {/* 2. Searchable Topic-Ranked Publisher Picker */}
           <fieldset className="space-y-3 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-4">
             <legend className="px-1 text-xs font-semibold text-[var(--color-ink)]">
               Mitra Penerbit Tujuan (Terverifikasi IKAPI)
@@ -449,6 +504,11 @@ function ManuscriptConfigFormContent({
                     (pub.matchedTopics ?? []).map((t) => t.toLowerCase()),
                   );
                   const allTopics = pub.topics ?? [];
+                  const visibleTopics = allTopics.slice(0, 3);
+                  const remainingTopicsCount = Math.max(
+                    0,
+                    allTopics.length - 3,
+                  );
 
                   return (
                     <button
@@ -488,9 +548,9 @@ function ManuscriptConfigFormContent({
                           )}
                         </div>
 
-                        {allTopics.length > 0 && (
+                        {visibleTopics.length > 0 && (
                           <div className="flex flex-wrap gap-1.5">
-                            {allTopics.slice(0, 5).map((topic) => {
+                            {visibleTopics.map((topic) => {
                               const isMatched = matchedSet.has(
                                 topic.toLowerCase(),
                               );
@@ -507,6 +567,11 @@ function ManuscriptConfigFormContent({
                                 </span>
                               );
                             })}
+                            {remainingTopicsCount > 0 && (
+                              <span className="rounded px-2 py-0.5 text-[10px] font-mono border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-muted)]">
+                                +{remainingTopicsCount}
+                              </span>
+                            )}
                           </div>
                         )}
 
@@ -534,20 +599,20 @@ function ManuscriptConfigFormContent({
             )}
           </fieldset>
 
-          {/* 3. Model Distribusi & Harga (Primary Flow) */}
+          {/* 3. Model Distribusi & Harga (3 Digital Models) */}
           <fieldset className="space-y-2.5">
             <legend className="text-xs font-semibold flex items-center gap-1.5 pb-1">
               <Layers
                 className="size-3.5 text-[var(--color-accent)]"
                 aria-hidden="true"
               />
-              <span>Model Distribusi Buku</span>
+              <span>Model Distribusi Digital</span>
             </legend>
 
             <div
               role="radiogroup"
               aria-label="Model distribusi buku"
-              className="grid grid-cols-1 sm:grid-cols-2 gap-2.5"
+              className="grid grid-cols-1 sm:grid-cols-3 gap-2.5"
             >
               {DISTRIBUTION_MODELS.map((model) => {
                 const isSelected = digitalPolicy === model.policy;
@@ -557,10 +622,7 @@ function ManuscriptConfigFormContent({
                     type="button"
                     role="radio"
                     aria-checked={isSelected}
-                    onClick={() => {
-                      setDigitalPolicy(model.policy);
-                      setHasPhysicalPrint(model.hasPhysical);
-                    }}
+                    onClick={() => setDigitalPolicy(model.policy)}
                     className={`min-h-11 text-left p-3 rounded-xl border transition-colors cursor-pointer ${
                       isSelected
                         ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)]"
@@ -584,8 +646,7 @@ function ManuscriptConfigFormContent({
               })}
             </div>
 
-            {(digitalPolicy === "single_purchase" ||
-              digitalPolicy === "nakama_or_purchase") && (
+            {digitalPolicy === "single_purchase" && (
               <div className="pt-2 space-y-1.5">
                 <Label
                   htmlFor="ms-config-price"
@@ -596,81 +657,22 @@ function ManuscriptConfigFormContent({
                 <Input
                   id="ms-config-price"
                   name="proposedDigitalPriceIdr"
-                  type="number"
-                  min={0}
-                  max={10000000}
-                  step={1000}
+                  type="text"
+                  inputMode="numeric"
                   value={proposedDigitalPriceIdr}
-                  onChange={(e) => setProposedDigitalPriceIdr(e.target.value)}
+                  onChange={(e) =>
+                    setProposedDigitalPriceIdr(
+                      e.target.value.replace(/[^0-9]/g, ""),
+                    )
+                  }
+                  placeholder="45000"
                   className="min-h-11 text-xs font-mono bg-[var(--color-paper)]"
                 />
               </div>
             )}
           </fieldset>
 
-          {/* 4. Simulasi Cetak Fisik */}
-          {hasPhysicalPrint && (
-            <div className="p-3.5 rounded-xl border border-[var(--color-green)]/40 bg-[var(--color-green-soft)] space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-bold text-xs flex items-center gap-1.5">
-                  <Printer className="size-3.5" aria-hidden="true" />
-                  <span>Simulasi Cetak Fisik (1.000 Eks)</span>
-                </span>
-                <span className="text-[11px] font-mono text-[var(--color-ink-2)]">
-                  Book Paper 72gsm
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-2 text-[11px] font-mono">
-                <div>
-                  <span className="text-[var(--color-ink-2)] block text-[10px]">
-                    Perkiraan Hal:
-                  </span>
-                  <strong>{estimatedPages} hal</strong>
-                </div>
-                <div>
-                  <span className="text-[var(--color-ink-2)] block text-[10px]">
-                    HPP / Eks:
-                  </span>
-                  <strong>
-                    Rp{" "}
-                    {standardTier?.hppPerUnitIdr.toLocaleString("id-ID") ||
-                      "18.500"}
-                  </strong>
-                </div>
-                <div>
-                  <span className="text-[var(--color-ink-2)] block text-[10px]">
-                    Royalti Penulis:
-                  </span>
-                  <strong>12% / terjual</strong>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 5. Sinopsis */}
-          <div className="space-y-1.5">
-            <Label
-              htmlFor="ms-config-synopsis"
-              className="text-xs font-semibold"
-            >
-              Sinopsis Naskah (minimal 10 karakter)
-            </Label>
-            <Textarea
-              id="ms-config-synopsis"
-              name="synopsis"
-              value={synopsis}
-              onChange={(e) => {
-                setSynopsis(e.target.value);
-                if (validationError) setValidationError(null);
-              }}
-              placeholder="Tuliskan sinopsis singkat atau intisari naskah Anda..."
-              rows={3}
-              required
-              className="text-xs bg-[var(--color-paper)]"
-            />
-          </div>
-
-          {/* 6. Pengaturan Lanjutan (Collapsible Disclosure) */}
+          {/* 4. Pengaturan Lanjutan */}
           <details className="editorial-disclosure rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-3.5 text-xs">
             <summary className="cursor-pointer font-semibold text-[var(--color-ink)] select-none py-1">
               Pengaturan Lanjutan (Bahasa, Target Pembaca, Halaman, ISBN &amp;
@@ -815,8 +817,8 @@ function ManuscriptConfigFormContent({
 
             <Button
               type="submit"
-              disabled={isSubmitting}
-              className="min-h-11 px-6 text-xs font-semibold bg-[var(--color-accent)] hover:brightness-95 text-[var(--color-accent-ink)] cursor-pointer inline-flex items-center gap-1.5"
+              disabled={!isManuscriptReady || isSubmitting}
+              className="min-h-11 px-6 text-xs font-semibold bg-[var(--color-accent)] hover:brightness-95 text-[var(--color-accent-ink)] cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50"
             >
               <Send className="size-3.5" aria-hidden="true" />
               <span>

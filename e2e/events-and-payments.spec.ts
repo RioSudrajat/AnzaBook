@@ -140,7 +140,7 @@ test.describe("Issue #6 Payments Alignment & Event Host / Co-Host Flows", () => 
     await ownerContext.close();
   });
 
-  test("shows Sandbox confirmation dialog without revenue split on single_purchase book", async ({
+  test("creates Midtrans QRIS checkout order with tax breakdown on single_purchase book and unlocks on confirmation", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
@@ -148,6 +148,9 @@ test.describe("Issue #6 Payments Alignment & Event Host / Co-Host Flows", () => 
 
     const suffix = randomUUID().slice(0, 8);
     const bookSlug = `buku-satuan-e2e-${suffix}`;
+    const bookTitle = `Buku Uji Satuan ${suffix}`;
+    const purchaseId = randomUUID();
+    let bookId = "";
     const pool = new Pool({
       connectionString: process.env.STARTER_TEST_DATABASE_URL,
       max: 1,
@@ -159,39 +162,112 @@ test.describe("Issue #6 Payments Alignment & Event Host / Co-Host Flows", () => 
          RETURNING id`,
         [
           bookSlug,
-          `Buku Uji Satuan ${suffix}`,
+          bookTitle,
           "Penulis Uji",
           "/covers/default-book.jpg",
-          "Sinopsis buku uji pembelian satuan mode simulasi sandbox.",
+          "Sinopsis buku uji pembelian satuan mode simulasi sandbox Midtrans.",
         ],
       );
+      bookId = inserted.rows[0].id;
       await pool.query(
         `INSERT INTO book_chapters (book_id, chapter_number, title_id, content_id)
          VALUES ($1, 1, 'Bab 1', 'Paragraf pembuka.\n\nParagraf kedua.'),
                 ($1, 2, 'Bab 2', 'Paragraf bab dua.\n\nParagraf penutup bab dua.')`,
-        [inserted.rows[0].id],
+        [bookId],
       );
     } finally {
       await pool.end();
     }
 
+    const checkoutUrl =
+      "https://app.sandbox.midtrans.com/snap/v4/redirection/book-test-transaction";
+    const order = {
+      id: purchaseId,
+      bookId,
+      bookSlug,
+      bookTitle,
+      bookCoverUrl: "/covers/default-book.jpg",
+      status: "pending" as const,
+      checkoutUrl,
+      priceIdr: 54390,
+      createdAt: new Date().toISOString(),
+      paidAt: null as string | null,
+      tax: { subtotalIdr: 49000, taxIdr: 5390, rateBps: 1100 },
+    };
+
+    let paid = false;
+    await page.route(
+      `${API_URL}/api/books/${encodeURIComponent(bookSlug)}/checkout`,
+      async (route) => {
+        expect(route.request().postDataJSON()).toMatchObject({
+          requestId: expect.any(String),
+        });
+        await route.fulfill({ status: 201, json: { data: order } });
+      },
+    );
+    await page.route(
+      `${API_URL}/api/books/purchases/${encodeURIComponent(purchaseId)}`,
+      async (route) => {
+        await route.fulfill({
+          json: {
+            data: paid
+              ? { ...order, status: "paid", paidAt: new Date().toISOString() }
+              : order,
+          },
+        });
+      },
+    );
+    await page.route(
+      `${API_URL}/api/books/purchases/${encodeURIComponent(purchaseId)}/refresh`,
+      async (route) => {
+        await route.fulfill({
+          json: {
+            data: paid
+              ? { ...order, status: "paid", paidAt: new Date().toISOString() }
+              : order,
+          },
+        });
+      },
+    );
+
     await page.goto(`/books/${bookSlug}`);
     await page.waitForLoadState("networkidle");
 
+    await expect(
+      page
+        .getByRole("button", { name: /Klaim Akses Digital Buku Fisik/i })
+        .locator(":visible")
+        .first(),
+    ).toBeVisible();
     await page
-      .getByRole("button", { name: /Beli Akses Digital Selamanya/i })
+      .getByRole("button", { name: /Beli Buku Digital — Rp49\.000/i })
       .first()
       .click();
 
-    const dialog = page.locator("dialog[open]");
-    await expect(dialog).toBeVisible();
-    await expect(dialog.locator("h1")).toHaveCount(0);
-    await expect(dialog.locator("h2#purchase-confirm-title")).toBeVisible();
-    await expect(dialog).toContainText("Simulasi Sandbox (Demo)");
-    await expect(dialog).toContainText("Rp");
-    await expect(dialog).not.toContainText(/75%|10%|15%|bagi hasil/i);
+    await expect(page).toHaveURL(
+      new RegExp(`/books/${bookSlug}/checkout/${purchaseId}$`),
+    );
+    await expect(
+      page.getByRole("heading", { name: "Menunggu Pembayaran" }),
+    ).toBeVisible();
+    await expect(page.getByText("Rp49.000", { exact: true })).toBeVisible();
+    await expect(page.getByText("Rp5.390", { exact: true })).toBeVisible();
+    await expect(page.getByText("Rp54.390", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /Buka Pembayaran QRIS Midtrans/i }),
+    ).toHaveAttribute("href", checkoutUrl);
 
-    await dialog.getByRole("button", { name: "Konfirmasi Pembelian" }).click();
-    await expect(page).toHaveURL(new RegExp(`/read/${bookSlug}`));
+    paid = true;
+    await page
+      .getByRole("button", { name: "Periksa Status Pembayaran" })
+      .click();
+    await expect(
+      page.getByRole("heading", {
+        name: "Pembayaran Lunas — Akses Buku Aktif Selamanya",
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Mulai Membaca Buku" }),
+    ).toHaveAttribute("href", `/read/${bookSlug}`);
   });
 });

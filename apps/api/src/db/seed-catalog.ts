@@ -708,6 +708,7 @@ export async function seedCatalog(
           audioDurationMinutes: bookRow.audioDurationMinutes,
           digitalPolicy: bookRow.digitalPolicy,
           accessTier: bookRow.accessTier,
+          digitalPriceIdr: bookRow.digitalPriceIdr ?? null,
           hasPhysical: bookRow.hasPhysical,
           securityLevel: bookRow.securityLevel,
           isWeeklyBulletin: bookRow.isWeeklyBulletin,

@@ -65,6 +65,14 @@ export function LenisGsapProvider({ children }: { children: ReactNode }) {
       smoothWheel: true,
       wheelMultiplier: 1.0,
       touchMultiplier: 1.5,
+      // Let native modal dialogs & explicitly opted-in scroll regions handle wheel/touch directly
+      // so scrolling inside a modal never leaks into or locks against Lenis on the page behind it.
+      prevent: (node) =>
+        Boolean(
+          node.closest(
+            'dialog[open], [role="dialog"][aria-modal="true"], [data-lenis-prevent]',
+          ),
+        ),
     });
 
     lenisRef.current = lenis;

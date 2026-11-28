@@ -59,9 +59,12 @@ test.describe("Social Sharing, Styled Feed Cards & Public OG Previews (Issue #14
       );
       expect(privateOgRes.status()).toBe(404);
 
-      // Publish via real Quote Post Composer UI from Profile -> Ulasan & Kutipan
+      // Publish via real Quote Post Composer UI from Profile -> Aktivitas (unified with Public Profile)
       await page.goto("/app?tab=profile");
-      await page.getByRole("tab", { name: /Ulasan & Kutipan/i }).click();
+      await expect(
+        page.getByRole("tab", { name: /Rak Bacaan/i }),
+      ).toBeVisible();
+      await page.getByRole("tab", { name: /Aktivitas/i }).click();
       await expect(page.getByText(quoteText)).toBeVisible();
 
       await page
@@ -199,7 +202,7 @@ test.describe("Social Sharing, Styled Feed Cards & Public OG Previews (Issue #14
     );
     await expect(page.getByText(/^2\/\d+$/)).toBeVisible();
 
-    await page.getByRole("button", { name: "Keluar ke Home" }).click();
+    await page.getByRole("button", { name: "Kembali" }).click();
     const exitDialog = page.getByRole("dialog", {
       name: "Ringkasan Sesi Baca",
     });
@@ -218,7 +221,7 @@ test.describe("Social Sharing, Styled Feed Cards & Public OG Previews (Issue #14
 
     // Regression check for PR #31 suppressResumeOnCloseRef bug:
     // Exiting immediately after closing composer must NOT open exit sheet again or duplicate the session
-    await page.getByRole("button", { name: "Keluar ke Home" }).click();
+    await page.getByRole("button", { name: "Kembali" }).click();
     await expect(page).toHaveURL(/\/app/);
 
     const sessionsRes = await page.request.get(
@@ -241,8 +244,9 @@ test.describe("Social Sharing, Styled Feed Cards & Public OG Previews (Issue #14
         ).status(),
       ).toBe(404);
 
-      // 2. Publish session via Profile -> Session Composer with WPM & duration hidden (FLEX-03)
+      // 2. Publish session via Profile -> Aktivitas -> Session Composer with WPM & duration hidden (FLEX-03)
       await page.goto("/app?tab=profile");
+      await page.getByRole("tab", { name: /Aktivitas/i }).click();
       await page
         .getByRole("button", { name: /Post & Bagikan/i })
         .first()

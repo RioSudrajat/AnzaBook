@@ -201,7 +201,7 @@ function ExitSheetContent({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               maxLength={140}
-              placeholder={`Sesi Bab ${summary.endChapterNumber}`}
+              placeholder={`Sesi Chapter ${summary.endChapterNumber}`}
               className="min-h-11 w-full rounded-[6px] border border-border bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
             />
           </div>
@@ -345,7 +345,7 @@ function ExitSheetContent({
               onClick={() => onContinueNextChapter(nextChapter)}
               className="min-h-11 flex-1 font-sans text-sm font-medium text-foreground"
             >
-              Lanjut ke Bab {nextChapter}
+              Lanjut ke Chapter {nextChapter}
             </Button>
           )}
         </div>

@@ -140,7 +140,7 @@ describe("Publisher & Manuscript Shared Contracts", () => {
       slug: "draf-legal",
       category: "Fiksi",
       synopsis: "Sinopsis awal naskah.",
-      proposedDigitalPolicy: "nakama_or_purchase",
+      proposedDigitalPolicy: "single_purchase",
       proposedDigitalPriceIdr: 49000,
     };
     expect(authorUpdateManuscriptSchema.safeParse(valid).success).toBe(true);
@@ -359,14 +359,9 @@ describe("Publisher & Manuscript Shared Contracts", () => {
 
   it("validates Phase 1 distribution helper, approved writer, inventory, and DTO shapes", () => {
     expect(DEFAULT_DIGITAL_BOOK_PRICE_IDR).toBe(45_000);
-    expect(deriveAccessTier("free_open", false)).toBe("free");
-    expect(deriveAccessTier("print_code_only", false)).toBe("premium_physical");
-    expect(deriveAccessTier("single_purchase", false)).toBe("premium");
-    expect(deriveAccessTier("nakama_subscription", false)).toBe("premium");
-    expect(deriveAccessTier("nakama_or_purchase", false)).toBe("premium");
-    expect(deriveAccessTier("nakama_or_purchase", true)).toBe(
-      "premium_physical",
-    );
+    expect(deriveAccessTier("free_open")).toBe("free");
+    expect(deriveAccessTier("single_purchase")).toBe("premium");
+    expect(deriveAccessTier("nakama_subscription")).toBe("premium");
 
     const writerInput: AddApprovedWriterInput = { identifier: "@penulis" };
     expect(addApprovedWriterSchema.parse(writerInput)).toEqual({

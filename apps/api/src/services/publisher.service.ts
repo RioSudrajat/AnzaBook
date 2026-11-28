@@ -1,6 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { and, asc, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
+import { extractPlainParagraphs } from "@starter/shared/reading-progress";
 import type {
+  BookDistributionModel,
   ManagedPublisherSummaryDto,
   ManuscriptChapterDto,
   ManuscriptSubmissionDto,
@@ -160,6 +162,7 @@ function formatManuscriptDto(
     status: submission.status,
     rejectionReason: submission.rejectionReason,
     publishedBookId: submission.publishedBookId,
+    isCatalogRevision: submission.isCatalogRevision,
     ...(isApprovedWriter !== undefined ? { isApprovedWriter } : {}),
     chapters: chapterDtos,
     totalChapters: chapterDtos.length,
@@ -248,7 +251,12 @@ async function loadBookCountsMap(
       count: sql<number>`count(*)`,
     })
     .from(books)
-    .where(inArray(books.publisherId, [...publisherIds]))
+    .where(
+      and(
+        inArray(books.publisherId, [...publisherIds]),
+        eq(books.isArchived, false),
+      ),
+    )
     .groupBy(books.publisherId);
 
   for (const row of rows) {
@@ -839,12 +847,13 @@ export async function createManuscriptDraft(
     .where(eq(user.id, authorUserId))
     .limit(1);
 
-  const baseSlug = (input.title || "naskah-baru")
+  const normalizedTitle = input.title?.trim() ?? "";
+  const baseSlug = normalizedTitle
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)+/g, "")
     .slice(0, 100);
-  const slug = `${baseSlug || "naskah"}-${randomBytes(3).toString("hex")}`;
+  const slug = `${baseSlug || "draf"}-${randomBytes(3).toString("hex")}`;
 
   const { submission, chapters } = await db.transaction(async (tx) => {
     const [sub] = await tx
@@ -853,7 +862,7 @@ export async function createManuscriptDraft(
         authorUserId,
         publisherId: input.publisherId || null,
         slug,
-        title: input.title,
+        title: normalizedTitle,
         coverUrl: input.coverUrl || null,
         coverColor: input.coverColor || "#13110F",
         category: input.category || null,
@@ -864,7 +873,7 @@ export async function createManuscriptDraft(
         isbn: input.isbn ?? null,
         estimatedPages: input.estimatedPages ?? null,
         proposedDigitalPolicy:
-          input.proposedDigitalPolicy || "nakama_or_purchase",
+          input.proposedDigitalPolicy || "nakama_subscription",
         proposedDigitalPriceIdr: input.proposedDigitalPriceIdr ?? null,
         status: "draft",
       })
@@ -877,8 +886,8 @@ export async function createManuscriptDraft(
         : [
             {
               chapterNumber: 1,
-              titleId: "Bab 1: Awal Mula",
-              contentId: "<p>Tuliskan naskah karyamu di sini...</p>",
+              titleId: "",
+              contentId: '{"type":"doc","content":[{"type":"paragraph"}]}',
               estimatedMinutes: 5,
             },
           ];
@@ -1321,6 +1330,49 @@ export async function submitManuscript(
   return formatManuscriptDto(submission, author, publisherName, chapters);
 }
 
+export function assertManuscriptCompleteness(params: {
+  title: string;
+  synopsis: string;
+  chapters: readonly { contentId: string }[];
+  digitalPolicy: BookDistributionModel;
+  digitalPriceIdr: number | null;
+}) {
+  if (params.title.trim().length < 2) {
+    throw new HttpError(
+      400,
+      "MANUSCRIPT_INCOMPLETE",
+      "Judul naskah minimal 2 karakter sebelum diajukan atau diterbitkan.",
+    );
+  }
+  if (params.synopsis.trim().length < 10) {
+    throw new HttpError(
+      400,
+      "MANUSCRIPT_INCOMPLETE",
+      "Sinopsis naskah minimal 10 karakter sebelum diajukan atau diterbitkan.",
+    );
+  }
+  const hasWrittenChapter = params.chapters.some(
+    (ch) => extractPlainParagraphs(ch.contentId).length > 0,
+  );
+  if (!hasWrittenChapter) {
+    throw new HttpError(
+      400,
+      "MANUSCRIPT_INCOMPLETE",
+      "Naskah harus memiliki minimal satu bab dengan isi tulisan.",
+    );
+  }
+  if (
+    params.digitalPolicy === "single_purchase" &&
+    (!params.digitalPriceIdr || params.digitalPriceIdr < 10_000)
+  ) {
+    throw new HttpError(
+      400,
+      "MANUSCRIPT_INCOMPLETE",
+      "Harga beli satuan digital minimal Rp10.000.",
+    );
+  }
+}
+
 /**
  * Submits an author's draft or revised manuscript to a publisher.
  * Auto-assigns `anzabook` if no publisherId is given on either the draft or the request.
@@ -1368,6 +1420,19 @@ export async function submitManuscriptDraft(
       "Naskah sudah diajukan atau telah diterbitkan.",
     );
   }
+
+  const chapters = await db
+    .select({ contentId: manuscriptChapters.contentId })
+    .from(manuscriptChapters)
+    .where(eq(manuscriptChapters.manuscriptId, current.id));
+
+  assertManuscriptCompleteness({
+    title: current.title,
+    synopsis: current.synopsis,
+    chapters,
+    digitalPolicy: current.proposedDigitalPolicy,
+    digitalPriceIdr: current.proposedDigitalPriceIdr,
+  });
 
   let finalPublisherId = publisherId || current.publisherId || null;
   if (finalPublisherId) {
@@ -1488,7 +1553,12 @@ export async function listPublisherManuscripts(
       })
       .from(manuscriptSubmissions)
       .leftJoin(user, eq(manuscriptSubmissions.authorUserId, user.id))
-      .where(eq(manuscriptSubmissions.publisherId, pub.id))
+      .where(
+        and(
+          eq(manuscriptSubmissions.publisherId, pub.id),
+          eq(manuscriptSubmissions.isCatalogRevision, false),
+        ),
+      )
       .orderBy(desc(manuscriptSubmissions.updatedAt)),
     db
       .select({ userId: publisherApprovedWriters.userId })
@@ -1616,7 +1686,12 @@ export async function listMyManuscripts(
     .from(manuscriptSubmissions)
     .leftJoin(publishers, eq(manuscriptSubmissions.publisherId, publishers.id))
     .leftJoin(user, eq(manuscriptSubmissions.authorUserId, user.id))
-    .where(eq(manuscriptSubmissions.authorUserId, authorUserId))
+    .where(
+      and(
+        eq(manuscriptSubmissions.authorUserId, authorUserId),
+        eq(manuscriptSubmissions.isCatalogRevision, false),
+      ),
+    )
     .orderBy(desc(manuscriptSubmissions.updatedAt));
 
   const results: ManuscriptSubmissionDto[] = [];
@@ -1639,4 +1714,124 @@ export async function listMyManuscripts(
   }
 
   return results;
+}
+
+export async function deleteAuthorManuscript(
+  authorUserId: string,
+  idOrSlug: string,
+  withdrawFirst = false,
+): Promise<{ deleted: boolean }> {
+  const isUuid = UUID_REGEX.test(idOrSlug);
+  const [current] = await db
+    .select()
+    .from(manuscriptSubmissions)
+    .where(
+      isUuid
+        ? or(
+            eq(manuscriptSubmissions.id, idOrSlug),
+            eq(manuscriptSubmissions.slug, idOrSlug),
+          )
+        : eq(manuscriptSubmissions.slug, idOrSlug),
+    )
+    .limit(1);
+
+  if (!current) {
+    throw new HttpError(404, "MANUSCRIPT_NOT_FOUND", "Naskah tidak ditemukan.");
+  }
+
+  if (current.authorUserId !== authorUserId) {
+    throw new HttpError(
+      403,
+      "FORBIDDEN",
+      "Hanya penulis pemilik naskah yang dapat menghapus naskah ini.",
+    );
+  }
+
+  if (current.publishedBookId !== null || current.status === "published") {
+    throw new HttpError(
+      409,
+      "MANUSCRIPT_LOCKED",
+      "Naskah yang sudah terbit di katalog tidak dapat dihapus dari studio penulis.",
+    );
+  }
+
+  if (current.status === "in_editing") {
+    throw new HttpError(
+      409,
+      "MANUSCRIPT_LOCKED",
+      "Naskah sedang disunting oleh tim redaksi penerbit.",
+    );
+  }
+
+  if (current.status === "pending_review" && !withdrawFirst) {
+    throw new HttpError(
+      409,
+      "MANUSCRIPT_PENDING_REVIEW",
+      "Tarik pengajuan terlebih dahulu sebelum menghapus naskah ini.",
+    );
+  }
+
+  await db
+    .delete(manuscriptSubmissions)
+    .where(eq(manuscriptSubmissions.id, current.id));
+
+  return { deleted: true };
+}
+
+export async function deletePublisherManuscript(
+  userId: string,
+  publisherSlug: string,
+  idOrSlug: string,
+): Promise<{ deleted: boolean; detached?: boolean }> {
+  const pub = await resolvePublisherBySlugOrId(publisherSlug);
+  await requirePublisherMember(pub.id, userId, ["owner", "editor"]);
+
+  const isUuid = UUID_REGEX.test(idOrSlug);
+  const [current] = await db
+    .select()
+    .from(manuscriptSubmissions)
+    .where(
+      isUuid
+        ? or(
+            eq(manuscriptSubmissions.id, idOrSlug),
+            eq(manuscriptSubmissions.slug, idOrSlug),
+          )
+        : eq(manuscriptSubmissions.slug, idOrSlug),
+    )
+    .limit(1);
+
+  if (!current) {
+    throw new HttpError(404, "MANUSCRIPT_NOT_FOUND", "Naskah tidak ditemukan.");
+  }
+
+  if (current.publisherId !== pub.id) {
+    throw new HttpError(
+      403,
+      "FORBIDDEN",
+      "Naskah ini tidak termasuk dalam katalog atau antrean penerbit Anda.",
+    );
+  }
+
+  // Catalog revision drafts or publisher-authored drafts can always be discarded completely.
+  if (current.isCatalogRevision || current.authorUserId === userId) {
+    await db
+      .delete(manuscriptSubmissions)
+      .where(eq(manuscriptSubmissions.id, current.id));
+    return { deleted: true };
+  }
+
+  // External submissions can be dismissed from inbox cleanly when rejected without erasing author's copy.
+  if (current.status === "rejected") {
+    await db
+      .update(manuscriptSubmissions)
+      .set({ publisherId: null, updatedAt: new Date() })
+      .where(eq(manuscriptSubmissions.id, current.id));
+    return { deleted: false, detached: true };
+  }
+
+  throw new HttpError(
+    409,
+    "MANUSCRIPT_LOCKED",
+    "Tolak naskah terlebih dahulu atau kembalikan untuk revisi sebelum membersihkan dari kotak masuk.",
+  );
 }

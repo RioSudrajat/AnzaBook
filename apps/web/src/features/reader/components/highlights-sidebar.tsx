@@ -62,7 +62,7 @@ export function HighlightsSidebar({
 
   const getChapterTitle = (chapterNum: number) => {
     const chap = allChapters.find((c) => c.chapterNumber === chapterNum);
-    return chap ? chap.title : `Bab ${chapterNum}`;
+    return chap ? chap.title : `Chapter ${chapterNum}`;
   };
 
   const getColorClasses = (color: string) => {

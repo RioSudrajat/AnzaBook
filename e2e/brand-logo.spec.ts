@@ -50,7 +50,10 @@ test.describe("AnzaBook Open-Page Arch Brand Assets", () => {
     if (await preloader.isVisible()) {
       const preloaderMark = preloader.locator('[data-brand-mark="anza-arch"]');
       await expect(preloaderMark).toBeVisible();
-      await page.getByTestId("skip-preloader").click();
+      await page
+        .getByTestId("skip-preloader")
+        .click({ timeout: 3000 })
+        .catch(() => undefined);
       await expect(preloader).toHaveCount(0);
     }
 

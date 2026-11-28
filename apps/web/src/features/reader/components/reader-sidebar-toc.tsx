@@ -18,7 +18,7 @@ export function ReaderSidebarToc({
 }: ReaderSidebarTocProps) {
   return (
     <nav
-      aria-label="Daftar Bab Naskah"
+      aria-label="Daftar Chapter Naskah"
       className="hidden lg:block fixed left-4 xl:left-8 top-1/3 -translate-y-8 z-20 w-44 xl:w-52 font-mono text-xs select-none"
     >
       <div className="space-y-3.5">

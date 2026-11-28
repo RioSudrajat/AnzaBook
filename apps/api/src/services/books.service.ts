@@ -1,4 +1,16 @@
-import { and, desc, eq, gte, ilike, isNull, lte, or, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  gt,
+  gte,
+  ilike,
+  isNull,
+  lte,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import { db } from "../db";
 import { env } from "../config/env";
 import {
@@ -11,6 +23,7 @@ import {
   communityEvents,
   communityWalletLedgers,
   eventRsvps,
+  publisherMembers,
   publishers,
   storeBranches,
   storeInventories,
@@ -23,9 +36,12 @@ import {
   enforceChapterWindowRateLimit,
   issueOrGetDrmWatermarkSession,
 } from "./drm.service";
-import { getActiveMembership } from "./membership.service";
+import { getActiveMembership, membershipGateway } from "./membership.service";
+import type { VerifiedPayment } from "./membership-payment";
+import { membershipTaxBreakdown, nextOrderStatus } from "./membership-policy";
 import { countContentWords } from "@starter/shared/reading-progress";
 import type {
+  BookCheckoutInput,
   ListBooksQuery,
   ReadBookQuery,
   StockQuery,
@@ -37,6 +53,7 @@ import type {
   BookDetailDto,
   BookDistributionModel,
   BookPurchaseDto,
+  BookPurchaseOrderDto,
   BookReaderPayloadDto,
   BookSummaryDto,
   CommunityEventSummaryDto,
@@ -147,45 +164,25 @@ export async function getBookReadAccess(
     return { hasFullAccess: true, accessExpiresAt: null, hasEventSampleAccess };
   }
 
-  // 2. Physical claim code unlocks all digital policies
+  // 2. Physical claim code unlocks all paid digital policies
   const isClaimed = await hasClaimedBook(book.id, userId);
   if (isClaimed) {
     return { hasFullAccess: true, accessExpiresAt: null, hasEventSampleAccess };
   }
 
-  // 3. Print code only: requires physical claim code redemption. Nakama does not unlock.
-  if (book.digitalPolicy === "print_code_only") {
-    return {
-      hasFullAccess: false,
-      accessExpiresAt: null,
-      hasEventSampleAccess,
-    };
-  }
-
-  // 4. Check single purchase for single_purchase and nakama_or_purchase
-  const isPurchased =
-    book.digitalPolicy === "single_purchase" ||
-    book.digitalPolicy === "nakama_or_purchase"
-      ? await hasPurchasedBook(book.id, userId)
-      : false;
-
-  if (isPurchased) {
-    return { hasFullAccess: true, accessExpiresAt: null, hasEventSampleAccess };
-  }
-
-  // 5. Single purchase only: requires purchase or physical claim. Nakama does not unlock.
+  // 3. Single purchase: permanent digital purchase required. Nakama membership does NOT unlock.
   if (book.digitalPolicy === "single_purchase") {
+    const isPurchased = await hasPurchasedBook(book.id, userId);
     return {
-      hasFullAccess: false,
+      hasFullAccess: isPurchased,
       accessExpiresAt: null,
       hasEventSampleAccess,
     };
   }
 
-  // 6. Nakama subscription and hybrid check active Nakama membership
+  // 4. Nakama subscription: active Nakama membership unlocks
   const membership =
-    book.digitalPolicy === "nakama_subscription" ||
-    book.digitalPolicy === "nakama_or_purchase"
+    book.digitalPolicy === "nakama_subscription"
       ? await getActiveMembership(userId)
       : null;
 
@@ -252,23 +249,397 @@ export async function resolveCommunityAffiliateAttribution(
 
 function toBookPurchaseDto(
   purchase: typeof bookPurchases.$inferSelect,
-  book?: Pick<typeof books.$inferSelect, "title" | "coverUrl">,
+  book?: Pick<typeof books.$inferSelect, "slug" | "title" | "coverUrl">,
 ): BookPurchaseDto {
   return {
     id: purchase.id,
     userId: purchase.userId,
     bookId: purchase.bookId,
+    bookSlug: book?.slug,
     bookTitle: book?.title,
     bookCoverUrl: book?.coverUrl,
     priceIdr: purchase.priceIdr,
+    tax:
+      purchase.subtotalIdr === null ||
+      purchase.taxIdr === null ||
+      purchase.taxRateBps === null
+        ? null
+        : {
+            subtotalIdr: purchase.subtotalIdr,
+            taxIdr: purchase.taxIdr,
+            rateBps: purchase.taxRateBps,
+          },
     publisherShareIdr: purchase.publisherShareIdr,
     affiliateCalendarId: purchase.affiliateCalendarId,
     affiliateCommissionIdr: purchase.affiliateCommissionIdr,
     anzabookNetIdr: purchase.anzabookNetIdr,
-    status: purchase.status as "pending" | "paid" | "failed",
+    status: purchase.status,
     paymentMethod: purchase.paymentMethod,
+    checkoutUrl: purchase.checkoutUrl,
     createdAt: purchase.createdAt.toISOString(),
+    paidAt: purchase.paidAt?.toISOString() ?? null,
   };
+}
+
+const BOOK_DAY_MS = 24 * 60 * 60 * 1000;
+const BOOK_CHECKOUT_WINDOW_MS = 10 * 60 * 1000;
+const BOOK_CHECKOUT_LIMIT = 6;
+
+function toBookPurchaseOrderDto(
+  purchase: typeof bookPurchases.$inferSelect,
+  book: Pick<typeof books.$inferSelect, "slug" | "title" | "coverUrl">,
+): BookPurchaseOrderDto {
+  const awaitingPayment =
+    purchase.status === "pending" || purchase.status === "failed";
+  const linkExpired =
+    awaitingPayment &&
+    Boolean(
+      purchase.checkoutCreatedAt &&
+      Date.now() - purchase.checkoutCreatedAt.getTime() >= BOOK_DAY_MS,
+    );
+  return {
+    id: purchase.id,
+    bookId: purchase.bookId,
+    bookSlug: book.slug,
+    bookTitle: book.title,
+    bookCoverUrl: book.coverUrl,
+    priceIdr: purchase.priceIdr,
+    tax:
+      purchase.subtotalIdr === null ||
+      purchase.taxIdr === null ||
+      purchase.taxRateBps === null
+        ? null
+        : {
+            subtotalIdr: purchase.subtotalIdr,
+            taxIdr: purchase.taxIdr,
+            rateBps: purchase.taxRateBps,
+          },
+    status: linkExpired ? "expired" : purchase.status,
+    checkoutUrl: awaitingPayment && !linkExpired ? purchase.checkoutUrl : null,
+    createdAt: purchase.createdAt.toISOString(),
+    paidAt: purchase.paidAt?.toISOString() ?? null,
+  };
+}
+
+async function reserveBookCheckoutOrder(
+  userId: string,
+  slug: string,
+  input: BookCheckoutInput,
+) {
+  return db.transaction(async (tx) => {
+    await tx
+      .select({ id: user.id })
+      .from(user)
+      .where(eq(user.id, userId))
+      .for("no key update");
+
+    const [book] = await tx
+      .select()
+      .from(books)
+      .where(and(eq(books.slug, slug), eq(books.isArchived, false)))
+      .limit(1);
+
+    if (!book) {
+      throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+    }
+    if (
+      book.digitalPolicy !== "single_purchase" ||
+      book.digitalPriceIdr === null ||
+      book.digitalPriceIdr <= 0
+    ) {
+      throw new HttpError(
+        400,
+        "BOOK_NOT_PURCHASABLE",
+        "Buku ini tidak tersedia untuk pembelian satuan digital.",
+      );
+    }
+
+    const [existingRequest] = await tx
+      .select()
+      .from(bookPurchases)
+      .where(
+        and(
+          eq(bookPurchases.userId, userId),
+          eq(bookPurchases.requestId, input.requestId),
+        ),
+      );
+    if (existingRequest) {
+      if (existingRequest.bookId !== book.id) {
+        throw new HttpError(
+          409,
+          "CHECKOUT_CONFLICT",
+          "Pesanan buku berubah. Buat pesanan baru.",
+        );
+      }
+      return { purchaseId: existingRequest.id, book };
+    }
+
+    const [alreadyPaid] = await tx
+      .select({ id: bookPurchases.id })
+      .from(bookPurchases)
+      .where(
+        and(
+          eq(bookPurchases.bookId, book.id),
+          eq(bookPurchases.userId, userId),
+          eq(bookPurchases.status, "paid"),
+        ),
+      );
+    if (alreadyPaid) {
+      throw new HttpError(
+        409,
+        "BOOK_ALREADY_PURCHASED",
+        "Buku ini sudah Anda miliki secara penuh.",
+      );
+    }
+
+    const recent = await tx
+      .select({ id: bookPurchases.id })
+      .from(bookPurchases)
+      .where(
+        and(
+          eq(bookPurchases.userId, userId),
+          gt(
+            bookPurchases.createdAt,
+            new Date(Date.now() - BOOK_CHECKOUT_WINDOW_MS),
+          ),
+        ),
+      )
+      .limit(BOOK_CHECKOUT_LIMIT);
+    if (recent.length >= BOOK_CHECKOUT_LIMIT) {
+      throw new HttpError(
+        429,
+        "CHECKOUT_RATE_LIMIT",
+        "Terlalu banyak percobaan pembayaran buku. Coba lagi nanti.",
+      );
+    }
+
+    const rateBps = env.membershipTaxRateBps;
+    if (rateBps === null) {
+      throw new HttpError(
+        503,
+        "PAYMENT_UNAVAILABLE",
+        "Perhitungan pajak pembayaran belum tersedia.",
+      );
+    }
+    const tax = membershipTaxBreakdown(book.digitalPriceIdr, rateBps);
+    const grossPriceIdr = tax.subtotalIdr + tax.taxIdr;
+    const subtotalForShare = tax.subtotalIdr;
+
+    const affiliateCalendarId = await resolveCommunityAffiliateAttribution(
+      userId,
+      input,
+    );
+    const publisherShareIdr = Math.round(subtotalForShare * 0.75);
+    const affiliateCommissionIdr = affiliateCalendarId
+      ? Math.round(subtotalForShare * 0.1)
+      : 0;
+    const anzabookNetIdr =
+      subtotalForShare - publisherShareIdr - affiliateCommissionIdr;
+
+    const [inserted] = await tx
+      .insert(bookPurchases)
+      .values({
+        requestId: input.requestId,
+        userId,
+        bookId: book.id,
+        priceIdr: grossPriceIdr,
+        subtotalIdr: tax.subtotalIdr,
+        taxIdr: tax.taxIdr,
+        taxRateBps: tax.rateBps,
+        currency: "IDR",
+        publisherShareIdr,
+        affiliateCalendarId,
+        affiliateCommissionIdr,
+        anzabookNetIdr,
+        status: "pending",
+        paymentMethod: "qris",
+      })
+      .returning({ id: bookPurchases.id });
+
+    return { purchaseId: inserted.id, book };
+  });
+}
+
+export async function startBookCheckout(
+  userId: string,
+  slug: string,
+  input: BookCheckoutInput,
+): Promise<BookPurchaseOrderDto> {
+  const gateway = membershipGateway();
+  const { purchaseId, book } = await reserveBookCheckoutOrder(
+    userId,
+    slug,
+    input,
+  );
+
+  return db.transaction(async (tx) => {
+    const [order] = await tx
+      .select()
+      .from(bookPurchases)
+      .where(
+        and(eq(bookPurchases.id, purchaseId), eq(bookPurchases.userId, userId)),
+      )
+      .for("update");
+
+    if (!order) {
+      throw new HttpError(404, "ORDER_NOT_FOUND", "Pesanan tidak ditemukan.");
+    }
+    if (order.checkoutUrl || order.status !== "pending") {
+      return toBookPurchaseOrderDto(order, book);
+    }
+
+    const subtotalIdr = order.subtotalIdr ?? order.priceIdr;
+    const taxIdr = order.taxIdr ?? 0;
+
+    const checkoutUrl = await gateway.createBookCheckout({
+      id: order.id,
+      bookSlug: book.slug,
+      bookTitle: book.title,
+      priceIdr: order.priceIdr,
+      subtotalIdr,
+      taxIdr,
+    });
+
+    const [updated] = await tx
+      .update(bookPurchases)
+      .set({
+        checkoutUrl,
+        checkoutCreatedAt: new Date(),
+      })
+      .where(eq(bookPurchases.id, order.id))
+      .returning();
+
+    return toBookPurchaseOrderDto(updated, book);
+  });
+}
+
+export async function getBookPurchaseOrder(
+  userId: string,
+  purchaseId: string,
+): Promise<BookPurchaseOrderDto> {
+  const [row] = await db
+    .select({
+      purchase: bookPurchases,
+      book: {
+        slug: books.slug,
+        title: books.title,
+        coverUrl: books.coverUrl,
+      },
+    })
+    .from(bookPurchases)
+    .innerJoin(books, eq(bookPurchases.bookId, books.id))
+    .where(
+      and(eq(bookPurchases.id, purchaseId), eq(bookPurchases.userId, userId)),
+    )
+    .limit(1);
+
+  if (!row) {
+    throw new HttpError(
+      404,
+      "ORDER_NOT_FOUND",
+      "Pesanan buku tidak ditemukan.",
+    );
+  }
+
+  return toBookPurchaseOrderDto(row.purchase, row.book);
+}
+
+export async function bookPurchaseOrderExists(
+  orderId: string,
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id: bookPurchases.id })
+    .from(bookPurchases)
+    .where(eq(bookPurchases.id, orderId))
+    .limit(1);
+  return Boolean(row);
+}
+
+export async function reconcileBookPurchasePayment(payment: VerifiedPayment) {
+  await db.transaction(async (tx) => {
+    const [order] = await tx
+      .select()
+      .from(bookPurchases)
+      .where(eq(bookPurchases.id, payment.orderId))
+      .for("update");
+
+    if (!order) return;
+
+    if (
+      order.priceIdr !== payment.priceIdr ||
+      order.currency !== payment.currency
+    ) {
+      throw new HttpError(
+        409,
+        "PAYMENT_AMOUNT_MISMATCH",
+        "Nominal pembayaran tidak cocok dengan harga buku.",
+      );
+    }
+
+    if (
+      order.paidTransactionId &&
+      order.paidTransactionId !== payment.transactionId
+    ) {
+      return;
+    }
+
+    const status = nextOrderStatus(order.status, payment.status);
+    if (status === order.status) return;
+
+    const changedToPaid = status === "paid";
+    const paidAt = changedToPaid
+      ? new Date(
+          Math.max(
+            order.createdAt.getTime(),
+            Math.min(payment.paidAt?.getTime() ?? Date.now(), Date.now()),
+          ),
+        )
+      : order.paidAt;
+
+    await tx
+      .update(bookPurchases)
+      .set({
+        status,
+        paidAt,
+        paidTransactionId: changedToPaid
+          ? payment.transactionId
+          : order.paidTransactionId,
+      })
+      .where(eq(bookPurchases.id, order.id));
+
+    if (
+      changedToPaid &&
+      order.affiliateCalendarId &&
+      order.affiliateCommissionIdr > 0
+    ) {
+      const [existingLedger] = await tx
+        .select({ id: communityWalletLedgers.id })
+        .from(communityWalletLedgers)
+        .where(
+          and(
+            eq(communityWalletLedgers.calendarId, order.affiliateCalendarId),
+            eq(communityWalletLedgers.entryType, "affiliate_book_purchase"),
+            eq(communityWalletLedgers.sourceBookPurchaseId, order.id),
+          ),
+        )
+        .limit(1);
+
+      if (!existingLedger) {
+        const [book] = await tx
+          .select({ title: books.title })
+          .from(books)
+          .where(eq(books.id, order.bookId))
+          .limit(1);
+        await tx.insert(communityWalletLedgers).values({
+          calendarId: order.affiliateCalendarId,
+          entryType: "affiliate_book_purchase",
+          amountIdr: order.affiliateCommissionIdr,
+          sourceBookPurchaseId: order.id,
+          description: `Komisi afiliasi pembelian buku "${book?.title ?? "AnzaBook"}"`,
+        });
+      }
+    }
+  });
 }
 
 export async function purchaseDigitalBook(
@@ -287,7 +658,7 @@ export async function purchaseDigitalBook(
   const [book] = await db
     .select()
     .from(books)
-    .where(eq(books.slug, slug))
+    .where(and(eq(books.slug, slug), eq(books.isArchived, false)))
     .limit(1);
 
   if (!book) {
@@ -297,8 +668,7 @@ export async function purchaseDigitalBook(
   if (
     book.digitalPriceIdr === null ||
     book.digitalPriceIdr <= 0 ||
-    (book.digitalPolicy !== "single_purchase" &&
-      book.digitalPolicy !== "nakama_or_purchase")
+    book.digitalPolicy !== "single_purchase"
   ) {
     throw new HttpError(
       400,
@@ -307,7 +677,6 @@ export async function purchaseDigitalBook(
     );
   }
 
-  // If bookId is provided in body, verify it matches
   if (input?.bookId && input.bookId !== book.id) {
     throw new HttpError(
       422,
@@ -337,7 +706,6 @@ export async function purchaseDigitalBook(
   const anzabookNetIdr = priceIdr - publisherShareIdr - affiliateCommissionIdr;
 
   const purchase = await db.transaction(async (tx) => {
-    // Serialize concurrent single-purchase requests per buyer before checking duplicates.
     await tx
       .select({ id: user.id })
       .from(user)
@@ -374,6 +742,7 @@ export async function purchaseDigitalBook(
         affiliateCommissionIdr,
         anzabookNetIdr,
         status: "paid",
+        paidAt: new Date(),
         paymentMethod: input?.paymentMethod || "manual_or_midtrans",
       })
       .returning();
@@ -513,7 +882,9 @@ export function toBookSummary(
 }
 
 export async function listBooks(query: ListBooksQuery) {
-  const conditions = [];
+  const conditions: (SQL<unknown> | undefined)[] = [
+    eq(books.isArchived, false),
+  ];
   if (query.search) {
     const keyword = `%${query.search}%`;
     conditions.push(
@@ -602,7 +973,7 @@ export async function listBooks(query: ListBooksQuery) {
     .from(books)
     .leftJoin(publishers, eq(books.publisherId, publishers.id))
     .leftJoin(user, eq(books.authorUserId, user.id))
-    .where(eq(books.isWeeklyBulletin, true))
+    .where(and(eq(books.isWeeklyBulletin, true), eq(books.isArchived, false)))
     .limit(1);
 
   return {
@@ -647,6 +1018,33 @@ export async function getBookBySlug(
   if (!bookRow) return null;
   const { book, publisher, authorUserImage, authorUsername } = bookRow;
 
+  const hasClaimedDigital = userId
+    ? await hasClaimedBook(book.id, userId)
+    : false;
+  const hasPurchasedDigital = userId
+    ? await hasPurchasedBook(book.id, userId)
+    : false;
+
+  if (book.isArchived) {
+    let isTeam = Boolean(userId && book.authorUserId === userId);
+    if (!isTeam && userId && book.publisherId) {
+      const [member] = await db
+        .select({ id: publisherMembers.id })
+        .from(publisherMembers)
+        .where(
+          and(
+            eq(publisherMembers.publisherId, book.publisherId),
+            eq(publisherMembers.userId, userId),
+          ),
+        )
+        .limit(1);
+      isTeam = Boolean(member);
+    }
+    if (!hasPurchasedDigital && !hasClaimedDigital && !isTeam) {
+      return null;
+    }
+  }
+
   const editions = await db
     .select()
     .from(bookPrintEditions)
@@ -669,9 +1067,6 @@ export async function getBookBySlug(
     .innerJoin(storeBranches, eq(storeInventories.branchId, storeBranches.id))
     .where(eq(storeInventories.bookId, book.id));
 
-  const hasClaimedDigital = userId
-    ? await hasClaimedBook(book.id, userId)
-    : false;
   const chapters = await listBookChapters(book.id);
 
   const shelves = await db
@@ -779,6 +1174,9 @@ export async function getBookBySlug(
       lastStockCheck: s.lastStockCheck.toISOString(),
     })),
     hasClaimedDigital,
+    hasPurchasedDigital,
+    checkoutAvailable: Boolean(env.MIDTRANS_SERVER_KEY),
+    isArchived: book.isArchived,
     totalShelved: shelves.length,
     upcomingEvents,
   };
@@ -926,6 +1324,10 @@ export async function getBookReaderPayload(
   await assertReaderNotSuspended(userId, requestContext?.userRole);
 
   const access = await getBookReadAccess(book, userId);
+
+  if (book.isArchived && !access.hasFullAccess) {
+    throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+  }
   const requestedChapterNum = query.chapter;
   const isSampleAllowed =
     requestedChapterNum === 1 ||
@@ -1038,7 +1440,8 @@ export async function listAuthors() {
       author: books.author,
       authorAvatar: books.authorAvatar,
     })
-    .from(books);
+    .from(books)
+    .where(eq(books.isArchived, false));
 
   const countMap = new Map<
     string,
@@ -1066,7 +1469,8 @@ export async function listCollections() {
       collectionName: books.collectionName,
       coverUrl: books.coverUrl,
     })
-    .from(books);
+    .from(books)
+    .where(eq(books.isArchived, false));
 
   const colMap = new Map<string, { count: number; coverUrl?: string }>();
   for (const b of allBooks) {
@@ -1090,7 +1494,8 @@ export async function listCollections() {
 export async function listCategories() {
   const allBooks = await db
     .select({ categories: books.categories })
-    .from(books);
+    .from(books)
+    .where(eq(books.isArchived, false));
   const catMap = new Map<string, number>();
   for (const b of allBooks) {
     const cats = (b.categories as string[]) || [];

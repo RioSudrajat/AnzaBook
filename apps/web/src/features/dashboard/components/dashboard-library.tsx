@@ -1,17 +1,13 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
-  Book,
   BookMarked,
   BookOpen,
   CheckCircle2,
   ChevronDown,
   Compass,
-  Crown,
   Highlighter,
   Inbox,
-  RotateCcw,
-  Unlock,
 } from "lucide-react";
 import type {
   BookSummaryDto,
@@ -19,6 +15,8 @@ import type {
   ShelfItemDto,
 } from "@starter/shared/types";
 import { Button } from "@/components/ui/button";
+import { BookAccessBadge } from "@/features/books/components/book-access-badge";
+import { BookCard } from "@/features/books/components/book-card";
 import { BookCover } from "@/features/books/components/book-cover";
 import { useBookSessions } from "@/features/books/hooks";
 import { CompletedBookDialog } from "./completed-book-dialog";
@@ -114,9 +112,12 @@ export function DashboardLibrary({
                           className="w-14 shrink-0"
                           decorative
                         />
-                        <span className="min-w-0">
-                          <span className="block font-serif font-semibold">
-                            {book.title}
+                        <span className="min-w-0 space-y-0.5">
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span className="font-serif font-semibold">
+                              {book.title}
+                            </span>
+                            <BookAccessBadge book={book} />
                           </span>
                           <span
                             className="block text-sm text-muted-foreground"
@@ -244,66 +245,15 @@ function CompletedShelfBooks({
   onSelectBook: (book: BookSummaryDto) => void;
 }) {
   return (
-    <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+    <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
       {shelves.map(({ id, book }) => (
         <li key={id}>
-          <button
-            type="button"
+          <BookCard
+            book={book}
+            variant="shelf"
+            showCompletedBadge
             onClick={() => onSelectBook(book)}
-            className="w-full text-left h-full space-y-2 rounded-lg border bg-card p-3 transition-colors hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-ring cursor-pointer group flex flex-col justify-between"
-          >
-            <div className="space-y-2 w-full">
-              <div className="relative">
-                <BookCover
-                  book={book}
-                  className="mx-auto w-full max-w-28 group-hover:brightness-105 transition-all shadow-sm"
-                  decorative
-                />
-                <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/75 backdrop-blur-xs text-[10px] font-mono text-emerald-400 font-bold border border-emerald-400/30">
-                  100%
-                </span>
-              </div>
-              <div className="flex items-center gap-1 flex-wrap pt-0.5">
-                {book.accessTier === "premium" ? (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 font-mono text-[10px] font-semibold text-foreground border border-border/40">
-                    <Crown
-                      className="size-3 text-foreground/85"
-                      aria-hidden="true"
-                    />
-                    Premium
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 font-mono text-[10px] font-semibold text-foreground border border-border/40">
-                    <Unlock
-                      className="size-3 text-foreground/85"
-                      aria-hidden="true"
-                    />
-                    Free
-                  </span>
-                )}
-                {book.hasPhysical && (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 font-mono text-[10px] font-semibold text-foreground border border-border/40">
-                    <Book
-                      className="size-3 text-foreground/85"
-                      aria-hidden="true"
-                    />
-                    Fisik
-                  </span>
-                )}
-              </div>
-              <h3 className="font-serif text-sm font-bold line-clamp-2 group-hover:text-[var(--color-accent)] transition-colors">
-                {book.title}
-              </h3>
-              <p className="text-xs text-muted-foreground line-clamp-1">
-                {book.author}
-              </p>
-            </div>
-
-            <div className="pt-2 flex items-center justify-between text-[11px] font-mono text-muted-foreground border-t border-border/60 w-full mt-auto">
-              <span>Riwayat & Baca</span>
-              <RotateCcw className="size-3 text-muted-foreground group-hover:text-[var(--color-accent)] transition-colors" />
-            </div>
-          </button>
+          />
         </li>
       ))}
     </ul>
@@ -312,54 +262,10 @@ function CompletedShelfBooks({
 
 function ShelfBookLinks({ shelves }: { shelves: ShelfItemDto[] }) {
   return (
-    <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+    <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
       {shelves.map(({ id, book }) => (
         <li key={id}>
-          <Link
-            to="/books/$slug"
-            params={{ slug: book.slug }}
-            className="block h-full space-y-2 rounded-lg border bg-card p-3 focus-visible:outline-2 focus-visible:outline-ring group hover:border-muted-foreground transition-all"
-          >
-            <BookCover
-              book={book}
-              className="mx-auto w-full max-w-28 group-hover:scale-[1.02] transition-transform"
-              decorative
-            />
-            <div className="flex items-center gap-1 flex-wrap pt-0.5">
-              {book.accessTier === "premium" ? (
-                <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 font-mono text-[10px] font-semibold text-foreground border border-border/40">
-                  <Crown
-                    className="size-3 text-foreground/85"
-                    aria-hidden="true"
-                  />
-                  Premium
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 font-mono text-[10px] font-semibold text-foreground border border-border/40">
-                  <Unlock
-                    className="size-3 text-foreground/85"
-                    aria-hidden="true"
-                  />
-                  Free
-                </span>
-              )}
-              {book.hasPhysical && (
-                <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 font-mono text-[10px] font-semibold text-foreground border border-border/40">
-                  <Book
-                    className="size-3 text-foreground/85"
-                    aria-hidden="true"
-                  />
-                  Fisik
-                </span>
-              )}
-            </div>
-            <h3 className="font-serif text-sm font-bold line-clamp-2">
-              {book.title}
-            </h3>
-            <p className="text-xs text-muted-foreground line-clamp-1">
-              {book.author}
-            </p>
-          </Link>
+          <BookCard book={book} variant="shelf" showPrice />
         </li>
       ))}
     </ul>

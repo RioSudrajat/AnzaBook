@@ -9,6 +9,7 @@ import type {
   PublishManuscriptResultDto,
   PublisherApprovedWriterDto,
   PublisherBookInventoryItemDto,
+  PublisherCatalogBookDto,
   PublisherDto,
   PublisherMemberDto,
   QuotePostConfig,
@@ -273,10 +274,42 @@ export async function unfollowPublisher(
 export async function listPublisherBooks(
   slug: string,
   signal?: AbortSignal,
-): Promise<BookSummaryDto[]> {
-  const { data } = await apiFetch<DataResponse<BookSummaryDto[]>>(
+): Promise<PublisherCatalogBookDto[]> {
+  const { data } = await apiFetch<DataResponse<PublisherCatalogBookDto[]>>(
     `/api/publisher/${encodeURIComponent(slug)}/books`,
     { signal },
+  );
+  return data;
+}
+
+export async function createOrGetBookRevisionDraft(
+  slug: string,
+  bookId: string,
+): Promise<ManuscriptSubmissionDto> {
+  const { data } = await apiFetch<DataResponse<ManuscriptSubmissionDto>>(
+    `/api/publisher/${encodeURIComponent(slug)}/books/${encodeURIComponent(bookId)}/revision-draft`,
+    {
+      method: "POST",
+    },
+  );
+  return data;
+}
+
+export async function deletePublisherBook(
+  slug: string,
+  bookId: string,
+): Promise<{ deleted: boolean; archived: boolean; paidPurchaseCount: number }> {
+  const { data } = await apiFetch<
+    DataResponse<{
+      deleted: boolean;
+      archived: boolean;
+      paidPurchaseCount: number;
+    }>
+  >(
+    `/api/publisher/${encodeURIComponent(slug)}/books/${encodeURIComponent(bookId)}`,
+    {
+      method: "DELETE",
+    },
   );
   return data;
 }
@@ -568,6 +601,35 @@ export async function withdrawManuscript(
     `/api/publisher/manuscripts/${encodeURIComponent(idOrSlug)}/withdraw`,
     {
       method: "POST",
+    },
+  );
+  return data;
+}
+
+export async function deleteAuthorManuscript(
+  idOrSlug: string,
+  withdrawFirst = false,
+): Promise<{ deleted: boolean }> {
+  const { data } = await apiFetch<DataResponse<{ deleted: boolean }>>(
+    `/api/publisher/manuscripts/${encodeURIComponent(idOrSlug)}`,
+    {
+      method: "DELETE",
+      query: withdrawFirst ? { withdrawFirst: "true" } : undefined,
+    },
+  );
+  return data;
+}
+
+export async function deletePublisherManuscript(
+  slug: string,
+  idOrSlug: string,
+): Promise<{ deleted: boolean; detached?: boolean }> {
+  const { data } = await apiFetch<
+    DataResponse<{ deleted: boolean; detached?: boolean }>
+  >(
+    `/api/publisher/${encodeURIComponent(slug)}/manuscripts/${encodeURIComponent(idOrSlug)}`,
+    {
+      method: "DELETE",
     },
   );
   return data;

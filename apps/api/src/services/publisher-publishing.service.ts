@@ -1,11 +1,14 @@
-import { randomBytes, randomUUID } from "node:crypto";
-import { and, asc, desc, eq, or, sql } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { and, asc, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
+import { extractPlainParagraphs } from "@starter/shared/reading-progress";
 import type {
   BookDistributionModel,
   BookSummaryDto,
+  ManuscriptSubmissionDto,
   PublishManuscriptResultDto,
   PublisherApprovedWriterDto,
   PublisherBookInventoryItemDto,
+  PublisherCatalogBookDto,
   PublisherMemberDto,
   PublisherMemberRole,
   StoreBranchDto,
@@ -23,9 +26,7 @@ import {
 import { db } from "../db";
 import {
   bookChapters,
-  bookClaimBatches,
-  bookClaimCodes,
-  bookPrintEditions,
+  bookPurchases,
   books,
   manuscriptChapters,
   manuscriptSubmissions,
@@ -53,10 +54,6 @@ function slugify(text: string): string {
     .replace(/--+/g, "-")
     .replace(/^-+|-+$/g, "")
     .trim();
-}
-
-function generateClaimCode(): string {
-  return `ANZ-${randomBytes(6).toString("hex").toUpperCase()}`;
 }
 
 /**
@@ -122,7 +119,7 @@ export async function requirePublisherMember(
 
 /**
  * Atomically publishes a manuscript scoped to a verified publisher.
- * Uses `SELECT ... FOR UPDATE` on the manuscript row to prevent concurrent double-publishing.
+ * Supports initial publication AND in-place republication of catalog revision drafts.
  */
 export async function publishPublisherManuscript(
   userId: string,
@@ -173,9 +170,12 @@ export async function publishPublisherManuscript(
       );
     }
 
+    const isCatalogRevisionUpdate =
+      manuscript.isCatalogRevision && manuscript.publishedBookId !== null;
+
     if (
       manuscript.status === "published" ||
-      manuscript.publishedBookId !== null
+      (!isCatalogRevisionUpdate && manuscript.publishedBookId !== null)
     ) {
       throw new HttpError(
         409,
@@ -209,6 +209,35 @@ export async function publishPublisherManuscript(
       );
     }
 
+    const resolvedTitle = (overrides?.title ?? manuscript.title).trim();
+    const resolvedSynopsis = (
+      overrides?.synopsis ?? manuscript.synopsis
+    ).trim();
+
+    if (resolvedTitle.length < 2) {
+      throw new HttpError(
+        400,
+        "MANUSCRIPT_INCOMPLETE",
+        "Judul buku minimal 2 karakter sebelum diterbitkan.",
+      );
+    }
+    if (resolvedSynopsis.length < 10) {
+      throw new HttpError(
+        400,
+        "MANUSCRIPT_INCOMPLETE",
+        "Sinopsis buku minimal 10 karakter sebelum diterbitkan.",
+      );
+    }
+    if (
+      !chapters.some((ch) => extractPlainParagraphs(ch.contentId).length > 0)
+    ) {
+      throw new HttpError(
+        400,
+        "MANUSCRIPT_INCOMPLETE",
+        "Minimal satu bab harus memiliki isi naskah sebelum diterbitkan.",
+      );
+    }
+
     const [authorUser] = await tx
       .select({
         name: user.name,
@@ -218,9 +247,6 @@ export async function publishPublisherManuscript(
       .from(user)
       .where(eq(user.id, manuscript.authorUserId))
       .limit(1);
-
-    const resolvedTitle = overrides?.title?.trim() || manuscript.title;
-    const resolvedSynopsis = overrides?.synopsis?.trim() || manuscript.synopsis;
 
     const authorName =
       overrides?.author?.trim() ||
@@ -233,10 +259,7 @@ export async function publishPublisherManuscript(
       manuscript.proposedDigitalPolicy ||
       "nakama_subscription";
 
-    const needsPurchasePrice =
-      digitalPolicy === "single_purchase" ||
-      digitalPolicy === "nakama_or_purchase";
-
+    const needsPurchasePrice = digitalPolicy === "single_purchase";
     const rawPrice =
       overrides?.digitalPriceIdr !== undefined
         ? overrides.digitalPriceIdr
@@ -246,14 +269,17 @@ export async function publishPublisherManuscript(
       ? rawPrice && rawPrice > 0
         ? rawPrice
         : DEFAULT_DIGITAL_BOOK_PRICE_IDR
-      : (rawPrice ?? null);
+      : null;
 
-    const hasPhysical =
-      overrides?.hasPhysical ??
-      (digitalPolicy === "print_code_only" ||
-        digitalPolicy === "nakama_or_purchase");
+    if (needsPurchasePrice && (!digitalPriceIdr || digitalPriceIdr < 10_000)) {
+      throw new HttpError(
+        400,
+        "INVALID_DIGITAL_PRICE",
+        "Harga beli satuan digital minimal Rp10.000.",
+      );
+    }
 
-    const accessTier = deriveAccessTier(digitalPolicy, hasPhysical);
+    const accessTier = deriveAccessTier(digitalPolicy);
 
     const coverUrl =
       overrides?.coverUrl?.trim() ||
@@ -282,12 +308,7 @@ export async function publishPublisherManuscript(
     const publishedYear =
       overrides?.publishedYear ?? new Date().getUTCFullYear();
     const collectionName = overrides?.collectionName?.trim() || null;
-    const rakyatPriceIdr = overrides?.rakyatPriceIdr ?? 35_000;
-    const standardPriceIdr = overrides?.standardPriceIdr ?? 75_000;
-    const isbn = overrides?.isbn?.trim() || manuscript.isbn || null;
 
-    const baseBookSlug = slugify(resolvedTitle).slice(0, 100) || "buku";
-    const bookSlug = `${baseBookSlug}-${randomUUID().slice(0, 8)}`;
     const readingMinutes = chapters.reduce(
       (sum, c) => sum + (c.estimatedMinutes || 5),
       0,
@@ -295,105 +316,108 @@ export async function publishPublisherManuscript(
     const pageCount =
       manuscript.estimatedPages ?? Math.max(chapters.length * 15, 20);
 
-    const [book] = await tx
-      .insert(books)
-      .values({
-        slug: bookSlug,
-        title: resolvedTitle,
-        author: authorName,
-        authorAvatar: authorUser?.image ?? null,
-        synopsis: resolvedSynopsis,
-        coverUrl,
-        coverColor,
-        publishedYear,
-        collectionName,
-        categories,
-        genres: categories,
-        availableLanguages,
-        digitalPolicy,
-        accessTier,
-        digitalPriceIdr,
-        rakyatPriceIdr,
-        standardPriceIdr,
-        publisherId: pub.id,
-        authorUserId: manuscript.authorUserId,
-        totalChapters: chapters.length,
-        readingMinutes,
-        pageCount,
-        hasPhysical,
-      })
-      .returning();
+    let book: typeof books.$inferSelect;
 
-    await tx.insert(bookChapters).values(
-      chapters.map((ch) => ({
-        bookId: book.id,
-        chapterNumber: ch.chapterNumber,
-        titleId: ch.titleId,
-        contentId: ch.contentId,
-        contentEn: ch.contentEn,
-        blueprintContent: ch.blueprintContent ?? "",
-      })),
-    );
+    if (isCatalogRevisionUpdate && manuscript.publishedBookId) {
+      const [updatedBook] = await tx
+        .update(books)
+        .set({
+          title: resolvedTitle,
+          author: authorName,
+          authorAvatar: authorUser?.image ?? null,
+          synopsis: resolvedSynopsis,
+          coverUrl,
+          coverColor,
+          publishedYear,
+          collectionName,
+          categories,
+          genres: categories,
+          availableLanguages,
+          digitalPolicy,
+          accessTier,
+          digitalPriceIdr,
+          totalChapters: chapters.length,
+          readingMinutes,
+          pageCount,
+          hasPhysical: false,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(books.id, manuscript.publishedBookId),
+            eq(books.publisherId, pub.id),
+          ),
+        )
+        .returning();
 
-    if (hasPhysical) {
-      await tx.insert(bookPrintEditions).values([
-        {
+      if (!updatedBook) {
+        throw new HttpError(
+          404,
+          "BOOK_NOT_FOUND",
+          "Buku katalog yang sedang direvisi tidak ditemukan.",
+        );
+      }
+
+      book = updatedBook;
+
+      await tx.delete(bookChapters).where(eq(bookChapters.bookId, book.id));
+      await tx.insert(bookChapters).values(
+        chapters.map((ch) => ({
           bookId: book.id,
-          tier: "rakyat_economy",
-          tierName: "Edisi Cetak Rakyat",
-          paperType: "Book Paper 55gsm",
-          paperGsm: 55,
-          coverType: "Softcover Standar",
-          bindingType: "Lem Panas",
-          priceIdr: rakyatPriceIdr,
-          traditionalPriceIdr: Math.round(rakyatPriceIdr * 1.45),
-          savingsPercent: 31,
-          weightGrams: 190,
-          inStock: true,
-        },
-        {
-          bookId: book.id,
-          isbn,
-          tier: "standard_trade",
-          tierName: "Edisi Standar Penerbit",
-          paperType: "Book Paper 72gsm",
-          paperGsm: 72,
-          coverType: "Softcover Doft",
-          bindingType: "Lem Panas",
-          priceIdr: standardPriceIdr,
-          traditionalPriceIdr: Math.round(standardPriceIdr * 1.25),
-          savingsPercent: 20,
-          weightGrams: 240,
-          inStock: true,
-        },
-      ]);
-    }
+          chapterNumber: ch.chapterNumber,
+          titleId: ch.titleId,
+          contentId: ch.contentId,
+          contentEn: ch.contentEn,
+          blueprintContent: ch.blueprintContent ?? "",
+        })),
+      );
+    } else {
+      const baseBookSlug = slugify(resolvedTitle).slice(0, 100) || "buku";
+      const bookSlug = `${baseBookSlug}-${randomUUID().slice(0, 8)}`;
+      const rakyatPriceIdr = overrides?.rakyatPriceIdr ?? 35_000;
+      const standardPriceIdr = overrides?.standardPriceIdr ?? 75_000;
 
-    let initialBatch: typeof bookClaimBatches.$inferSelect | null = null;
-
-    if (digitalPolicy === "print_code_only") {
-      const [batch] = await tx
-        .insert(bookClaimBatches)
+      const [insertedBook] = await tx
+        .insert(books)
         .values({
-          bookId: book.id,
+          slug: bookSlug,
+          title: resolvedTitle,
+          author: authorName,
+          authorAvatar: authorUser?.image ?? null,
+          synopsis: resolvedSynopsis,
+          coverUrl,
+          coverColor,
+          publishedYear,
+          collectionName,
+          categories,
+          genres: categories,
+          availableLanguages,
+          digitalPolicy,
+          accessTier,
+          digitalPriceIdr,
+          rakyatPriceIdr,
+          standardPriceIdr,
           publisherId: pub.id,
-          batchName: `Batch Perdana (500 Eks) - ${resolvedTitle.slice(0, 50)}`,
-          totalCodes: 500,
-          unitFeeIdr: 0,
-          billingStatus: "free_tier",
+          authorUserId: manuscript.authorUserId,
+          totalChapters: chapters.length,
+          readingMinutes,
+          pageCount,
+          hasPhysical: false,
         })
         .returning();
 
-      initialBatch = batch;
+      book = insertedBook;
 
-      const codeRecords = Array.from({ length: 500 }, () => ({
-        bookId: book.id,
-        batchId: batch.id,
-        code: generateClaimCode(),
-        isDemo: false,
-      }));
-
-      await tx.insert(bookClaimCodes).values(codeRecords);
+      await tx.insert(bookChapters).values(
+        chapters.map((ch) => ({
+          bookId: book.id,
+          chapterNumber: ch.chapterNumber,
+          titleId: ch.titleId,
+          contentId: ch.contentId,
+          contentEn: ch.contentEn,
+          blueprintContent: ch.blueprintContent ?? "",
+        })),
+      );
     }
 
     await tx
@@ -401,6 +425,7 @@ export async function publishPublisherManuscript(
       .set({
         status: "published",
         publishedBookId: book.id,
+        isCatalogRevision: false,
         updatedAt: new Date(),
       })
       .where(eq(manuscriptSubmissions.id, manuscript.id));
@@ -408,31 +433,19 @@ export async function publishPublisherManuscript(
     return {
       publishedBookId: book.id,
       book: toBookSummary(book, pub, authorUser?.image ?? null),
-      claimBatch: initialBatch
-        ? {
-            id: initialBatch.id,
-            bookId: initialBatch.bookId,
-            bookTitle: book.title,
-            publisherId: initialBatch.publisherId,
-            publisherName: pub.name,
-            batchName: initialBatch.batchName,
-            totalCodes: initialBatch.totalCodes,
-            unitFeeIdr: initialBatch.unitFeeIdr,
-            billingStatus: initialBatch.billingStatus,
-            createdAt: initialBatch.createdAt.toISOString(),
-          }
-        : null,
+      claimBatch: null,
     };
   });
 }
 
 /**
- * Lists all catalog books owned by the publisher (owner or editor only).
+ * Lists all active catalog books owned by the publisher (owner or editor only),
+ * enriched with any open editorial revision draft and paid purchase count.
  */
 export async function listPublisherBooks(
   userId: string,
   publisherSlug: string,
-): Promise<BookSummaryDto[]> {
+): Promise<PublisherCatalogBookDto[]> {
   const pub = await resolvePublisherBySlugOrId(publisherSlug);
   await requirePublisherMember(pub.id, userId, ["owner", "editor"]);
 
@@ -440,15 +453,301 @@ export async function listPublisherBooks(
     .select({
       book: books,
       authorAvatarFallback: user.image,
+      authorUsername: user.username,
     })
     .from(books)
     .leftJoin(user, eq(books.authorUserId, user.id))
-    .where(eq(books.publisherId, pub.id))
+    .where(and(eq(books.publisherId, pub.id), eq(books.isArchived, false)))
     .orderBy(desc(books.createdAt), books.id);
 
-  return rows.map(({ book, authorAvatarFallback }) =>
-    toBookSummary(book, pub, authorAvatarFallback),
-  );
+  const bookIds = rows.map((r) => r.book.id);
+  const revisionByBookId = new Map<string, { id: string; updatedAt: Date }>();
+  const purchaseCountByBookId = new Map<string, number>();
+
+  if (bookIds.length > 0) {
+    const [revRows, paidRows] = await Promise.all([
+      db
+        .select({
+          id: manuscriptSubmissions.id,
+          publishedBookId: manuscriptSubmissions.publishedBookId,
+          updatedAt: manuscriptSubmissions.updatedAt,
+        })
+        .from(manuscriptSubmissions)
+        .where(
+          and(
+            eq(manuscriptSubmissions.publisherId, pub.id),
+            eq(manuscriptSubmissions.isCatalogRevision, true),
+            ne(manuscriptSubmissions.status, "published"),
+            inArray(manuscriptSubmissions.publishedBookId, bookIds),
+          ),
+        )
+        .orderBy(desc(manuscriptSubmissions.updatedAt)),
+      db
+        .select({
+          bookId: bookPurchases.bookId,
+          count: sql<number>`count(*)`,
+        })
+        .from(bookPurchases)
+        .where(
+          and(
+            inArray(bookPurchases.bookId, bookIds),
+            eq(bookPurchases.status, "paid"),
+          ),
+        )
+        .groupBy(bookPurchases.bookId),
+    ]);
+
+    for (const rev of revRows) {
+      if (rev.publishedBookId && !revisionByBookId.has(rev.publishedBookId)) {
+        revisionByBookId.set(rev.publishedBookId, {
+          id: rev.id,
+          updatedAt: rev.updatedAt,
+        });
+      }
+    }
+    for (const p of paidRows) {
+      purchaseCountByBookId.set(p.bookId, Number(p.count || 0));
+    }
+  }
+
+  return rows.map(({ book, authorAvatarFallback, authorUsername }) => {
+    const rev = revisionByBookId.get(book.id);
+    return {
+      ...toBookSummary(book, pub, authorAvatarFallback, authorUsername),
+      activeRevisionManuscriptId: rev?.id ?? null,
+      activeRevisionUpdatedAt: rev ? rev.updatedAt.toISOString() : null,
+      paidPurchaseCount: purchaseCountByBookId.get(book.id) ?? 0,
+    };
+  });
+}
+
+/**
+ * Creates or retrieves an active editorial revision draft linked to a live catalog book,
+ * without touching the published book until republished.
+ */
+export async function createOrGetBookRevisionDraft(
+  userId: string,
+  publisherSlug: string,
+  bookId: string,
+): Promise<ManuscriptSubmissionDto> {
+  if (!UUID_REGEX.test(bookId)) {
+    throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+  }
+
+  return await db.transaction(async (tx) => {
+    const pub = await resolvePublisherBySlugOrId(publisherSlug, tx);
+    await requirePublisherMember(pub.id, userId, ["owner", "editor"], tx);
+
+    const [book] = await tx
+      .select()
+      .from(books)
+      .where(and(eq(books.id, bookId), eq(books.publisherId, pub.id)))
+      .limit(1);
+
+    if (!book || book.isArchived) {
+      throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+    }
+
+    const [existingRev] = await tx
+      .select()
+      .from(manuscriptSubmissions)
+      .where(
+        and(
+          eq(manuscriptSubmissions.publishedBookId, book.id),
+          eq(manuscriptSubmissions.publisherId, pub.id),
+          eq(manuscriptSubmissions.isCatalogRevision, true),
+          ne(manuscriptSubmissions.status, "published"),
+        ),
+      )
+      .limit(1);
+
+    let revRow = existingRev;
+    let revChapters: (typeof manuscriptChapters.$inferSelect)[] = [];
+
+    if (revRow) {
+      revChapters = await tx
+        .select()
+        .from(manuscriptChapters)
+        .where(eq(manuscriptChapters.manuscriptId, revRow.id))
+        .orderBy(asc(manuscriptChapters.chapterNumber));
+    } else {
+      const liveChapters = await tx
+        .select()
+        .from(bookChapters)
+        .where(eq(bookChapters.bookId, book.id))
+        .orderBy(asc(bookChapters.chapterNumber));
+
+      const revisionSlug = `rev-${book.slug.slice(0, 80)}-${randomUUID().slice(0, 6)}`;
+      const [inserted] = await tx
+        .insert(manuscriptSubmissions)
+        .values({
+          authorUserId: book.authorUserId ?? userId,
+          publisherId: pub.id,
+          slug: revisionSlug,
+          title: book.title,
+          coverUrl: book.coverUrl,
+          coverColor: book.coverColor,
+          category: (book.categories as string[])?.[0] ?? null,
+          synopsis: book.synopsis,
+          sourceLanguage:
+            (book.availableLanguages as string[])?.[0] === "en" ? "en" : "id",
+          proposedDigitalPolicy: book.digitalPolicy,
+          proposedDigitalPriceIdr: book.digitalPriceIdr,
+          status: "in_editing",
+          publishedBookId: book.id,
+          isCatalogRevision: true,
+        })
+        .returning();
+
+      revRow = inserted;
+
+      if (liveChapters.length > 0) {
+        revChapters = await tx
+          .insert(manuscriptChapters)
+          .values(
+            liveChapters.map((ch) => ({
+              manuscriptId: revRow.id,
+              chapterNumber: ch.chapterNumber,
+              titleId: ch.titleId,
+              contentId: ch.contentId,
+              contentEn: ch.contentEn,
+              blueprintContent: ch.blueprintContent,
+              estimatedMinutes: Math.max(
+                1,
+                Math.round(
+                  book.readingMinutes / Math.max(liveChapters.length, 1),
+                ),
+              ),
+            })),
+          )
+          .returning();
+      }
+    }
+
+    const [authorUser] = await tx
+      .select({ name: user.name, authorPenName: user.authorPenName })
+      .from(user)
+      .where(eq(user.id, revRow.authorUserId))
+      .limit(1);
+
+    return {
+      id: revRow.id,
+      authorUserId: revRow.authorUserId,
+      authorName: authorUser?.name ?? book.author,
+      authorPenName: authorUser?.authorPenName ?? null,
+      publisherId: revRow.publisherId,
+      publisherName: pub.name,
+      title: revRow.title,
+      slug: revRow.slug ?? null,
+      coverUrl: revRow.coverUrl ?? null,
+      coverColor: revRow.coverColor,
+      category: revRow.category ?? null,
+      synopsis: revRow.synopsis,
+      sourceLanguage: revRow.sourceLanguage,
+      targetAudience: revRow.targetAudience,
+      authorNotes: revRow.authorNotes ?? null,
+      isbn: revRow.isbn ?? null,
+      estimatedPages: revRow.estimatedPages ?? null,
+      editorialNotes: revRow.editorialNotes ?? null,
+      proposedDigitalPolicy: revRow.proposedDigitalPolicy,
+      proposedDigitalPriceIdr: revRow.proposedDigitalPriceIdr,
+      printSimJson: revRow.printSimJson,
+      status: revRow.status,
+      rejectionReason: revRow.rejectionReason,
+      publishedBookId: revRow.publishedBookId,
+      isCatalogRevision: revRow.isCatalogRevision,
+      chapters: revChapters.map((ch) => ({
+        id: ch.id,
+        manuscriptId: ch.manuscriptId,
+        chapterNumber: ch.chapterNumber,
+        titleId: ch.titleId,
+        contentId: ch.contentId,
+        contentEn: ch.contentEn,
+        blueprintContent: ch.blueprintContent,
+        estimatedMinutes: ch.estimatedMinutes,
+        createdAt: ch.createdAt.toISOString(),
+        updatedAt: ch.updatedAt.toISOString(),
+      })),
+      totalChapters: revChapters.length,
+      createdAt: revRow.createdAt.toISOString(),
+      updatedAt: revRow.updatedAt.toISOString(),
+    };
+  });
+}
+
+/**
+ * Safely removes a catalog book:
+ * - Soft-archives (`isArchived = true`) when paid purchases exist so buyers never lose entitlement.
+ * - Hard-deletes when there are zero paid purchases.
+ */
+export async function deletePublisherBook(
+  userId: string,
+  publisherSlug: string,
+  bookId: string,
+): Promise<{ deleted: boolean; archived: boolean; paidPurchaseCount: number }> {
+  if (!UUID_REGEX.test(bookId)) {
+    throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+  }
+
+  return await db.transaction(async (tx) => {
+    const pub = await resolvePublisherBySlugOrId(publisherSlug, tx);
+    await requirePublisherMember(pub.id, userId, ["owner", "editor"], tx);
+
+    const [book] = await tx
+      .select({
+        id: books.id,
+        publisherId: books.publisherId,
+        isArchived: books.isArchived,
+      })
+      .from(books)
+      .where(eq(books.id, bookId))
+      .for("update")
+      .limit(1);
+
+    if (!book) {
+      throw new HttpError(404, "BOOK_NOT_FOUND", "Buku tidak ditemukan.");
+    }
+    if (book.publisherId !== pub.id) {
+      throw new HttpError(
+        403,
+        "FORBIDDEN",
+        "Buku ini bukan milik penerbit Anda.",
+      );
+    }
+
+    // Discard any open catalog revision drafts for this book first.
+    await tx
+      .delete(manuscriptSubmissions)
+      .where(
+        and(
+          eq(manuscriptSubmissions.publishedBookId, book.id),
+          eq(manuscriptSubmissions.isCatalogRevision, true),
+        ),
+      );
+
+    const [countRow] = await tx
+      .select({ count: sql<number>`count(*)` })
+      .from(bookPurchases)
+      .where(
+        and(
+          eq(bookPurchases.bookId, book.id),
+          eq(bookPurchases.status, "paid"),
+        ),
+      );
+
+    const paidPurchaseCount = Number(countRow?.count || 0);
+
+    if (paidPurchaseCount > 0) {
+      await tx
+        .update(books)
+        .set({ isArchived: true, updatedAt: new Date() })
+        .where(eq(books.id, book.id));
+      return { deleted: false, archived: true, paidPurchaseCount };
+    }
+
+    await tx.delete(books).where(eq(books.id, book.id));
+    return { deleted: true, archived: false, paidPurchaseCount: 0 };
+  });
 }
 
 /**
@@ -488,12 +787,6 @@ export async function updatePublisherBook(
   const nextPolicy: BookDistributionModel =
     input.digitalPolicy ??
     (existingBook.digitalPolicy as BookDistributionModel);
-  const nextHasPhysical =
-    input.hasPhysical ??
-    (input.digitalPolicy !== undefined
-      ? input.digitalPolicy === "print_code_only" ||
-        input.digitalPolicy === "nakama_or_purchase"
-      : existingBook.hasPhysical);
 
   const patch: Partial<typeof books.$inferInsert> = {
     updatedAt: new Date(),
@@ -520,19 +813,19 @@ export async function updatePublisherBook(
     patch.standardPriceIdr = input.standardPriceIdr;
 
   patch.digitalPolicy = nextPolicy;
-  patch.hasPhysical = nextHasPhysical;
-  patch.accessTier = deriveAccessTier(nextPolicy, nextHasPhysical);
+  patch.hasPhysical = false;
+  patch.accessTier = deriveAccessTier(nextPolicy);
 
   const rawPrice =
     input.digitalPriceIdr !== undefined
       ? input.digitalPriceIdr
       : existingBook.digitalPriceIdr;
 
-  if (nextPolicy === "single_purchase" || nextPolicy === "nakama_or_purchase") {
+  if (nextPolicy === "single_purchase") {
     patch.digitalPriceIdr =
       rawPrice && rawPrice > 0 ? rawPrice : DEFAULT_DIGITAL_BOOK_PRICE_IDR;
-  } else if (input.digitalPriceIdr !== undefined) {
-    patch.digitalPriceIdr = input.digitalPriceIdr;
+  } else {
+    patch.digitalPriceIdr = null;
   }
 
   const [updated] = await db

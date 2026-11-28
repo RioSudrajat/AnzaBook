@@ -513,7 +513,8 @@ function buildQuoteLocationLabel(
   pageNumber?: number | null,
 ): string {
   const parts: string[] = [];
-  if (chapterNumber && chapterNumber > 0) parts.push(`Bab ${chapterNumber}`);
+  if (chapterNumber && chapterNumber > 0)
+    parts.push(`Chapter ${chapterNumber}`);
   if (pageNumber && pageNumber > 0) parts.push(`Hal ${pageNumber}`);
   return parts.join(" · ");
 }
@@ -1042,9 +1043,9 @@ function drawReadingTrail(
   const chapterEnd = params.endChapter ?? params.startChapter;
   const chapterText =
     chapterStart && chapterEnd && chapterStart !== chapterEnd
-      ? `Bab ${chapterStart} -> ${chapterEnd}`
+      ? `Chapter ${chapterStart} -> ${chapterEnd}`
       : chapterEnd
-        ? `Bab ${chapterEnd}`
+        ? `Chapter ${chapterEnd}`
         : "Jejak Baca";
 
   ctx.font = `700 21px ${FONT_MONO}`;
