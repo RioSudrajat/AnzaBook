@@ -1,9 +1,19 @@
 import { ApiError, apiFetch } from "@/lib/api/client";
 import type {
+  CreateSpotReportInput,
+  CreateSpotSubmissionInput,
   ListSpotsQueryInput,
   ListSpotsResponseDto,
+  MySpotActivityDto,
+  NearbyCheckQueryInput,
   ReadingSpotDetailDto,
+  ReadingSpotReportDto,
   SpotCitySummaryDto,
+  SpotGeocodeResultDto,
+  SpotNearbyMatchDto,
+  SpotReviewsResponseDto,
+  UpsertSpotReviewInput,
+  UpsertSpotReviewResponseDto,
 } from "./types";
 
 function cleanQuery(
@@ -123,4 +133,128 @@ export async function toggleSpotBookmark(
     bookmarkCount:
       typeof payload?.bookmarkCount === "number" ? payload.bookmarkCount : 0,
   };
+}
+
+export async function listSpotReviews(
+  slug: string,
+  params: { limit?: number; offset?: number } = {},
+  signal?: AbortSignal,
+): Promise<SpotReviewsResponseDto> {
+  return apiFetch<SpotReviewsResponseDto>(
+    `/api/spots/${encodeURIComponent(slug)}/reviews`,
+    {
+      query: {
+        limit: params.limit ?? 10,
+        offset: params.offset ?? 0,
+      },
+      signal,
+    },
+  );
+}
+
+export async function upsertMySpotReview(
+  slug: string,
+  input: UpsertSpotReviewInput,
+): Promise<UpsertSpotReviewResponseDto> {
+  const { data } = await apiFetch<{ data: UpsertSpotReviewResponseDto }>(
+    `/api/spots/${encodeURIComponent(slug)}/reviews/me`,
+    {
+      method: "PUT",
+      body: input,
+    },
+  );
+  return data;
+}
+
+export async function deleteMySpotReview(
+  slug: string,
+): Promise<{ deleted: boolean; ratingAvg: number; ratingCount: number }> {
+  const { data } = await apiFetch<{
+    data: { deleted: boolean; ratingAvg: number; ratingCount: number };
+  }>(`/api/spots/${encodeURIComponent(slug)}/reviews/me`, {
+    method: "DELETE",
+  });
+  return data;
+}
+
+export async function geocodeSpotLocation(
+  q: string,
+  signal?: AbortSignal,
+): Promise<SpotGeocodeResultDto[]> {
+  const trimmed = q.trim();
+  if (trimmed.length < 2) {
+    return [];
+  }
+  const { data } = await apiFetch<{ data: SpotGeocodeResultDto[] }>(
+    "/api/spots/geocode",
+    {
+      query: { q: trimmed },
+      signal,
+    },
+  );
+  return Array.isArray(data) ? data : [];
+}
+
+export async function checkNearbyDuplicateSpots(
+  params: NearbyCheckQueryInput,
+  signal?: AbortSignal,
+): Promise<SpotNearbyMatchDto[]> {
+  const { data } = await apiFetch<{ data: SpotNearbyMatchDto[] }>(
+    "/api/spots/nearby-check",
+    {
+      query: {
+        lat: params.lat,
+        lng: params.lng,
+        name: params.name?.trim() || undefined,
+        radiusMeters: params.radiusMeters ?? 100,
+      },
+      signal,
+    },
+  );
+  return Array.isArray(data) ? data : [];
+}
+
+export async function submitReadingSpot(
+  input: CreateSpotSubmissionInput,
+): Promise<ReadingSpotDetailDto> {
+  const { data } = await apiFetch<{ data: ReadingSpotDetailDto }>(
+    "/api/spots",
+    {
+      method: "POST",
+      body: input,
+    },
+  );
+  return data;
+}
+
+export async function listMySpotActivity(
+  signal?: AbortSignal,
+): Promise<MySpotActivityDto> {
+  const { data } = await apiFetch<{ data: MySpotActivityDto }>(
+    "/api/spots/mine",
+    { signal },
+  );
+  return {
+    submissions: Array.isArray(data?.submissions) ? data.submissions : [],
+    bookmarks: Array.isArray(data?.bookmarks) ? data.bookmarks : [],
+  };
+}
+
+export async function reportSpotOrReview(
+  slug: string,
+  input: CreateSpotReportInput,
+): Promise<{
+  report: ReadingSpotReportDto;
+  openUniqueReporterCount: number;
+}> {
+  const { data } = await apiFetch<{
+    data: {
+      report: ReadingSpotReportDto;
+      openUniqueReporterCount: number;
+    };
+  }>(`/api/spots/${encodeURIComponent(slug)}/reports`, {
+    method: "POST",
+    body: input,
+  });
+  return data;
 }
