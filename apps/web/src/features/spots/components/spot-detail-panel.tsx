@@ -17,7 +17,8 @@ import {
   Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ApiError } from "@/lib/api/client";
+import { isUsableAssetUrl } from "@/lib/media-url";
+import { safeExternalHref, safeSocialHref } from "@/lib/safe-url";
 import { useToggleSpotBookmark } from "../hooks";
 import {
   buildGoogleMapsDirectionsUrl,
@@ -25,10 +26,10 @@ import {
   formatDistanceMeters,
   formatNoiseLevel,
   formatPriceRange,
+  formatSpotApiError,
   formatSpotCategory,
   formatVerifiedBadge,
   getActiveFacilityChips,
-  sanitizeExternalHttpUrl,
 } from "../spots-helpers";
 import type { ReadingSpotDetailDto, ReadingSpotSummaryDto } from "../types";
 
@@ -57,20 +58,17 @@ export function SpotDetailPanel({
   const facilityChips = getActiveFacilityChips(spot.facilities);
   const directionsUrl = buildGoogleMapsDirectionsUrl(spot);
   const placeUrl = buildGoogleMapsPlaceUrl(spot);
-  const safeWebsiteUrl = sanitizeExternalHttpUrl(spot.websiteUrl);
-  const safeCoverUrl = sanitizeExternalHttpUrl(spot.coverUrl);
+  const safeWebsiteUrl = safeExternalHref(spot.websiteUrl);
+  const safeInstagramUrl = safeSocialHref(spot.instagramHandle, "instagram");
+  const safeCoverUrl = isUsableAssetUrl(spot.coverUrl) ? spot.coverUrl : null;
 
   const handleToggleBookmark = () => {
     setActionError(null);
     bookmarkMutation.mutate(spot.slug, {
       onError: (err) => {
-        if (err instanceof ApiError && err.status === 404) {
-          setActionError(
-            "Fitur simpan sudut baca menunggu sinkronisasi layanan.",
-          );
-          return;
-        }
-        setActionError("Gagal memperbarui simpanan sudut baca.");
+        setActionError(
+          formatSpotApiError(err, "Gagal memperbarui simpanan sudut baca."),
+        );
       },
     });
   };
@@ -303,7 +301,7 @@ export function SpotDetailPanel({
           </div>
         </div>
 
-        {(safeWebsiteUrl || spot.instagramHandle) && (
+        {(safeWebsiteUrl || safeInstagramUrl) && (
           <div className="py-3 flex flex-wrap items-center gap-3">
             <dt className="sr-only">Tautan eksternal</dt>
             {safeWebsiteUrl && (
@@ -311,20 +309,20 @@ export function SpotDetailPanel({
                 href={safeWebsiteUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="min-h-11 inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-accent)] hover:underline"
+                className="min-h-11 inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-accent-text)] hover:underline"
               >
                 <Globe className="size-3.5" aria-hidden="true" />
                 <span>Situs Resmi</span>
               </a>
             )}
-            {spot.instagramHandle && (
+            {safeInstagramUrl && spot.instagramHandle && (
               <a
-                href={`https://instagram.com/${encodeURIComponent(spot.instagramHandle.replace(/^@/, ""))}`}
+                href={safeInstagramUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="min-h-11 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
               >
-                <span>@{spot.instagramHandle.replace(/^@/, "")}</span>
+                <span>@{spot.instagramHandle.replace(/^@+/, "")}</span>
               </a>
             )}
           </div>
@@ -368,7 +366,7 @@ export function SpotDetailPanel({
             <Link
               to="/c/$slug"
               params={{ slug: detailSpot.linkedCalendarSlug }}
-              className="min-h-11 inline-flex items-center gap-2 text-xs font-semibold text-[var(--color-accent)] hover:underline"
+              className="min-h-11 inline-flex items-center gap-2 text-xs font-semibold text-[var(--color-accent-text)] hover:underline"
             >
               <Calendar className="size-4" aria-hidden="true" />
               <span>
