@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import type {
   AddCalendarMemberInput,
   CheckInRsvpInput,
@@ -35,6 +40,7 @@ import {
   communityWalletQuery,
   eventAttendeesQuery,
   eventDetailQuery,
+  eventsInfiniteQuery,
   eventsKeys,
   eventsQuery,
   locationSuggestionsQuery,
@@ -42,6 +48,10 @@ import {
 
 export function useEvents(params?: ListEventsInput) {
   return useQuery(eventsQuery(params));
+}
+
+export function useInfiniteEvents(params?: Omit<ListEventsInput, "offset">) {
+  return useInfiniteQuery(eventsInfiniteQuery(params));
 }
 
 export function useEvent(slug: string) {
@@ -161,6 +171,7 @@ export function useCheckInRsvp(slug: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: eventsKeys.detail(slug) });
       queryClient.invalidateQueries({ queryKey: eventsKeys.attendees(slug) });
+      queryClient.invalidateQueries({ queryKey: eventsKeys.lists() });
     },
   });
 }

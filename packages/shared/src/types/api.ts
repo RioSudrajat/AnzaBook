@@ -1,5 +1,6 @@
 // The JSON contract between the API and the web app. Timestamps cross the wire
 // as ISO strings, so these are the shapes the browser actually receives.
+import type { EventTheme, MeetingPlatform } from "../validators/community";
 import type {
   SpotCategory,
   SpotNoiseLevel,
@@ -19,7 +20,12 @@ export type ApiErrorBody = {
   };
 };
 
-export type PageMeta = { limit: number; offset: number; hasMore: boolean };
+export type PageMeta = {
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+  total?: number;
+};
 
 export type Paginated<T> = { data: T[]; meta: PageMeta };
 
@@ -372,6 +378,7 @@ export type FeaturedWorkDto = {
 };
 
 export type EventCoHostDto = {
+  userId?: string;
   name: string;
   avatarUrl?: string;
   roleLabel?: string;
@@ -396,7 +403,7 @@ export type CommunityEventSummaryDto = {
   title: string;
   description: string;
   coverUrl: string;
-  themePreset: "minimal" | "classic_paper" | "midnight_ink" | "terracotta";
+  themePreset: EventTheme;
   visibility: "public" | "private_link";
   eventType:
     | "book_club"
@@ -416,6 +423,7 @@ export type CommunityEventSummaryDto = {
   isAddressHidden: boolean;
   latitude: number | null;
   longitude: number | null;
+  meetingPlatform?: MeetingPlatform | null;
   startsAt: string;
   endsAt: string;
   timezone: string;

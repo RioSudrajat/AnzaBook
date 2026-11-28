@@ -207,13 +207,21 @@ function AppPage() {
         />
       )}
 
-      {activeTab === "events" && <DashboardEvents />}
+      {activeTab === "events" && (
+        <DashboardEvents
+          key={search.view === "hosting" ? "hosting" : "default"}
+          initialView={search.view === "hosting" ? "hosting" : undefined}
+        />
+      )}
 
       {activeTab === "community" &&
         (search.slug ? (
           <CommunityHubView slug={search.slug} isInsideApp />
         ) : (
-          <DashboardEvents />
+          <DashboardEvents
+            key={search.view === "hosting" ? "hosting" : "default"}
+            initialView={search.view === "hosting" ? "hosting" : undefined}
+          />
         ))}
 
       {activeTab === "publisher" && <PublisherHubView />}

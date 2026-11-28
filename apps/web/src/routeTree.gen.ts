@@ -23,6 +23,7 @@ import { Route as ProtectedNotesRouteImport } from './routes/_protected/notes'
 import { Route as BookPreviewSlugRouteImport } from './routes/book-preview.$slug'
 import { Route as BooksSlugRouteImport } from './routes/books.$slug'
 import { Route as CSlugRouteImport } from './routes/c.$slug'
+import { Route as EventPreviewSlugRouteImport } from './routes/event-preview.$slug'
 import { Route as EventsSlugRouteImport } from './routes/events.$slug'
 import { Route as PSlugRouteImport } from './routes/p.$slug'
 import { Route as UUsernameRouteImport } from './routes/u.$username'
@@ -104,6 +105,11 @@ const CSlugRoute = CSlugRouteImport.update({
   path: '/c/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EventPreviewSlugRoute = EventPreviewSlugRouteImport.update({
+  id: '/event-preview/$slug',
+  path: '/event-preview/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EventsSlugRoute = EventsSlugRouteImport.update({
   id: '/events/$slug',
   path: '/events/$slug',
@@ -179,6 +185,7 @@ export interface FileRoutesByFullPath {
   '/book-preview/$slug': typeof BookPreviewSlugRoute
   '/books/$slug': typeof BooksSlugRoute
   '/c/$slug': typeof CSlugRoute
+  '/event-preview/$slug': typeof EventPreviewSlugRoute
   '/events/$slug': typeof EventsSlugRoute
   '/p/$slug': typeof PSlugRoute
   '/u/$username': typeof UUsernameRoute
@@ -205,6 +212,7 @@ export interface FileRoutesByTo {
   '/book-preview/$slug': typeof BookPreviewSlugRoute
   '/books/$slug': typeof BooksSlugRoute
   '/c/$slug': typeof CSlugRoute
+  '/event-preview/$slug': typeof EventPreviewSlugRoute
   '/events/$slug': typeof EventsSlugRoute
   '/p/$slug': typeof PSlugRoute
   '/u/$username': typeof UUsernameRoute
@@ -234,6 +242,7 @@ export interface FileRoutesById {
   '/book-preview/$slug': typeof BookPreviewSlugRoute
   '/books/$slug': typeof BooksSlugRoute
   '/c/$slug': typeof CSlugRoute
+  '/event-preview/$slug': typeof EventPreviewSlugRoute
   '/events/$slug': typeof EventsSlugRoute
   '/p/$slug': typeof PSlugRoute
   '/u/$username': typeof UUsernameRoute
@@ -262,6 +271,7 @@ export interface FileRouteTypes {
     | '/book-preview/$slug'
     | '/books/$slug'
     | '/c/$slug'
+    | '/event-preview/$slug'
     | '/events/$slug'
     | '/p/$slug'
     | '/u/$username'
@@ -288,6 +298,7 @@ export interface FileRouteTypes {
     | '/book-preview/$slug'
     | '/books/$slug'
     | '/c/$slug'
+    | '/event-preview/$slug'
     | '/events/$slug'
     | '/p/$slug'
     | '/u/$username'
@@ -316,6 +327,7 @@ export interface FileRouteTypes {
     | '/book-preview/$slug'
     | '/books/$slug'
     | '/c/$slug'
+    | '/event-preview/$slug'
     | '/events/$slug'
     | '/p/$slug'
     | '/u/$username'
@@ -340,6 +352,7 @@ export interface RootRouteChildren {
   BookPreviewSlugRoute: typeof BookPreviewSlugRoute
   BooksSlugRoute: typeof BooksSlugRoute
   CSlugRoute: typeof CSlugRoute
+  EventPreviewSlugRoute: typeof EventPreviewSlugRoute
   EventsSlugRoute: typeof EventsSlugRoute
   PSlugRoute: typeof PSlugRoute
   UUsernameRoute: typeof UUsernameRoute
@@ -445,6 +458,13 @@ declare module '@tanstack/react-router' {
       path: '/c/$slug'
       fullPath: '/c/$slug'
       preLoaderRoute: typeof CSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/event-preview/$slug': {
+      id: '/event-preview/$slug'
+      path: '/event-preview/$slug'
+      fullPath: '/event-preview/$slug'
+      preLoaderRoute: typeof EventPreviewSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/events/$slug': {
@@ -587,6 +607,7 @@ const rootRouteChildren: RootRouteChildren = {
   BookPreviewSlugRoute: BookPreviewSlugRoute,
   BooksSlugRoute: BooksSlugRoute,
   CSlugRoute: CSlugRoute,
+  EventPreviewSlugRoute: EventPreviewSlugRoute,
   EventsSlugRoute: EventsSlugRoute,
   PSlugRoute: PSlugRoute,
   UUsernameRoute: UUsernameRoute,

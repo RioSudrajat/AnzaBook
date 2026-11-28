@@ -15,16 +15,17 @@ import {
 } from "../db/schema";
 import { HttpError } from "../lib/http-error";
 import { toBookSummary } from "./books.service";
-import type {
-  AddCalendarMemberOutput,
-  CheckInRsvpInput,
-  CreateCalendarInput,
-  CreateEventInput,
-  ListEventsQuery,
-  RsvpEventInput,
-  UpdateCalendarInput,
-  UpdateCalendarMemberInput,
-  UpdateEventInput,
+import {
+  detectMeetingPlatform,
+  type AddCalendarMemberOutput,
+  type CheckInRsvpInput,
+  type CreateCalendarInput,
+  type CreateEventInput,
+  type ListEventsQuery,
+  type RsvpEventInput,
+  type UpdateCalendarInput,
+  type UpdateCalendarMemberInput,
+  type UpdateEventInput,
 } from "@starter/shared/validators/community";
 import type {
   CommunityCalendarDto,
@@ -511,6 +512,10 @@ export async function createEvent(
   return (await getEventBySlug(event.slug, userId, userRole))!;
 }
 
+function escapeIlikePattern(raw: string): string {
+  return raw.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
 export async function listEvents(
   query: ListEventsQuery,
   currentUserId?: string,
@@ -525,7 +530,22 @@ export async function listEvents(
     conditions.push(eq(communityEvents.eventType, query.eventType));
   }
   if (query.city) {
-    conditions.push(ilike(communityEvents.city, `%${query.city}%`));
+    conditions.push(
+      ilike(communityEvents.city, `%${escapeIlikePattern(query.city)}%`),
+    );
+  }
+  if (query.q && query.q.trim()) {
+    const pattern = `%${escapeIlikePattern(query.q.trim())}%`;
+    conditions.push(
+      or(
+        ilike(communityEvents.title, pattern),
+        ilike(communityEvents.venueName, pattern),
+        ilike(communityEvents.city, pattern),
+        ilike(communityEvents.district, pattern),
+        ilike(communityEvents.categoryTag, pattern),
+        ilike(communityCalendars.name, pattern),
+      )!,
+    );
   }
   if (query.bookId) {
     conditions.push(eq(communityEvents.bookId, query.bookId));
@@ -547,6 +567,7 @@ export async function listEvents(
           limit: query.limit,
           offset: query.offset,
           hasMore: false,
+          total: 0,
         },
       };
     }
@@ -564,6 +585,11 @@ export async function listEvents(
         ),
       );
     conditions.push(inArray(communityEvents.id, userEventIdsSubquery));
+    if (query.timeScope === "upcoming") {
+      conditions.push(sql`${communityEvents.endsAt} >= ${now}`);
+    } else if (query.timeScope === "past") {
+      conditions.push(sql`${communityEvents.endsAt} < ${now}`);
+    }
   } else if (query.filter === "hosting") {
     if (!currentUserId) {
       return {
@@ -572,17 +598,25 @@ export async function listEvents(
           limit: query.limit,
           offset: query.offset,
           hasMore: false,
+          total: 0,
         },
       };
     }
-    conditions.push(
-      sql`EXISTS (
-        SELECT 1 FROM ${communityCalendarMembers}
-        WHERE ${communityCalendarMembers.calendarId} = ${communityEvents.calendarId}
-          AND ${communityCalendarMembers.userId} = ${currentUserId}
-          AND ${communityCalendarMembers.role} IN ('owner', 'admin')
-      )`,
-    );
+    if (currentUserRole !== "admin") {
+      conditions.push(
+        sql`EXISTS (
+          SELECT 1 FROM ${communityCalendarMembers}
+          WHERE ${communityCalendarMembers.calendarId} = ${communityEvents.calendarId}
+            AND ${communityCalendarMembers.userId} = ${currentUserId}
+            AND ${communityCalendarMembers.role} IN ('owner', 'admin')
+        )`,
+      );
+    }
+    if (query.timeScope === "upcoming") {
+      conditions.push(sql`${communityEvents.endsAt} >= ${now}`);
+    } else if (query.timeScope === "past") {
+      conditions.push(sql`${communityEvents.endsAt} < ${now}`);
+    }
   }
 
   // Filter published for public viewing, unless query is hosting or viewer manages calendar
@@ -623,138 +657,237 @@ export async function listEvents(
     }
   }
 
-  const rows = await db
-    .select({
-      event: communityEvents,
-      calendar: communityCalendars,
-      book: books,
-    })
-    .from(communityEvents)
-    .innerJoin(
-      communityCalendars,
-      eq(communityEvents.calendarId, communityCalendars.id),
-    )
-    .leftJoin(books, eq(communityEvents.bookId, books.id))
-    .where(and(...conditions))
-    .orderBy(
-      query.filter === "past"
-        ? desc(communityEvents.endsAt)
-        : communityEvents.startsAt,
-      communityEvents.id,
-    )
-    .limit(query.limit + 1)
-    .offset(query.offset);
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+  const orderByDesc = query.filter === "past" || query.timeScope === "past";
 
+  const [[countRow], rows] = await Promise.all([
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(communityEvents)
+      .innerJoin(
+        communityCalendars,
+        eq(communityEvents.calendarId, communityCalendars.id),
+      )
+      .leftJoin(books, eq(communityEvents.bookId, books.id))
+      .where(whereClause),
+    db
+      .select({
+        event: communityEvents,
+        calendar: communityCalendars,
+        book: books,
+      })
+      .from(communityEvents)
+      .innerJoin(
+        communityCalendars,
+        eq(communityEvents.calendarId, communityCalendars.id),
+      )
+      .leftJoin(books, eq(communityEvents.bookId, books.id))
+      .where(whereClause)
+      .orderBy(
+        orderByDesc ? desc(communityEvents.endsAt) : communityEvents.startsAt,
+        communityEvents.id,
+      )
+      .limit(query.limit + 1)
+      .offset(query.offset),
+  ]);
+
+  const total = Number(countRow?.count || 0);
   const hasMore = rows.length > query.limit;
   const items = rows.slice(0, query.limit);
 
-  const data: CommunityEventSummaryDto[] = [];
-  for (const { event, calendar, book } of items) {
-    // Count going attendees
-    const [attCount] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(eventRsvps)
-      .where(
-        and(eq(eventRsvps.eventId, event.id), eq(eventRsvps.status, "going")),
-      );
+  if (items.length === 0) {
+    return {
+      data: [],
+      meta: {
+        limit: query.limit,
+        offset: query.offset,
+        hasMore: false,
+        total,
+      },
+    };
+  }
 
-    // Previews (up to 5 going attendees)
-    const previews = await db
-      .select({
-        userId: user.id,
-        name: user.name,
-        image: user.image,
-      })
-      .from(eventRsvps)
-      .innerJoin(user, eq(eventRsvps.userId, user.id))
-      .where(
-        and(eq(eventRsvps.eventId, event.id), eq(eventRsvps.status, "going")),
-      )
-      .limit(5);
+  const eventIds = items.map((r) => r.event.id);
+  const calendarIds = [...new Set(items.map((r) => r.calendar.id))];
 
-    let userRsvpStatus: CommunityEventSummaryDto["userRsvpStatus"] = null;
-    let isManager = false;
-
-    if (currentUserId) {
-      const [rsvp] = await db
-        .select({ status: eventRsvps.status })
+  const [goingCounts, previewRows, userRsvpRows, managerRows] =
+    await Promise.all([
+      db
+        .select({
+          eventId: eventRsvps.eventId,
+          count: sql<number>`count(*)`,
+        })
         .from(eventRsvps)
         .where(
           and(
-            eq(eventRsvps.eventId, event.id),
-            eq(eventRsvps.userId, currentUserId),
+            inArray(eventRsvps.eventId, eventIds),
+            eq(eventRsvps.status, "going"),
           ),
         )
-        .limit(1);
-      userRsvpStatus =
-        (rsvp?.status as CommunityEventSummaryDto["userRsvpStatus"]) || null;
-      isManager = await isCalendarManager(
-        calendar.id,
-        currentUserId,
-        currentUserRole,
-      );
-    }
-
-    let pendingRsvpCount = 0;
-    if (isManager) {
-      const [pCount] = await db
-        .select({ count: sql<number>`count(*)` })
+        .groupBy(eventRsvps.eventId),
+      db
+        .select({
+          eventId: eventRsvps.eventId,
+          userId: user.id,
+          name: user.name,
+          image: user.image,
+        })
         .from(eventRsvps)
+        .innerJoin(user, eq(eventRsvps.userId, user.id))
         .where(
           and(
-            eq(eventRsvps.eventId, event.id),
-            eq(eventRsvps.status, "pending_approval"),
+            inArray(eventRsvps.eventId, eventIds),
+            eq(eventRsvps.status, "going"),
           ),
-        );
-      pendingRsvpCount = Number(pCount?.count || 0);
-    }
+        )
+        .orderBy(eventRsvps.createdAt),
+      currentUserId
+        ? db
+            .select({
+              eventId: eventRsvps.eventId,
+              status: eventRsvps.status,
+            })
+            .from(eventRsvps)
+            .where(
+              and(
+                inArray(eventRsvps.eventId, eventIds),
+                eq(eventRsvps.userId, currentUserId),
+              ),
+            )
+        : Promise.resolve([]),
+      currentUserId && currentUserRole !== "admin"
+        ? db
+            .select({ calendarId: communityCalendarMembers.calendarId })
+            .from(communityCalendarMembers)
+            .where(
+              and(
+                inArray(communityCalendarMembers.calendarId, calendarIds),
+                eq(communityCalendarMembers.userId, currentUserId),
+                inArray(communityCalendarMembers.role, ["owner", "admin"]),
+              ),
+            )
+        : Promise.resolve([]),
+    ]);
 
-    const isAddressHidden =
-      event.hideAddressUntilApproved &&
-      userRsvpStatus !== "going" &&
-      !isManager;
-
-    data.push({
-      id: event.id,
-      slug: event.slug,
-      calendarId: calendar.id,
-      calendarSlug: calendar.slug,
-      calendarName: calendar.name,
-      calendarAvatarUrl: calendar.avatarUrl,
-      bookId: event.bookId,
-      bookSummary: book ? toBookSummary(book) : null,
-      featuredWork: event.featuredWork,
-      title: event.title,
-      description: event.description,
-      coverUrl: event.coverUrl,
-      themePreset: event.themePreset,
-      visibility: event.visibility,
-      eventType: event.eventType,
-      categoryTag: event.categoryTag,
-      coHosts: event.coHosts,
-      format: event.format,
-      district: event.district,
-      city: event.city,
-      venueName: isAddressHidden ? null : event.venueName,
-      venueAddress: isAddressHidden ? null : event.venueAddress,
-      hideAddressUntilApproved: event.hideAddressUntilApproved,
-      isAddressHidden,
-      latitude: isAddressHidden ? null : event.latitude,
-      longitude: isAddressHidden ? null : event.longitude,
-      startsAt: event.startsAt.toISOString(),
-      endsAt: event.endsAt.toISOString(),
-      timezone: event.timezone,
-      capacity: event.capacity,
-      requiresApproval: event.requiresApproval,
-      allowWaitlist: event.allowWaitlist,
-      status: event.status,
-      attendeeCount: Number(attCount?.count || 0),
-      attendeesPreview: previews,
-      userRsvpStatus,
-      canManage: isManager,
-      pendingRsvpCount,
-    });
+  const attendeeCountMap = new Map<string, number>();
+  for (const row of goingCounts) {
+    attendeeCountMap.set(row.eventId, Number(row.count || 0));
   }
+
+  const previewsMap = new Map<
+    string,
+    { userId: string; name: string; image: string | null }[]
+  >();
+  for (const row of previewRows) {
+    const bucket = previewsMap.get(row.eventId) ?? [];
+    if (bucket.length < 5) {
+      bucket.push({ userId: row.userId, name: row.name, image: row.image });
+      previewsMap.set(row.eventId, bucket);
+    }
+  }
+
+  const userRsvpMap = new Map<
+    string,
+    CommunityEventSummaryDto["userRsvpStatus"]
+  >();
+  for (const row of userRsvpRows) {
+    if (row.status !== "canceled") {
+      userRsvpMap.set(
+        row.eventId,
+        row.status as CommunityEventSummaryDto["userRsvpStatus"],
+      );
+    }
+  }
+
+  const managedCalendarSet =
+    currentUserId && currentUserRole === "admin"
+      ? new Set(calendarIds)
+      : new Set(managerRows.map((m) => m.calendarId));
+
+  const managedEventIds = items
+    .filter((r) =>
+      Boolean(currentUserId && managedCalendarSet.has(r.calendar.id)),
+    )
+    .map((r) => r.event.id);
+
+  const pendingCountMap = new Map<string, number>();
+  if (managedEventIds.length > 0) {
+    const pendingRows = await db
+      .select({
+        eventId: eventRsvps.eventId,
+        count: sql<number>`count(*)`,
+      })
+      .from(eventRsvps)
+      .where(
+        and(
+          inArray(eventRsvps.eventId, managedEventIds),
+          eq(eventRsvps.status, "pending_approval"),
+        ),
+      )
+      .groupBy(eventRsvps.eventId);
+
+    for (const row of pendingRows) {
+      pendingCountMap.set(row.eventId, Number(row.count || 0));
+    }
+  }
+
+  const data: CommunityEventSummaryDto[] = items.map(
+    ({ event, calendar, book }) => {
+      const userRsvpStatus = userRsvpMap.get(event.id) ?? null;
+      const isManager = Boolean(
+        currentUserId && managedCalendarSet.has(calendar.id),
+      );
+      const pendingRsvpCount = isManager
+        ? (pendingCountMap.get(event.id) ?? 0)
+        : 0;
+      const isAddressHidden =
+        event.hideAddressUntilApproved &&
+        userRsvpStatus !== "going" &&
+        !isManager;
+
+      return {
+        id: event.id,
+        slug: event.slug,
+        calendarId: calendar.id,
+        calendarSlug: calendar.slug,
+        calendarName: calendar.name,
+        calendarAvatarUrl: calendar.avatarUrl,
+        bookId: event.bookId,
+        bookSummary: book ? toBookSummary(book) : null,
+        featuredWork: event.featuredWork,
+        title: event.title,
+        description: event.description,
+        coverUrl: event.coverUrl,
+        themePreset: event.themePreset,
+        visibility: event.visibility,
+        eventType: event.eventType,
+        categoryTag: event.categoryTag,
+        coHosts: event.coHosts,
+        format: event.format,
+        district: event.district,
+        city: event.city,
+        venueName: isAddressHidden ? null : event.venueName,
+        venueAddress: isAddressHidden ? null : event.venueAddress,
+        hideAddressUntilApproved: event.hideAddressUntilApproved,
+        isAddressHidden,
+        latitude: isAddressHidden ? null : event.latitude,
+        longitude: isAddressHidden ? null : event.longitude,
+        meetingPlatform: detectMeetingPlatform(event.onlineMeetingUrl),
+        startsAt: event.startsAt.toISOString(),
+        endsAt: event.endsAt.toISOString(),
+        timezone: event.timezone,
+        capacity: event.capacity,
+        requiresApproval: event.requiresApproval,
+        allowWaitlist: event.allowWaitlist,
+        status: event.status,
+        attendeeCount: attendeeCountMap.get(event.id) ?? 0,
+        attendeesPreview: previewsMap.get(event.id) ?? [],
+        userRsvpStatus,
+        canManage: isManager,
+        pendingRsvpCount,
+      };
+    },
+  );
 
   return {
     data,
@@ -762,6 +895,7 @@ export async function listEvents(
       limit: query.limit,
       offset: query.offset,
       hasMore,
+      total,
     },
   };
 }
@@ -820,7 +954,7 @@ export async function getEventBySlug(
       )
       .limit(1);
 
-    if (r) {
+    if (r && r.status !== "canceled") {
       userRsvp = {
         ...r,
         status: r.status as EventRsvpDto["status"],
@@ -883,6 +1017,7 @@ export async function getEventBySlug(
     isAddressHidden,
     latitude: isAddressHidden ? null : event.latitude,
     longitude: isAddressHidden ? null : event.longitude,
+    meetingPlatform: detectMeetingPlatform(event.onlineMeetingUrl),
     onlineMeetingUrl: canSeeMeetingUrl ? event.onlineMeetingUrl : null,
     startsAt: event.startsAt.toISOString(),
     endsAt: event.endsAt.toISOString(),
@@ -1065,6 +1200,24 @@ export async function approveRsvp(
     );
   }
 
+  const [existing] = await db
+    .select()
+    .from(eventRsvps)
+    .where(and(eq(eventRsvps.id, rsvpId), eq(eventRsvps.eventId, event.id)))
+    .limit(1);
+
+  if (!existing) {
+    throw new HttpError(404, "RSVP_NOT_FOUND", "Pendaftaran tidak ditemukan.");
+  }
+
+  if (existing.status === "canceled") {
+    throw new HttpError(
+      409,
+      "RSVP_CANCELED",
+      "Peserta sudah membatalkan pendaftaran dan tidak dapat disetujui.",
+    );
+  }
+
   const [row] = await db
     .update(eventRsvps)
     .set({ status: "going", updatedAt: new Date() })
@@ -1124,27 +1277,46 @@ export async function checkInRsvp(
     );
   }
 
-  const condition = input.checkinCode
-    ? eq(eventRsvps.checkinCode, input.checkinCode)
+  const normalizedCode = input.checkinCode?.trim().toUpperCase();
+  const condition = normalizedCode
+    ? sql`upper(${eventRsvps.checkinCode}) = ${normalizedCode}`
     : eq(eventRsvps.userId, input.userId!);
 
-  const [row] = await db
-    .update(eventRsvps)
-    .set({
-      checkedInAt: new Date(),
-      checkedInByUserId: hostUserId,
-      updatedAt: new Date(),
-    })
+  const [existing] = await db
+    .select()
+    .from(eventRsvps)
     .where(and(eq(eventRsvps.eventId, event.id), condition))
-    .returning();
+    .limit(1);
 
-  if (!row) {
+  if (!existing) {
     throw new HttpError(
       404,
       "RSVP_NOT_FOUND",
       "Pendaftaran peserta tidak ditemukan.",
     );
   }
+
+  if (existing.status !== "going") {
+    throw new HttpError(
+      409,
+      "RSVP_NOT_CONFIRMED",
+      "Hanya peserta dengan status terdaftar (akan hadir) yang dapat melakukan check-in.",
+    );
+  }
+
+  const row = existing.checkedInAt
+    ? existing
+    : (
+        await db
+          .update(eventRsvps)
+          .set({
+            checkedInAt: new Date(),
+            checkedInByUserId: hostUserId,
+            updatedAt: new Date(),
+          })
+          .where(eq(eventRsvps.id, existing.id))
+          .returning()
+      )[0];
 
   const [userData] = await db
     .select({ name: user.name, email: user.email, image: user.image })
@@ -1374,7 +1546,7 @@ export async function updateEvent(
   input: UpdateEventInput,
 ): Promise<CommunityEventDetailDto> {
   const [event] = await db
-    .select({ id: communityEvents.id, calendarId: communityEvents.calendarId })
+    .select()
     .from(communityEvents)
     .where(eq(communityEvents.slug, slug))
     .limit(1);
@@ -1396,6 +1568,58 @@ export async function updateEvent(
     );
   }
 
+  const nextStartsAt = input.startsAt
+    ? new Date(input.startsAt)
+    : event.startsAt;
+  const nextEndsAt = input.endsAt ? new Date(input.endsAt) : event.endsAt;
+  if (nextEndsAt <= nextStartsAt) {
+    throw new HttpError(
+      400,
+      "INVALID_EVENT_SCHEDULE",
+      "Waktu selesai harus setelah waktu mulai acara.",
+    );
+  }
+
+  const nextFormat = input.format ?? event.format;
+  const nextMeetingUrl =
+    input.onlineMeetingUrl !== undefined
+      ? input.onlineMeetingUrl || null
+      : event.onlineMeetingUrl;
+  const nextVenueName =
+    input.venueName !== undefined ? input.venueName || null : event.venueName;
+  const nextVenueAddress =
+    input.venueAddress !== undefined
+      ? input.venueAddress || null
+      : event.venueAddress;
+
+  if (nextFormat === "online" && !nextMeetingUrl) {
+    throw new HttpError(
+      400,
+      "MISSING_MEETING_URL",
+      "Tautan rapat virtual wajib diisi untuk acara daring.",
+    );
+  }
+
+  if (
+    (nextFormat === "offline" || nextFormat === "hybrid") &&
+    !nextVenueName &&
+    !nextVenueAddress
+  ) {
+    throw new HttpError(
+      400,
+      "MISSING_VENUE",
+      "Nama tempat atau alamat fisik wajib diisi untuk acara tatap muka.",
+    );
+  }
+
+  if (nextFormat === "hybrid" && !nextMeetingUrl) {
+    throw new HttpError(
+      400,
+      "MISSING_MEETING_URL",
+      "Tautan rapat virtual wajib diisi untuk acara hibrida.",
+    );
+  }
+
   const patch: Partial<typeof communityEvents.$inferInsert> = {
     updatedAt: new Date(),
   };
@@ -1403,18 +1627,50 @@ export async function updateEvent(
   if (input.description !== undefined) patch.description = input.description;
   if (input.coverUrl !== undefined) patch.coverUrl = input.coverUrl;
   if (input.themePreset !== undefined) patch.themePreset = input.themePreset;
+  if (input.eventType !== undefined) patch.eventType = input.eventType;
+  if (input.visibility !== undefined) patch.visibility = input.visibility;
+  if (input.categoryTag !== undefined) patch.categoryTag = input.categoryTag;
+  if (input.hideAddressUntilApproved !== undefined)
+    patch.hideAddressUntilApproved = input.hideAddressUntilApproved;
+  if (input.bookId !== undefined) patch.bookId = input.bookId;
+  if (input.featuredWork !== undefined) patch.featuredWork = input.featuredWork;
   if (input.format !== undefined) patch.format = input.format;
-  if (input.venueName !== undefined) patch.venueName = input.venueName;
-  if (input.venueAddress !== undefined) patch.venueAddress = input.venueAddress;
-  if (input.district !== undefined) patch.district = input.district;
-  if (input.city !== undefined) patch.city = input.city;
-  if (input.latitude !== undefined) patch.latitude = input.latitude;
-  if (input.longitude !== undefined) patch.longitude = input.longitude;
-  if (input.onlineMeetingUrl !== undefined)
-    patch.onlineMeetingUrl = input.onlineMeetingUrl || null;
-  if (input.startsAt !== undefined) patch.startsAt = new Date(input.startsAt);
-  if (input.endsAt !== undefined) patch.endsAt = new Date(input.endsAt);
-  if (input.capacity !== undefined) patch.capacity = input.capacity || null;
+  if (input.timezone !== undefined) patch.timezone = input.timezone;
+
+  if (nextFormat === "online") {
+    patch.venueName = null;
+    patch.venueAddress = null;
+    patch.district = null;
+    patch.city = null;
+    patch.latitude = null;
+    patch.longitude = null;
+    patch.onlineMeetingUrl = nextMeetingUrl;
+  } else if (nextFormat === "offline") {
+    patch.onlineMeetingUrl = null;
+    if (input.venueName !== undefined)
+      patch.venueName = input.venueName || null;
+    if (input.venueAddress !== undefined)
+      patch.venueAddress = input.venueAddress || null;
+    if (input.district !== undefined) patch.district = input.district || null;
+    if (input.city !== undefined) patch.city = input.city || null;
+    if (input.latitude !== undefined) patch.latitude = input.latitude;
+    if (input.longitude !== undefined) patch.longitude = input.longitude;
+  } else {
+    if (input.venueName !== undefined)
+      patch.venueName = input.venueName || null;
+    if (input.venueAddress !== undefined)
+      patch.venueAddress = input.venueAddress || null;
+    if (input.district !== undefined) patch.district = input.district || null;
+    if (input.city !== undefined) patch.city = input.city || null;
+    if (input.latitude !== undefined) patch.latitude = input.latitude;
+    if (input.longitude !== undefined) patch.longitude = input.longitude;
+    if (input.onlineMeetingUrl !== undefined)
+      patch.onlineMeetingUrl = input.onlineMeetingUrl || null;
+  }
+
+  if (input.startsAt !== undefined) patch.startsAt = nextStartsAt;
+  if (input.endsAt !== undefined) patch.endsAt = nextEndsAt;
+  if (input.capacity !== undefined) patch.capacity = input.capacity;
   if (input.coHosts !== undefined) patch.coHosts = input.coHosts;
   if (input.logisticsNotes !== undefined)
     patch.logisticsNotes = input.logisticsNotes || null;

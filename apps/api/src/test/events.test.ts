@@ -1078,4 +1078,375 @@ describe("Community Calendars & Events API", () => {
     expect(rateLimitedStatus).toBe(429);
     expect(rateLimitedCode).toBe("CALENDAR_MEMBER_RATE_LIMIT");
   });
+
+  it("normalizes canceled RSVP to null across list/detail and allows clean re-registration", async () => {
+    const host = agent();
+    const hostEmail = await signUp(host, "Host Cancel Audit");
+    await setRole(hostEmail, "admin");
+
+    const calSlug = `cal-cancel-${Date.now()}`;
+    const calRes = await host
+      .post("/api/events/calendars")
+      .set(originHeader)
+      .send({ name: "Komunitas Uji Batal", slug: calSlug });
+    expect(calRes.status).toBe(201);
+
+    const evRes = await host
+      .post("/api/events")
+      .set(originHeader)
+      .send({
+        calendarId: calRes.body.data.id,
+        title: "Sesi Diskusi Pembatalan",
+        description: "Menguji pembatalan RSVP tidak dianggap daftar tunggu.",
+        coverUrl: "https://example.com/banner-cancel.jpg",
+        format: "online",
+        onlineMeetingUrl: "https://meet.google.com/cancel-audit",
+        startsAt: new Date(Date.now() + 86400_000).toISOString(),
+        endsAt: new Date(Date.now() + 90000_000).toISOString(),
+      });
+    expect(evRes.status).toBe(201);
+    const slug = evRes.body.data.slug;
+
+    const reader = agent();
+    await signUp(reader, "Pembaca Uji Batal");
+
+    const rsvpRes = await reader
+      .post(`/api/events/${slug}/rsvp`)
+      .set(originHeader)
+      .send({});
+    expect(rsvpRes.status).toBe(201);
+    expect(rsvpRes.body.data.status).toBe("going");
+
+    const cancelRes = await reader
+      .delete(`/api/events/${slug}/rsvp`)
+      .set(originHeader)
+      .send();
+    expect(cancelRes.status).toBe(200);
+
+    const detailAfterCancel = await reader.get(`/api/events/${slug}`);
+    expect(detailAfterCancel.status).toBe(200);
+    expect(detailAfterCancel.body.data.userRsvpStatus).toBeNull();
+    expect(detailAfterCancel.body.data.userRsvp).toBeNull();
+
+    const listAfterCancel = await reader.get(
+      `/api/events?calendarSlug=${calSlug}`,
+    );
+    expect(listAfterCancel.status).toBe(200);
+    expect(listAfterCancel.body.data).toHaveLength(1);
+    expect(listAfterCancel.body.data[0].userRsvpStatus).toBeNull();
+
+    const reRsvpRes = await reader
+      .post(`/api/events/${slug}/rsvp`)
+      .set(originHeader)
+      .send({});
+    expect(reRsvpRes.status).toBe(201);
+    expect(reRsvpRes.body.data.status).toBe("going");
+  });
+
+  it("supports q search, timeScope filtering on hosting/my_rsvps, and returns meta.total", async () => {
+    const host = agent();
+    const hostEmail = await signUp(host, "Host Filter Audit");
+    await setRole(hostEmail, "admin");
+
+    const calSlug = `cal-filter-${Date.now()}`;
+    const calRes = await host
+      .post("/api/events/calendars")
+      .set(originHeader)
+      .send({ name: "Komunitas Filter Uji", slug: calSlug });
+    expect(calRes.status).toBe(201);
+    const calId = calRes.body.data.id;
+
+    // Create 1 past event and 2 upcoming events
+    const pastEv = await host
+      .post("/api/events")
+      .set(originHeader)
+      .send({
+        calendarId: calId,
+        title: "Arsip Diskusi Lampau",
+        description: "Acara yang sudah lewat untuk uji timeScope.",
+        coverUrl: "https://example.com/past.jpg",
+        format: "online",
+        onlineMeetingUrl: "https://meet.google.com/past-ev",
+        startsAt: new Date(Date.now() - 172800_000).toISOString(),
+        endsAt: new Date(Date.now() - 169200_000).toISOString(),
+      });
+    expect(pastEv.status).toBe(201);
+
+    const upEv1 = await host
+      .post("/api/events")
+      .set(originHeader)
+      .send({
+        calendarId: calId,
+        title: "Bedah Novel Nusantara",
+        description: "Acara mendatang pertama dengan kata kunci unik.",
+        coverUrl: "https://example.com/up1.jpg",
+        format: "offline",
+        venueName: "Kedai Aksara",
+        venueAddress: "Jl. Menteng No. 5",
+        city: "Jakarta Pusat",
+        startsAt: new Date(Date.now() + 86400_000).toISOString(),
+        endsAt: new Date(Date.now() + 90000_000).toISOString(),
+      });
+    expect(upEv1.status).toBe(201);
+
+    const upEv2 = await host
+      .post("/api/events")
+      .set(originHeader)
+      .send({
+        calendarId: calId,
+        title: "Silent Reading Minggu Pagi",
+        description: "Acara mendatang kedua di Bandung.",
+        coverUrl: "https://example.com/up2.jpg",
+        format: "offline",
+        venueName: "Taman Balai Kota",
+        venueAddress: "Jl. Wastukencana",
+        city: "Bandung",
+        startsAt: new Date(Date.now() + 172800_000).toISOString(),
+        endsAt: new Date(Date.now() + 176400_000).toISOString(),
+      });
+    expect(upEv2.status).toBe(201);
+
+    const searchRes = await host.get(
+      `/api/events?calendarSlug=${calSlug}&q=Nusantara`,
+    );
+    expect(searchRes.status).toBe(200);
+    expect(searchRes.body.meta.total).toBe(1);
+    expect(searchRes.body.meta.hasMore).toBe(false);
+    expect(searchRes.body.data[0].title).toBe("Bedah Novel Nusantara");
+
+    const pagedRes = await host.get(
+      `/api/events?calendarSlug=${calSlug}&limit=1&offset=0`,
+    );
+    expect(pagedRes.status).toBe(200);
+    expect(pagedRes.body.meta.total).toBe(2);
+    expect(pagedRes.body.meta.hasMore).toBe(true);
+    expect(pagedRes.body.data).toHaveLength(1);
+
+    const hostingUpcoming = await host.get(
+      `/api/events?calendarSlug=${calSlug}&filter=hosting&timeScope=upcoming`,
+    );
+    expect(hostingUpcoming.status).toBe(200);
+    expect(hostingUpcoming.body.meta.total).toBe(2);
+
+    const hostingPast = await host.get(
+      `/api/events?calendarSlug=${calSlug}&filter=hosting&timeScope=past`,
+    );
+    expect(hostingPast.status).toBe(200);
+    expect(hostingPast.body.meta.total).toBe(1);
+    expect(hostingPast.body.data[0].title).toBe("Arsip Diskusi Lampau");
+
+    // RSVP reader to both past and up1 to test my_rsvps timeScope
+    const reader = agent();
+    await signUp(reader, "Peserta TimeScope");
+    await reader
+      .post(`/api/events/${pastEv.body.data.slug}/rsvp`)
+      .set(originHeader)
+      .send({});
+    await reader
+      .post(`/api/events/${upEv1.body.data.slug}/rsvp`)
+      .set(originHeader)
+      .send({});
+
+    const rsvpUpcoming = await reader.get(
+      `/api/events?calendarSlug=${calSlug}&filter=my_rsvps&timeScope=upcoming`,
+    );
+    expect(rsvpUpcoming.status).toBe(200);
+    expect(rsvpUpcoming.body.meta.total).toBe(1);
+    expect(rsvpUpcoming.body.data[0].slug).toBe(upEv1.body.data.slug);
+
+    const rsvpPast = await reader.get(
+      `/api/events?calendarSlug=${calSlug}&filter=my_rsvps&timeScope=past`,
+    );
+    expect(rsvpPast.status).toBe(200);
+    expect(rsvpPast.body.meta.total).toBe(1);
+    expect(rsvpPast.body.data[0].slug).toBe(pastEv.body.data.slug);
+  });
+
+  it("updates all editable fields via PATCH /api/events/:slug, cleans stale fields on format switch, clears capacity, and validates schedule", async () => {
+    const host = agent();
+    const hostEmail = await signUp(host, "Host Update Audit");
+    await setRole(hostEmail, "admin");
+
+    const calSlug = `cal-update-${Date.now()}`;
+    const calRes = await host
+      .post("/api/events/calendars")
+      .set(originHeader)
+      .send({ name: "Komunitas Update Uji", slug: calSlug });
+    expect(calRes.status).toBe(201);
+
+    const startsAt = new Date(Date.now() + 86400_000).toISOString();
+    const endsAt = new Date(Date.now() + 90000_000).toISOString();
+
+    const evRes = await host.post("/api/events").set(originHeader).send({
+      calendarId: calRes.body.data.id,
+      title: "Acara Offline Awal",
+      description: "Deskripsi acara awal yang cukup panjang.",
+      coverUrl: "https://example.com/update.jpg",
+      format: "offline",
+      eventType: "book_club",
+      categoryTag: "Fiksi",
+      visibility: "public",
+      venueName: "Perpustakaan Kota",
+      venueAddress: "Jl. Merdeka 10",
+      city: "Jakarta",
+      capacity: 25,
+      startsAt,
+      endsAt,
+    });
+    expect(evRes.status).toBe(201);
+    const slug = evRes.body.data.slug;
+
+    // Invalid schedule (endsAt <= startsAt) returns 400 or 422
+    const badSchedule = await host
+      .patch(`/api/events/${slug}`)
+      .set(originHeader)
+      .send({
+        startsAt,
+        endsAt: new Date(Date.now() + 80000_000).toISOString(),
+      });
+    expect([400, 422]).toContain(badSchedule.status);
+
+    // Update eventType, categoryTag, visibility, clear capacity: null, switch offline -> online
+    const toOnline = await host
+      .patch(`/api/events/${slug}`)
+      .set(originHeader)
+      .send({
+        eventType: "writing_session",
+        categoryTag: "Esai",
+        visibility: "private_link",
+        capacity: null,
+        format: "online",
+        onlineMeetingUrl: "https://zoom.us/j/123456789",
+      });
+    expect(toOnline.status).toBe(200);
+    expect(toOnline.body.data.eventType).toBe("writing_session");
+    expect(toOnline.body.data.categoryTag).toBe("Esai");
+    expect(toOnline.body.data.visibility).toBe("private_link");
+    expect(toOnline.body.data.capacity).toBeNull();
+    expect(toOnline.body.data.format).toBe("online");
+    expect(toOnline.body.data.venueName).toBeNull();
+    expect(toOnline.body.data.venueAddress).toBeNull();
+    expect(toOnline.body.data.city).toBeNull();
+    expect(toOnline.body.data.onlineMeetingUrl).toBe(
+      "https://zoom.us/j/123456789",
+    );
+
+    // Switch online -> offline clears stale onlineMeetingUrl and persists coHosts containing userId
+    const toOffline = await host
+      .patch(`/api/events/${slug}`)
+      .set(originHeader)
+      .send({
+        format: "offline",
+        venueName: "Studio Aksara",
+        venueAddress: "Jl. Kemang Selatan 12",
+        hideAddressUntilApproved: true,
+        coHosts: [
+          {
+            userId: "usr-seed-1",
+            name: "Mitra Komunitas",
+            roleLabel: "Moderator",
+          },
+        ],
+      });
+    expect(toOffline.status).toBe(200);
+    expect(toOffline.body.data.format).toBe("offline");
+    expect(toOffline.body.data.onlineMeetingUrl).toBeNull();
+    expect(toOffline.body.data.venueName).toBe("Studio Aksara");
+    expect(toOffline.body.data.hideAddressUntilApproved).toBe(true);
+    expect(toOffline.body.data.coHosts).toEqual([
+      {
+        userId: "usr-seed-1",
+        name: "Mitra Komunitas",
+        roleLabel: "Moderator",
+      },
+    ]);
+  });
+
+  it("enforces RSVP state rules on check-in and approval", async () => {
+    const host = agent();
+    const hostEmail = await signUp(host, "Host Checkin Audit");
+    await setRole(hostEmail, "admin");
+
+    const calSlug = `cal-checkin-${Date.now()}`;
+    const calRes = await host
+      .post("/api/events/calendars")
+      .set(originHeader)
+      .send({ name: "Komunitas Checkin Uji", slug: calSlug });
+    expect(calRes.status).toBe(201);
+
+    const evRes = await host
+      .post("/api/events")
+      .set(originHeader)
+      .send({
+        calendarId: calRes.body.data.id,
+        title: "Klub Seleksi Ketat",
+        description: "Acara dengan persetujuan host sebelum check-in.",
+        coverUrl: "https://example.com/checkin.jpg",
+        format: "online",
+        onlineMeetingUrl: "https://meet.google.com/strict-checkin",
+        requiresApproval: true,
+        startsAt: new Date(Date.now() + 86400_000).toISOString(),
+        endsAt: new Date(Date.now() + 90000_000).toISOString(),
+      });
+    expect(evRes.status).toBe(201);
+    const slug = evRes.body.data.slug;
+
+    const pendingUser = agent();
+    await signUp(pendingUser, "Peserta Pending");
+    const rsvp1 = await pendingUser
+      .post(`/api/events/${slug}/rsvp`)
+      .set(originHeader)
+      .send({});
+    expect(rsvp1.status).toBe(201);
+    expect(rsvp1.body.data.status).toBe("pending_approval");
+
+    // Cannot check in while still pending_approval
+    const badCheckin = await host
+      .post(`/api/events/${slug}/check-in`)
+      .set(originHeader)
+      .send({ checkinCode: rsvp1.body.data.checkinCode.toLowerCase() });
+    expect(badCheckin.status).toBe(409);
+    expect(badCheckin.body.error.code).toBe("RSVP_NOT_CONFIRMED");
+
+    // Approve, then lowercase check-in succeeds
+    const approveRes = await host
+      .post(`/api/events/${slug}/rsvp/${rsvp1.body.data.id}/approve`)
+      .set(originHeader)
+      .send();
+    expect(approveRes.status).toBe(200);
+    expect(approveRes.body.data.status).toBe("going");
+
+    const goodCheckin = await host
+      .post(`/api/events/${slug}/check-in`)
+      .set(originHeader)
+      .send({ checkinCode: rsvp1.body.data.checkinCode.toLowerCase() });
+    expect(goodCheckin.status).toBe(200);
+    expect(goodCheckin.body.data.checkedInAt).toBeTruthy();
+
+    // Canceled RSVP cannot be approved or checked in
+    const cancelingUser = agent();
+    await signUp(cancelingUser, "Peserta Batal");
+    const rsvp2 = await cancelingUser
+      .post(`/api/events/${slug}/rsvp`)
+      .set(originHeader)
+      .send({});
+    await cancelingUser
+      .delete(`/api/events/${slug}/rsvp`)
+      .set(originHeader)
+      .send();
+
+    const approveCanceled = await host
+      .post(`/api/events/${slug}/rsvp/${rsvp2.body.data.id}/approve`)
+      .set(originHeader)
+      .send();
+    expect(approveCanceled.status).toBe(409);
+    expect(approveCanceled.body.error.code).toBe("RSVP_CANCELED");
+
+    const checkinCanceled = await host
+      .post(`/api/events/${slug}/check-in`)
+      .set(originHeader)
+      .send({ checkinCode: rsvp2.body.data.checkinCode });
+    expect(checkinCanceled.status).toBe(409);
+    expect(checkinCanceled.body.error.code).toBe("RSVP_NOT_CONFIRMED");
+  });
 });

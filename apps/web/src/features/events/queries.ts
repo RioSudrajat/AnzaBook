@@ -1,4 +1,4 @@
-import { queryOptions } from "@tanstack/react-query";
+import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 import type { ListEventsInput } from "@starter/shared/validators/community";
 import {
   getCalendar,
@@ -32,6 +32,19 @@ export function eventsQuery(params?: ListEventsInput) {
   return queryOptions({
     queryKey: eventsKeys.list(params),
     queryFn: ({ signal }) => listEvents(params, signal),
+  });
+}
+
+export function eventsInfiniteQuery(params?: Omit<ListEventsInput, "offset">) {
+  return infiniteQueryOptions({
+    queryKey: [...eventsKeys.lists(), "infinite", params ?? {}] as const,
+    initialPageParam: 0,
+    queryFn: ({ pageParam, signal }) =>
+      listEvents({ ...params, offset: pageParam }, signal),
+    getNextPageParam: (lastPage) =>
+      lastPage.meta.hasMore
+        ? lastPage.meta.offset + lastPage.meta.limit
+        : undefined,
   });
 }
 

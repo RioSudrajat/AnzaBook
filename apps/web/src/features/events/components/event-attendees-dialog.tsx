@@ -1,8 +1,9 @@
 import * as React from "react";
-import { X, Users, Search, Check, QrCode } from "lucide-react";
+import { Check, QrCode, Search, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
+import { formatEventApiError } from "../event-description-doc";
 import {
   useApproveRsvp,
   useCheckInRsvp,
@@ -25,7 +26,11 @@ export function EventAttendeesDialog({
 }: EventAttendeesDialogProps) {
   useBodyScrollLock(open);
 
-  const { data: attendees = [], isLoading } = useEventAttendees(eventSlug);
+  const {
+    data: attendees = [],
+    isLoading,
+    error,
+  } = useEventAttendees(eventSlug);
   const approveMutation = useApproveRsvp(eventSlug);
   const rejectMutation = useRejectRsvp(eventSlug);
   const checkInMutation = useCheckInRsvp(eventSlug);
@@ -35,9 +40,39 @@ export function EventAttendeesDialog({
     "all" | "pending" | "going" | "waitlisted"
   >("all");
   const [manualCode, setManualCode] = React.useState("");
-  const [codeFeedback, setCodeFeedback] = React.useState<string | null>(null);
+  const [codeFeedback, setCodeFeedback] = React.useState<{
+    ok: boolean;
+    text: string;
+  } | null>(null);
+  const [actionFeedback, setActionFeedback] = React.useState<{
+    ok: boolean;
+    text: string;
+  } | null>(null);
+  const [activeRsvpActionId, setActiveRsvpActionId] = React.useState<
+    string | null
+  >(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, open]);
 
   if (!open) return null;
+
+  const pendingCount = attendees.filter(
+    (a) => a.status === "pending_approval",
+  ).length;
+  const goingCount = attendees.filter((a) => a.status === "going").length;
+  const waitlistedCount = attendees.filter(
+    (a) => a.status === "waitlisted",
+  ).length;
+  const checkedInCount = attendees.filter(
+    (a) => a.status === "going" && Boolean(a.checkedInAt),
+  ).length;
 
   const filteredAttendees = attendees.filter((a) => {
     if (filterTab === "pending" && a.status !== "pending_approval")
@@ -56,254 +91,416 @@ export function EventAttendeesDialog({
     return true;
   });
 
-  const pendingCount = attendees.filter(
-    (a) => a.status === "pending_approval",
-  ).length;
-  const goingCount = attendees.filter((a) => a.status === "going").length;
-
   const handleManualCheckIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualCode.trim()) return;
+    setCodeFeedback(null);
     try {
-      await checkInMutation.mutateAsync({ checkinCode: manualCode.trim() });
-      setCodeFeedback("Check-in berhasil!");
+      await checkInMutation.mutateAsync({
+        checkinCode: manualCode.trim().toUpperCase(),
+      });
+      setCodeFeedback({ ok: true, text: "Check-in peserta berhasil dicatat." });
       setManualCode("");
-      setTimeout(() => setCodeFeedback(null), 2500);
     } catch (err: unknown) {
-      const apiErr = err as { message?: string };
-      setCodeFeedback(apiErr?.message || "Kode tiket tidak valid.");
-      setTimeout(() => setCodeFeedback(null), 3500);
+      setCodeFeedback({
+        ok: false,
+        text: formatEventApiError(err, "Kode tiket tidak valid atau ditolak."),
+      });
     }
   };
 
-  const handleQuickCheckIn = async (code: string) => {
+  const handleApprove = async (rsvpId: string, name: string) => {
+    setActionFeedback(null);
+    setActiveRsvpActionId(rsvpId);
+    try {
+      await approveMutation.mutateAsync(rsvpId);
+      setActionFeedback({
+        ok: true,
+        text: `${name} disetujui dan masuk daftar peserta hadir.`,
+      });
+    } catch (err: unknown) {
+      setActionFeedback({
+        ok: false,
+        text: formatEventApiError(err, "Gagal menyetujui pendaftar."),
+      });
+    } finally {
+      setActiveRsvpActionId(null);
+    }
+  };
+
+  const handleReject = async (rsvpId: string, name: string) => {
+    setActionFeedback(null);
+    setActiveRsvpActionId(rsvpId);
+    try {
+      await rejectMutation.mutateAsync(rsvpId);
+      setActionFeedback({
+        ok: true,
+        text: `Pendaftaran ${name} telah ditolak.`,
+      });
+    } catch (err: unknown) {
+      setActionFeedback({
+        ok: false,
+        text: formatEventApiError(err, "Gagal menolak pendaftar."),
+      });
+    } finally {
+      setActiveRsvpActionId(null);
+    }
+  };
+
+  const handleQuickCheckIn = async (
+    rsvpId: string,
+    code: string,
+    name: string,
+  ) => {
+    setActionFeedback(null);
+    setActiveRsvpActionId(rsvpId);
     try {
       await checkInMutation.mutateAsync({ checkinCode: code });
-    } catch {
-      // handled
+      setActionFeedback({
+        ok: true,
+        text: `${name} berhasil ditandai sudah hadir.`,
+      });
+    } catch (err: unknown) {
+      setActionFeedback({
+        ok: false,
+        text: formatEventApiError(err, "Gagal mencatat kehadiran peserta."),
+      });
+    } finally {
+      setActiveRsvpActionId(null);
     }
+  };
+
+  const renderStatusBadge = (status: string) => {
+    if (status === "going") {
+      return {
+        label: "Terdaftar",
+        cls: "bg-[var(--color-green-soft)] text-[var(--color-green)] border border-[var(--color-green)]/30",
+      };
+    }
+    if (status === "pending_approval") {
+      return {
+        label: "Perlu Persetujuan",
+        cls: "bg-[var(--color-accent-soft)] text-foreground border border-[var(--color-accent)]/40",
+      };
+    }
+    if (status === "waitlisted") {
+      return {
+        label: "Daftar Tunggu",
+        cls: "bg-[var(--color-paper-3)] text-foreground border border-border",
+      };
+    }
+    if (status === "rejected") {
+      return {
+        label: "Ditolak",
+        cls: "bg-[var(--color-error-soft)] text-[var(--color-error)] border border-[var(--color-error)]/30",
+      };
+    }
+    if (status === "canceled") {
+      return {
+        label: "Dibatalkan",
+        cls: "bg-[var(--color-paper-3)] text-muted-foreground border border-border",
+      };
+    }
+    return {
+      label: status,
+      cls: "bg-[var(--color-paper-3)] text-foreground border border-border",
+    };
   };
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200 select-none"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-3 sm:p-4 backdrop-blur-xs"
       style={{ overscrollBehavior: "contain" }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="attendees-dialog-title"
     >
       <div
         data-lenis-prevent
-        className="relative flex h-[88vh] max-h-[720px] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#16171b] text-white shadow-2xl"
+        className="relative flex h-[88dvh] max-h-[760px] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-card text-foreground shadow-2xl"
         style={{ overscrollBehavior: "contain" }}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4 bg-[#141518]">
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-2">
-              <Users className="size-4 text-amber-500" />
-              <h2 className="text-base font-bold text-white">
+        <div className="flex items-center justify-between border-b border-border bg-[var(--color-paper-2)] px-5 py-3.5 gap-3">
+          <div className="space-y-0.5 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Users
+                className="size-4 text-[var(--color-accent)] shrink-0"
+                aria-hidden="true"
+              />
+              <h2
+                id="attendees-dialog-title"
+                className="font-serif text-base font-bold text-foreground"
+              >
                 Kelola Peserta Acara
               </h2>
+              <span className="rounded-md border border-border bg-background px-2 py-0.5 font-mono text-[11px] tabular-nums text-foreground">
+                Hadir {checkedInCount}/{goingCount}
+              </span>
             </div>
-            <p className="text-xs text-white/50 truncate max-w-md">
+            <p className="text-xs text-muted-foreground truncate max-w-md">
               {eventTitle}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex size-8 items-center justify-center rounded-lg text-white/60 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+            aria-label="Tutup dialog peserta"
+            className="size-11 shrink-0 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
           >
-            <X className="size-4" />
+            <X className="size-4" aria-hidden="true" />
           </button>
         </div>
 
-        {/* Quick Check-in Bar */}
-        <div className="border-b border-white/10 bg-white/5 p-4">
+        <div className="border-b border-border bg-[var(--color-paper-2)]/60 p-4">
           <form
             onSubmit={handleManualCheckIn}
             className="flex items-center gap-2"
           >
             <div className="relative flex-1">
-              <QrCode className="size-4 text-white/40 absolute left-3 top-1/2 -translate-y-1/2" />
+              <QrCode
+                className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                aria-hidden="true"
+              />
               <Input
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value.toUpperCase())}
                 placeholder="Masukkan kode tiket peserta (misal: CHK-A1B2)"
-                className="pl-9 h-9 text-xs bg-black/40 border-white/10 text-white placeholder:text-white/30 rounded-xl uppercase font-mono tracking-wider"
+                aria-label="Kode tiket peserta"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                className="pl-9 h-11 text-xs bg-background border-border rounded-xl uppercase font-mono tracking-wider"
               />
             </div>
             <Button
               type="submit"
-              size="sm"
               disabled={checkInMutation.isPending || !manualCode.trim()}
-              className="h-9 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs cursor-pointer shrink-0"
+              className="min-h-11 px-4 rounded-xl bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:opacity-90 font-semibold text-xs shrink-0"
             >
               {checkInMutation.isPending ? "Memproses..." : "Check-in"}
             </Button>
           </form>
           {codeFeedback && (
             <p
-              className={`text-[11px] mt-1.5 font-medium ${codeFeedback.includes("berhasil") ? "text-emerald-400" : "text-rose-400"}`}
+              role={codeFeedback.ok ? "status" : "alert"}
+              className={`text-xs mt-2 font-medium ${
+                codeFeedback.ok
+                  ? "text-[var(--color-green)]"
+                  : "text-[var(--color-error)]"
+              }`}
             >
-              {codeFeedback}
+              {codeFeedback.text}
             </p>
           )}
         </div>
 
-        {/* Filter Tabs & Search */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 p-4">
-          <div className="flex items-center gap-1 rounded-xl bg-white/5 p-1 text-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border p-4">
+          <div
+            role="tablist"
+            aria-label="Filter status peserta"
+            className="flex flex-wrap items-center gap-1 rounded-xl bg-[var(--color-paper-2)] p-1 text-xs"
+          >
             <button
               type="button"
+              role="tab"
+              aria-selected={filterTab === "all"}
               onClick={() => setFilterTab("all")}
-              className={`rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer ${
+              className={`min-h-10 rounded-lg px-2.5 font-medium transition-colors cursor-pointer ${
                 filterTab === "all"
-                  ? "bg-white/15 text-white"
-                  : "text-white/50 hover:text-white"
+                  ? "bg-background text-foreground shadow-xs font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               Semua ({attendees.length})
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={filterTab === "pending"}
               onClick={() => setFilterTab("pending")}
-              className={`rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+              className={`min-h-10 rounded-lg px-2.5 font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
                 filterTab === "pending"
-                  ? "bg-white/15 text-white"
-                  : "text-white/50 hover:text-white"
+                  ? "bg-background text-foreground shadow-xs font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <span>Perlu Persetujuan</span>
               {pendingCount > 0 && (
-                <span className="rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
+                <span className="rounded-full bg-[var(--color-error)] px-1.5 text-[10px] font-bold text-white tabular-nums">
                   {pendingCount}
                 </span>
               )}
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={filterTab === "going"}
               onClick={() => setFilterTab("going")}
-              className={`rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer ${
+              className={`min-h-10 rounded-lg px-2.5 font-medium transition-colors cursor-pointer ${
                 filterTab === "going"
-                  ? "bg-white/15 text-white"
-                  : "text-white/50 hover:text-white"
+                  ? "bg-background text-foreground shadow-xs font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              Diterima ({goingCount})
+              Terdaftar ({goingCount})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={filterTab === "waitlisted"}
+              onClick={() => setFilterTab("waitlisted")}
+              className={`min-h-10 rounded-lg px-2.5 font-medium transition-colors cursor-pointer ${
+                filterTab === "waitlisted"
+                  ? "bg-background text-foreground shadow-xs font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Daftar Tunggu ({waitlistedCount})
             </button>
           </div>
 
           <div className="relative w-full sm:w-48">
-            <Search className="size-3.5 text-white/40 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <Search
+              className="size-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+              aria-hidden="true"
+            />
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari nama/email..."
-              className="pl-8 h-8 text-xs bg-black/40 border-white/10 text-white placeholder:text-white/30 rounded-lg"
+              placeholder="Cari nama/email/kode..."
+              aria-label="Cari peserta"
+              className="pl-8 h-11 text-xs bg-[var(--color-paper-2)] border-border rounded-lg"
             />
           </div>
         </div>
 
-        {/* Attendees List */}
         <div
           data-lenis-prevent
-          className="flex-1 overflow-y-auto p-4 space-y-2.5 scrollbar-thin"
+          className="flex-1 overflow-y-auto p-4 space-y-2.5"
           style={{ overscrollBehavior: "contain" }}
         >
-          {isLoading ? (
-            <div className="py-12 text-center text-xs text-white/40">
+          {actionFeedback && (
+            <div
+              role={actionFeedback.ok ? "status" : "alert"}
+              className={`flex items-center justify-between gap-2 rounded-xl border px-3.5 py-2.5 text-xs font-medium ${
+                actionFeedback.ok
+                  ? "border-[var(--color-green)]/35 bg-[var(--color-green-soft)] text-foreground"
+                  : "border-[var(--color-error)]/40 bg-[var(--color-error-soft)] text-[var(--color-error)]"
+              }`}
+            >
+              <span>{actionFeedback.text}</span>
+              <button
+                type="button"
+                onClick={() => setActionFeedback(null)}
+                aria-label="Tutup pesan"
+                className="size-7 inline-flex items-center justify-center rounded-md hover:bg-black/5 cursor-pointer"
+              >
+                <X className="size-3.5" aria-hidden="true" />
+              </button>
+            </div>
+          )}
+
+          {error ? (
+            <div
+              role="alert"
+              className="rounded-xl border border-[var(--color-error)]/40 bg-[var(--color-error-soft)] p-4 text-xs text-[var(--color-error)]"
+            >
+              {formatEventApiError(error, "Gagal memuat daftar peserta.")}
+            </div>
+          ) : isLoading ? (
+            <div className="py-12 text-center text-xs text-muted-foreground">
               Memuat data pendaftar...
             </div>
           ) : filteredAttendees.length === 0 ? (
-            <div className="py-12 text-center text-xs text-white/40">
+            <div className="py-12 text-center text-xs text-muted-foreground">
               Tidak ada peserta dalam filter ini.
             </div>
           ) : (
             filteredAttendees.map((att) => {
               const isCheckedIn = Boolean(att.checkedInAt);
+              const badge = renderStatusBadge(att.status);
+              const isBusy = activeRsvpActionId === att.id;
               return (
                 <div
                   key={att.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 p-3.5 hover:bg-white/[0.07] transition-colors"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-border bg-[var(--color-paper-2)] p-3.5"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-amber-300 font-bold text-xs uppercase">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-border bg-[var(--color-accent-soft)] text-foreground font-bold text-xs uppercase">
                       {att.userName[0]}
                     </div>
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-white text-xs truncate">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-foreground text-xs truncate">
                           {att.userName}
                         </span>
-                        {/* Status Badge */}
                         <span
-                          className={`rounded px-1.5 py-0.2 text-[10px] font-medium ${
-                            att.status === "going"
-                              ? "bg-emerald-500/20 text-emerald-300"
-                              : att.status === "pending_approval"
-                                ? "bg-amber-500/20 text-amber-300"
-                                : att.status === "waitlisted"
-                                  ? "bg-blue-500/20 text-blue-300"
-                                  : "bg-white/10 text-white/40"
-                          }`}
+                          className={`rounded px-2 py-0.5 text-[10px] font-semibold ${badge.cls}`}
                         >
-                          {att.status === "going"
-                            ? "Terdaftar"
-                            : att.status === "pending_approval"
-                              ? "Perlu Persetujuan"
-                              : att.status === "waitlisted"
-                                ? "Daftar Tunggu"
-                                : att.status}
+                          {badge.label}
                         </span>
                       </div>
-                      <div className="text-[11px] text-white/50 truncate">
+                      <div className="text-[11px] text-muted-foreground truncate">
                         {att.userEmail}
                       </div>
-                      <div className="text-[10px] font-mono text-white/40 mt-0.5">
+                      <div className="text-[11px] font-mono text-muted-foreground mt-0.5">
                         Kode:{" "}
-                        <span className="text-white/70">{att.checkinCode}</span>
+                        <span className="text-foreground font-semibold">
+                          {att.checkinCode}
+                        </span>
                         {isCheckedIn && (
-                          <span className="text-emerald-400 font-sans ml-2">
-                            ✓ Sudah Hadir
+                          <span className="text-[var(--color-green)] font-sans font-semibold ml-2">
+                            Sudah Hadir
                           </span>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Actions per attendee */}
                   <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                    {att.status === "pending_approval" && (
+                    {(att.status === "pending_approval" ||
+                      att.status === "waitlisted") && (
                       <>
                         <Button
                           type="button"
-                          size="sm"
-                          disabled={approveMutation.isPending}
-                          onClick={() => approveMutation.mutate(att.id)}
-                          className="h-7 px-3 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs cursor-pointer"
+                          disabled={isBusy}
+                          onClick={() =>
+                            void handleApprove(att.id, att.userName)
+                          }
+                          className="min-h-11 px-3.5 rounded-lg bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:opacity-90 font-semibold text-xs"
                         >
-                          <Check className="size-3 mr-1" />
+                          <Check className="size-3.5 mr-1" aria-hidden="true" />
                           Setujui
                         </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={rejectMutation.isPending}
-                          onClick={() => rejectMutation.mutate(att.id)}
-                          className="h-7 px-2.5 rounded-lg border-white/20 text-white/60 hover:bg-rose-500/20 hover:text-rose-200 cursor-pointer text-xs"
-                        >
-                          Tolak
-                        </Button>
+                        {att.status === "pending_approval" && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={isBusy}
+                            onClick={() =>
+                              void handleReject(att.id, att.userName)
+                            }
+                            className="min-h-11 px-3 rounded-lg text-xs"
+                          >
+                            Tolak
+                          </Button>
+                        )}
                       </>
                     )}
 
                     {att.status === "going" && !isCheckedIn && (
                       <Button
                         type="button"
-                        size="sm"
-                        disabled={checkInMutation.isPending}
-                        onClick={() => handleQuickCheckIn(att.checkinCode)}
-                        className="h-7 px-3 rounded-lg bg-white/10 hover:bg-white/20 text-white font-medium text-xs border border-white/15 cursor-pointer"
+                        variant="outline"
+                        disabled={isBusy}
+                        onClick={() =>
+                          void handleQuickCheckIn(
+                            att.id,
+                            att.checkinCode,
+                            att.userName,
+                          )
+                        }
+                        className="min-h-11 px-3.5 rounded-lg text-xs font-semibold"
                       >
                         Check-in
                       </Button>
