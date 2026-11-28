@@ -122,10 +122,10 @@ export function AppShell({
       <div
         className={`flex-1 flex flex-col min-w-0 ${fullBleed ? "min-h-0" : ""}`}
       >
-        <header className="sticky top-0 z-30 border-b border-border/80 bg-background/95 backdrop-blur-md px-6 py-3.5 flex items-center justify-between select-none shrink-0">
-          <div className="flex items-center gap-3">
+        <header className="sticky top-0 z-30 border-b border-border/80 bg-background/95 backdrop-blur-md px-4 sm:px-6 py-3.5 flex items-center justify-between gap-2 select-none shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <AnzaLogoMark className="size-6 text-foreground md:hidden shrink-0" />
-            <h1 className="font-serif text-xl sm:text-2xl font-bold">
+            <h1 className="font-serif text-lg sm:text-2xl font-bold truncate">
               {title}
             </h1>
           </div>

@@ -29,13 +29,17 @@ let cachedRaw: string | null = null;
 let cachedParsed: SavedSpotRegion = DEFAULT_REGION;
 
 function getClientSnapshot(): SavedSpotRegion {
-  const raw = localStorage.getItem(SPOT_REGION_STORAGE_KEY);
-  if (raw === cachedRaw) {
+  try {
+    const raw = localStorage.getItem(SPOT_REGION_STORAGE_KEY);
+    if (raw === cachedRaw) {
+      return cachedParsed;
+    }
+    cachedRaw = raw;
+    cachedParsed = parseSavedSpotRegion(raw) ?? DEFAULT_REGION;
+    return cachedParsed;
+  } catch {
     return cachedParsed;
   }
-  cachedRaw = raw;
-  cachedParsed = parseSavedSpotRegion(raw) ?? DEFAULT_REGION;
-  return cachedParsed;
 }
 
 function getServerSnapshot(): SavedSpotRegion {
@@ -60,7 +64,11 @@ export function useSpotRegion(): [
     const serialized = serializeSavedSpotRegion(next);
     cachedRaw = serialized;
     cachedParsed = next;
-    localStorage.setItem(SPOT_REGION_STORAGE_KEY, serialized);
+    try {
+      localStorage.setItem(SPOT_REGION_STORAGE_KEY, serialized);
+    } catch {
+      // Keep in-memory region active even when storage is restricted.
+    }
     window.dispatchEvent(new Event(REGION_CHANGE_EVENT));
   }, []);
 

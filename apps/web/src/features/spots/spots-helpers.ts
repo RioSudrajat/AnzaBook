@@ -2,13 +2,13 @@ import {
   googleMapsUrlSchema,
   haversineDistanceMeters,
 } from "@starter/shared/validators/spots";
+import { safeExternalHref } from "../../lib/safe-url";
 import {
   INDONESIA_BBOX,
   INDONESIA_CITY_PRESETS,
   type ReadingSpotSummaryDto,
   type SavedSpotRegion,
   type SpotCategory,
-  type SpotCitySummaryDto,
   type SpotFacilitiesDto,
   type SpotNoiseLevel,
   type SpotPriceRange,
@@ -98,22 +98,7 @@ export const FACILITY_CHIP_ORDER: ReadonlyArray<{
 export function sanitizeExternalHttpUrl(
   rawUrl: string | null | undefined,
 ): string | null {
-  if (!rawUrl) {
-    return null;
-  }
-  const trimmed = rawUrl.trim();
-  if (!trimmed) {
-    return null;
-  }
-  try {
-    const parsed = new URL(trimmed);
-    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
-      return parsed.toString();
-    }
-    return null;
-  } catch {
-    return null;
-  }
+  return safeExternalHref(rawUrl);
 }
 
 export function buildGoogleMapsDirectionsUrl(
@@ -137,6 +122,32 @@ export function buildGoogleMapsPlaceUrl(
   }
   const query = `${spot.name} ${spot.city}`.trim();
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
+export function clampMapBounds(bounds: {
+  minLat: number;
+  maxLat: number;
+  minLng: number;
+  maxLng: number;
+}): {
+  minLat: number;
+  maxLat: number;
+  minLng: number;
+  maxLng: number;
+} {
+  const minLat = Math.max(-90, Math.min(90, bounds.minLat));
+  const maxLat = Math.max(-90, Math.min(90, bounds.maxLat));
+  const lngSpan = bounds.maxLng - bounds.minLng;
+  const minLng =
+    lngSpan >= 360 ? -180 : Math.max(-180, Math.min(180, bounds.minLng));
+  const maxLng =
+    lngSpan >= 360 ? 180 : Math.max(-180, Math.min(180, bounds.maxLng));
+  return {
+    minLat: Math.min(minLat, maxLat),
+    maxLat: Math.max(minLat, maxLat),
+    minLng: Math.min(minLng, maxLng),
+    maxLng: Math.max(minLng, maxLng),
+  };
 }
 
 export function formatDistanceMeters(
@@ -296,10 +307,21 @@ export function findNearestIndonesianCityPreset(lat: number, lng: number) {
   return { preset: nearest, distanceMeters: minDistance };
 }
 
+export type CityCameraTarget = {
+  city: string;
+  lat: number;
+  lng: number;
+  zoom: number;
+};
+
 export function resolveCityCameraTarget(
   cityName: string,
-  citiesData?: readonly SpotCitySummaryDto[],
-): { city: string; lat: number; lng: number; zoom: number } | null {
+  citiesData?: ReadonlyArray<{
+    city: string;
+    latitude: number | null;
+    longitude: number | null;
+  }>,
+): CityCameraTarget | null {
   const normalized = cityName.trim().toLowerCase();
   if (!normalized) {
     return null;
@@ -317,11 +339,13 @@ export function resolveCityCameraTarget(
     };
   }
 
-  const cityMatch = citiesData?.find(
-    (item) => item.city.trim().toLowerCase() === normalized,
+  const cityMatch = (citiesData ?? []).find(
+    (item) => item.city.toLowerCase() === normalized,
   );
   if (
     cityMatch &&
+    typeof cityMatch.latitude === "number" &&
+    typeof cityMatch.longitude === "number" &&
     isWithinIndonesiaBbox(cityMatch.latitude, cityMatch.longitude)
   ) {
     return {

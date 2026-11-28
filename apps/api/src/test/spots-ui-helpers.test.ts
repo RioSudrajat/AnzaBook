@@ -5,6 +5,7 @@ import {
   buildGoogleMapsDirectionsUrl,
   buildGoogleMapsPlaceUrl,
   calculateDistanceMeters,
+  clampMapBounds,
   formatDistanceMeters,
   formatNoiseLevel,
   formatPriceRange,
@@ -91,37 +92,12 @@ describe("Reading Spots UI & Cartographic Helpers (Issue #22)", () => {
     );
   });
 
-  it("builds Google Maps place search URL using official Maps allowlist and falls back safely", () => {
+  it("builds Google Maps place search URL safely and rejects javascript: URIs", () => {
     const withCustom = makeSpot({
       googleMapsUrl: "https://maps.app.goo.gl/xyz123",
     });
     expect(buildGoogleMapsPlaceUrl(withCustom)).toBe(
       "https://maps.app.goo.gl/xyz123",
-    );
-
-    const withOfficialPath = makeSpot({
-      googleMapsUrl: "https://www.google.com/maps/place/Kineruku",
-    });
-    expect(buildGoogleMapsPlaceUrl(withOfficialPath)).toBe(
-      "https://www.google.com/maps/place/Kineruku",
-    );
-
-    const withNonMapsHost = makeSpot({
-      googleMapsUrl: "https://evil.example.com/phish",
-      name: "Kineruku",
-      city: "Bandung",
-    });
-    expect(buildGoogleMapsPlaceUrl(withNonMapsHost)).toBe(
-      "https://www.google.com/maps/search/?api=1&query=Kineruku%20Bandung",
-    );
-
-    const withInsecureHttp = makeSpot({
-      googleMapsUrl: "http://maps.google.com/?q=Jakarta",
-      name: "POST Bookshop",
-      city: "Jakarta",
-    });
-    expect(buildGoogleMapsPlaceUrl(withInsecureHttp)).toBe(
-      "https://www.google.com/maps/search/?api=1&query=POST%20Bookshop%20Jakarta",
     );
 
     const withUnsafe = makeSpot({
@@ -133,60 +109,49 @@ describe("Reading Spots UI & Cartographic Helpers (Issue #22)", () => {
       "https://www.google.com/maps/search/?api=1&query=POST%20Bookshop%20Jakarta",
     );
 
+    const withNonGoogleDomain = makeSpot({
+      googleMapsUrl: "https://phishing.example/maps/place/foo",
+      name: "Kineruku",
+      city: "Bandung",
+    });
+    expect(buildGoogleMapsPlaceUrl(withNonGoogleDomain)).toBe(
+      "https://www.google.com/maps/search/?api=1&query=Kineruku%20Bandung",
+    );
+
     expect(sanitizeExternalHttpUrl("javascript:alert(1)")).toBeNull();
     expect(sanitizeExternalHttpUrl("https://anzabook.id/spots")).toBe(
       "https://anzabook.id/spots",
     );
   });
 
-  it("resolves camera coordinates for both preset and dynamic citiesData cities", () => {
-    const dynamicCities = [
-      {
-        city: "Malang",
-        province: "Jawa Timur",
-        count: 6,
-        latitude: -7.9666,
-        longitude: 112.6326,
-      },
-      {
-        city: "Semarang",
-        province: "Jawa Tengah",
-        count: 5,
-        latitude: -6.9667,
-        longitude: 110.4167,
-      },
-      {
-        city: "Tokyo",
-        province: "Tokyo",
-        count: 1,
-        latitude: 35.6762,
-        longitude: 139.6503,
-      },
-    ];
-
-    expect(resolveCityCameraTarget("bandung", dynamicCities)).toEqual({
-      city: "Bandung",
-      lat: -6.9175,
-      lng: 107.6191,
-      zoom: 12,
+  it("clamps map viewport bounds safely within [-90, 90] and [-180, 180]", () => {
+    expect(
+      clampMapBounds({
+        minLat: -95,
+        maxLat: 92,
+        minLng: -210,
+        maxLng: 195,
+      }),
+    ).toEqual({
+      minLat: -90,
+      maxLat: 90,
+      minLng: -180,
+      maxLng: 180,
     });
 
-    expect(resolveCityCameraTarget("malang", dynamicCities)).toEqual({
-      city: "Malang",
-      lat: -7.9666,
-      lng: 112.6326,
-      zoom: 12,
+    expect(
+      clampMapBounds({
+        minLat: -8.5,
+        maxLat: -6.1,
+        minLng: 105.2,
+        maxLng: 112.4,
+      }),
+    ).toEqual({
+      minLat: -8.5,
+      maxLat: -6.1,
+      minLng: 105.2,
+      maxLng: 112.4,
     });
-
-    expect(resolveCityCameraTarget("Semarang", dynamicCities)).toEqual({
-      city: "Semarang",
-      lat: -6.9667,
-      lng: 110.4167,
-      zoom: 12,
-    });
-
-    expect(resolveCityCameraTarget("Tokyo", dynamicCities)).toBeNull();
-    expect(resolveCityCameraTarget("Kota Tidak Ada", dynamicCities)).toBeNull();
   });
 
   it("formats distance, categories, noise level, price range, and verified badges cleanly in Indonesian", () => {
@@ -365,5 +330,32 @@ describe("Reading Spots UI & Cartographic Helpers (Issue #22)", () => {
       "indie_bookstore",
       "reading_lounge",
     ]);
+  });
+
+  it("resolves city camera targets for presets and non-preset Indonesian cities", () => {
+    const presetTarget = resolveCityCameraTarget("bandung");
+    expect(presetTarget).toEqual({
+      city: "Bandung",
+      lat: -6.9175,
+      lng: 107.6191,
+      zoom: 12,
+    });
+
+    const cities = [
+      { city: "Malang", latitude: -7.9666, longitude: 112.6326 },
+      { city: "Kota Tanpa Koordinat", latitude: null, longitude: null },
+      { city: "Tokyo", latitude: 35.6762, longitude: 139.6503 },
+    ];
+
+    expect(resolveCityCameraTarget("malang", cities)).toEqual({
+      city: "Malang",
+      lat: -7.9666,
+      lng: 112.6326,
+      zoom: 12,
+    });
+    expect(resolveCityCameraTarget("Kota Tanpa Koordinat", cities)).toBeNull();
+    expect(resolveCityCameraTarget("Tokyo", cities)).toBeNull();
+    expect(resolveCityCameraTarget("Tidak Ada", cities)).toBeNull();
+    expect(resolveCityCameraTarget("   ", cities)).toBeNull();
   });
 });

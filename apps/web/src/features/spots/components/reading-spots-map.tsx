@@ -3,6 +3,7 @@ import type {
   GeoJSONSource,
   Map as MapLibreMap,
   MapMouseEvent,
+  Popup,
 } from "maplibre-gl";
 import {
   Crosshair,
@@ -15,9 +16,12 @@ import {
 import {
   PARTNER_SPOT_COLOR_HEX,
   SPOT_CATEGORY_STYLES,
+  calculateDistanceMeters,
+  clampMapBounds,
+  formatSpotCategory,
   spotsToGeoJson,
 } from "../spots-helpers";
-import type { ReadingSpotSummaryDto } from "../types";
+import type { ReadingSpotSummaryDto, SpotCategory } from "../types";
 
 export type MapBoundsPayload = {
   minLat: number;
@@ -57,12 +61,8 @@ const LAYER_CLUSTER_COUNT_ID = "reading-spots-cluster-count";
 const LAYER_SELECTED_RING_ID = "reading-spots-selected-ring";
 const LAYER_POINT_ID = "reading-spots-points";
 
-const OPENFREEMAP_LIGHT_STYLE = "https://tiles.openfreemap.org/styles/positron";
-const OPENFREEMAP_DARK_STYLE = "https://tiles.openfreemap.org/styles/dark";
-
-function getBasemapStyleUrl(isDark: boolean): string {
-  return isDark ? OPENFREEMAP_DARK_STYLE : OPENFREEMAP_LIGHT_STYLE;
-}
+const OPENFREEMAP_BASEMAP_STYLE =
+  "https://tiles.openfreemap.org/styles/positron";
 
 function prefersReducedMotion(): boolean {
   if (
@@ -78,26 +78,55 @@ function moveCamera(
   map: MapLibreMap,
   target: { center: [number, number]; zoom: number },
 ) {
-  if (prefersReducedMotion()) {
+  const current = map.getCenter();
+  const distanceMeters = calculateDistanceMeters(
+    current.lat,
+    current.lng,
+    target.center[1],
+    target.center[0],
+  );
+  if (
+    prefersReducedMotion() ||
+    !map.isStyleLoaded() ||
+    distanceMeters > 50_000
+  ) {
     map.jumpTo({ center: target.center, zoom: target.zoom });
     return;
   }
-  map.flyTo({
+  map.easeTo({
     center: target.center,
     zoom: target.zoom,
-    duration: 480,
+    duration: 360,
     essential: true,
   });
+}
+
+function buildSpotTooltipElement(
+  name: string,
+  categoryLabel: string,
+): HTMLElement {
+  const wrapper = document.createElement("div");
+  wrapper.className = "anzabook-map-tooltip-body";
+
+  const titleEl = document.createElement("div");
+  titleEl.className = "anzabook-map-tooltip-title";
+  titleEl.textContent = name;
+
+  const metaEl = document.createElement("div");
+  metaEl.className = "anzabook-map-tooltip-meta";
+  metaEl.textContent = categoryLabel;
+
+  wrapper.append(titleEl, metaEl);
+  return wrapper;
 }
 
 function syncSpotsSourceAndLayers(
   map: MapLibreMap,
   spots: readonly ReadingSpotSummaryDto[],
   selectedSlug: string,
-  isDark: boolean,
-  forceStyleReady = false,
+  force = false,
 ) {
-  if (!forceStyleReady && !map.isStyleLoaded()) {
+  if (!force && !map.isStyleLoaded()) {
     return;
   }
 
@@ -116,9 +145,9 @@ function syncSpotsSourceAndLayers(
     });
   }
 
-  const strokeColor = isDark ? "#161412" : "#FAF6EE";
-  const clusterFill = isDark ? "#F06A24" : "#221E1A";
-  const clusterText = isDark ? "#161412" : "#FAF6EE";
+  const strokeColor = "#FAF6EE";
+  const clusterFill = "#1E1B18";
+  const clusterText = "#FAF6EE";
 
   if (!map.getLayer(LAYER_CLUSTER_ID)) {
     map.addLayer({
@@ -129,7 +158,7 @@ function syncSpotsSourceAndLayers(
       paint: {
         "circle-color": clusterFill,
         "circle-radius": ["step", ["get", "point_count"], 18, 10, 22, 30, 26],
-        "circle-stroke-width": 2,
+        "circle-stroke-width": 2.5,
         "circle-stroke-color": strokeColor,
       },
     });
@@ -163,9 +192,9 @@ function syncSpotsSourceAndLayers(
         ["==", ["get", "slug"], selectedSlug],
       ],
       paint: {
-        "circle-radius": 16,
-        "circle-color": "transparent",
-        "circle-stroke-width": 3,
+        "circle-radius": 17,
+        "circle-color": "rgba(240, 106, 36, 0.16)",
+        "circle-stroke-width": 2.5,
         "circle-stroke-color": PARTNER_SPOT_COLOR_HEX,
       },
     });
@@ -193,7 +222,7 @@ function syncSpotsSourceAndLayers(
           10,
           8,
         ],
-        "circle-stroke-width": 2,
+        "circle-stroke-width": 2.5,
         "circle-stroke-color": strokeColor,
       },
     });
@@ -225,48 +254,33 @@ export function ReadingSpotsMap({
 }: ReadingSpotsMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
+  const hoverPopupRef = useRef<Popup | null>(null);
   const [mapState, setMapState] = useState<"loading" | "ready" | "fallback">(
     "loading",
-  );
-  const [isDark, setIsDark] = useState<boolean>(() =>
-    typeof document !== "undefined"
-      ? document.documentElement.classList.contains("dark")
-      : false,
   );
 
   const spotsRef = useRef(spots);
   const selectedSlugRef = useRef(selectedSpotSlug);
   const onSelectSpotRef = useRef(onSelectSpot);
   const onViewportChangeRef = useRef(onViewportChange);
-  const isDarkRef = useRef(isDark);
-  const prevIsDarkRef = useRef(isDark);
+  const initialCenterRef = useRef(initialCenter);
+  const cameraRequestRef = useRef(cameraRequest);
+  const appliedCameraSeqRef = useRef(0);
 
   useEffect(() => {
     spotsRef.current = spots;
     selectedSlugRef.current = selectedSpotSlug;
     onSelectSpotRef.current = onSelectSpot;
     onViewportChangeRef.current = onViewportChange;
-    isDarkRef.current = isDark;
-  }, [spots, selectedSpotSlug, onSelectSpot, onViewportChange, isDark]);
-
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    const observer = new MutationObserver(() => {
-      const nextDark = document.documentElement.classList.contains("dark");
-      setIsDark(nextDark);
-    });
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
-    return () => observer.disconnect();
-  }, []);
+    cameraRequestRef.current = cameraRequest;
+  }, [spots, selectedSpotSlug, onSelectSpot, onViewportChange, cameraRequest]);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     let cancelled = false;
+    let loadedOnce = false;
     let moveEndTimer: ReturnType<typeof setTimeout> | null = null;
 
     async function initMap() {
@@ -296,37 +310,70 @@ export function ReadingSpotsMap({
           maplibregl.setWorkerUrl(workerUrlModule.default);
         }
 
+        const startCenter = initialCenterRef.current;
+
         const map = new maplibregl.Map({
           container: containerRef.current,
-          style: getBasemapStyleUrl(isDarkRef.current),
-          center: [initialCenter.lng, initialCenter.lat],
-          zoom: initialCenter.zoom,
+          style: OPENFREEMAP_BASEMAP_STYLE,
+          center: [startCenter.lng, startCenter.lat],
+          zoom: startCenter.zoom,
           minZoom: 4,
           maxZoom: 18,
           attributionControl: { compact: false },
         });
 
-        prevIsDarkRef.current = isDarkRef.current;
+        const hoverPopup = new maplibregl.Popup({
+          closeButton: false,
+          closeOnClick: false,
+          offset: 14,
+          className: "anzabook-map-tooltip",
+        });
+
         mapRef.current = map;
+        hoverPopupRef.current = hoverPopup;
+
+        if (
+          cameraRequestRef.current &&
+          cameraRequestRef.current.seq > appliedCameraSeqRef.current
+        ) {
+          map.jumpTo({
+            center: [
+              cameraRequestRef.current.lng,
+              cameraRequestRef.current.lat,
+            ],
+            zoom: cameraRequestRef.current.zoom,
+          });
+          appliedCameraSeqRef.current = cameraRequestRef.current.seq;
+        }
 
         const handleSyncLayers = () => {
-          if (cancelled) return;
-          syncSpotsSourceAndLayers(
-            map,
-            spotsRef.current,
-            selectedSlugRef.current,
-            isDarkRef.current,
-            true,
-          );
+          if (cancelled || !mapRef.current) return;
+          try {
+            syncSpotsSourceAndLayers(
+              map,
+              spotsRef.current,
+              selectedSlugRef.current,
+              true,
+            );
+          } catch {
+            // Style may still be initializing; subsequent load/spots effect will retry.
+          }
         };
 
         map.on("load", () => {
           if (cancelled) return;
+          loadedOnce = true;
           handleSyncLayers();
           setMapState("ready");
         });
 
         map.on("style.load", handleSyncLayers);
+
+        map.on("error", () => {
+          if (!cancelled && !loadedOnce) {
+            setMapState("fallback");
+          }
+        });
 
         map.on("click", LAYER_CLUSTER_ID, (event: MapMouseEvent) => {
           const features = map.queryRenderedFeatures(event.point, {
@@ -340,11 +387,18 @@ export function ReadingSpotsMap({
           const source = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
           if (!source) return;
 
-          void source.getClusterExpansionZoom(clusterId).then((zoom) => {
-            if (cluster.geometry.type !== "Point") return;
-            const [lng, lat] = cluster.geometry.coordinates as [number, number];
-            moveCamera(map, { center: [lng, lat], zoom });
-          });
+          void source
+            .getClusterExpansionZoom(clusterId)
+            .then((zoom) => {
+              if (cancelled || !mapRef.current) return;
+              if (cluster.geometry.type !== "Point") return;
+              const [lng, lat] = cluster.geometry.coordinates as [
+                number,
+                number,
+              ];
+              moveCamera(map, { center: [lng, lat], zoom });
+            })
+            .catch(() => {});
         });
 
         map.on("click", LAYER_POINT_ID, (event: MapMouseEvent) => {
@@ -357,27 +411,60 @@ export function ReadingSpotsMap({
           }
         });
 
-        for (const interactiveLayer of [LAYER_CLUSTER_ID, LAYER_POINT_ID]) {
-          map.on("mouseenter", interactiveLayer, () => {
-            map.getCanvas().style.cursor = "pointer";
+        map.on("mouseenter", LAYER_CLUSTER_ID, () => {
+          map.getCanvas().style.cursor = "pointer";
+        });
+        map.on("mouseleave", LAYER_CLUSTER_ID, () => {
+          map.getCanvas().style.cursor = "";
+        });
+
+        map.on("mouseenter", LAYER_POINT_ID, (event: MapMouseEvent) => {
+          map.getCanvas().style.cursor = "pointer";
+          const features = map.queryRenderedFeatures(event.point, {
+            layers: [LAYER_POINT_ID],
           });
-          map.on("mouseleave", interactiveLayer, () => {
-            map.getCanvas().style.cursor = "";
-          });
-        }
+          const feature = features[0];
+          if (!feature || feature.geometry.type !== "Point") return;
+          const rawName = feature.properties?.name;
+          const rawCat = feature.properties?.category as
+            SpotCategory | undefined;
+          const isPartner = Boolean(feature.properties?.isPartner);
+          if (typeof rawName !== "string" || !rawName) return;
+
+          const catText =
+            rawCat && rawCat in SPOT_CATEGORY_STYLES
+              ? formatSpotCategory(rawCat)
+              : "Sudut Baca";
+          const metaText = isPartner ? `${catText} · Mitra AnzaBook` : catText;
+          const [lng, lat] = feature.geometry.coordinates as [number, number];
+
+          hoverPopup
+            .setLngLat([lng, lat])
+            .setDOMContent(buildSpotTooltipElement(rawName, metaText))
+            .addTo(map);
+        });
+
+        map.on("mouseleave", LAYER_POINT_ID, () => {
+          map.getCanvas().style.cursor = "";
+          hoverPopup.remove();
+        });
 
         map.on("moveend", () => {
           if (moveEndTimer) clearTimeout(moveEndTimer);
           moveEndTimer = setTimeout(() => {
-            const bounds = map.getBounds();
+            if (cancelled || !mapRef.current) return;
+            const rawBounds = map.getBounds();
+            const clamped = clampMapBounds({
+              minLat: rawBounds.getSouth(),
+              maxLat: rawBounds.getNorth(),
+              minLng: rawBounds.getWest(),
+              maxLng: rawBounds.getEast(),
+            });
             const center = map.getCenter();
             onViewportChangeRef.current?.({
-              minLat: bounds.getSouth(),
-              maxLat: bounds.getNorth(),
-              minLng: bounds.getWest(),
-              maxLng: bounds.getEast(),
-              centerLat: center.lat,
-              centerLng: center.lng,
+              ...clamped,
+              centerLat: Math.max(-90, Math.min(90, center.lat)),
+              centerLng: Math.max(-180, Math.min(180, center.lng)),
               zoom: map.getZoom(),
             });
           }, 300);
@@ -393,31 +480,35 @@ export function ReadingSpotsMap({
 
     return () => {
       cancelled = true;
+      appliedCameraSeqRef.current = 0;
       if (moveEndTimer) clearTimeout(moveEndTimer);
+      if (hoverPopupRef.current) {
+        hoverPopupRef.current.remove();
+        hoverPopupRef.current = null;
+      }
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
       }
     };
-  }, [initialCenter.lat, initialCenter.lng, initialCenter.zoom]);
+  }, []);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    syncSpotsSourceAndLayers(map, spots, selectedSpotSlug, isDark);
-  }, [spots, selectedSpotSlug, isDark]);
+    syncSpotsSourceAndLayers(map, spots, selectedSpotSlug);
+  }, [spots, selectedSpotSlug]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || mapState !== "ready") return;
-    if (prevIsDarkRef.current === isDark) return;
-    prevIsDarkRef.current = isDark;
-    map.setStyle(getBasemapStyleUrl(isDark));
-  }, [isDark, mapState]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !cameraRequest || mapState !== "ready") return;
+    if (
+      !map ||
+      !cameraRequest ||
+      cameraRequest.seq <= appliedCameraSeqRef.current
+    ) {
+      return;
+    }
+    appliedCameraSeqRef.current = cameraRequest.seq;
     moveCamera(map, {
       center: [cameraRequest.lng, cameraRequest.lat],
       zoom: cameraRequest.zoom,
@@ -446,10 +537,13 @@ export function ReadingSpotsMap({
     }
   };
 
+  const floatingChromeClass =
+    "border border-foreground/15 dark:border-white/15 bg-card/95 text-foreground shadow-[0_6px_20px_-6px_rgba(24,20,16,0.28)] backdrop-blur-sm";
+
   return (
     <div
       data-lenis-prevent
-      className="relative size-full overflow-hidden bg-[var(--color-paper-2)]"
+      className="relative size-full overflow-hidden bg-[#EDEAE2] lg:shadow-[inset_12px_0_24px_-18px_rgba(0,0,0,0.22)]"
     >
       <div
         ref={containerRef}
@@ -462,9 +556,11 @@ export function ReadingSpotsMap({
       {mapState === "loading" && (
         <div
           aria-live="polite"
-          className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[var(--color-paper-2)]/85"
+          className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[#EDEAE2]/85"
         >
-          <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-4 py-2.5 text-xs font-mono text-foreground shadow-sm">
+          <div
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-mono ${floatingChromeClass}`}
+          >
             <Loader2 className="size-4 animate-spin" aria-hidden="true" />
             <span>Memuat peta interaktif...</span>
           </div>
@@ -498,10 +594,10 @@ export function ReadingSpotsMap({
           <button
             type="button"
             onClick={onSearchThisArea}
-            className="pointer-events-auto min-h-11 inline-flex items-center gap-2 rounded-lg border border-border bg-background/95 px-4 py-2 text-xs font-semibold text-foreground shadow-md backdrop-blur-sm hover:border-[var(--color-accent)] cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
+            className={`pointer-events-auto min-h-11 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold hover:border-[var(--color-accent)] cursor-pointer focus-visible:outline-2 focus-visible:outline-ring ${floatingChromeClass}`}
           >
             <Search
-              className="size-3.5 text-[var(--color-accent)]"
+              className="size-3.5 text-[var(--color-accent-text)]"
               aria-hidden="true"
             />
             <span>{isFetching ? "Memuat area..." : "Cari di area ini"}</span>
@@ -510,22 +606,22 @@ export function ReadingSpotsMap({
       )}
 
       <div
-        className={`hidden md:flex absolute left-4 ${bottomControlsOffsetClass} z-10 flex-wrap items-center gap-2 rounded-lg border border-border bg-background/90 px-3 py-2 text-[11px] font-mono text-foreground backdrop-blur-sm max-w-md`}
+        className={`hidden md:flex absolute left-4 ${bottomControlsOffsetClass} z-10 flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-3 py-1.5 text-[11px] font-mono max-w-md ${floatingChromeClass}`}
         aria-label="Legenda kategori sudut baca"
       >
         {Object.entries(SPOT_CATEGORY_STYLES).map(([key, meta]) => (
           <span key={key} className="inline-flex items-center gap-1.5">
             <span
-              className="size-2.5 rounded-full shrink-0"
+              className="size-2.5 rounded-full shrink-0 ring-1 ring-black/10"
               style={{ backgroundColor: meta.colorHex }}
               aria-hidden="true"
             />
             <span>{meta.shortLabel}</span>
           </span>
         ))}
-        <span className="inline-flex items-center gap-1.5 pl-1 border-l border-border">
+        <span className="inline-flex items-center gap-1.5 pl-2 border-l border-border">
           <span
-            className="size-2.5 rounded-full shrink-0"
+            className="size-2.5 rounded-full shrink-0 ring-1 ring-black/10"
             style={{ backgroundColor: PARTNER_SPOT_COLOR_HEX }}
             aria-hidden="true"
           />
@@ -544,7 +640,7 @@ export function ReadingSpotsMap({
             aria-busy={isLocating}
             aria-label="Pusatkan ke lokasiku"
             title="Lokasiku"
-            className="size-11 rounded-lg border border-border bg-background/95 text-foreground shadow-md backdrop-blur-sm flex items-center justify-center hover:border-[var(--color-accent)] cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
+            className={`size-11 rounded-lg flex items-center justify-center hover:border-[var(--color-accent)] cursor-pointer focus-visible:outline-2 focus-visible:outline-ring ${floatingChromeClass}`}
           >
             {isLocating ? (
               <Loader2 className="size-4 animate-spin" aria-hidden="true" />
@@ -555,7 +651,9 @@ export function ReadingSpotsMap({
         )}
 
         {mapState === "ready" && (
-          <div className="flex flex-col overflow-hidden rounded-lg border border-border bg-background/95 shadow-md backdrop-blur-sm">
+          <div
+            className={`flex flex-col overflow-hidden rounded-lg ${floatingChromeClass}`}
+          >
             <button
               type="button"
               onClick={handleZoomIn}
@@ -585,7 +683,9 @@ export function ReadingSpotsMap({
       )}
 
       {isLocating && (
-        <div className="pointer-events-none absolute bottom-16 right-4 z-10 rounded-md border border-border bg-background/95 px-2.5 py-1 text-[11px] font-mono text-foreground shadow-xs">
+        <div
+          className={`pointer-events-none absolute top-32 lg:top-4 right-4 z-10 rounded-md px-2.5 py-1 text-[11px] font-mono ${floatingChromeClass}`}
+        >
           <Crosshair className="inline size-3 mr-1" aria-hidden="true" />
           Mendeteksi GPS...
         </div>

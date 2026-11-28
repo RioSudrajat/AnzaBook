@@ -746,3 +746,45 @@
     display: flex !important;
   }
 }
+
+.anzabook-map-tooltip .maplibregl-popup-content {
+  background: #1e1b18;
+  color: #faf6ee;
+  padding: 0.45rem 0.7rem;
+  border-radius: 8px;
+  box-shadow: 0 8px 20px -6px rgba(24, 20, 16, 0.36);
+  pointer-events: none;
+}
+
+.anzabook-map-tooltip .maplibregl-popup-tip {
+  border-top-color: #1e1b18;
+  border-bottom-color: #1e1b18;
+}
+
+.anzabook-map-tooltip-title {
+  font-family: var(--font-display);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.anzabook-map-tooltip-meta {
+  font-family: var(--font-outlier);
+  font-size: 0.6875rem;
+  color: #d6cfc3;
+  margin-top: 0.125rem;
+}
+
+.spots-city-select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  display: block;
+  background-image: none;
+  padding-block: 0.6875rem;
+  line-height: 1.25rem;
+}
+
+.spots-city-select::picker-icon {
+  display: none;
+}

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   ArrowLeft,
@@ -17,9 +17,12 @@ import {
   Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ApiError } from "@/lib/api/client";
+import { copyTextToClipboard } from "@/features/share/web-share";
+import { isUsableAssetUrl } from "@/lib/media-url";
+import { safeSocialHref } from "@/lib/safe-url";
 import { useToggleSpotBookmark } from "../hooks";
 import {
+  SPOT_CATEGORY_STYLES,
   buildGoogleMapsDirectionsUrl,
   buildGoogleMapsPlaceUrl,
   formatDistanceMeters,
@@ -50,6 +53,15 @@ export function SpotDetailPanel({
   const bookmarkMutation = useToggleSpotBookmark();
   const [shareCopied, setShareCopied] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const shareCopiedTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (shareCopiedTimerRef.current !== null) {
+        window.clearTimeout(shareCopiedTimerRef.current);
+      }
+    };
+  }, []);
 
   const detailSpot = spot as Partial<ReadingSpotDetailDto>;
   const verifiedLabel = formatVerifiedBadge(spot.verifiedBadge);
@@ -58,18 +70,16 @@ export function SpotDetailPanel({
   const directionsUrl = buildGoogleMapsDirectionsUrl(spot);
   const placeUrl = buildGoogleMapsPlaceUrl(spot);
   const safeWebsiteUrl = sanitizeExternalHttpUrl(spot.websiteUrl);
-  const safeCoverUrl = sanitizeExternalHttpUrl(spot.coverUrl);
+  const safeInstagramUrl = safeSocialHref(spot.instagramHandle, "instagram");
+  const safeCoverUrl = isUsableAssetUrl(spot.coverUrl)
+    ? spot.coverUrl.trim()
+    : null;
+  const upcomingEvents = detailSpot.upcomingEvents ?? [];
 
   const handleToggleBookmark = () => {
     setActionError(null);
     bookmarkMutation.mutate(spot.slug, {
-      onError: (err) => {
-        if (err instanceof ApiError && err.status === 404) {
-          setActionError(
-            "Fitur simpan sudut baca menunggu sinkronisasi layanan.",
-          );
-          return;
-        }
+      onError: () => {
         setActionError("Gagal memperbarui simpanan sudut baca.");
       },
     });
@@ -77,15 +87,21 @@ export function SpotDetailPanel({
 
   const handleCopyShareLink = async () => {
     setActionError(null);
-    try {
-      const shareUrl =
-        typeof window !== "undefined"
-          ? `${window.location.origin}/spots?spot=${encodeURIComponent(spot.slug)}`
-          : `/spots?spot=${encodeURIComponent(spot.slug)}`;
-      await navigator.clipboard.writeText(shareUrl);
+    const shareUrl =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/spots?spot=${encodeURIComponent(spot.slug)}`
+        : `/spots?spot=${encodeURIComponent(spot.slug)}`;
+    const ok = await copyTextToClipboard(shareUrl);
+    if (ok) {
       setShareCopied(true);
-      setTimeout(() => setShareCopied(false), 2500);
-    } catch {
+      if (shareCopiedTimerRef.current !== null) {
+        window.clearTimeout(shareCopiedTimerRef.current);
+      }
+      shareCopiedTimerRef.current = window.setTimeout(
+        () => setShareCopied(false),
+        2500,
+      );
+    } else {
       setActionError("Tidak dapat menyalin tautan dari peramban ini.");
     }
   };
@@ -119,28 +135,33 @@ export function SpotDetailPanel({
       )}
 
       <div className="space-y-2.5">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center rounded-md border border-border bg-[var(--color-paper-2)] px-2.5 py-0.5 font-mono text-[11px] font-semibold text-foreground">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+          <span
+            className="size-2.5 rounded-full shrink-0"
+            style={{
+              backgroundColor: SPOT_CATEGORY_STYLES[spot.category].colorHex,
+            }}
+            aria-hidden="true"
+          />
+          <span className="font-medium text-muted-foreground">
             {formatSpotCategory(spot.category)}
           </span>
 
           {verifiedLabel && (
-            <span
-              className={`inline-flex items-center rounded-md px-2.5 py-0.5 font-mono text-[11px] font-semibold ${
-                spot.verifiedBadge === "partner"
-                  ? "bg-[var(--color-accent-soft)] text-foreground border border-[var(--color-accent)]/40"
-                  : "bg-[var(--color-green-soft)] text-[var(--color-green)] border border-[var(--color-green)]/30"
-              }`}
-            >
-              {verifiedLabel}
-            </span>
-          )}
-
-          {distanceLabel && (
-            <span className="ml-auto inline-flex items-center gap-1 font-mono text-xs tabular-nums text-muted-foreground">
-              <Navigation className="size-3.5" aria-hidden="true" />
-              {distanceLabel}
-            </span>
+            <>
+              <span className="text-muted-foreground/60" aria-hidden="true">
+                ·
+              </span>
+              <span
+                className={
+                  spot.verifiedBadge === "partner"
+                    ? "font-semibold text-[var(--color-accent-text)]"
+                    : "font-medium text-[var(--color-green)]"
+                }
+              >
+                {verifiedLabel}
+              </span>
+            </>
           )}
         </div>
 
@@ -148,7 +169,7 @@ export function SpotDetailPanel({
           {spot.name}
         </h2>
 
-        <div className="flex flex-wrap items-center gap-3 text-xs font-mono tabular-nums text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-mono tabular-nums text-muted-foreground">
           <span className="inline-flex items-center gap-1 text-foreground font-semibold">
             <Star
               className="size-3.5 text-[var(--color-accent)]"
@@ -157,8 +178,17 @@ export function SpotDetailPanel({
             {spot.ratingCount > 0 ? spot.ratingAvg.toFixed(1) : "Baru"}
           </span>
           <span>({spot.ratingCount} ulasan)</span>
-          <span>·</span>
+          <span aria-hidden="true">·</span>
           <span>{spot.bookmarkCount} disimpan</span>
+          {distanceLabel && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span className="inline-flex items-center gap-1 text-foreground">
+                <Navigation className="size-3" aria-hidden="true" />
+                {distanceLabel}
+              </span>
+            </>
+          )}
         </div>
 
         {spot.description && (
@@ -175,7 +205,7 @@ export function SpotDetailPanel({
         >
           <a href={directionsUrl} target="_blank" rel="noopener noreferrer">
             <Navigation className="size-4" aria-hidden="true" />
-            <span>Buka di Google Maps</span>
+            <span>Buka Rute di Google Maps</span>
             <ExternalLink
               className="size-3.5 ml-auto opacity-80"
               aria-hidden="true"
@@ -192,7 +222,7 @@ export function SpotDetailPanel({
             disabled={bookmarkMutation.isPending}
             className={`min-h-11 text-xs ${
               spot.isBookmarked
-                ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-foreground font-semibold"
+                ? "border-foreground bg-foreground text-background hover:bg-foreground/90 hover:text-background font-semibold"
                 : ""
             }`}
           >
@@ -278,7 +308,7 @@ export function SpotDetailPanel({
               aria-hidden="true"
             />
             <div>
-              <dt className="text-[11px] font-mono uppercase text-muted-foreground">
+              <dt className="text-[11px] font-medium text-muted-foreground">
                 Kisaran Biaya
               </dt>
               <dd className="text-xs font-semibold text-foreground">
@@ -293,7 +323,7 @@ export function SpotDetailPanel({
               aria-hidden="true"
             />
             <div>
-              <dt className="text-[11px] font-mono uppercase text-muted-foreground">
+              <dt className="text-[11px] font-medium text-muted-foreground">
                 Suasana
               </dt>
               <dd className="text-xs font-semibold text-foreground">
@@ -303,7 +333,7 @@ export function SpotDetailPanel({
           </div>
         </div>
 
-        {(safeWebsiteUrl || spot.instagramHandle) && (
+        {(safeWebsiteUrl || safeInstagramUrl) && (
           <div className="py-3 flex flex-wrap items-center gap-3">
             <dt className="sr-only">Tautan eksternal</dt>
             {safeWebsiteUrl && (
@@ -311,20 +341,27 @@ export function SpotDetailPanel({
                 href={safeWebsiteUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="min-h-11 inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-accent)] hover:underline"
+                className="min-h-11 inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-accent-text)] hover:underline focus-visible:outline-2 focus-visible:outline-ring rounded-sm"
               >
                 <Globe className="size-3.5" aria-hidden="true" />
                 <span>Situs Resmi</span>
               </a>
             )}
-            {spot.instagramHandle && (
+            {safeInstagramUrl && spot.instagramHandle && (
               <a
-                href={`https://instagram.com/${encodeURIComponent(spot.instagramHandle.replace(/^@/, ""))}`}
+                href={safeInstagramUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="min-h-11 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+                className="min-h-11 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring rounded-sm"
               >
-                <span>@{spot.instagramHandle.replace(/^@/, "")}</span>
+                <span>
+                  @
+                  {spot.instagramHandle
+                    .trim()
+                    .replace(/^https?:\/\/(www\.)?instagram\.com\//i, "")
+                    .replace(/^@/, "")
+                    .replace(/\/+$/, "")}
+                </span>
               </a>
             )}
           </div>
@@ -333,14 +370,14 @@ export function SpotDetailPanel({
 
       {facilityChips.length > 0 && (
         <section aria-label="Fasilitas kenyamanan baca" className="space-y-2.5">
-          <h3 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+          <h3 className="font-serif text-sm font-semibold text-foreground">
             Fasilitas Kenyamanan Baca
           </h3>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {facilityChips.map((chip) => (
               <span
                 key={chip.key}
-                className="inline-flex items-center rounded-md border border-border bg-[var(--color-paper-2)] px-2.5 py-1 text-xs font-medium text-foreground"
+                className="inline-flex items-center rounded-md border border-border/80 bg-card px-2.5 py-1 text-xs font-medium text-foreground"
               >
                 {chip.label}
               </span>
@@ -349,10 +386,12 @@ export function SpotDetailPanel({
         </section>
       )}
 
-      {(detailSpot.linkedBranchName || detailSpot.linkedCalendarSlug) && (
+      {(detailSpot.linkedBranchName ||
+        detailSpot.linkedCalendarSlug ||
+        upcomingEvents.length > 0) && (
         <section
           aria-label="Terhubung dengan ekosistem AnzaBook"
-          className="rounded-xl border border-[var(--color-accent)]/35 bg-[var(--color-accent-soft)]/50 p-4 space-y-2"
+          className="rounded-xl border border-border bg-card p-4 space-y-2.5"
         >
           {detailSpot.linkedBranchName && (
             <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
@@ -368,7 +407,7 @@ export function SpotDetailPanel({
             <Link
               to="/c/$slug"
               params={{ slug: detailSpot.linkedCalendarSlug }}
-              className="min-h-11 inline-flex items-center gap-2 text-xs font-semibold text-[var(--color-accent)] hover:underline"
+              className="min-h-11 inline-flex items-center gap-2 text-xs font-semibold text-[var(--color-accent-text)] hover:underline focus-visible:outline-2 focus-visible:outline-ring rounded-sm"
             >
               <Calendar className="size-4" aria-hidden="true" />
               <span>
@@ -376,6 +415,33 @@ export function SpotDetailPanel({
                 {detailSpot.linkedCalendarName ?? detailSpot.linkedCalendarSlug}
               </span>
             </Link>
+          )}
+
+          {upcomingEvents.length > 0 && (
+            <div className="pt-2 border-t border-border/70 space-y-1.5">
+              <h3 className="font-serif text-sm font-semibold text-foreground">
+                Agenda Terdekat di Lokasi Ini
+              </h3>
+              <ul className="space-y-1">
+                {upcomingEvents.slice(0, 3).map((ev) => (
+                  <li key={ev.id}>
+                    <Link
+                      to="/events/$slug"
+                      params={{ slug: ev.slug }}
+                      className="min-h-11 flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-foreground hover:bg-background/70 hover:text-[var(--color-accent-text)] transition-colors focus-visible:outline-2 focus-visible:outline-ring"
+                    >
+                      <span className="truncate">{ev.title}</span>
+                      <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
+                        {new Date(ev.startAt).toLocaleDateString("id-ID", {
+                          day: "numeric",
+                          month: "short",
+                        })}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </section>
       )}
