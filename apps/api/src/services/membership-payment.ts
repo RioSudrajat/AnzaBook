@@ -175,6 +175,65 @@ export function createMidtransGateway(config: MidtransConfig, request = fetch) {
       );
     },
 
+    async createBookCheckout(order: {
+      id: string;
+      bookSlug: string;
+      bookTitle: string;
+      priceIdr: number;
+      subtotalIdr: number;
+      taxIdr: number;
+    }) {
+      const finish = new URL(
+        "/books/" +
+          encodeURIComponent(order.bookSlug) +
+          "/checkout/" +
+          order.id,
+        config.webUrl,
+      );
+      const items = [
+        {
+          id: ("book-" + order.bookSlug).slice(0, 50),
+          name: `Buku: ${order.bookTitle}`.slice(0, 50),
+          price: order.subtotalIdr,
+          quantity: 1,
+        },
+      ];
+      if (order.taxIdr > 0) {
+        items.push({
+          id: "tax",
+          name: "Pajak",
+          price: order.taxIdr,
+          quantity: 1,
+        });
+      }
+      const response = await call(snapOrigin + "/snap/v1/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transaction_details: {
+            order_id: order.id,
+            gross_amount: order.priceIdr,
+          },
+          item_details: items,
+          enabled_payments: ["other_qris"],
+          page_expiry: { duration: 1, unit: "day" },
+          callbacks: { finish: finish.href, error: finish.href },
+        }),
+      });
+      const checkout = z
+        .object({ redirect_url: z.string() })
+        .safeParse(response.body);
+      if (response.ok && checkout.success) {
+        const url = parseMidtransCheckoutUrl(checkout.data.redirect_url);
+        if (url?.origin === snapOrigin) return url.href;
+      }
+      throw new HttpError(
+        502,
+        "PAYMENT_CHECKOUT_FAILED",
+        "Halaman pembayaran QRIS belum dapat dibuka.",
+      );
+    },
+
     async getPayment(orderId: string): Promise<VerifiedPayment | null> {
       const response = await call(
         "https://api." +

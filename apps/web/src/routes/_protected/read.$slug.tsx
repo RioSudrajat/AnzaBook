@@ -8,8 +8,13 @@ import {
   type MouseEvent,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { CheckCircle2, Star } from "lucide-react";
+import {
+  createFileRoute,
+  Link,
+  useNavigate,
+  useRouter,
+} from "@tanstack/react-router";
+import { CheckCircle2, Lock, Star, Unlock } from "lucide-react";
 import { z } from "zod";
 import {
   encodeZeroWidthFingerprint,
@@ -149,6 +154,13 @@ import {
   useTogglePostSession,
   useUpdateManuscript,
 } from "@/features/social/hooks";
+import {
+  hasManuscriptBodyContent,
+  sliceDocForLockedPreview,
+} from "@/features/reader/editor/manuscript-json";
+import { DEFAULT_DIGITAL_BOOK_PRICE_IDR } from "@starter/shared/validators/publisher";
+import { sanitizeReturnTo } from "@/lib/navigation-return";
+import type { JSONContent } from "@tiptap/core";
 import "@/features/reader/editor/components/editor-styles.css";
 
 const readSearchSchema = z.object({
@@ -159,7 +171,66 @@ const readSearchSchema = z.object({
   editorial: z.enum(["preview", "edit"]).optional(),
   publisherSlug: z.string().optional(),
   targetPublisherId: z.string().optional(),
+  returnTo: z.string().optional().catch(undefined),
 });
+
+function createEditorialExtensions() {
+  return [
+    StarterKit.configure({
+      heading: {
+        levels: [1, 2, 3],
+      },
+    }),
+    ImageExtension.configure({
+      inline: false,
+      allowBase64: true,
+    }),
+    Placeholder.configure({
+      placeholder: "Mulai menulis isi chapter di sini...",
+    }),
+    TextStyle,
+    Color,
+    Highlight.configure({ multicolor: true }),
+    TextAlign.configure({
+      types: ["heading", "paragraph"],
+    }),
+    PageBreak,
+    ChapterBreak,
+    NakamaPaywall,
+    SubstackButton,
+    AudioEmbed,
+    VideoEmbed,
+    CalloutBox,
+    FinancialChart,
+    LatexBlock,
+    Collapsible,
+    PoetryBlock,
+    PollBlock,
+    PredictionMarket,
+    RecipeBlock,
+    AudienceGated,
+    FootnoteBlock,
+    ThinDivider,
+    MediumDivider,
+  ];
+}
+
+function LockedPreviewEditorContent({ doc }: { doc: JSONContent }) {
+  const previewEditor = useEditor({
+    extensions: createEditorialExtensions(),
+    content: doc,
+    editable: false,
+  });
+
+  useEffect(() => {
+    if (!previewEditor) return;
+    queueMicrotask(() => {
+      previewEditor.commands.setContent(doc);
+    });
+  }, [previewEditor, doc]);
+
+  return <EditorContent editor={previewEditor} />;
+}
 
 export const Route = createFileRoute("/_protected/read/$slug")({
   validateSearch: readSearchSchema,
@@ -336,6 +407,7 @@ function ReaderBook() {
   const { slug } = Route.useParams();
   const search = Route.useSearch();
   const navigate = useNavigate();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const requestedChapter = search.chapter ?? 1;
   const [anchorChapter, setAnchorChapter] = useState(requestedChapter);
@@ -400,8 +472,8 @@ function ReaderBook() {
               id: "ch-1",
               manuscriptId: manuscript.id,
               chapterNumber: 1,
-              titleId: "Bab 1: Permulaan",
-              contentId: "Tuliskan naskah Anda di sini...",
+              titleId: "",
+              contentId: "",
               contentEn: null,
               blueprintContent: "",
               estimatedMinutes: 5,
@@ -414,9 +486,10 @@ function ReaderBook() {
       book: {
         id: manuscript.id,
         slug: `manuscript-${manuscript.id}`,
-        title: manuscript.title || "Naskah Tanpa Judul",
+        title: manuscript.title || "",
         author: user.name || "Penulis",
-        coverUrl: manuscript.coverUrl || "template",
+        coverUrl: manuscript.coverUrl ?? null,
+        coverColor: manuscript.coverColor || "#181614",
         synopsis: manuscript.synopsis || "",
         readingMinutes: 15,
         pageCount: (manuscript as { pageCount?: number }).pageCount || 10,
@@ -424,7 +497,8 @@ function ReaderBook() {
         accessTier: "free" as const,
         digitalPolicy:
           (manuscript.proposedDigitalPolicy as BookDistributionModel) ||
-          "nakama_or_purchase",
+          "nakama_subscription",
+        digitalPriceIdr: manuscript.proposedDigitalPriceIdr ?? null,
         authorUserId: manuscript.authorUserId,
         publisherId: manuscript.publisherId,
       } as unknown as BookSummaryDto,
@@ -432,7 +506,7 @@ function ReaderBook() {
       currentChapter: {
         id: chaps[0].id || "1",
         chapterNumber: chaps[0].chapterNumber || 1,
-        title: chaps[0].titleId || "Bab 1",
+        title: chaps[0].titleId || "",
         contentId: chaps[0].contentId || "",
         contentEn: chaps[0].contentEn || null,
         blueprintContent: chaps[0].blueprintContent || "",
@@ -494,11 +568,14 @@ function ReaderBook() {
     search.editorial ??
       (isManuscript && manuscript?.status === "draft" ? "edit" : "preview"),
   );
+  const [previewLockState, setPreviewLockState] = useState<
+    "unlocked" | "locked"
+  >("unlocked");
   const [editorialTitle, setEditorialTitle] = useState("");
   const [editorialSynopsis, setEditorialSynopsis] = useState("");
-  const [editorialCoverUrl, setEditorialCoverUrl] = useState<string | null>(
-    null,
-  );
+  const [editorialCoverUrl, setEditorialCoverUrl] = useState<
+    string | null | undefined
+  >(undefined);
   const [editorialCoverColor, setEditorialCoverColor] =
     useState<string>("#181614");
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
@@ -507,35 +584,19 @@ function ReaderBook() {
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
 
-  const coverInitializedRef = useRef(false);
-  const titleInitializedRef = useRef(false);
-  const synopsisInitializedRef = useRef(false);
+  const initializedManuscriptIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!payload?.book) return;
-    const book = payload.book;
+    if (!isManuscript || !manuscript) return;
+    if (initializedManuscriptIdRef.current === manuscript.id) return;
+    initializedManuscriptIdRef.current = manuscript.id;
     queueMicrotask(() => {
-      if (!titleInitializedRef.current && book.title) {
-        setEditorialTitle(book.title);
-        titleInitializedRef.current = true;
-      }
-      if (!synopsisInitializedRef.current) {
-        setEditorialSynopsis(manuscript?.synopsis ?? book.synopsis ?? "");
-        synopsisInitializedRef.current = true;
-      }
-      if (!coverInitializedRef.current) {
-        if (book.coverUrl) {
-          setEditorialCoverUrl(book.coverUrl);
-        }
-        if (manuscript?.coverColor || book.coverColor) {
-          setEditorialCoverColor(
-            manuscript?.coverColor || book.coverColor || "#181614",
-          );
-        }
-        coverInitializedRef.current = true;
-      }
+      setEditorialTitle(manuscript.title ?? "");
+      setEditorialSynopsis(manuscript.synopsis ?? "");
+      setEditorialCoverUrl(manuscript.coverUrl ?? null);
+      setEditorialCoverColor(manuscript.coverColor || "#181614");
     });
-  }, [payload?.book, manuscript?.synopsis, manuscript?.coverColor]);
+  }, [isManuscript, manuscript]);
 
   const bookId = payload?.book?.id || "";
   const scope = payload?.hasFullAccess ? "full" : "preview";
@@ -576,11 +637,8 @@ function ReaderBook() {
   ];
 
   const initialEditorContent = useMemo(() => {
-    return buildUnifiedDocFromChapters(
-      payload?.chapters || [],
-      editorialTitle || payload?.book?.title || "Bab 1: Permulaan",
-    );
-  }, [payload?.chapters, payload?.book?.title, editorialTitle]);
+    return buildUnifiedDocFromChapters(payload?.chapters || []);
+  }, [payload?.chapters]);
 
   // Live Chapter State derived from Tiptap JSON AST (Industry Standard)
   const [liveChapters, setLiveChapters] = useState<ExtractedChapter[]>(() => {
@@ -601,45 +659,7 @@ function ReaderBook() {
   }, []);
 
   const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        heading: {
-          levels: [1, 2, 3],
-        },
-      }),
-      ImageExtension.configure({
-        inline: false,
-        allowBase64: true,
-      }),
-      Placeholder.configure({
-        placeholder:
-          "Mulai menulis naskah Anda di sini (mendukung paragraf, heading, kutipan, pemisah)...",
-      }),
-      TextStyle,
-      Color,
-      Highlight.configure({ multicolor: true }),
-      TextAlign.configure({
-        types: ["heading", "paragraph"],
-      }),
-      PageBreak,
-      ChapterBreak,
-      NakamaPaywall,
-      SubstackButton,
-      AudioEmbed,
-      VideoEmbed,
-      CalloutBox,
-      FinancialChart,
-      LatexBlock,
-      Collapsible,
-      PoetryBlock,
-      PollBlock,
-      PredictionMarket,
-      RecipeBlock,
-      AudienceGated,
-      FootnoteBlock,
-      ThinDivider,
-      MediumDivider,
-    ],
+    extensions: createEditorialExtensions(),
     content: initialEditorContent,
     editable: editMode === "edit",
     onUpdate({ editor: currentEditor }) {
@@ -664,10 +684,7 @@ function ReaderBook() {
     if (!isManuscript || !manuscript || !editor || !isAuthorOrPublisher) return;
     if (manuscriptHydratedRef.current === manuscript.id) return;
     manuscriptHydratedRef.current = manuscript.id;
-    const doc = buildUnifiedDocFromChapters(
-      manuscriptPayload?.chapters || [],
-      manuscript.title || "Bab 1: Permulaan",
-    );
+    const doc = buildUnifiedDocFromChapters(manuscriptPayload?.chapters || []);
     queueMicrotask(() => {
       editor.commands.setContent(doc);
       syncLiveChaptersFromEditor(editor);
@@ -689,6 +706,36 @@ function ReaderBook() {
     }
   }, [editor, isAuthorOrPublisher, syncLiveChaptersFromEditor]);
 
+  const effectiveManuscriptPolicy = (manuscript?.proposedDigitalPolicy ||
+    payload?.book?.digitalPolicy ||
+    "nakama_subscription") as BookDistributionModel;
+  const showPreviewLockToggle = Boolean(
+    isAuthorOrPublisher &&
+    editMode === "preview" &&
+    (effectiveManuscriptPolicy === "nakama_subscription" ||
+      effectiveManuscriptPolicy === "single_purchase"),
+  );
+  const isLockedEditorialPreview = Boolean(
+    showPreviewLockToggle && previewLockState === "locked",
+  );
+  const previewLockNote =
+    isAuthorOrPublisher &&
+    editMode === "preview" &&
+    effectiveManuscriptPolicy === "free_open"
+      ? "Semua chapter terbuka — Model Gratis"
+      : null;
+
+  const liveDocForPreview = useMemo(() => {
+    if (editor) return editor.getJSON();
+    return initialEditorContent;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, initialEditorContent, liveChapters, previewLockState, editMode]);
+
+  const lockedPreviewSlice = useMemo(
+    () => sliceDocForLockedPreview(liveDocForPreview),
+    [liveDocForPreview],
+  );
+
   // Derived effective chapters: prioritizes live editor chapters for authors/publishers
   const displayChapters = useMemo(() => {
     if (isAuthorOrPublisher && liveChapters.length > 0) {
@@ -696,11 +743,19 @@ function ReaderBook() {
         id: `live-toc-${c.chapterNumber}`,
         chapterNumber: c.chapterNumber,
         title: c.title,
-        isSample: true,
+        isSample: isLockedEditorialPreview
+          ? lockedPreviewSlice.unlockedChapterNumbers.has(c.chapterNumber)
+          : true,
       }));
     }
     return payload?.allChapters || [];
-  }, [isAuthorOrPublisher, liveChapters, payload?.allChapters]);
+  }, [
+    isAuthorOrPublisher,
+    isLockedEditorialPreview,
+    liveChapters,
+    lockedPreviewSlice.unlockedChapterNumbers,
+    payload?.allChapters,
+  ]);
 
   useEffect(() => {
     if (editor) {
@@ -736,14 +791,10 @@ function ReaderBook() {
         ),
       }));
       const baseFields = {
-        title: editorialTitle.trim() || undefined,
+        title: editorialTitle.trim(),
         synopsis: editorialSynopsis.trim(),
         coverUrl:
-          editorialCoverUrl === "template"
-            ? null
-            : editorialCoverUrl !== undefined
-              ? editorialCoverUrl
-              : undefined,
+          editorialCoverUrl === undefined ? undefined : editorialCoverUrl,
         coverColor: editorialCoverColor || undefined,
         chapters: chapterPayload,
       };
@@ -766,6 +817,7 @@ function ReaderBook() {
       await refetchManuscript();
     } catch (err) {
       console.error("Failed to save manuscript draft", err);
+      setSaveError(true);
     } finally {
       setIsSavingDraft(false);
     }
@@ -922,7 +974,10 @@ function ReaderBook() {
 
   const accessibleChapters = useMemo(() => {
     if (isAuthorOrPublisher && liveChapters.length > 0) {
-      return liveChapters.map((c) => ({
+      const sourceChapters = isLockedEditorialPreview
+        ? extractChaptersFromJson(lockedPreviewSlice.slicedDoc)
+        : liveChapters;
+      return sourceChapters.map((c) => ({
         id: `live-chap-${c.chapterNumber}`,
         chapterNumber: c.chapterNumber,
         title: c.title,
@@ -934,7 +989,13 @@ function ReaderBook() {
       }));
     }
     return loadedChapters;
-  }, [isAuthorOrPublisher, liveChapters, loadedChapters]);
+  }, [
+    isAuthorOrPublisher,
+    isLockedEditorialPreview,
+    liveChapters,
+    loadedChapters,
+    lockedPreviewSlice.slicedDoc,
+  ]);
 
   useEffect(() => {
     for (const ch of accessibleChapters) {
@@ -1687,6 +1748,17 @@ function ReaderBook() {
 
   async function handleSelectChapter(ch: number) {
     if (isAuthorOrPublisher) {
+      if (
+        isLockedEditorialPreview &&
+        !lockedPreviewSlice.unlockedChapterNumbers.has(ch)
+      ) {
+        paywallRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+        paywallRef.current?.focus();
+        return;
+      }
       if (readingLayout === "slide") {
         setSlidePosition({ chapter: ch, paragraph: -1, offset: 0 });
         return;
@@ -1880,6 +1952,51 @@ function ReaderBook() {
     }
   };
 
+  const navigateBackFromReader = useCallback(
+    async (targetKind: "manuscript" | "book") => {
+      const safeReturn = sanitizeReturnTo(search.returnTo);
+      const isValidBackTarget =
+        safeReturn &&
+        !safeReturn.startsWith("/sign-in") &&
+        !safeReturn.startsWith("/sign-up") &&
+        !safeReturn.startsWith("/read/");
+      if (isValidBackTarget && typeof window !== "undefined") {
+        const parsed = new URL(safeReturn, window.location.origin);
+        const searchEntries = Object.fromEntries(parsed.searchParams.entries());
+        await router.navigate({
+          to: parsed.pathname as never,
+          search: (Object.keys(searchEntries).length > 0
+            ? searchEntries
+            : undefined) as never,
+        });
+        return;
+      }
+      if (targetKind === "manuscript") {
+        const studioSlug = search.publisherSlug || activePublisherSlug;
+        if (studioSlug) {
+          await navigate({
+            to: "/p/$slug/studio",
+            params: { slug: studioSlug },
+          });
+          return;
+        }
+        await navigate({
+          to: "/app",
+          search: { tab: "profile", subtab: "author_studio" },
+        });
+        return;
+      }
+      await navigate({ to: "/app" });
+    },
+    [
+      activePublisherSlug,
+      navigate,
+      router,
+      search.publisherSlug,
+      search.returnTo,
+    ],
+  );
+
   async function saveSession(
     destination: "exit" | "home" | "membership" | "summary",
     finishedBook = false,
@@ -1891,6 +2008,14 @@ function ReaderBook() {
     clearTimeout(pendingCheckpoint.current);
 
     try {
+      if (isManuscript) {
+        if (isAuthorOrPublisher && editor) {
+          await handleSaveDraft();
+        }
+        await navigateBackFromReader("manuscript");
+        return;
+      }
+
       const position = capturePosition();
       const activeSeconds = Math.min(28_800, getActiveSeconds());
       let openExitSheet = destination === "summary";
@@ -2018,7 +2143,9 @@ function ReaderBook() {
         setPostSessionError(null);
         setSessionSummary({
           sessionId: resolvedSessionId,
-          bookTitle: editorialTitle || payload?.book?.title || "Buku",
+          bookTitle: isManuscript
+            ? editorialTitle
+            : payload?.book?.title || "Buku",
           bookAuthor: payload?.book?.author || user.name || "Penulis",
           activeSeconds: metrics.activeSeconds,
           wordsRead: metrics.wordsRead,
@@ -2036,11 +2163,11 @@ function ReaderBook() {
       if (destination === "membership") {
         await navigate({ to: "/membership", search: { book: slug } });
       } else if (destination === "home") {
-        await navigate({ to: "/app", search: { tab: "home" } });
+        await navigateBackFromReader("book");
       } else if (openExitSheet) {
         setIsExitPromptOpen(true);
       } else {
-        await navigate({ to: "/app", search: { tab: "home" } });
+        await navigateBackFromReader("book");
       }
     } catch {
       setSaveError(true);
@@ -2309,11 +2436,11 @@ function ReaderBook() {
               Periksa Status Akses
             </Button>
             <Link
-              to="/app"
-              search={{ tab: "home" }}
+              to="/books/$slug"
+              params={{ slug }}
               className="inline-flex min-h-11 items-center rounded-sm px-2 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
             >
-              Kembali ke Home
+              Kembali ke Halaman Buku
             </Link>
           </footer>
         </section>
@@ -2327,7 +2454,9 @@ function ReaderBook() {
         id="main-content"
         className="mx-auto flex min-h-svh max-w-xl flex-col items-center justify-center gap-4 px-6 text-center"
       >
-        <h1 className="font-serif text-3xl font-semibold">Bab ini terkunci</h1>
+        <h1 className="font-serif text-3xl font-semibold">
+          Chapter ini terkunci
+        </h1>
         <p className="text-muted-foreground">
           Buka cuplikan atau aktifkan akses untuk lanjut membaca naskah lengkap.
         </p>
@@ -2342,11 +2471,11 @@ function ReaderBook() {
           </Link>
         </Button>
         <Link
-          to="/app"
-          search={{ tab: "home" }}
+          to="/books/$slug"
+          params={{ slug }}
           className="rounded-sm px-3 py-3 text-sm underline focus-visible:outline-2 focus-visible:outline-ring"
         >
-          Keluar ke Home
+          Kembali ke Halaman Buku
         </Link>
       </main>
     );
@@ -2360,7 +2489,7 @@ function ReaderBook() {
         </h2>
         <p className="text-sm text-muted-foreground max-w-md mb-6">
           {isMissing
-            ? "Buka detail buku untuk melihat bab yang tersedia."
+            ? "Buka detail buku untuk melihat chapter yang tersedia."
             : "Periksa koneksi, lalu coba buka naskah lagi."}
         </p>
         {!isMissing && (
@@ -2461,7 +2590,7 @@ function ReaderBook() {
           }
         >
           <ReaderToolbar
-            bookTitle={editorialTitle || book.title}
+            bookTitle={isManuscript ? editorialTitle : book.title}
             readingLayout={readingLayout}
             onReadingLayoutChange={changeReadingLayout}
             languageView={languageView}
@@ -2510,10 +2639,17 @@ function ReaderBook() {
             isAuthorOrPublisher={isAuthorOrPublisher}
             editMode={editMode}
             onEditModeChange={setEditMode}
+            showPreviewLockToggle={showPreviewLockToggle}
+            previewLockState={previewLockState}
+            onPreviewLockStateChange={setPreviewLockState}
+            previewLockNote={previewLockNote}
             onSaveDraft={handleSaveDraft}
             onSubmitDraft={
               isPublisherReview
-                ? () => setIsPublishDialogOpen(true)
+                ? () => {
+                    void handleSaveDraft();
+                    setIsPublishDialogOpen(true);
+                  }
                 : () => setIsConfigDialogOpen(true)
             }
             submitDraftLabel={
@@ -2596,16 +2732,23 @@ function ReaderBook() {
               {/* Header Buku (Author, Judul Besar Serif, Bab, Cover) - Sesuai SS 2 */}
               <ReaderBookHeader
                 authorOrPublisher={book.author || user.name || "Penulis"}
-                title={editorialTitle || book.title}
+                title={isManuscript ? editorialTitle : book.title}
                 synopsis={isManuscript ? editorialSynopsis : book.synopsis}
                 canEditSynopsis={isManuscript && isAuthorOrPublisher}
+                isDraftManuscript={isManuscript}
                 totalChapters={displayChapters.length}
                 coverUrl={
-                  editorialCoverUrl !== undefined
-                    ? editorialCoverUrl
+                  isManuscript
+                    ? editorialCoverUrl !== undefined
+                      ? editorialCoverUrl
+                      : (manuscript?.coverUrl ?? null)
                     : book.coverUrl
                 }
-                coverColor={editorialCoverColor || book.coverColor}
+                coverColor={
+                  isManuscript
+                    ? editorialCoverColor || manuscript?.coverColor || "#181614"
+                    : book.coverColor
+                }
                 publishedYear={book.publishedYear}
                 genres={book.genres}
                 pageCount={book.pageCount}
@@ -2614,19 +2757,94 @@ function ReaderBook() {
                 onSynopsisChange={setEditorialSynopsis}
                 onCoverUrlChange={setEditorialCoverUrl}
                 onCoverColorChange={setEditorialCoverColor}
+                onCoverModalClose={() => {
+                  if (isAuthorOrPublisher && editMode === "edit") {
+                    void handleSaveDraft();
+                  }
+                }}
               />
 
               {/* JIKA AUTHOR / PUBLISHER: RENDER TIPTAP WYSIWYG KANVAS (EDIT ATAU PREVIEW) */}
               {isAuthorOrPublisher ? (
-                <div
-                  className={`tiptap-editorial-canvas relative font-serif text-[18px] leading-[1.85] text-justify min-h-[500px] ${
-                    editMode === "preview"
-                      ? "is-preview-reading-mode select-text"
-                      : ""
-                  }`}
-                >
-                  <EditorContent editor={editor} />
-                </div>
+                <>
+                  {previewLockNote && (
+                    <div
+                      role="status"
+                      className="flex items-center gap-2 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-4 py-2.5 text-xs font-mono text-[var(--color-muted)]"
+                    >
+                      <Unlock
+                        className="size-3.5 shrink-0"
+                        aria-hidden="true"
+                      />
+                      <span>{previewLockNote}</span>
+                    </div>
+                  )}
+
+                  {isLockedEditorialPreview ? (
+                    <div className="space-y-8">
+                      <div
+                        data-preview-fade="true"
+                        className="tiptap-editorial-canvas is-preview-reading-mode relative font-serif text-[18px] leading-[1.85] text-justify select-text"
+                      >
+                        <LockedPreviewEditorContent
+                          doc={lockedPreviewSlice.slicedDoc}
+                        />
+                      </div>
+
+                      <section
+                        ref={paywallRef}
+                        tabIndex={-1}
+                        aria-labelledby="editorial-preview-paywall-title"
+                        className="rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-6 sm:p-8 text-center space-y-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--color-focus)]"
+                      >
+                        <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 py-1 font-mono text-[11px] uppercase tracking-wider text-[var(--color-muted)]">
+                          <Lock className="size-3" aria-hidden="true" />
+                          <span>Simulasi Pembaca Terkunci</span>
+                        </div>
+
+                        <h2
+                          id="editorial-preview-paywall-title"
+                          className="font-serif text-2xl sm:text-3xl font-bold text-[var(--color-ink)]"
+                        >
+                          Akhir Cuplikan Gratis
+                        </h2>
+
+                        <p className="mx-auto max-w-md text-sm leading-relaxed text-[var(--color-ink-2)]">
+                          {effectiveManuscriptPolicy === "single_purchase"
+                            ? "Chapter selanjutnya terkunci bagi pembaca yang belum membeli buku digital ini."
+                            : "Chapter selanjutnya terkunci. Pembaca perlu berlangganan Nakama untuk membaca seluruh isi buku."}
+                        </p>
+
+                        <div className="pt-1 flex flex-wrap items-center justify-center gap-2.5">
+                          {effectiveManuscriptPolicy === "single_purchase" ? (
+                            <span className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[var(--color-accent)] px-6 text-xs font-semibold text-[var(--color-accent-ink)]">
+                              Beli Buku Digital — Rp
+                              {(
+                                manuscript?.proposedDigitalPriceIdr ??
+                                book.digitalPriceIdr ??
+                                DEFAULT_DIGITAL_BOOK_PRICE_IDR
+                              ).toLocaleString("id-ID")}
+                            </span>
+                          ) : (
+                            <span className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[var(--color-accent)] px-6 text-xs font-semibold text-[var(--color-accent-ink)]">
+                              Langganan Nakama
+                            </span>
+                          )}
+                        </div>
+                      </section>
+                    </div>
+                  ) : (
+                    <div
+                      className={`tiptap-editorial-canvas relative font-serif text-[18px] leading-[1.85] text-justify min-h-[500px] ${
+                        editMode === "preview"
+                          ? "is-preview-reading-mode select-text"
+                          : ""
+                      }`}
+                    >
+                      <EditorContent editor={editor} />
+                    </div>
+                  )}
+                </>
               ) : (
                 chaptersList.map(
                   (chap: BookReaderChapterDto, chapIdx: number) => {
@@ -2823,8 +3041,8 @@ function ReaderBook() {
               {payload.hasFullAccess && hasMoreChapters && (
                 <div className="pt-12 border-t border-current/10 text-center space-y-3">
                   <p className="text-xs font-mono text-muted-foreground">
-                    Menyiapkan Bab {lastLoadedChapterNum + 1} agar baca tetap
-                    mengalir...
+                    Menyiapkan Chapter {lastLoadedChapterNum + 1} agar baca
+                    tetap mengalir...
                   </p>
                   <Button
                     type="button"
@@ -2835,7 +3053,7 @@ function ReaderBook() {
                     }
                     className="font-mono text-xs"
                   >
-                    Muat Bab {lastLoadedChapterNum + 1}
+                    Muat Chapter {lastLoadedChapterNum + 1}
                   </Button>
                 </div>
               )}
@@ -2916,14 +3134,17 @@ function ReaderBook() {
                 Akhir cuplikan
               </h2>
               <p className="mx-auto max-w-sm text-base leading-relaxed">
-                {book.digitalPolicy === "print_code_only"
-                  ? "Klaim kode dari buku cetak untuk membuka naskah lengkap."
+                {book.digitalPolicy === "single_purchase"
+                  ? "Beli buku digital ini untuk melanjutkan membaca seluruh chapter hingga tuntas."
                   : "Jadi Nakama untuk melanjutkan buku ini dan membuka koleksi Premium."}
               </p>
               <Button asChild size="lg" className="min-h-11">
-                {book.digitalPolicy === "print_code_only" ? (
+                {book.digitalPolicy === "single_purchase" ? (
                   <Link to="/books/$slug" params={{ slug }}>
-                    Buka detail dan klaim kode
+                    Beli Buku Digital — Rp
+                    {(
+                      book.digitalPriceIdr ?? DEFAULT_DIGITAL_BOOK_PRICE_IDR
+                    ).toLocaleString("id-ID")}
                   </Link>
                 ) : (
                   <Link
@@ -2931,7 +3152,7 @@ function ReaderBook() {
                     search={{ book: slug }}
                     onClick={handleUpgrade}
                   >
-                    Jadi Nakama
+                    Langganan Nakama
                   </Link>
                 )}
               </Button>
@@ -3112,9 +3333,7 @@ function ReaderBook() {
           isSubmittingPost={togglePostSessionMutation.isPending}
           postError={postSessionError}
           nextChapter={nextChapter}
-          onSkipAndExit={() =>
-            void navigate({ to: "/app", search: { tab: "home" } })
-          }
+          onSkipAndExit={() => void navigateBackFromReader("book")}
           onResumeReading={handleResumeReading}
           onContinueNextChapter={(targetChapter) => {
             handleResumeReading();
@@ -3132,12 +3351,17 @@ function ReaderBook() {
             isOpen={isConfigDialogOpen}
             onClose={() => setIsConfigDialogOpen(false)}
             initialData={{
-              title: editorialTitle || book.title,
-              synopsis:
-                editorialSynopsis ||
-                manuscript?.synopsis ||
-                book.synopsis ||
-                "",
+              title: isManuscript ? editorialTitle : book.title,
+              synopsis: isManuscript ? editorialSynopsis : book.synopsis || "",
+              authorName:
+                manuscript?.authorPenName ||
+                manuscript?.authorName ||
+                user.name ||
+                "Penulis AnzaBook",
+              coverUrl: editorialCoverUrl ?? manuscript?.coverUrl ?? null,
+              coverColor: editorialCoverColor || manuscript?.coverColor || null,
+              chapterCount: displayChapters.length,
+              hasBodyContent: hasManuscriptBodyContent(liveChapters),
               category: manuscript?.category || "",
               sourceLanguage: manuscript?.sourceLanguage || "id",
               targetAudience: manuscript?.targetAudience || "general",
@@ -3146,20 +3370,17 @@ function ReaderBook() {
               estimatedPages: manuscript?.estimatedPages || 180,
               publisherId:
                 search.targetPublisherId || manuscript?.publisherId || "",
-              digitalPolicy: book.digitalPolicy,
+              digitalPolicy: effectiveManuscriptPolicy,
               proposedDigitalPriceIdr:
-                manuscript?.proposedDigitalPriceIdr ?? 45_000,
+                manuscript?.proposedDigitalPriceIdr ??
+                DEFAULT_DIGITAL_BOOK_PRICE_IDR,
             }}
             onSubmit={async (config) => {
-              setEditorialTitle(config.title);
-              setEditorialSynopsis(config.synopsis);
               await handleSaveDraft();
               if (isManuscript && manuscriptId) {
                 await updateManuscriptMutation.mutateAsync({
                   idOrSlug: manuscriptId,
                   input: {
-                    title: config.title,
-                    synopsis: config.synopsis,
                     category: config.category,
                     sourceLanguage: config.sourceLanguage,
                     targetAudience: config.targetAudience,
@@ -3177,7 +3398,10 @@ function ReaderBook() {
                 });
                 setIsConfigDialogOpen(false);
                 refetchManuscript();
-                navigate({ to: "/app", search: { tab: "profile" } });
+                await navigate({
+                  to: "/app",
+                  search: { tab: "profile", subtab: "author_studio" },
+                });
               }
             }}
             isSubmitting={submitDraftMutation.isPending}
@@ -3197,10 +3421,11 @@ function ReaderBook() {
                 managedTargetPublisher?.name ?? manuscript.publisherName
               }
               manuscript={manuscript}
-              initialTitle={editorialTitle || manuscript.title}
-              initialSynopsis={editorialSynopsis || manuscript.synopsis}
+              initialTitle={editorialTitle}
+              initialSynopsis={editorialSynopsis}
               initialCoverUrl={editorialCoverUrl}
               initialCoverColor={editorialCoverColor}
+              initialHasBodyContent={hasManuscriptBodyContent(liveChapters)}
             />
           )}
 
@@ -3229,7 +3454,7 @@ function ReaderBook() {
                         className="text-[11px] font-mono uppercase tracking-wider text-[var(--color-muted)] font-semibold"
                       >
                         Kurasi {managedTargetPublisher?.name || "Penerbit"}:{" "}
-                        {editorialTitle || book.title}
+                        {editorialTitle || "Naskah Tanpa Judul"}
                       </label>
                     </div>
                     <input

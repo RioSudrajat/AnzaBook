@@ -1,6 +1,12 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
+import { MoreHorizontal } from "lucide-react";
 import { AnzaLogoMark } from "@/components/brand";
+import {
+  ProfileShareDialog,
+  type ProfileShareEntityType,
+} from "@/components/profile/profile-share-dialog";
+import { VerifiedBadge } from "@/components/profile/verified-badge";
 import { isUsableAssetUrl } from "@/lib/media-url";
 import { cn } from "@/lib/utils";
 import {
@@ -23,6 +29,15 @@ export type EntityProfileMetric = {
   title?: string;
 };
 
+export type EntityProfileShareConfig = {
+  entityType: ProfileShareEntityType;
+  name: string;
+  handle: string;
+  avatarUrl?: string | null;
+  sharePath: string;
+  affiliateSlug?: string | null;
+};
+
 export type EntityProfileHeaderProps = {
   kind: "user" | "publisher" | "community";
   name: string;
@@ -33,6 +48,8 @@ export type EntityProfileHeaderProps = {
   avatarUrl?: string | null;
   bannerUrl?: string | null;
   logoFit?: "cover" | "contain";
+  isVerified?: boolean;
+  verifiedEntityType?: "author" | "publisher" | "community";
   badges?: EntityProfileBadge[];
   metaItems?: Array<{ icon?: ReactNode; label: string }>;
   bio?: string | null;
@@ -42,6 +59,7 @@ export type EntityProfileHeaderProps = {
   actions?: ReactNode;
   modeSwitcher?: ReactNode;
   metrics?: EntityProfileMetric[];
+  shareConfig?: EntityProfileShareConfig;
   ariaLabel?: string;
 };
 
@@ -61,6 +79,41 @@ const BADGE_TONE_CLASS: Record<
     "border-[var(--color-error)]/40 bg-[var(--color-error-soft)] text-[var(--color-ink)]",
 };
 
+const VERIFIED_PILL_LABELS = new Set([
+  "terverifikasi ikapi",
+  "komunitas terverifikasi",
+  "penulis resmi",
+  "verified",
+  "trusted",
+]);
+
+function isSuppressedProfileBadge(badge: EntityProfileBadge): boolean {
+  const lower = badge.label.trim().toLowerCase();
+  if (VERIFIED_PILL_LABELS.has(lower)) return true;
+  if (
+    lower === "anggota nakama" ||
+    lower === "pemilik komunitas" ||
+    lower === "pengurus" ||
+    lower === "anggota" ||
+    lower.startsWith("peran anda:") ||
+    lower.includes("menunggu verifikasi") ||
+    lower === "pending" ||
+    lower === "rejected" ||
+    lower === "ditolak"
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function formatNormalizedHandle(raw?: string | null): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const cleaned = trimmed.replace(/^\/?[pcu]\//i, "").replace(/^@+/, "");
+  return cleaned ? `@${cleaned}` : null;
+}
+
 export function EntityProfileHeader({
   kind,
   name,
@@ -71,6 +124,8 @@ export function EntityProfileHeader({
   avatarUrl,
   bannerUrl,
   logoFit,
+  isVerified,
+  verifiedEntityType,
   badges = [],
   metaItems = [],
   bio,
@@ -80,11 +135,14 @@ export function EntityProfileHeader({
   actions,
   modeSwitcher,
   metrics = [],
+  shareConfig,
   ariaLabel,
 }: EntityProfileHeaderProps) {
   const [failedBannerUrl, setFailedBannerUrl] = useState<string | null>(null);
   const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
   const [bioExpanded, setBioExpanded] = useState(false);
+  const [topicsExpanded, setTopicsExpanded] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
 
   const showBanner =
     isUsableAssetUrl(bannerUrl) && failedBannerUrl !== bannerUrl;
@@ -97,12 +155,33 @@ export function EntityProfileHeader({
   const initial = (name || "A").slice(0, 1).toUpperCase();
   const HeadingTag = headingLevel;
 
+  const badgeIndicatesVerified = badges.some((badge) =>
+    VERIFIED_PILL_LABELS.has(badge.label.trim().toLowerCase()),
+  );
+  const showVerifiedBadge = Boolean(isVerified || badgeIndicatesVerified);
+  const effectiveVerifiedEntityType =
+    verifiedEntityType ??
+    (kind === "publisher"
+      ? "publisher"
+      : kind === "community"
+        ? "community"
+        : "author");
+
+  const visibleBadges = badges.filter(
+    (badge) => !isSuppressedProfileBadge(badge),
+  );
+  const normalizedHandle = formatNormalizedHandle(handleOrSlug);
+
   const trimmedBio = bio?.trim() || "";
   const isLongBio = trimmedBio.length > 320;
   const displayedBio =
     isLongBio && !bioExpanded
       ? `${trimmedBio.slice(0, 320).trimEnd()}…`
       : trimmedBio;
+
+  const hasExtraTopics = topics.length > 3;
+  const displayedTopics =
+    hasExtraTopics && !topicsExpanded ? topics.slice(0, 3) : topics;
 
   return (
     <section
@@ -169,25 +248,44 @@ export function EntityProfileHeader({
             )}
           </div>
 
-          {(modeSwitcher || actions) && (
+          {(modeSwitcher || actions || shareConfig) && (
             <div className="flex flex-wrap items-center gap-2 md:justify-end">
               {modeSwitcher}
               {actions}
+              {shareConfig && (
+                <button
+                  type="button"
+                  onClick={() => setIsShareOpen(true)}
+                  aria-label={`Bagikan profil ${shareConfig.name}`}
+                  title="Bagikan profil"
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)]"
+                >
+                  <MoreHorizontal className="size-4" aria-hidden="true" />
+                </button>
+              )}
             </div>
           )}
         </div>
 
-        {/* Identity, Badges, Meta, Bio, Topics, Social */}
+        {/* Identity, Verified Badge, Meta, Bio, Topics, Social */}
         <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <HeadingTag
-              id={headingId}
-              className="font-serif text-2xl sm:text-3xl font-bold tracking-tight text-[var(--color-ink)] break-words"
-            >
-              {name}
-            </HeadingTag>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex flex-wrap items-center gap-1.5">
+              <HeadingTag
+                id={headingId}
+                className="font-serif text-2xl sm:text-3xl font-bold tracking-tight text-[var(--color-ink)] break-words"
+              >
+                {name}
+              </HeadingTag>
+              {showVerifiedBadge && (
+                <VerifiedBadge
+                  entityType={effectiveVerifiedEntityType}
+                  size="md"
+                />
+              )}
+            </div>
 
-            {badges.map((badge) => (
+            {visibleBadges.map((badge) => (
               <span
                 key={badge.label}
                 className={cn(
@@ -201,19 +299,19 @@ export function EntityProfileHeader({
             ))}
           </div>
 
-          {(handleOrSlug || metaItems.length > 0) && (
+          {(normalizedHandle || metaItems.length > 0) && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 font-mono text-xs text-[var(--color-muted)]">
-              {handleOrSlug &&
+              {normalizedHandle &&
                 (handleHref ? (
                   <Link
                     to={handleHref}
                     className="font-semibold text-[var(--color-ink)] hover:underline focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] rounded-sm"
                   >
-                    {handleOrSlug}
+                    {normalizedHandle}
                   </Link>
                 ) : (
                   <span className="font-semibold text-[var(--color-ink)]">
-                    {handleOrSlug}
+                    {normalizedHandle}
                   </span>
                 ))}
 
@@ -252,7 +350,7 @@ export function EntityProfileHeader({
               className="flex flex-wrap items-center gap-2 pt-1"
               aria-label="Topik kurasi"
             >
-              {topics.map((topic) => (
+              {displayedTopics.map((topic) => (
                 <li
                   key={topic}
                   className="rounded-md border border-[var(--color-rule)] bg-[var(--color-paper)] px-2.5 py-1 text-xs font-medium text-[var(--color-ink-2)]"
@@ -260,6 +358,18 @@ export function EntityProfileHeader({
                   {topic}
                 </li>
               ))}
+              {hasExtraTopics && (
+                <li>
+                  <button
+                    type="button"
+                    aria-expanded={topicsExpanded}
+                    onClick={() => setTopicsExpanded((prev) => !prev)}
+                    className="rounded-md border border-[var(--color-rule)] bg-[var(--color-paper-3)] px-2.5 py-1 font-mono text-xs font-semibold text-[var(--color-ink)] hover:border-[var(--color-ink)]/40 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+                  >
+                    {topicsExpanded ? "Ringkas" : `+${topics.length - 3}`}
+                  </button>
+                </li>
+              )}
             </ul>
           )}
 
@@ -314,6 +424,19 @@ export function EntityProfileHeader({
           </dl>
         )}
       </div>
+
+      {shareConfig && (
+        <ProfileShareDialog
+          open={isShareOpen}
+          onClose={() => setIsShareOpen(false)}
+          entityType={shareConfig.entityType}
+          name={shareConfig.name}
+          handle={shareConfig.handle}
+          avatarUrl={shareConfig.avatarUrl}
+          sharePath={shareConfig.sharePath}
+          affiliateSlug={shareConfig.affiliateSlug}
+        />
+      )}
     </section>
   );
 }

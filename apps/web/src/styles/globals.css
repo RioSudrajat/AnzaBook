@@ -49,6 +49,7 @@
   --color-water-soft: var(--color-water-soft);
   --color-error: var(--color-error);
   --color-error-soft: var(--color-error-soft);
+  --color-verified: var(--color-verified);
 
   --font-sans: var(--font-body);
   --font-serif: var(--font-display);
@@ -145,6 +146,7 @@
   --color-water-soft: oklch(92% 0.025 232);
   --color-error: oklch(52% 0.18 25);
   --color-error-soft: oklch(92% 0.04 25);
+  --color-verified: #1d9bf0;
 
   --evt-surface: color-mix(in oklch, var(--color-paper-2) 84%, transparent);
   --evt-surface-elevated: color-mix(
@@ -233,6 +235,7 @@
   --color-water-soft: oklch(27% 0.03 232);
   --color-error: oklch(70% 0.17 25);
   --color-error-soft: oklch(28% 0.06 25);
+  --color-verified: #38a8f5;
 
   --evt-surface: color-mix(in oklch, var(--color-paper-2) 86%, transparent);
   --evt-surface-elevated: color-mix(
@@ -687,6 +690,44 @@
   dialog::backdrop {
     overflow: hidden;
     overscroll-behavior: contain;
+  }
+
+  /* Semantic native reading progress bar (WebKit & Firefox rules kept separate) */
+  progress.anza-reading-progress {
+    appearance: none;
+    border: 0 solid;
+    overflow: clip;
+    border-radius: 1e5px;
+    background: var(--color-paper-3);
+  }
+
+  progress.anza-reading-progress::-webkit-progress-bar {
+    background: transparent;
+  }
+
+  progress.anza-reading-progress::-webkit-progress-value {
+    background: var(--color-accent);
+    border-radius: 1e5px;
+    transition: inline-size 0.25s ease;
+  }
+
+  progress.anza-reading-progress::-moz-progress-bar {
+    background: var(--color-accent);
+    border-radius: 1e5px;
+    transition: inline-size 0.25s ease;
+  }
+
+  /* Stretched-link card pattern (modern-web-guidance: card) */
+  .anza-book-card .anza-book-card-link::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+
+  .anza-book-card:has(.anza-book-card-link:focus-visible)
+    .anza-book-card-stage {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
   }
 }
 

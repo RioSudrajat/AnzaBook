@@ -7,6 +7,7 @@ import type {
 } from "@starter/shared/validators/books";
 import {
   getBook,
+  getBookPurchaseOrder,
   getBookReader,
   getBookStock,
   getReaderDrmStatus,
@@ -49,6 +50,8 @@ export const booksKeys = {
     [...booksKeys.all, "progress", bookId, scope] as const,
   sessions: (bookId: string) => [...booksKeys.all, "sessions", bookId] as const,
   drmStatus: () => [...booksKeys.all, "drm-status"] as const,
+  purchaseOrder: (purchaseId: string) =>
+    [...booksKeys.all, "purchase-order", purchaseId] as const,
 };
 
 export function booksListQuery(params?: ListBooksInput) {
@@ -145,6 +148,14 @@ export function chapterCommentsQuery(slug: string, chapterId: string) {
   return queryOptions({
     queryKey: booksKeys.commentList(slug, chapterId),
     queryFn: ({ signal }) => listChapterComments(slug, chapterId, signal),
+  });
+}
+
+export function bookPurchaseOrderQuery(purchaseId: string) {
+  return queryOptions({
+    queryKey: booksKeys.purchaseOrder(purchaseId),
+    queryFn: ({ signal }) => getBookPurchaseOrder(purchaseId, signal),
+    enabled: Boolean(purchaseId),
   });
 }
 

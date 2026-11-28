@@ -484,7 +484,7 @@ export function resolveQuoteCardViewModel(
 
   const locationParts: string[] = [];
   if (typeof post.chapterNumber === "number" && post.chapterNumber > 0) {
-    locationParts.push(`Bab ${post.chapterNumber}`);
+    locationParts.push(`Chapter ${post.chapterNumber}`);
   }
   if (typeof post.pageNumber === "number" && post.pageNumber > 0) {
     locationParts.push(`Hal. ${post.pageNumber}`);
@@ -583,9 +583,9 @@ export function resolveSessionCardViewModel(
       ? post.endChapterNumber
       : null;
   if (startCh && endCh && startCh !== endCh) {
-    chapterLabel = `Bab ${startCh} → Bab ${endCh}`;
+    chapterLabel = `Chapter ${startCh} → Chapter ${endCh}`;
   } else if (endCh || startCh) {
-    chapterLabel = `Bab ${endCh ?? startCh}`;
+    chapterLabel = `Chapter ${endCh ?? startCh}`;
   }
 
   return {

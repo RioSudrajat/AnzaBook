@@ -7,6 +7,30 @@ export interface ExtractedChapter {
   plainTextParagraphs: string[];
 }
 
+export interface LockedPreviewSlice {
+  slicedDoc: JSONContent;
+  unlockedChapterNumbers: Set<number>;
+  hitPaywallNode: boolean;
+  truncatedByFallback: boolean;
+}
+
+const RICH_CONTENT_NODE_TYPES = new Set([
+  "image",
+  "audioEmbed",
+  "videoEmbed",
+  "calloutBox",
+  "financialChart",
+  "latexBlock",
+  "collapsible",
+  "poetryBlock",
+  "pollBlock",
+  "predictionMarket",
+  "recipeBlock",
+  "audienceGated",
+  "footnoteBlock",
+  "substackButton",
+]);
+
 /**
  * Extracts inline plain text recursively from any Tiptap node (including chapterBreak titles).
  */
@@ -24,16 +48,35 @@ export function extractInlineText(node: JSONContent): string {
  * Extracts plain body text recursively from a Tiptap node (skips chapter/page markers).
  */
 export function extractTextFromNode(node: JSONContent): string {
-  if (node.type === "chapterBreak" || node.type === "pageBreak") {
+  if (
+    node.type === "chapterBreak" ||
+    node.type === "pageBreak" ||
+    node.type === "nakamaPaywall"
+  ) {
     return "";
   }
   return extractInlineText(node);
 }
 
+function nodeHasMeaningfulBody(node: JSONContent): boolean {
+  if (!node.type) return false;
+  if (
+    node.type === "chapterBreak" ||
+    node.type === "pageBreak" ||
+    node.type === "nakamaPaywall"
+  ) {
+    return false;
+  }
+  if (RICH_CONTENT_NODE_TYPES.has(node.type)) {
+    return true;
+  }
+  return extractTextFromNode(node).trim().length > 0;
+}
+
 function normalizeChapterBreakNode(
   node: JSONContent,
   chapterNumber: number,
-  fallbackTitle: string,
+  fallbackTitle = "",
 ): JSONContent {
   const inlineText = extractInlineText(node);
   const resolvedTitle =
@@ -53,7 +96,7 @@ function normalizeChapterBreakNode(
     attrs: {
       chapterNumber,
     },
-    content: nextContent,
+    ...(nextContent && nextContent.length > 0 ? { content: nextContent } : {}),
   };
 }
 
@@ -62,27 +105,24 @@ function normalizeChapterBreakNode(
  * 1. It is a valid doc object
  * 2. It always starts with Chapter 1 break at content[0] with live editable text content
  * 3. All chapter breaks have valid sequential chapter numbers
+ * 4. Empty documents stay genuinely empty (no fake starter sentences)
  */
 export function normalizeManuscriptJson(
   rawJson: JSONContent | null | undefined,
-  defaultTitle = "Bab 1: Permulaan",
+  defaultTitle = "",
 ): JSONContent {
+  const emptyChapter1: JSONContent = {
+    type: "chapterBreak",
+    attrs: { chapterNumber: 1 },
+    ...(defaultTitle
+      ? { content: [{ type: "text", text: defaultTitle }] }
+      : {}),
+  };
+
   if (!rawJson || typeof rawJson !== "object") {
     return {
       type: "doc",
-      content: [
-        {
-          type: "chapterBreak",
-          attrs: { chapterNumber: 1 },
-          content: [{ type: "text", text: defaultTitle }],
-        },
-        {
-          type: "paragraph",
-          content: [
-            { type: "text", text: "Mulai menulis naskah Anda di sini..." },
-          ],
-        },
-      ],
+      content: [emptyChapter1, { type: "paragraph" }],
     };
   }
 
@@ -93,19 +133,7 @@ export function normalizeManuscriptJson(
   if (content.length === 0) {
     return {
       type: "doc",
-      content: [
-        {
-          type: "chapterBreak",
-          attrs: { chapterNumber: 1 },
-          content: [{ type: "text", text: defaultTitle }],
-        },
-        {
-          type: "paragraph",
-          content: [
-            { type: "text", text: "Mulai menulis naskah Anda di sini..." },
-          ],
-        },
-      ],
+      content: [emptyChapter1, { type: "paragraph" }],
     };
   }
 
@@ -117,7 +145,7 @@ export function normalizeManuscriptJson(
       content[i] = normalizeChapterBreakNode(
         item,
         num,
-        num === 1 ? defaultTitle : `Bab ${num}`,
+        num === 1 ? defaultTitle : "",
       );
     }
   }
@@ -128,11 +156,7 @@ export function normalizeManuscriptJson(
     firstNode.type !== "chapterBreak" ||
     Number(firstNode.attrs?.chapterNumber) !== 1
   ) {
-    content.unshift({
-      type: "chapterBreak",
-      attrs: { chapterNumber: 1 },
-      content: [{ type: "text", text: defaultTitle }],
-    });
+    content.unshift(emptyChapter1);
   }
 
   return {
@@ -150,33 +174,32 @@ export function extractChaptersFromJson(doc: JSONContent): ExtractedChapter[] {
     return [
       {
         chapterNumber: 1,
-        title: "Bab 1",
+        title: "",
         doc: {
           type: "doc",
-          content: [
-            {
-              type: "paragraph",
-              content: [
-                { type: "text", text: "Mulai menulis naskah Anda di sini..." },
-              ],
-            },
-          ],
+          content: [{ type: "paragraph" }],
         },
-        plainTextParagraphs: ["Mulai menulis naskah Anda di sini..."],
+        plainTextParagraphs: [],
       },
     ];
   }
 
   const chapters: ExtractedChapter[] = [];
   let currentNum = 1;
-  let currentTitle = "Bab 1";
+  let currentTitle = "";
   let currentNodes: JSONContent[] = [];
 
   const flushChapter = () => {
     const paragraphs: string[] = [];
 
     for (const node of currentNodes) {
-      if (node.type === "chapterBreak" || node.type === "pageBreak") continue;
+      if (
+        node.type === "chapterBreak" ||
+        node.type === "pageBreak" ||
+        node.type === "nakamaPaywall"
+      ) {
+        continue;
+      }
       const text = extractTextFromNode(node);
       if (text) {
         paragraphs.push(text);
@@ -184,16 +207,7 @@ export function extractChaptersFromJson(doc: JSONContent): ExtractedChapter[] {
     }
 
     const safeNodes =
-      currentNodes.length > 0
-        ? currentNodes
-        : [
-            {
-              type: "paragraph",
-              content: [
-                { type: "text", text: "Mulai menulis naskah bab ini..." },
-              ],
-            },
-          ];
+      currentNodes.length > 0 ? currentNodes : [{ type: "paragraph" }];
 
     chapters.push({
       chapterNumber: currentNum,
@@ -202,10 +216,7 @@ export function extractChaptersFromJson(doc: JSONContent): ExtractedChapter[] {
         type: "doc",
         content: safeNodes,
       },
-      plainTextParagraphs:
-        paragraphs.length > 0
-          ? paragraphs
-          : ["Mulai menulis naskah bab ini..."],
+      plainTextParagraphs: paragraphs,
     });
   };
 
@@ -225,7 +236,7 @@ export function extractChaptersFromJson(doc: JSONContent): ExtractedChapter[] {
         (typeof node.attrs?.title === "string"
           ? node.attrs.title.trim()
           : "") ||
-        `Bab ${currentNum}`;
+        "";
     } else {
       currentNodes.push(node);
     }
@@ -242,19 +253,12 @@ export function extractChaptersFromJson(doc: JSONContent): ExtractedChapter[] {
     } else {
       sorted.unshift({
         chapterNumber: 1,
-        title: "Bab 1: Permulaan",
+        title: "",
         doc: {
           type: "doc",
-          content: [
-            {
-              type: "paragraph",
-              content: [
-                { type: "text", text: "Mulai menulis naskah Bab 1 di sini..." },
-              ],
-            },
-          ],
+          content: [{ type: "paragraph" }],
         },
-        plainTextParagraphs: ["Mulai menulis naskah Bab 1 di sini..."],
+        plainTextParagraphs: [],
       });
     }
   }
@@ -280,13 +284,9 @@ export function buildUnifiedDocFromChapters(
     contentEn?: string | null;
     blueprintContent?: string | null;
   }>,
-  defaultBookTitle?: string,
 ): JSONContent {
   if (!chapters || chapters.length === 0) {
-    return normalizeManuscriptJson(
-      null,
-      defaultBookTitle || "Bab 1: Permulaan",
-    );
+    return normalizeManuscriptJson(null, "");
   }
 
   const unifiedContent: JSONContent[] = [];
@@ -299,7 +299,7 @@ export function buildUnifiedDocFromChapters(
   for (let idx = 0; idx < sorted.length; idx++) {
     const chap = sorted[idx];
     const chapNum = chap.chapterNumber || idx + 1;
-    const chapTitle = chap.titleId || chap.title || `Bab ${chapNum}`;
+    const chapTitle = (chap.titleId || chap.title || "").trim();
 
     // Add live editable chapter break header node
     unifiedContent.push({
@@ -348,11 +348,14 @@ export function buildUnifiedDocFromChapters(
       const subNodes = parsedDoc.content.filter(
         (n) => n.type !== "chapterBreak",
       );
-      unifiedContent.push(...subNodes);
+      if (subNodes.length > 0) {
+        unifiedContent.push(...subNodes);
+      } else {
+        unifiedContent.push({ type: "paragraph" });
+      }
     } else {
       // Legacy HTML or plain text fallback: convert lines to paragraph nodes
-      const rawText = chap.contentId || "Mulai menulis naskah Anda di sini...";
-      // Strip any raw HTML tags
+      const rawText = chap.contentId || "";
       const cleanParagraphs = rawText
         .replace(/<[^>]*>/g, "\n\n")
         .split(/\n\n+/)
@@ -367,18 +370,122 @@ export function buildUnifiedDocFromChapters(
           });
         }
       } else {
-        unifiedContent.push({
-          type: "paragraph",
-          content: [
-            { type: "text", text: "Mulai menulis naskah Anda di sini..." },
-          ],
-        });
+        unifiedContent.push({ type: "paragraph" });
       }
     }
   }
 
-  return normalizeManuscriptJson(
-    { type: "doc", content: unifiedContent },
-    defaultBookTitle || "Bab 1: Permulaan",
+  return normalizeManuscriptJson({ type: "doc", content: unifiedContent }, "");
+}
+
+/**
+ * Checks whether any chapter in a manuscript already contains real body content.
+ */
+export function hasManuscriptBodyContent(
+  chapters: Array<{
+    contentId?: string | null;
+    blueprintContent?: string | null;
+    plainTextParagraphs?: string[];
+    doc?: JSONContent;
+  }>,
+): boolean {
+  if (!chapters || chapters.length === 0) return false;
+  for (const ch of chapters) {
+    if (ch.plainTextParagraphs && ch.plainTextParagraphs.length > 0) {
+      return true;
+    }
+    if (ch.doc?.content?.some(nodeHasMeaningfulBody)) {
+      return true;
+    }
+    const raw = (ch.blueprintContent || ch.contentId || "").trim();
+    if (!raw) continue;
+    if (raw.startsWith("{") && raw.includes('"type"')) {
+      try {
+        const parsed = JSON.parse(raw) as JSONContent;
+        if (parsed.content?.some(nodeHasMeaningfulBody)) {
+          return true;
+        }
+        continue;
+      } catch {
+        // Fall through to plain text check
+      }
+    }
+    const stripped = raw.replace(/<[^>]*>/g, "").trim();
+    if (stripped.length > 0) return true;
+  }
+  return false;
+}
+
+/**
+ * Slices a Tiptap document for Locked Preview mode (`Terkunci`):
+ * - If a `nakamaPaywall` divider exists, slices cleanly before that node.
+ * - Otherwise falls back to `min(3, max(1, chapter1BodyCount - 1))` paragraphs of Chapter 1
+ *   and locks Chapter 2+.
+ */
+export function sliceDocForLockedPreview(doc: JSONContent): LockedPreviewSlice {
+  const nodes = Array.isArray(doc.content) ? doc.content : [];
+  const paywallIndex = nodes.findIndex((n) => n.type === "nakamaPaywall");
+
+  if (paywallIndex !== -1) {
+    const slicedContent = nodes.slice(0, paywallIndex);
+    const unlocked = new Set<number>([1]);
+    for (const node of slicedContent) {
+      if (node.type === "chapterBreak") {
+        const num = Number(node.attrs?.chapterNumber) || 1;
+        unlocked.add(num);
+      }
+    }
+    return {
+      slicedDoc: {
+        type: "doc",
+        content:
+          slicedContent.length > 0
+            ? slicedContent
+            : [{ type: "chapterBreak", attrs: { chapterNumber: 1 } }],
+      },
+      unlockedChapterNumbers: unlocked,
+      hitPaywallNode: true,
+      truncatedByFallback: false,
+    };
+  }
+
+  // Fallback: slice Chapter 1 to getPreviewParagraphCount(chapter1)
+  const secondChapterIdx = nodes.findIndex(
+    (n, idx) => idx > 0 && n.type === "chapterBreak",
   );
+  const chapter1Nodes =
+    secondChapterIdx === -1 ? nodes : nodes.slice(0, secondChapterIdx);
+  const hasLaterChapters = secondChapterIdx !== -1;
+
+  const nonEmptyBodyIndices: number[] = [];
+  chapter1Nodes.forEach((node, idx) => {
+    if (nodeHasMeaningfulBody(node)) {
+      nonEmptyBodyIndices.push(idx);
+    }
+  });
+
+  const allowedCount = Math.min(3, Math.max(1, nonEmptyBodyIndices.length - 1));
+  const lastAllowedIdx =
+    nonEmptyBodyIndices.length > 0
+      ? (nonEmptyBodyIndices[
+          Math.min(allowedCount, nonEmptyBodyIndices.length) - 1
+        ] ?? chapter1Nodes.length - 1)
+      : chapter1Nodes.length - 1;
+
+  const slicedContent = chapter1Nodes.slice(0, lastAllowedIdx + 1);
+  const truncatedByFallback =
+    hasLaterChapters || nonEmptyBodyIndices.length > allowedCount;
+
+  return {
+    slicedDoc: {
+      type: "doc",
+      content:
+        slicedContent.length > 0
+          ? slicedContent
+          : [{ type: "chapterBreak", attrs: { chapterNumber: 1 } }],
+    },
+    unlockedChapterNumbers: new Set<number>([1]),
+    hitPaywallNode: false,
+    truncatedByFallback,
+  };
 }

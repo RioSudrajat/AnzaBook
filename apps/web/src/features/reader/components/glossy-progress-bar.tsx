@@ -63,7 +63,7 @@ export function GlossyProgressBar({
     <div
       className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-[min(92vw,30rem)] select-none pointer-events-auto"
       role="region"
-      aria-label={`Progres membaca bab ${currentChapter} dari ${safeTotal}, ${displayPercent}`}
+      aria-label={`Progres membaca chapter ${currentChapter} dari ${safeTotal}, ${displayPercent}`}
     >
       <div className="rounded-full px-5 py-2.5 bg-card/85 text-foreground backdrop-blur-xl border border-border/70 shadow-[0_12px_32px_-10px_color-mix(in_oklab,var(--color-ink)_16%,transparent)] transition-colors duration-200">
         <div className="flex items-center justify-between gap-3 mb-2">
@@ -95,7 +95,7 @@ export function GlossyProgressBar({
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round(currentPercent * 10) / 10}
-          aria-label="Progres baca per bab"
+          aria-label="Progres baca per chapter"
         >
           {resolvedSegments.map((segment) => (
             <div

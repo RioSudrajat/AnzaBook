@@ -11,8 +11,6 @@ import {
 import { db } from "../db";
 import {
   bookChapters,
-  bookClaimBatches,
-  bookClaimCodes,
   books,
   manuscriptSubmissions,
   publisherMembers,
@@ -320,7 +318,7 @@ describe("Publisher Publishing Workflow, Topic-Ranked Targets & Team RBAC (Issue
         publisherId: pubId,
         title: `Naskah Verified ${suffix}`,
         synopsis: "Sinopsis lengkap untuk uji isolasi RBAC.",
-        proposedDigitalPolicy: "nakama_or_purchase",
+        proposedDigitalPolicy: "nakama_subscription",
         chapters: [
           { chapterNumber: 1, titleId: "Bab 1", contentId: "Isi bab 1." },
         ],
@@ -518,7 +516,7 @@ describe("Publisher Publishing Workflow, Topic-Ranked Targets & Team RBAC (Issue
         title: `Hikayat Nusantara ${suffix}`,
         category: "Sastra Sejarah",
         synopsis: "Kisah epik lintas pulau dari penulis muda Indonesia.",
-        proposedDigitalPolicy: "print_code_only",
+        proposedDigitalPolicy: "nakama_subscription",
         chapters: [
           {
             chapterNumber: 1,
@@ -657,20 +655,8 @@ describe("Publisher Publishing Workflow, Topic-Ranked Targets & Team RBAC (Issue
       .from(bookChapters)
       .where(eq(bookChapters.bookId, publishedBookId));
     expect(createdChapters).toHaveLength(2);
-
-    const [batch] = await db
-      .select()
-      .from(bookClaimBatches)
-      .where(eq(bookClaimBatches.bookId, publishedBookId));
-    expect(batch).toBeDefined();
-    expect(batch.totalCodes).toBe(500);
-    expect(batch.billingStatus).toBe("free_tier");
-
-    const codes = await db
-      .select({ id: bookClaimCodes.id })
-      .from(bookClaimCodes)
-      .where(eq(bookClaimCodes.batchId, batch.id));
-    expect(codes).toHaveLength(500);
+    expect(createdBooksForTitle[0].digitalPolicy).toBe("nakama_subscription");
+    expect(createdBooksForTitle[0].hasPhysical).toBe(false);
 
     const [manuscriptAfter] = await db
       .select()
@@ -918,6 +904,7 @@ describe("Publisher Publishing Workflow, Topic-Ranked Targets & Team RBAC (Issue
         estimatedPages: 240,
         coverColor: "#1E3A5F",
         proposedDigitalPolicy: "single_purchase",
+        proposedDigitalPriceIdr: 45_000,
         chapters: [
           {
             chapterNumber: 1,
@@ -995,10 +982,7 @@ describe("Publisher Publishing Workflow, Topic-Ranked Targets & Team RBAC (Issue
         synopsis: "Sinopsis edisi terbit lengkap untuk katalog pembaca.",
         coverUrl: uploadedPath,
         coverColor: "#2C4A3E",
-        digitalPolicy: "nakama_or_purchase",
-        hasPhysical: true,
-        rakyatPriceIdr: 49_000,
-        standardPriceIdr: 89_000,
+        digitalPolicy: "single_purchase",
         publishedYear: 2026,
         collectionName: "Seri Pemikiran",
         isbn: `978-602-99-${suffix.slice(0, 2)}`,
@@ -1007,7 +991,7 @@ describe("Publisher Publishing Workflow, Topic-Ranked Targets & Team RBAC (Issue
     const bookId = publishRes.body.data.publishedBookId as string;
     const bookSlug = publishRes.body.data.book.slug as string;
     expect(publishRes.body.data.book.digitalPriceIdr).toBe(45_000);
-    expect(publishRes.body.data.book.accessTier).toBe("premium_physical");
+    expect(publishRes.body.data.book.accessTier).toBe("premium");
 
     const bookDetailRes = await approvedAuthor.get(`/api/books/${bookSlug}`);
     expect(bookDetailRes.status).toBe(200);

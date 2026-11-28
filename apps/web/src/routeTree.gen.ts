@@ -37,6 +37,7 @@ import { Route as PostPreviewTypeIdRouteImport } from './routes/post-preview.$ty
 import { Route as PostTypeIdRouteImport } from './routes/post.$type.$id'
 import { Route as ProtectedMembershipCheckoutOrderIdRouteImport } from './routes/_protected/membership.checkout.$orderId'
 import { Route as ProtectedPSlugStudioRouteImport } from './routes/_protected/p.$slug.studio'
+import { Route as ProtectedBooksSlugCheckoutPurchaseIdRouteImport } from './routes/_protected/books.$slug.checkout.$purchaseId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -177,6 +178,12 @@ const ProtectedPSlugStudioRoute = ProtectedPSlugStudioRouteImport.update({
   path: '/p/$slug/studio',
   getParentRoute: () => ProtectedRoute,
 } as any)
+const ProtectedBooksSlugCheckoutPurchaseIdRoute =
+  ProtectedBooksSlugCheckoutPurchaseIdRouteImport.update({
+    id: '/books/$slug/checkout/$purchaseId',
+    path: '/books/$slug/checkout/$purchaseId',
+    getParentRoute: () => ProtectedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -205,6 +212,7 @@ export interface FileRoutesByFullPath {
   '/post/$type/$id': typeof PostTypeIdRoute
   '/membership/checkout/$orderId': typeof ProtectedMembershipCheckoutOrderIdRoute
   '/p/$slug/studio': typeof ProtectedPSlugStudioRoute
+  '/books/$slug/checkout/$purchaseId': typeof ProtectedBooksSlugCheckoutPurchaseIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -233,6 +241,7 @@ export interface FileRoutesByTo {
   '/post/$type/$id': typeof PostTypeIdRoute
   '/membership/checkout/$orderId': typeof ProtectedMembershipCheckoutOrderIdRoute
   '/p/$slug/studio': typeof ProtectedPSlugStudioRoute
+  '/books/$slug/checkout/$purchaseId': typeof ProtectedBooksSlugCheckoutPurchaseIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -264,6 +273,7 @@ export interface FileRoutesById {
   '/post/$type/$id': typeof PostTypeIdRoute
   '/_protected/membership/checkout/$orderId': typeof ProtectedMembershipCheckoutOrderIdRoute
   '/_protected/p/$slug/studio': typeof ProtectedPSlugStudioRoute
+  '/_protected/books/$slug/checkout/$purchaseId': typeof ProtectedBooksSlugCheckoutPurchaseIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -294,6 +304,7 @@ export interface FileRouteTypes {
     | '/post/$type/$id'
     | '/membership/checkout/$orderId'
     | '/p/$slug/studio'
+    | '/books/$slug/checkout/$purchaseId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -322,6 +333,7 @@ export interface FileRouteTypes {
     | '/post/$type/$id'
     | '/membership/checkout/$orderId'
     | '/p/$slug/studio'
+    | '/books/$slug/checkout/$purchaseId'
   id:
     | '__root__'
     | '/'
@@ -352,6 +364,7 @@ export interface FileRouteTypes {
     | '/post/$type/$id'
     | '/_protected/membership/checkout/$orderId'
     | '/_protected/p/$slug/studio'
+    | '/_protected/books/$slug/checkout/$purchaseId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -570,6 +583,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProtectedPSlugStudioRouteImport
       parentRoute: typeof ProtectedRoute
     }
+    '/_protected/books/$slug/checkout/$purchaseId': {
+      id: '/_protected/books/$slug/checkout/$purchaseId'
+      path: '/books/$slug/checkout/$purchaseId'
+      fullPath: '/books/$slug/checkout/$purchaseId'
+      preLoaderRoute: typeof ProtectedBooksSlugCheckoutPurchaseIdRouteImport
+      parentRoute: typeof ProtectedRoute
+    }
   }
 }
 
@@ -597,6 +617,7 @@ interface ProtectedRouteChildren {
   ProtectedReadSlugRoute: typeof ProtectedReadSlugRoute
   ProtectedMembershipCheckoutOrderIdRoute: typeof ProtectedMembershipCheckoutOrderIdRoute
   ProtectedPSlugStudioRoute: typeof ProtectedPSlugStudioRoute
+  ProtectedBooksSlugCheckoutPurchaseIdRoute: typeof ProtectedBooksSlugCheckoutPurchaseIdRoute
 }
 
 const ProtectedRouteChildren: ProtectedRouteChildren = {
@@ -612,6 +633,8 @@ const ProtectedRouteChildren: ProtectedRouteChildren = {
   ProtectedMembershipCheckoutOrderIdRoute:
     ProtectedMembershipCheckoutOrderIdRoute,
   ProtectedPSlugStudioRoute: ProtectedPSlugStudioRoute,
+  ProtectedBooksSlugCheckoutPurchaseIdRoute:
+    ProtectedBooksSlugCheckoutPurchaseIdRoute,
 }
 
 const ProtectedRouteWithChildren = ProtectedRoute._addFileChildren(

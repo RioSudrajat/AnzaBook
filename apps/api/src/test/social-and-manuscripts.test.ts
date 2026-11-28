@@ -441,7 +441,7 @@ describe("Social Profile, 4D Explore, Community Membership & Manuscript Studio A
         title: "Kronik Menara Embun",
         synopsis:
           "Di dunia di mana kabut menyembunyikan masa lalu, seorang penenun waktu mencari kebenaran tentang kota yang hilang di atas awan.",
-        proposedDigitalPolicy: "nakama_or_purchase",
+        proposedDigitalPolicy: "single_purchase",
         proposedDigitalPriceIdr: 45_000,
         chapters: [
           {

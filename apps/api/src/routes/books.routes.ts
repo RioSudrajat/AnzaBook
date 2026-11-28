@@ -1,5 +1,7 @@
 import { Router } from "express";
 import {
+  bookCheckoutSchema,
+  bookPurchaseOrderId,
   bookSlugSchema,
   claimPrintCodeSchema,
   listBooksQuerySchema,
@@ -25,9 +27,11 @@ import {
   postClaimCodeRateLimit,
   publicCatalogRateLimit,
 } from "../middleware/spot-rate-limit";
+import { createUserWindowLimiter } from "../middleware/user-rate-limit";
 import {
   claimPrintCode,
   getBookBySlug,
+  getBookPurchaseOrder,
   getBookReaderPayload,
   getReadableParagraphCount,
   getBookStock,
@@ -36,7 +40,10 @@ import {
   listCollections,
   listBooks,
   purchaseDigitalBook,
+  reconcileBookPurchasePayment,
+  startBookCheckout,
 } from "../services/books.service";
+import { membershipGateway } from "../services/membership.service";
 import {
   createComment,
   createReview,
@@ -70,6 +77,41 @@ booksRouter.get("/meta/categories", async (_req, res) => {
   const categories = await listCategories();
   res.json({ data: categories });
 });
+
+const limitBookPurchaseStatusRefresh = createUserWindowLimiter({
+  limit: 20,
+  code: "STATUS_RATE_LIMIT",
+  message: "Terlalu banyak pemeriksaan status pembelian. Coba lagi nanti.",
+});
+
+// Protected: Get single book Midtrans purchase order
+booksRouter.get("/purchases/:purchaseId", requireAuth, async (req, res) => {
+  const purchaseId = bookPurchaseOrderId.parse(req.params.purchaseId);
+  const order = await getBookPurchaseOrder(getAuth(req).user.id, purchaseId);
+  res.json({ data: order });
+});
+
+// Protected: Refresh single book Midtrans purchase order status
+booksRouter.post(
+  "/purchases/:purchaseId/refresh",
+  requireAuth,
+  requireTrustedOrigin,
+  async (req, res) => {
+    const buyerId = getAuth(req).user.id;
+    const purchaseId = bookPurchaseOrderId.parse(req.params.purchaseId);
+    const order = await getBookPurchaseOrder(buyerId, purchaseId);
+    if (
+      order.status === "pending" ||
+      order.status === "failed" ||
+      order.status === "expired"
+    ) {
+      limitBookPurchaseStatusRefresh(buyerId);
+      const payment = await membershipGateway().getPayment(purchaseId);
+      if (payment) await reconcileBookPurchasePayment(payment);
+    }
+    res.json({ data: await getBookPurchaseOrder(buyerId, purchaseId) });
+  },
+);
 
 // Public with optional auth: Book details
 booksRouter.get(
@@ -126,6 +168,24 @@ booksRouter.post(
     const { code } = claimPrintCodeSchema.parse(req.body);
     const result = await claimPrintCode(slug, auth.user.id, code);
     res.json({ data: result });
+  },
+);
+
+// Protected: Start Midtrans QRIS checkout for a single_purchase digital book
+booksRouter.post(
+  "/:slug/checkout",
+  requireAuth,
+  requireTrustedOrigin,
+  jsonBody,
+  async (req, res) => {
+    const { slug } = bookSlugSchema.parse({ slug: req.params.slug });
+    const auth = getAuth(req);
+    const input = bookCheckoutSchema.parse(req.body);
+    const order = await startBookCheckout(auth.user.id, slug, input);
+    res
+      .status(201)
+      .location(`/api/books/purchases/${order.id}`)
+      .json({ data: order });
   },
 );
 

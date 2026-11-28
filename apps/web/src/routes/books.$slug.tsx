@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   createFileRoute,
   Link,
@@ -16,12 +16,10 @@ import {
   Loader2,
   MapPin,
   MessageSquare,
-  Package,
   Share2,
-  ShieldCheck,
-  ShoppingBag,
   Star,
 } from "lucide-react";
+import { z } from "zod";
 import type {
   BookDetailDto,
   BookSummaryDto,
@@ -34,6 +32,8 @@ import { AppShell } from "@/features/dashboard/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api/client";
+import { sanitizeReturnTo } from "@/lib/navigation-return";
+import { formatRupiah } from "@/features/membership/presentation";
 import {
   bookPagePath,
   bookPreviewPath,
@@ -44,19 +44,22 @@ import { BookCover } from "@/features/books/components/book-cover";
 import { BookCatalogCard } from "@/features/books/components/book-catalog-card";
 import { BookShareDialog } from "@/features/books/components/book-share-dialog";
 import { ClaimCodeDialog } from "@/features/books/components/claim-code-dialog";
-import { LiveStockTracker } from "@/features/books/components/live-stock-tracker";
-import { StoreMap } from "@/features/books/components/store-map";
+import { SinglePurchaseCard } from "@/features/books/components/single-purchase-card";
 import {
   useBookDetail,
   useBookReviews,
   useBooks,
   useCreateReview,
-  usePurchaseDigitalBook,
 } from "@/features/books/hooks";
 import { bookDetailQuery } from "@/features/books/queries";
 import { useUpsertShelf } from "@/features/community/hooks";
 
+const bookDetailSearchSchema = z.object({
+  returnTo: z.string().optional(),
+});
+
 export const Route = createFileRoute("/books/$slug")({
+  validateSearch: bookDetailSearchSchema,
   loader: async ({ context, params }) => {
     try {
       const { slug, title, author, synopsis } =
@@ -101,64 +104,26 @@ export const Route = createFileRoute("/books/$slug")({
   component: BookDetailPage,
 });
 
-function formatIdr(amount: number): string {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
 function B2B2CActionButtons({
   book,
   isLoggedIn,
   onStartReading,
   onReadSample,
-  onPurchaseDigitalBook,
-  isPurchasing,
-  purchaseError,
-  purchaseSuccess,
+  returnTo,
 }: {
   book: BookDetailDto;
   isLoggedIn: boolean;
   onStartReading: () => void;
   onReadSample: () => void;
-  onPurchaseDigitalBook: () => void;
-  isPurchasing: boolean;
-  purchaseError: string | null;
-  purchaseSuccess: boolean;
+  returnTo?: string | null;
 }) {
   const policy = book.digitalPolicy;
-  const isClaimOnly = policy === "print_code_only";
   const isNakamaOnly = policy === "nakama_subscription";
   const isSinglePurchase = policy === "single_purchase";
-  const isNakamaOrPurchase = policy === "nakama_or_purchase";
   const isFree = policy === "free_open";
 
-  const priceFormatted =
-    book.digitalPriceIdr && book.digitalPriceIdr > 0
-      ? formatIdr(book.digitalPriceIdr)
-      : "Rp45.000";
-
   return (
-    <div className="w-full lg:max-w-[280px] space-y-3 font-mono text-left">
-      {/* 1. Policy Context Notice / Badge */}
-      {isClaimOnly && (
-        <div className="rounded-lg border border-[var(--color-accent)]/35 bg-[var(--color-accent-soft)] p-3 text-[11px] font-sans leading-snug text-[var(--color-ink)]">
-          <div className="font-bold flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-[var(--color-ink)]">
-            <ShieldCheck
-              className="size-3.5 text-[var(--color-accent)] shrink-0"
-              aria-hidden="true"
-            />
-            <span>Eksklusif Pembeli Buku Cetak</span>
-          </div>
-          <p className="mt-1 text-[11px] text-[var(--color-ink-2)]">
-            Eksklusif Pemilik Buku Cetak Resmi — Tidak Dijual Satuan Digital.
-            Masukkan kode unik buku fisik Anda untuk membuka akses penuh.
-          </p>
-        </div>
-      )}
-
+    <div className="w-full lg:max-w-[296px] space-y-3 font-mono text-left">
       {isNakamaOnly && (
         <div className="rounded-lg border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-3 text-[11px] font-sans leading-snug text-[var(--color-ink-2)]">
           <div className="font-bold flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-[var(--color-ink)]">
@@ -175,42 +140,7 @@ function B2B2CActionButtons({
         </div>
       )}
 
-      {/* 2. Primary Distribution Action Buttons */}
-      {/* Model A: print_code_only */}
-      {isClaimOnly && (
-        <>
-          {isLoggedIn ? (
-            <ClaimCodeDialog
-              slug={book.slug}
-              bookTitle={book.title}
-              hasClaimedDigital={book.hasClaimedDigital}
-            />
-          ) : (
-            <Button
-              asChild
-              size="lg"
-              className="w-full min-h-11 bg-[var(--color-accent)] hover:brightness-95 text-[var(--color-accent-ink)] font-semibold text-xs gap-2 transition-colors"
-            >
-              <Link to="/sign-in" search={{ redirect: `/books/${book.slug}` }}>
-                <KeyRound className="size-4" aria-hidden="true" />
-                <span>Klaim Kode Buku Cetak Asli</span>
-              </Link>
-            </Button>
-          )}
-
-          <Button
-            onClick={onReadSample}
-            variant="outline"
-            size="lg"
-            className="w-full min-h-11 border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] font-medium text-xs gap-2 transition-colors cursor-pointer"
-          >
-            <BookOpen className="size-4" aria-hidden="true" />
-            Baca Cuplikan Bab 1
-          </Button>
-        </>
-      )}
-
-      {/* Model B: nakama_subscription */}
+      {/* Model 1: nakama_subscription */}
       {isNakamaOnly && (
         <>
           <Button
@@ -237,133 +167,45 @@ function B2B2CActionButtons({
             </Link>
           </Button>
 
-          {book.hasPhysical &&
-            (isLoggedIn ? (
-              <ClaimCodeDialog
-                slug={book.slug}
-                bookTitle={book.title}
-                hasClaimedDigital={book.hasClaimedDigital}
-              />
-            ) : (
-              <Button
-                asChild
-                variant="outline"
-                size="sm"
-                className="w-full min-h-11 border-[var(--color-rule)] text-xs"
-              >
-                <Link
-                  to="/sign-in"
-                  search={{ redirect: `/books/${book.slug}` }}
-                >
-                  Klaim Kode Buku Fisik
-                </Link>
-              </Button>
-            ))}
+          {isLoggedIn ? (
+            <ClaimCodeDialog
+              slug={book.slug}
+              bookTitle={book.title}
+              hasClaimedDigital={book.hasClaimedDigital}
+              returnTo={returnTo}
+              className="w-full"
+            />
+          ) : (
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="w-full min-h-11 border-[var(--color-rule)] text-xs gap-1.5"
+            >
+              <Link to="/sign-in" search={{ redirect: `/books/${book.slug}` }}>
+                <KeyRound
+                  className="size-3.5 text-[var(--color-accent)]"
+                  aria-hidden="true"
+                />
+                Klaim Akses Digital Buku Fisik
+              </Link>
+            </Button>
+          )}
         </>
       )}
 
-      {/* Model C: single_purchase */}
+      {/* Model 2: single_purchase */}
       {isSinglePurchase && (
-        <>
-          <Button
-            onClick={onPurchaseDigitalBook}
-            disabled={isPurchasing}
-            size="lg"
-            className="w-full min-h-11 bg-[var(--color-accent)] hover:brightness-95 text-[var(--color-accent-ink)] font-semibold text-xs gap-2 transition-colors cursor-pointer"
-          >
-            {isPurchasing ? (
-              <>
-                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                Memproses Pembelian...
-              </>
-            ) : purchaseSuccess ? (
-              <>
-                <Check className="size-4" aria-hidden="true" />
-                Akses Berhasil Dibeli!
-              </>
-            ) : (
-              <>
-                <ShoppingBag className="size-4" aria-hidden="true" />
-                Beli Akses Digital Selamanya ({priceFormatted})
-              </>
-            )}
-          </Button>
-
-          <Button
-            onClick={onReadSample}
-            variant="outline"
-            size="lg"
-            className="w-full min-h-11 border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] font-medium text-xs gap-2 transition-colors cursor-pointer"
-          >
-            <BookOpen className="size-4" aria-hidden="true" />
-            Baca Cuplikan Bab 1
-          </Button>
-
-          {purchaseError && (
-            <p
-              role="alert"
-              className="text-xs text-[var(--color-error)] font-sans"
-            >
-              {purchaseError}
-            </p>
-          )}
-        </>
+        <SinglePurchaseCard
+          book={book}
+          isLoggedIn={isLoggedIn}
+          onStartReading={onStartReading}
+          onReadSample={onReadSample}
+          returnTo={returnTo}
+        />
       )}
 
-      {/* Model D: nakama_or_purchase */}
-      {isNakamaOrPurchase && (
-        <>
-          <Button
-            onClick={onPurchaseDigitalBook}
-            disabled={isPurchasing}
-            size="lg"
-            className="w-full min-h-11 bg-[var(--color-accent)] hover:brightness-95 text-[var(--color-accent-ink)] font-semibold text-xs gap-2 transition-colors cursor-pointer"
-          >
-            {isPurchasing ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <ShoppingBag className="size-4" aria-hidden="true" />
-            )}
-            Beli Akses Digital ({priceFormatted})
-          </Button>
-
-          <Button
-            asChild
-            variant="outline"
-            size="lg"
-            className="w-full min-h-11 border-[var(--color-accent)]/40 bg-[var(--color-accent-soft)] hover:brightness-95 text-[var(--color-ink)] font-medium text-xs gap-2 transition-colors"
-          >
-            <Link to="/membership">
-              <Crown
-                className="size-4 text-[var(--color-accent)]"
-                aria-hidden="true"
-              />
-              Buka dengan Nakama (mulai Rp16rb/bln)
-            </Link>
-          </Button>
-
-          <Button
-            onClick={onReadSample}
-            variant="outline"
-            size="sm"
-            className="w-full min-h-11 border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] text-xs gap-2 transition-colors cursor-pointer"
-          >
-            <BookOpen className="size-3.5" aria-hidden="true" />
-            Baca Cuplikan Bab 1
-          </Button>
-
-          {purchaseError && (
-            <p
-              role="alert"
-              className="text-xs text-[var(--color-error)] font-sans"
-            >
-              {purchaseError}
-            </p>
-          )}
-        </>
-      )}
-
-      {/* Scheme Free: free_open */}
+      {/* Model 3: free_open */}
       {isFree && (
         <Button
           onClick={onStartReading}
@@ -380,6 +222,8 @@ function B2B2CActionButtons({
 
 function BookDetailPage() {
   const { slug } = Route.useParams();
+  const { returnTo } = Route.useSearch();
+  const safeReturnTo = sanitizeReturnTo(returnTo);
   const navigate = useNavigate();
   const isLoggedIn = !!Route.useRouteContext().session;
   const sessionUser = Route.useRouteContext().session?.user;
@@ -402,28 +246,12 @@ function BookDetailPage() {
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewSuccess, setReviewSuccess] = useState(false);
 
-  const [purchaseError, setPurchaseError] = useState<string | null>(null);
-  const [purchaseSuccess, setPurchaseSuccess] = useState(false);
-  const [isPurchaseDialogOpen, setIsPurchaseDialogOpen] = useState(false);
-  const purchaseDialogRef = useRef<HTMLDialogElement>(null);
-  const pressedOutsidePurchaseRef = useRef(false);
   const [shareTrigger, setShareTrigger] = useState<HTMLButtonElement | null>(
     null,
   );
 
-  useEffect(() => {
-    const dialogEl = purchaseDialogRef.current;
-    if (!dialogEl) return;
-    if (isPurchaseDialogOpen && !dialogEl.open) {
-      dialogEl.showModal();
-    } else if (!isPurchaseDialogOpen && dialogEl.open) {
-      dialogEl.close();
-    }
-  }, [isPurchaseDialogOpen]);
-
   const upsertShelfMutation = useUpsertShelf();
   const createReviewMutation = useCreateReview(slug);
-  const purchaseMutation = usePurchaseDigitalBook(slug);
 
   // Capture Affiliate Referral ref=cal_<slug> to sessionStorage
   useEffect(() => {
@@ -437,64 +265,28 @@ function BookDetailPage() {
   }, []);
 
   const handleStartReading = () => {
+    const targetReturn = isLoggedIn
+      ? (safeReturnTo ?? `/books/${book.slug}`)
+      : undefined;
     navigate({
       to: "/read/$slug",
       params: { slug: book.slug },
-      search: {},
+      search: targetReturn ? { returnTo: targetReturn } : {},
     });
   };
 
   const handleReadSample = () => {
+    const targetReturn = isLoggedIn
+      ? (safeReturnTo ?? `/books/${book.slug}`)
+      : undefined;
     navigate({
       to: "/read/$slug",
       params: { slug: book.slug },
-      search: { chapter: 1 },
+      search: {
+        chapter: 1,
+        ...(targetReturn ? { returnTo: targetReturn } : {}),
+      },
     });
-  };
-
-  const handlePurchaseDigitalBook = () => {
-    if (!isLoggedIn) {
-      navigate({
-        to: "/sign-in",
-        search: { redirect: `/books/${book.slug}` },
-      });
-      return;
-    }
-
-    setPurchaseError(null);
-    setIsPurchaseDialogOpen(true);
-  };
-
-  const handleConfirmSandboxPurchase = async () => {
-    setPurchaseError(null);
-    try {
-      const affiliateRef =
-        typeof window !== "undefined"
-          ? sessionStorage.getItem("anzabook_affiliate_ref")
-          : null;
-      const affiliateCalendarSlug = affiliateRef
-        ? affiliateRef.replace(/^cal_/, "")
-        : undefined;
-
-      await purchaseMutation.mutateAsync({
-        bookId: book.id,
-        affiliateCalendarSlug,
-      });
-      setIsPurchaseDialogOpen(false);
-      setPurchaseSuccess(true);
-      setTimeout(() => {
-        navigate({
-          to: "/read/$slug",
-          params: { slug: book.slug },
-          search: {},
-        });
-      }, 800);
-    } catch (err: unknown) {
-      const error = err as { message?: string };
-      setPurchaseError(
-        error?.message || "Gagal memproses pembelian buku. Silakan coba lagi.",
-      );
-    }
   };
 
   // Simpan ke rak baca
@@ -554,6 +346,12 @@ function BookDetailPage() {
   };
 
   const isPremium = book.accessTier !== "free";
+  const showClaimCode =
+    book.digitalPolicy !== "free_open" || book.hasClaimedDigital;
+  const hasSinglePurchasePrice =
+    book.digitalPolicy === "single_purchase" &&
+    typeof book.digitalPriceIdr === "number" &&
+    book.digitalPriceIdr > 0;
 
   const body = (
     <>
@@ -563,37 +361,45 @@ function BookDetailPage() {
           sessionUser ? "" : "sticky top-0 z-30"
         }`}
       >
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 min-h-14 py-1.5 flex items-center justify-between gap-2">
           <SmartBackButton
-            fallbackTo={sessionUser ? "/app" : "/"}
+            fallbackTo={safeReturnTo ?? (sessionUser ? "/app" : "/")}
             label="Kembali"
-            className="-ml-2"
+            className="-ml-2 shrink-0"
           />
 
-          {book.hasPhysical &&
-            (isLoggedIn ? (
-              <ClaimCodeDialog
-                slug={book.slug}
-                bookTitle={book.title}
-                hasClaimedDigital={book.hasClaimedDigital}
-              />
-            ) : (
-              <Button asChild variant="outline" size="sm" className="min-h-11">
-                <Link
-                  to="/sign-in"
-                  search={{ redirect: `/books/${book.slug}` }}
+          <div className="hidden sm:block shrink-0">
+            {showClaimCode &&
+              (isLoggedIn ? (
+                <ClaimCodeDialog
+                  slug={book.slug}
+                  bookTitle={book.title}
+                  hasClaimedDigital={book.hasClaimedDigital}
+                  returnTo={safeReturnTo}
+                />
+              ) : (
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="min-h-11"
                 >
-                  Klaim kode cetak
-                </Link>
-              </Button>
-            ))}
+                  <Link
+                    to="/sign-in"
+                    search={{ redirect: `/books/${book.slug}` }}
+                  >
+                    Klaim kode cetak
+                  </Link>
+                </Button>
+              ))}
+          </div>
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10 pb-16 space-y-12">
         {/* 2-Column Hero: Left Book Details & TOC, Right 3D Cover & Action Buttons */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
-          {/* Left Column: Details, Metadata, TOC, Store Map, Reviews */}
+          {/* Left Column: Details, Metadata, TOC, Reviews */}
           <div className="lg:col-span-8 space-y-8">
             <div className="space-y-4">
               {/* Mobile Cover placed above title */}
@@ -606,11 +412,21 @@ function BookDetailPage() {
 
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1 space-y-2">
-                  {isPremium && (
-                    <span className="inline-flex items-center gap-2 rounded-md bg-muted px-3 py-1 font-mono text-xs font-semibold text-foreground">
-                      <Crown className="size-4" aria-hidden="true" />
-                      Premium
-                    </span>
+                  {(isPremium || book.digitalPolicy === "single_purchase") && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-2 rounded-md bg-[var(--color-paper-3)] border border-[var(--color-rule)] px-3 py-1 font-mono text-xs font-semibold text-[var(--color-ink)]">
+                        <Crown
+                          className="size-4 text-[var(--color-accent)]"
+                          aria-hidden="true"
+                        />
+                        Premium
+                      </span>
+                      {hasSinglePurchasePrice && book.digitalPriceIdr && (
+                        <span className="inline-flex items-center rounded-md bg-[var(--color-accent-soft)] border border-[var(--color-accent)]/30 px-2.5 py-1 font-mono text-xs font-semibold text-[var(--color-ink)] tabular-nums">
+                          {formatRupiah(book.digitalPriceIdr)}
+                        </span>
+                      )}
+                    </div>
                   )}
                   <h1 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground leading-[1.2] pt-1">
                     {book.title}
@@ -800,10 +616,7 @@ function BookDetailPage() {
                   isLoggedIn={isLoggedIn}
                   onStartReading={handleStartReading}
                   onReadSample={handleReadSample}
-                  onPurchaseDigitalBook={handlePurchaseDigitalBook}
-                  isPurchasing={purchaseMutation.isPending}
-                  purchaseError={purchaseError}
-                  purchaseSuccess={purchaseSuccess}
+                  returnTo={safeReturnTo}
                 />
               </div>
 
@@ -885,7 +698,10 @@ function BookDetailPage() {
                     key={chap.id}
                     to="/read/$slug"
                     params={{ slug: book.slug }}
-                    search={{ chapter: chap.chapterNumber }}
+                    search={{
+                      chapter: chap.chapterNumber,
+                      ...(safeReturnTo ? { returnTo: safeReturnTo } : {}),
+                    }}
                     className="flex min-h-11 items-center justify-between gap-4 p-3.5 transition-colors hover:bg-muted/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring group"
                   >
                     <div className="flex items-center gap-3">
@@ -899,7 +715,7 @@ function BookDetailPage() {
 
                     <div className="flex items-center gap-1 text-muted-foreground group-hover:text-foreground transition-colors">
                       <span className="text-[11px] font-mono opacity-0 group-hover:opacity-100 transition-opacity">
-                        Baca Bab Ini
+                        Baca Chapter Ini
                       </span>
                       <ChevronRight className="size-4" />
                     </div>
@@ -907,36 +723,6 @@ function BookDetailPage() {
                 ))}
               </div>
             </div>
-
-            {/* Physical Store Stock Section (Map & Table) */}
-            {book.hasPhysical && (
-              <div
-                id="stok-buku"
-                className="scroll-mt-20 space-y-6 border-t border-border pt-6"
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Package className="size-5 text-[var(--color-accent)]" />
-                    <h2 className="font-serif text-xl font-bold tracking-tight text-foreground">
-                      Titik Ketersediaan Stok Buku Fisik
-                    </h2>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Pantau sebaran eksemplar fisik di jaringan toko buku mitra
-                    Gramedia dan komunitas di berbagai kota.
-                  </p>
-                </div>
-
-                {/* OpenStreetMap Interactive Map */}
-                <StoreMap stocks={book.storeStocks} />
-
-                {/* Stock Table */}
-                <LiveStockTracker
-                  slug={book.slug}
-                  initialStocks={book.storeStocks}
-                />
-              </div>
-            )}
 
             {/* Section: Verified Reader Reviews */}
             <div className="pt-6 border-t border-border space-y-6">
@@ -1172,10 +958,7 @@ function BookDetailPage() {
               isLoggedIn={isLoggedIn}
               onStartReading={handleStartReading}
               onReadSample={handleReadSample}
-              onPurchaseDigitalBook={handlePurchaseDigitalBook}
-              isPurchasing={purchaseMutation.isPending}
-              purchaseError={purchaseError}
-              purchaseSuccess={purchaseSuccess}
+              returnTo={safeReturnTo}
             />
           </div>
         </div>
@@ -1288,7 +1071,7 @@ function BookDetailPage() {
               </Link>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
               {relatedBooks.slice(0, 4).map((relBook: BookSummaryDto) => (
                 <BookCatalogCard key={relBook.id} book={relBook} />
               ))}
@@ -1296,120 +1079,6 @@ function BookDetailPage() {
           </div>
         )}
       </div>
-
-      <dialog
-        ref={purchaseDialogRef}
-        closedby="any"
-        aria-labelledby="purchase-confirm-title"
-        onClose={() => {
-          if (purchaseDialogRef.current)
-            purchaseDialogRef.current.returnValue = "";
-          if (isPurchaseDialogOpen) setIsPurchaseDialogOpen(false);
-        }}
-        onPointerDown={(e) => {
-          const el = purchaseDialogRef.current;
-          if (!el) return;
-          const r = el.getBoundingClientRect();
-          pressedOutsidePurchaseRef.current =
-            e.clientX < r.left ||
-            e.clientX > r.right ||
-            e.clientY < r.top ||
-            e.clientY > r.bottom;
-        }}
-        onPointerUp={(e) => {
-          const el = purchaseDialogRef.current;
-          if (!el || "closedBy" in HTMLDialogElement.prototype) return;
-          const r = el.getBoundingClientRect();
-          const releasedOutside =
-            e.clientX < r.left ||
-            e.clientX > r.right ||
-            e.clientY < r.top ||
-            e.clientY > r.bottom;
-          if (pressedOutsidePurchaseRef.current && releasedOutside) {
-            setIsPurchaseDialogOpen(false);
-          }
-          pressedOutsidePurchaseRef.current = false;
-        }}
-        className="m-auto w-[min(92vw,28rem)] rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-6 text-[var(--color-ink)] shadow-2xl backdrop:bg-black/60"
-      >
-        {isPurchaseDialogOpen && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-accent)]/40 bg-[var(--color-accent-soft)] px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink)]">
-                Simulasi Sandbox (Demo)
-              </span>
-            </div>
-
-            <div className="space-y-1">
-              <h2
-                id="purchase-confirm-title"
-                className="font-serif text-xl font-bold text-[var(--color-ink)]"
-              >
-                Konfirmasi Pembelian Akses Digital
-              </h2>
-              <p className="text-xs text-[var(--color-muted)]">
-                {book.title} · {book.author}
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-4 flex items-center justify-between">
-              <span className="text-xs font-medium text-[var(--color-ink-2)]">
-                Total Pembayaran
-              </span>
-              <span className="font-mono text-lg font-bold text-[var(--color-ink)] tabular-nums">
-                {book.digitalPriceIdr && book.digitalPriceIdr > 0
-                  ? formatIdr(book.digitalPriceIdr)
-                  : "Rp45.000"}
-              </span>
-            </div>
-
-            <p className="text-xs leading-relaxed text-[var(--color-muted)]">
-              Pembelian buku satuan pada tahap ini berjalan dalam mode simulasi
-              sandbox untuk demo dan langsung membuka akses baca penuh di akun
-              Anda. Pembayaran QRIS Midtrans Sandbox aktif di halaman{" "}
-              <Link
-                to="/membership"
-                className="underline text-[var(--color-ink)]"
-              >
-                Keanggotaan Nakama
-              </Link>
-              .
-            </p>
-
-            {purchaseError && (
-              <p
-                role="alert"
-                className="text-xs text-[var(--color-error)] font-sans"
-              >
-                {purchaseError}
-              </p>
-            )}
-
-            <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-[var(--color-rule)]">
-              <Button
-                type="button"
-                variant="outline"
-                autoFocus
-                disabled={purchaseMutation.isPending}
-                onClick={() => setIsPurchaseDialogOpen(false)}
-                className="min-h-11 px-4 text-xs border-[var(--color-rule)] cursor-pointer"
-              >
-                Batal
-              </Button>
-              <Button
-                type="button"
-                disabled={purchaseMutation.isPending}
-                onClick={() => void handleConfirmSandboxPurchase()}
-                className="min-h-11 px-5 text-xs font-semibold bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:brightness-95 cursor-pointer"
-              >
-                {purchaseMutation.isPending
-                  ? "Memproses..."
-                  : "Konfirmasi Pembelian"}
-              </Button>
-            </div>
-          </div>
-        )}
-      </dialog>
 
       {shareTrigger && (
         <BookShareDialog

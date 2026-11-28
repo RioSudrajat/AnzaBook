@@ -5,6 +5,7 @@ import { siteConfig } from "@/config/site";
 import { AppShell } from "@/features/dashboard/components/app-shell";
 import {
   PublisherStudioView,
+  type PublisherCatalogView,
   type PublisherStudioTab,
 } from "@/features/publisher/components/publisher-studio-view";
 import { canAccessPublisherStudio } from "@/features/publisher/publisher-helpers";
@@ -13,10 +14,9 @@ import { publisherDetailQuery } from "@/features/social/queries";
 import { ApiError } from "@/lib/api/client";
 
 const studioSearchSchema = z.object({
-  tab: z
-    .enum(["inbox", "catalog", "team", "profile"])
-    .optional()
-    .catch(undefined),
+  tab: z.enum(["inbox", "catalog", "team"]).optional().catch(undefined),
+  catalogView: z.enum(["publish", "draft"]).optional().catch(undefined),
+  returnTo: z.string().optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/_protected/p/$slug/studio")({
@@ -48,12 +48,33 @@ function PublisherStudioPage() {
   const { data: publisher, isLoading, isError } = usePublisher(slug);
 
   const activeTab: PublisherStudioTab = search.tab ?? "inbox";
+  const catalogView: PublisherCatalogView = search.catalogView ?? "publish";
+
   const handleTabChange = (tab: PublisherStudioTab) => {
     void navigate({
       to: "/p/$slug/studio",
       params: { slug },
-      search: { tab },
+      search: (prev) => ({
+        ...prev,
+        tab,
+        catalogView: tab === "catalog" ? prev.catalogView : undefined,
+      }),
       replace: true,
+      resetScroll: false,
+    });
+  };
+
+  const handleCatalogViewChange = (nextView: PublisherCatalogView) => {
+    void navigate({
+      to: "/p/$slug/studio",
+      params: { slug },
+      search: (prev) => ({
+        ...prev,
+        tab: "catalog",
+        catalogView: nextView,
+      }),
+      replace: true,
+      resetScroll: false,
     });
   };
 
@@ -122,6 +143,9 @@ function PublisherStudioPage() {
           publisher={publisher}
           activeTab={activeTab}
           onTabChange={handleTabChange}
+          catalogView={catalogView}
+          onCatalogViewChange={handleCatalogViewChange}
+          returnTo={search.returnTo}
           currentUserId={user.id}
         />
       )}

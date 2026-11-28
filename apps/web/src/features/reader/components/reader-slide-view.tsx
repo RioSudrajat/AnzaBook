@@ -76,7 +76,7 @@ function Leaf({
     >
       {leaf?.heading && (
         <header className="reader-leaf-heading">
-          <span>BAB {spread.chapter.chapterNumber}</span>
+          <span>CHAPTER {spread.chapter.chapterNumber}</span>
           <h1>{spread.chapter.title}</h1>
         </header>
       )}

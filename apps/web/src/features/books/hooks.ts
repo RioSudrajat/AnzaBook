@@ -5,6 +5,7 @@ import {
   useSuspenseQuery,
 } from "@tanstack/react-query";
 import type {
+  BookCheckoutInput,
   ListBooksInput,
   ReadBookInput,
   StockInput,
@@ -35,8 +36,10 @@ import {
   deleteHighlight,
   purchaseDigitalBook,
   recordDrmEvent,
+  refreshBookPurchaseOrder,
   restartBookReading,
   saveReadingProgress,
+  startBookCheckout,
   submitReaderDrmAppeal,
 } from "./api";
 import type { PurchaseBookInput } from "@starter/shared/validators/publisher";
@@ -45,6 +48,7 @@ import {
   authorsQuery,
   bookDetailQuery,
   bookHighlightsQuery,
+  bookPurchaseOrderQuery,
   bookReaderQuery,
   bookReviewsQuery,
   bookSessionsQuery,
@@ -271,6 +275,36 @@ export function usePurchaseDigitalBook(slug: string) {
       queryClient.invalidateQueries({
         queryKey: booksKeys.readers(),
       });
+    },
+  });
+}
+
+export function useStartBookCheckout(slug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: BookCheckoutInput) => startBookCheckout(slug, input),
+    onSuccess: (order) => {
+      queryClient.setQueryData(booksKeys.purchaseOrder(order.id), order);
+    },
+  });
+}
+
+export function useBookPurchaseOrder(purchaseId: string) {
+  return useQuery({
+    ...bookPurchaseOrderQuery(purchaseId),
+  });
+}
+
+export function useRefreshBookPurchaseOrder(purchaseId: string, slug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => refreshBookPurchaseOrder(purchaseId),
+    onSuccess: (order) => {
+      queryClient.setQueryData(booksKeys.purchaseOrder(purchaseId), order);
+      if (order.status === "paid") {
+        queryClient.invalidateQueries({ queryKey: booksKeys.detail(slug) });
+        queryClient.invalidateQueries({ queryKey: booksKeys.readers() });
+      }
     },
   });
 }

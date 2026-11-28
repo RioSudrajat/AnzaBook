@@ -148,7 +148,7 @@ export function PaperTierSelector({ book }: PaperTierSelectorProps) {
                 </p>
                 <div className="mt-2 text-[11px] font-mono text-muted-foreground flex items-center gap-1">
                   <ShieldCheck className="size-3 text-emerald-600" />
-                  <span>Gratis Sampel Bab 1</span>
+                  <span>Gratis Sampel Chapter 1</span>
                 </div>
               </button>
 
@@ -242,7 +242,7 @@ export function PaperTierSelector({ book }: PaperTierSelectorProps) {
                   search={{ chapter: 1 }}
                 >
                   <BookOpen className="size-4 mr-1.5" />
-                  Baca Bab 1
+                  Baca Chapter 1
                 </Link>
               </Button>
 

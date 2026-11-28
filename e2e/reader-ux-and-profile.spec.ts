@@ -31,7 +31,7 @@ test.describe("E-Reader UX, Themes, Progress Sync & Profile Safeguards", () => {
     );
 
     const progressRegion = page.getByRole("region", {
-      name: /Progres membaca bab 1 dari 8/i,
+      name: /Progres membaca chapter 1 dari 8/i,
     });
     await expect(progressRegion).toBeVisible();
     await expect(
@@ -59,7 +59,7 @@ test.describe("E-Reader UX, Themes, Progress Sync & Profile Safeguards", () => {
         res.url().includes("/api/reading/progress/") &&
         res.request().method() === "PUT",
     );
-    await page.getByRole("button", { name: "Keluar ke Home" }).click();
+    await page.getByRole("button", { name: "Kembali" }).click();
     await progressSave;
 
     const exitDialog = page.getByRole("dialog", {
@@ -162,7 +162,7 @@ test.describe("E-Reader UX, Themes, Progress Sync & Profile Safeguards", () => {
     // Switching Slide -> Scroll keeps non-zero progress (never drops to 0%)
     await page.getByRole("button", { name: "Scroll", exact: true }).click();
     const scrollBarRegion = page.getByRole("region", {
-      name: /Progres membaca bab/i,
+      name: /Progres membaca chapter/i,
     });
     await expect(scrollBarRegion).toBeVisible();
     await expect
@@ -200,7 +200,7 @@ test.describe("E-Reader UX, Themes, Progress Sync & Profile Safeguards", () => {
       .innerText();
     const recordedPct = parseFloat(recordedText.replace("%", ""));
 
-    await page.getByRole("button", { name: "Keluar ke Home" }).click();
+    await page.getByRole("button", { name: "Kembali" }).click();
     const exitDialog = page.getByRole("dialog", {
       name: "Ringkasan Sesi Baca",
     });
@@ -216,12 +216,13 @@ test.describe("E-Reader UX, Themes, Progress Sync & Profile Safeguards", () => {
     }
 
     await page
-      .getByRole("link", { name: /^Lanjut$/ })
+      .getByRole("region", { name: "Lanjutkan Membaca" })
+      .locator('a[href^="/read/"]')
       .first()
       .click();
     await expect(page).toHaveURL(new RegExp(`/read/${slug}`));
     const resumedBar = page.getByRole("region", {
-      name: /Progres membaca bab/i,
+      name: /Progres membaca chapter/i,
     });
     await expect(resumedBar).toBeVisible();
     await expect
@@ -509,8 +510,8 @@ test.describe("E-Reader UX, Themes, Progress Sync & Profile Safeguards", () => {
       "Paragraf pertama setelah garis judul bab satu.",
     );
 
-    // 4. "+ Bab Baru" places caret directly in the new chapter title with bottom divider line
-    await page.getByRole("button", { name: "+ Bab Baru" }).click();
+    // 4. "+ Chapter Baru" places caret directly in the new chapter title with bottom divider line
+    await page.getByRole("button", { name: "+ Chapter Baru" }).click();
     const chap2Break = page.locator(
       '[data-type="chapter-break"][data-chapter-number="2"]',
     );
@@ -554,5 +555,38 @@ test.describe("E-Reader UX, Themes, Progress Sync & Profile Safeguards", () => {
     await page.keyboard.press("Enter");
 
     await expect(page.locator('[data-type="page-break"]')).toHaveCount(2);
+
+    // 7. Regression checks: clearing title to empty stays empty & template cover persists across save + reload
+    const titleInput = page.getByLabel("Judul buku atau naskah");
+    await titleInput.fill("Judul Sementara Uji Hapus");
+    await expect(titleInput).toHaveValue("Judul Sementara Uji Hapus");
+    await titleInput.fill("");
+    await expect(titleInput).toHaveValue("");
+
+    await page
+      .getByRole("button", { name: "Pilih atau unggah sampul buku" })
+      .click();
+    const coverDialog = page.getByRole("dialog", {
+      name: "Konfigurasi Sampul Buku",
+    });
+    await expect(coverDialog).toBeVisible();
+    await coverDialog.getByRole("button", { name: "Emerald Tua" }).click();
+    await coverDialog.getByRole("button", { name: "Selesai" }).click();
+    await expect(coverDialog).toHaveCount(0);
+
+    const savePatch = page.waitForResponse(
+      (res) =>
+        res.url().includes(`/api/publisher/manuscripts/${draftJson.data.id}`) &&
+        res.request().method() === "PATCH",
+    );
+    await page.getByRole("button", { name: "Simpan" }).click();
+    await savePatch;
+
+    await page.reload({ waitUntil: "networkidle" });
+    await page.getByRole("button", { name: /^Edit$/i }).click();
+    await expect(page.getByLabel("Judul buku atau naskah")).toHaveValue("");
+    await expect(
+      page.getByRole("button", { name: "Ganti Sampul" }),
+    ).toBeVisible();
   });
 });

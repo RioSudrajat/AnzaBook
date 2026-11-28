@@ -3,6 +3,7 @@ import type {
   BookDetailDto,
   BookHighlightDto,
   BookPurchaseDto,
+  BookPurchaseOrderDto,
   BookReaderPayloadDto,
   BookReviewDto,
   BookSummaryDto,
@@ -19,6 +20,7 @@ import type {
   StoreStockItemDto,
 } from "@starter/shared/types";
 import type {
+  BookCheckoutInput,
   ListBooksInput,
   ReadBookInput,
   StockInput,
@@ -249,6 +251,43 @@ export async function purchaseDigitalBook(
     {
       method: "POST",
       body: input || {},
+    },
+  );
+  return data;
+}
+
+export async function startBookCheckout(
+  slug: string,
+  input: BookCheckoutInput,
+): Promise<BookPurchaseOrderDto> {
+  const { data } = await apiFetch<DataResponse<BookPurchaseOrderDto>>(
+    `/api/books/${encodeURIComponent(slug)}/checkout`,
+    {
+      method: "POST",
+      body: input,
+    },
+  );
+  return data;
+}
+
+export async function getBookPurchaseOrder(
+  purchaseId: string,
+  signal?: AbortSignal,
+): Promise<BookPurchaseOrderDto> {
+  const { data } = await apiFetch<DataResponse<BookPurchaseOrderDto>>(
+    `/api/books/purchases/${encodeURIComponent(purchaseId)}`,
+    { signal },
+  );
+  return data;
+}
+
+export async function refreshBookPurchaseOrder(
+  purchaseId: string,
+): Promise<BookPurchaseOrderDto> {
+  const { data } = await apiFetch<DataResponse<BookPurchaseOrderDto>>(
+    `/api/books/purchases/${encodeURIComponent(purchaseId)}/refresh`,
+    {
+      method: "POST",
     },
   );
   return data;

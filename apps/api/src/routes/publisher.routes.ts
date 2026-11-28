@@ -26,6 +26,8 @@ import { postMemberLookupRateLimit } from "../middleware/spot-rate-limit";
 import {
   applyPublisher,
   createManuscriptDraft,
+  deleteAuthorManuscript,
+  deletePublisherManuscript,
   editPublisherManuscript,
   followPublisher,
   getManuscript,
@@ -46,6 +48,8 @@ import {
 import {
   addPublisherApprovedWriter,
   addPublisherMember,
+  createOrGetBookRevisionDraft,
+  deletePublisherBook,
   listPublisherApprovedWriters,
   listPublisherBookInventory,
   listPublisherBooks,
@@ -211,6 +215,24 @@ publisherRouter.post(
   },
 );
 
+// Delete manuscript draft / revision_requested / rejected (author only)
+publisherRouter.delete(
+  "/manuscripts/:idOrSlug",
+  requireAuth,
+  requireTrustedOrigin,
+  async (req, res) => {
+    const userId = getAuth(req).user.id;
+    const idOrSlug = String(req.params.idOrSlug);
+    const withdrawFirst = req.query.withdrawFirst === "true";
+    const result = await deleteAuthorManuscript(
+      userId,
+      idOrSlug,
+      withdrawFirst,
+    );
+    res.json({ data: result });
+  },
+);
+
 // Publisher Studio: Incoming manuscripts inbox (owner/editor)
 publisherRouter.get("/:slug/manuscripts", requireAuth, async (req, res) => {
   const userId = getAuth(req).user.id;
@@ -278,6 +300,48 @@ publisherRouter.post(
       idOrSlug,
       input,
     );
+    res.json({ data: result });
+  },
+);
+
+// Publisher Studio: Delete / dismiss catalog revision or rejected submission (owner/editor)
+publisherRouter.delete(
+  "/:slug/manuscripts/:idOrSlug",
+  requireAuth,
+  requireTrustedOrigin,
+  async (req, res) => {
+    const userId = getAuth(req).user.id;
+    const slug = String(req.params.slug);
+    const idOrSlug = String(req.params.idOrSlug);
+    const result = await deletePublisherManuscript(userId, slug, idOrSlug);
+    res.json({ data: result });
+  },
+);
+
+// Publisher Studio: Create or get editorial revision draft for an existing catalog book
+publisherRouter.post(
+  "/:slug/books/:bookId/revision-draft",
+  requireAuth,
+  requireTrustedOrigin,
+  async (req, res) => {
+    const userId = getAuth(req).user.id;
+    const slug = String(req.params.slug);
+    const bookId = String(req.params.bookId);
+    const draft = await createOrGetBookRevisionDraft(userId, slug, bookId);
+    res.json({ data: draft });
+  },
+);
+
+// Publisher Studio: Safely delete or archive published book (archives if paid buyers exist)
+publisherRouter.delete(
+  "/:slug/books/:bookId",
+  requireAuth,
+  requireTrustedOrigin,
+  async (req, res) => {
+    const userId = getAuth(req).user.id;
+    const slug = String(req.params.slug);
+    const bookId = String(req.params.bookId);
+    const result = await deletePublisherBook(userId, slug, bookId);
     res.json({ data: result });
   },
 );

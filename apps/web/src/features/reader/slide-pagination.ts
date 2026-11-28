@@ -73,7 +73,7 @@ function paginateSingleChapter(
   let fragments: SlideFragment[] = [];
   probe.replaceChildren(heading);
   heading.hidden = false;
-  numberEl.textContent = `BAB ${chapter.chapterNumber}`;
+  numberEl.textContent = `CHAPTER ${chapter.chapterNumber}`;
   titleEl.textContent = chapter.title;
 
   function nextLeaf() {

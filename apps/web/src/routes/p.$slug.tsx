@@ -18,7 +18,6 @@ import {
   MapPin,
   PenTool,
   Send,
-  ShieldCheck,
   UserPlus,
   Users,
   X,
@@ -76,15 +75,18 @@ function DraftPickerDialog({
   isOpen,
   onClose,
   publisherId,
+  publisherSlug,
   publisherName,
 }: {
   isOpen: boolean;
   onClose: () => void;
   publisherId: string;
+  publisherSlug: string;
   publisherName: string;
 }) {
   const navigate = useNavigate();
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const pressedOutsideRef = useRef(false);
   const { data: myManuscripts = [] } = useMyManuscripts(isOpen);
   const submitDraftMutation = useSubmitManuscriptDraft();
   const [feedback, setFeedback] = useState<{
@@ -106,10 +108,37 @@ function DraftPickerDialog({
     (item) => item.status === "draft" || item.status === "revision_requested",
   );
 
+  const isPointerOutside = (
+    e: React.PointerEvent<HTMLDialogElement>,
+    el: HTMLDialogElement,
+  ) => {
+    const rect = el.getBoundingClientRect();
+    return (
+      e.clientX < rect.left ||
+      e.clientX > rect.right ||
+      e.clientY < rect.top ||
+      e.clientY > rect.bottom
+    );
+  };
+
   return (
     <dialog
       ref={dialogRef}
       aria-labelledby="draft-picker-title"
+      {...({ closedby: "any" } as Record<string, string>)}
+      onPointerDown={(e) => {
+        const el = dialogRef.current;
+        if (!el) return;
+        pressedOutsideRef.current = isPointerOutside(e, el);
+      }}
+      onPointerUp={(e) => {
+        const el = dialogRef.current;
+        if (!el) return;
+        if (pressedOutsideRef.current && isPointerOutside(e, el)) {
+          onClose();
+        }
+        pressedOutsideRef.current = false;
+      }}
       onClose={() => {
         if (dialogRef.current) dialogRef.current.returnValue = "";
         if (isOpen) onClose();
@@ -161,71 +190,84 @@ function DraftPickerDialog({
             </div>
           ) : (
             <ul className="space-y-2.5">
-              {eligibleDrafts.map((draft) => (
-                <li
-                  key={draft.id}
-                  className="rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-4 space-y-3"
-                >
-                  <div>
-                    <h2 className="font-serif text-sm font-bold">
-                      {draft.title || "Draf Tanpa Judul"}
-                    </h2>
-                    <p className="text-xs text-[var(--color-muted)] line-clamp-2 mt-0.5">
-                      {draft.synopsis || "Sinopsis belum diisi."}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center justify-end gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        onClose();
-                        void navigate({
-                          to: "/read/$slug",
-                          params: { slug: `manuscript-${draft.id}` },
-                          search: {
-                            editorial: "edit",
-                            targetPublisherId: publisherId,
-                          },
-                        });
-                      }}
-                      className="min-h-11 px-3.5 text-xs cursor-pointer"
-                    >
-                      <PenTool className="size-3.5 mr-1.5" aria-hidden="true" />
-                      Buka Editor
-                    </Button>
-                    <Button
-                      type="button"
-                      disabled={submitDraftMutation.isPending}
-                      onClick={async () => {
-                        setFeedback(null);
-                        try {
-                          await submitDraftMutation.mutateAsync({
-                            idOrSlug: draft.id,
-                            publisherId,
+              {eligibleDrafts.map((draft) => {
+                const hasTitle = Boolean(draft.title && draft.title.trim());
+                return (
+                  <li
+                    key={draft.id}
+                    className="rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-4 space-y-3"
+                  >
+                    <div>
+                      <h2 className="font-serif text-sm font-bold">
+                        {hasTitle ? (
+                          draft.title
+                        ) : (
+                          <span className="italic font-normal text-[var(--color-muted)]">
+                            Naskah Tanpa Judul
+                          </span>
+                        )}
+                      </h2>
+                      <p className="text-xs text-[var(--color-muted)] line-clamp-2 mt-0.5">
+                        {draft.synopsis || "Sinopsis belum diisi."}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          onClose();
+                          void navigate({
+                            to: "/read/$slug",
+                            params: { slug: `manuscript-${draft.id}` },
+                            search: {
+                              editorial: "edit",
+                              targetPublisherId: publisherId,
+                              returnTo: `/p/${publisherSlug}`,
+                            },
                           });
-                          setFeedback({
-                            type: "success",
-                            text: `Draf "${draft.title}" berhasil dikirim ke redaksi ${publisherName}.`,
-                          });
-                        } catch (error) {
-                          setFeedback({
-                            type: "error",
-                            text:
-                              error instanceof Error
-                                ? error.message
-                                : "Gagal mengirim draf. Pastikan judul dan sinopsis sudah lengkap.",
-                          });
-                        }
-                      }}
-                      className="min-h-11 px-4 text-xs font-semibold bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:brightness-95 cursor-pointer"
-                    >
-                      <Send className="size-3.5 mr-1.5" aria-hidden="true" />
-                      Kirim Langsung
-                    </Button>
-                  </div>
-                </li>
-              ))}
+                        }}
+                        className="min-h-11 px-3.5 text-xs cursor-pointer"
+                      >
+                        <PenTool
+                          className="size-3.5 mr-1.5"
+                          aria-hidden="true"
+                        />
+                        Buka Editor
+                      </Button>
+                      <Button
+                        type="button"
+                        disabled={submitDraftMutation.isPending}
+                        onClick={async () => {
+                          setFeedback(null);
+                          try {
+                            await submitDraftMutation.mutateAsync({
+                              idOrSlug: draft.id,
+                              publisherId,
+                            });
+                            setFeedback({
+                              type: "success",
+                              text: `Draf "${draft.title || "Tanpa Judul"}" berhasil dikirim ke redaksi ${publisherName}.`,
+                            });
+                          } catch (error) {
+                            setFeedback({
+                              type: "error",
+                              text:
+                                error instanceof Error
+                                  ? error.message
+                                  : "Gagal mengirim draf. Pastikan judul dan sinopsis sudah lengkap.",
+                            });
+                          }
+                        }}
+                        className="min-h-11 px-4 text-xs font-semibold bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:brightness-95 cursor-pointer"
+                      >
+                        <Send className="size-3.5 mr-1.5" aria-hidden="true" />
+                        Kirim Langsung
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
@@ -260,11 +302,11 @@ function PublisherPublicProfilePage() {
 
   const publishedBooks = booksResponse?.data || [];
   const hasStudioAccess = canAccessPublisherStudio(publisher.currentUserRole);
+  const isVerifiedPublisher = publisher.verificationStatus === "verified";
   const isAccepting =
-    publisher.verificationStatus === "verified" &&
-    publisher.isAcceptingSubmissions !== false;
+    isVerifiedPublisher && publisher.isAcceptingSubmissions !== false;
   const isApprovedWriterFastTrack =
-    publisher.verificationStatus === "verified" &&
+    isVerifiedPublisher &&
     !isAccepting &&
     Boolean(publisher.isCurrentUserApprovedWriter);
   const canSubmitToPublisher = isAccepting || isApprovedWriterFastTrack;
@@ -278,9 +320,9 @@ function PublisherPublicProfilePage() {
     try {
       const created = await createDraftMutation.mutateAsync({
         publisherId: publisher.id,
-        title: `Draf untuk ${publisher.name}`,
+        title: "",
         synopsis: "",
-        proposedDigitalPolicy: "nakama_or_purchase",
+        proposedDigitalPolicy: "nakama_subscription",
       });
       await navigate({
         to: "/read/$slug",
@@ -288,6 +330,7 @@ function PublisherPublicProfilePage() {
         search: {
           editorial: "edit",
           targetPublisherId: publisher.id,
+          returnTo: `/p/${publisher.slug}`,
         },
       });
     } catch (error) {
@@ -313,17 +356,6 @@ function PublisherPublicProfilePage() {
     },
   ];
 
-  const verificationBadge =
-    publisher.verificationStatus === "verified"
-      ? {
-          label: "Mitra Penerbit Terverifikasi IKAPI",
-          tone: "success" as const,
-          icon: <ShieldCheck className="size-3.5" aria-hidden="true" />,
-        }
-      : publisher.verificationStatus === "rejected"
-        ? { label: "Verifikasi Ditolak", tone: "error" as const }
-        : { label: "Menunggu Verifikasi", tone: "warning" as const };
-
   return (
     <PageFrame
       user={sessionUser}
@@ -339,10 +371,11 @@ function PublisherPublicProfilePage() {
           headingLevel="h2"
           logoFit="contain"
           name={publisher.name}
-          handleOrSlug={`/p/${publisher.slug}`}
+          handleOrSlug={`@${publisher.slug}`}
+          isVerified={isVerifiedPublisher}
+          verifiedEntityType="publisher"
           avatarUrl={publisher.logoUrl}
           bannerUrl={publisher.headerImageUrl}
-          badges={[verificationBadge]}
           metaItems={[
             ...(publisher.ikapiNumber
               ? [{ label: `IKAPI: ${publisher.ikapiNumber}` }]
@@ -367,25 +400,13 @@ function PublisherPublicProfilePage() {
           bio={publisher.description}
           topics={publisher.topics ?? []}
           socialLinks={publisher.socialLinks}
-          modeSwitcher={
-            hasStudioAccess ? (
-              <nav
-                aria-label="Mode tampilan penerbit"
-                className="inline-flex items-center rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-1 text-xs"
-              >
-                <span className="inline-flex min-h-9 items-center rounded-lg bg-[var(--color-ink)] px-3 font-semibold text-[var(--color-paper)]">
-                  Halaman Publik
-                </span>
-                <Link
-                  to="/p/$slug/studio"
-                  params={{ slug: publisher.slug }}
-                  className="inline-flex min-h-9 items-center rounded-lg px-3 font-medium text-[var(--color-ink-2)] hover:text-[var(--color-ink)] transition-colors"
-                >
-                  Studio Penerbit
-                </Link>
-              </nav>
-            ) : undefined
-          }
+          shareConfig={{
+            entityType: "publisher",
+            name: publisher.name,
+            handle: publisher.slug,
+            avatarUrl: publisher.logoUrl,
+            sharePath: `/p/${publisher.slug}`,
+          }}
           actions={
             <>
               {sessionUser ? (
@@ -429,6 +450,18 @@ function PublisherPublicProfilePage() {
                 >
                   <UserPlus className="size-3.5" aria-hidden="true" />
                   <span>Ikuti Penerbit</span>
+                </Link>
+              )}
+
+              {hasStudioAccess && (
+                <Link
+                  to="/p/$slug/studio"
+                  params={{ slug: publisher.slug }}
+                  search={{ returnTo: `/p/${publisher.slug}` }}
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] px-4 text-xs font-semibold text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] transition-colors"
+                >
+                  <PenTool className="size-3.5" aria-hidden="true" />
+                  <span>Buka Studio Redaksi</span>
                 </Link>
               )}
 
@@ -495,7 +528,7 @@ function PublisherPublicProfilePage() {
                 </h2>
                 <p className="text-xs sm:text-sm text-[var(--color-ink-2)] leading-relaxed">
                   {publisher.submissionGuidelines ||
-                    `Redaksi ${publisher.name} terbuka menerima naskah buku digital dan cetak dari penulis.`}
+                    `Redaksi ${publisher.name} terbuka menerima naskah buku digital dari penulis.`}
                 </p>
               </div>
 
@@ -575,7 +608,7 @@ function PublisherPublicProfilePage() {
             )}
           </section>
         ) : (
-          publisher.verificationStatus === "verified" && (
+          isVerifiedPublisher && (
             <div
               role="status"
               className="rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-5 py-3.5 text-xs text-[var(--color-muted)]"
@@ -595,144 +628,147 @@ function PublisherPublicProfilePage() {
           idPrefix="pub-public"
         />
 
-        {/* Published Books Catalog */}
-        {activeTab === "books" && (
-          <section
-            role="tabpanel"
-            aria-labelledby="pub-public-tab-books"
-            className="space-y-6"
-          >
-            {publishedBooks.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-[var(--color-rule)] p-12 text-center space-y-3">
-                <BookOpen
-                  className="size-8 mx-auto text-[var(--color-muted)]"
-                  aria-hidden="true"
-                />
-                <p className="text-sm text-[var(--color-muted)]">
-                  Belum ada buku dari penerbit ini di katalog digital AnzaBook.
-                </p>
-              </div>
-            ) : (
-              <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {publishedBooks.map((book) => (
-                  <li key={book.id}>
-                    <BookCatalogCard book={book} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        )}
-
-        {/* About & Guidelines */}
-        {activeTab === "about" && (
-          <section
-            role="tabpanel"
-            aria-labelledby="pub-public-tab-about"
-            className="rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-6 sm:p-8 space-y-5"
-          >
-            <div className="space-y-2">
-              <h2 className="font-serif text-lg font-bold">
-                Profil Redaksi &amp; Panduan Naskah
-              </h2>
-              <p className="text-sm text-[var(--color-ink-2)] leading-relaxed">
-                {publisher.description ||
-                  `${publisher.name} adalah mitra penerbit resmi AnzaBook.`}
-              </p>
-            </div>
-
-            {publisher.submissionGuidelines && (
-              <div className="space-y-1.5 border-t border-[var(--color-rule)] pt-4">
-                <h3 className="text-xs font-mono uppercase tracking-wider text-[var(--color-muted)]">
-                  Panduan Pengiriman Naskah
-                </h3>
-                <p className="text-sm text-[var(--color-ink)] leading-relaxed whitespace-pre-line">
-                  {publisher.submissionGuidelines}
-                </p>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-[var(--color-rule)] pt-4 text-xs">
-              {publisher.address && (
-                <div>
-                  <span className="font-mono text-[var(--color-muted)] block">
-                    Alamat Kantor
-                  </span>
-                  <span className="font-medium">{publisher.address}</span>
-                </div>
-              )}
-              {(() => {
-                const websiteHref = safeSocialHref(
-                  publisher.socialLinks?.website,
-                  "website",
-                );
-                if (!websiteHref || !publisher.socialLinks?.website) {
-                  return null;
-                }
-                return (
-                  <div>
-                    <span className="font-mono text-[var(--color-muted)] block">
-                      Situs Web
-                    </span>
-                    <a
-                      href={websiteHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 font-medium underline underline-offset-4 hover:text-[var(--color-accent)]"
-                    >
-                      <Globe className="size-3.5" aria-hidden="true" />
-                      <span>{publisher.socialLinks.website}</span>
-                    </a>
-                  </div>
-                );
-              })()}
-            </div>
-
-            {approvedWritersShowcase.length > 0 && (
-              <div className="space-y-3 border-t border-[var(--color-rule)] pt-5">
-                <div className="flex items-center gap-2">
-                  <Users
-                    className="size-4 text-[var(--color-accent)]"
+        <div className="min-h-[55vh]">
+          {/* Published Books Catalog */}
+          {activeTab === "books" && (
+            <section
+              role="tabpanel"
+              aria-labelledby="pub-public-tab-books"
+              className="space-y-6"
+            >
+              {publishedBooks.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-[var(--color-rule)] p-12 text-center space-y-3">
+                  <BookOpen
+                    className="size-8 mx-auto text-[var(--color-muted)]"
                     aria-hidden="true"
                   />
-                  <h3 className="text-sm font-serif font-bold text-[var(--color-ink)]">
-                    Penulis Rekanan ({approvedWritersShowcase.length})
-                  </h3>
+                  <p className="text-sm text-[var(--color-muted)]">
+                    Belum ada buku dari penerbit ini di katalog digital
+                    AnzaBook.
+                  </p>
                 </div>
-                <ul className="grid gap-3 sm:grid-cols-2">
-                  {approvedWritersShowcase.map((writer) => (
-                    <li
-                      key={writer.id}
-                      className="flex items-start gap-3 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-3.5"
-                    >
-                      {writer.image ? (
-                        <img
-                          src={writer.image}
-                          alt={writer.name}
-                          className="size-10 rounded-full object-cover border border-[var(--color-rule)] shrink-0"
-                        />
-                      ) : (
-                        <div className="flex size-10 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-sm font-serif font-bold text-[var(--color-ink)] shrink-0">
-                          {writer.name.slice(0, 1).toUpperCase()}
-                        </div>
-                      )}
-                      <div className="min-w-0 space-y-0.5">
-                        <p className="font-semibold text-xs text-[var(--color-ink)] truncate">
-                          {writer.name}
-                        </p>
-                        {writer.username && (
-                          <p className="font-mono text-[11px] text-[var(--color-muted)] truncate">
-                            @{writer.username}
-                          </p>
-                        )}
-                      </div>
+              ) : (
+                <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
+                  {publishedBooks.map((book) => (
+                    <li key={book.id}>
+                      <BookCatalogCard book={book} />
                     </li>
                   ))}
                 </ul>
+              )}
+            </section>
+          )}
+
+          {/* About & Guidelines */}
+          {activeTab === "about" && (
+            <section
+              role="tabpanel"
+              aria-labelledby="pub-public-tab-about"
+              className="rounded-2xl border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-6 sm:p-8 space-y-5"
+            >
+              <div className="space-y-2">
+                <h2 className="font-serif text-lg font-bold">
+                  Profil Redaksi &amp; Panduan Naskah
+                </h2>
+                <p className="text-sm text-[var(--color-ink-2)] leading-relaxed">
+                  {publisher.description ||
+                    `${publisher.name} adalah mitra penerbit resmi AnzaBook.`}
+                </p>
               </div>
-            )}
-          </section>
-        )}
+
+              {publisher.submissionGuidelines && (
+                <div className="space-y-1.5 border-t border-[var(--color-rule)] pt-4">
+                  <h3 className="text-xs font-mono uppercase tracking-wider text-[var(--color-muted)]">
+                    Panduan Pengiriman Naskah
+                  </h3>
+                  <p className="text-sm text-[var(--color-ink)] leading-relaxed whitespace-pre-line">
+                    {publisher.submissionGuidelines}
+                  </p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-[var(--color-rule)] pt-4 text-xs">
+                {publisher.address && (
+                  <div>
+                    <span className="font-mono text-[var(--color-muted)] block">
+                      Alamat Kantor
+                    </span>
+                    <span className="font-medium">{publisher.address}</span>
+                  </div>
+                )}
+                {(() => {
+                  const websiteHref = safeSocialHref(
+                    publisher.socialLinks?.website,
+                    "website",
+                  );
+                  if (!websiteHref || !publisher.socialLinks?.website) {
+                    return null;
+                  }
+                  return (
+                    <div>
+                      <span className="font-mono text-[var(--color-muted)] block">
+                        Situs Web
+                      </span>
+                      <a
+                        href={websiteHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 font-medium underline underline-offset-4 hover:text-[var(--color-accent)]"
+                      >
+                        <Globe className="size-3.5" aria-hidden="true" />
+                        <span>{publisher.socialLinks.website}</span>
+                      </a>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {approvedWritersShowcase.length > 0 && (
+                <div className="space-y-3 border-t border-[var(--color-rule)] pt-5">
+                  <div className="flex items-center gap-2">
+                    <Users
+                      className="size-4 text-[var(--color-accent)]"
+                      aria-hidden="true"
+                    />
+                    <h3 className="text-sm font-serif font-bold text-[var(--color-ink)]">
+                      Penulis Rekanan ({approvedWritersShowcase.length})
+                    </h3>
+                  </div>
+                  <ul className="grid gap-3 sm:grid-cols-2">
+                    {approvedWritersShowcase.map((writer) => (
+                      <li
+                        key={writer.id}
+                        className="flex items-start gap-3 rounded-xl border border-[var(--color-rule)] bg-[var(--color-paper)] p-3.5"
+                      >
+                        {writer.image ? (
+                          <img
+                            src={writer.image}
+                            alt={writer.name}
+                            className="size-10 rounded-full object-cover border border-[var(--color-rule)] shrink-0"
+                          />
+                        ) : (
+                          <div className="flex size-10 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-sm font-serif font-bold text-[var(--color-ink)] shrink-0">
+                            {writer.name.slice(0, 1).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="min-w-0 space-y-0.5">
+                          <p className="font-semibold text-xs text-[var(--color-ink)] truncate">
+                            {writer.name}
+                          </p>
+                          {writer.username && (
+                            <p className="font-mono text-[11px] text-[var(--color-muted)] truncate">
+                              @{writer.username}
+                            </p>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </section>
+          )}
+        </div>
       </div>
 
       {sessionUser && (
@@ -740,6 +776,7 @@ function PublisherPublicProfilePage() {
           isOpen={isDraftPickerOpen}
           onClose={() => setIsDraftPickerOpen(false)}
           publisherId={publisher.id}
+          publisherSlug={publisher.slug}
           publisherName={publisher.name}
         />
       )}

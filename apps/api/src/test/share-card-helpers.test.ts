@@ -263,7 +263,7 @@ describe("Share Card Helpers (Issue #13)", () => {
     expect(hiddenNoteVm.alignment).toBe("center");
     expect(hiddenNoteVm.caption).toBe("Refleksi sore ini");
     expect(hiddenNoteVm.note).toBeNull();
-    expect(hiddenNoteVm.locationLabel).toBe("Bab 4 · Hal. 78");
+    expect(hiddenNoteVm.locationLabel).toBe("Chapter 4 · Hal. 78");
 
     const revealedNoteVm = resolveQuoteCardViewModel({
       ...basePost,
@@ -325,7 +325,7 @@ describe("Share Card Helpers (Issue #13)", () => {
       startPercent: 15,
       endPercent: 32,
       deltaPercent: 17,
-      chapterLabel: "Bab 1 → Bab 2",
+      chapterLabel: "Chapter 1 → Chapter 2",
     });
     expect(vm.metrics.map((m) => m.key)).toEqual(["pages", "highlights"]);
     expect(vm.metrics.find((m) => m.key === "tempo")).toBeUndefined();

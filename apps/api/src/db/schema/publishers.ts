@@ -17,6 +17,7 @@ import type {
   PublisherMemberRole,
   PublisherVerificationStatus,
 } from "@starter/shared/types";
+import type { MembershipOrderStatus } from "@starter/shared/validators/membership";
 import { user } from "./user";
 import { books } from "./anzabook";
 import { communityCalendars } from "./events";
@@ -196,6 +197,7 @@ export const manuscriptSubmissions = pgTable(
     publishedBookId: uuid("published_book_id").references(() => books.id, {
       onDelete: "set null",
     }),
+    isCatalogRevision: boolean("is_catalog_revision").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -272,6 +274,7 @@ export const bookPurchases = pgTable(
   "book_purchases",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+    requestId: uuid("request_id"),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
@@ -279,6 +282,10 @@ export const bookPurchases = pgTable(
       .notNull()
       .references(() => books.id, { onDelete: "cascade" }),
     priceIdr: integer("price_idr").notNull(),
+    subtotalIdr: integer("subtotal_idr"),
+    taxIdr: integer("tax_idr"),
+    taxRateBps: integer("tax_rate_bps"),
+    currency: text("currency").notNull().default("IDR"),
     publisherShareIdr: integer("publisher_share_idr").notNull(),
     affiliateCalendarId: uuid("affiliate_calendar_id").references(
       () => communityCalendars.id,
@@ -289,17 +296,25 @@ export const bookPurchases = pgTable(
       .default(0),
     anzabookNetIdr: integer("anzabook_net_idr").notNull(),
     status: varchar("status", { length: 20 })
-      .$type<"pending" | "paid" | "failed">()
+      .$type<MembershipOrderStatus>()
       .notNull()
-      .default("paid"),
+      .default("pending"),
     paymentMethod: varchar("payment_method", { length: 50 })
       .notNull()
       .default("manual_or_midtrans"),
+    checkoutUrl: text("checkout_url"),
+    checkoutCreatedAt: timestamp("checkout_created_at", { withTimezone: true }),
+    paidTransactionId: text("paid_transaction_id").unique(),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
   },
   (table) => [
+    uniqueIndex("book_purchases_user_request_unique").on(
+      table.userId,
+      table.requestId,
+    ),
     index("book_purchases_user_idx").on(table.userId),
     index("book_purchases_book_idx").on(table.bookId),
     index("book_purchases_affiliate_cal_idx").on(table.affiliateCalendarId),

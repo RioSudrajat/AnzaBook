@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   BookOpen,
@@ -10,31 +10,51 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import { useClaimBookCode } from "../hooks";
 
 type ClaimCodeDialogProps = {
   slug: string;
   bookTitle: string;
   hasClaimedDigital: boolean;
+  returnTo?: string | null;
+  className?: string;
 };
 
 export function ClaimCodeDialog({
   slug,
   bookTitle,
   hasClaimedDigital,
+  returnTo,
+  className,
 }: ClaimCodeDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [code, setCode] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
 
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const pressedOutsideRef = useRef(false);
+  const titleId = useId();
+  const inputId = useId();
+
   const claimMutation = useClaimBookCode(slug);
 
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (isOpen && !dialog.open) {
+      dialog.showModal();
+    } else if (!isOpen && dialog.open) {
+      dialog.close();
+    }
+  }, [isOpen]);
+
   const handleOpen = () => {
-    setIsOpen(true);
     setErrorMessage(null);
     setIsSuccess(false);
     setCode("");
+    setIsOpen(true);
   };
 
   const handleClose = () => {
@@ -66,8 +86,13 @@ export function ClaimCodeDialog({
 
   if (hasClaimedDigital) {
     return (
-      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-[6px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs font-mono">
-        <CheckCircle2 className="size-4 shrink-0" />
+      <div
+        className={cn(
+          "inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--color-green-soft)] border border-[var(--color-green)]/25 text-[var(--color-green)] text-xs font-mono",
+          className,
+        )}
+      >
+        <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
         <span>
           Edisi Fisik Anda telah terverifikasi. Akses digital aktif penuh.
         </span>
@@ -78,99 +103,144 @@ export function ClaimCodeDialog({
   return (
     <>
       <Button
+        type="button"
         variant="outline"
         size="sm"
         onClick={handleOpen}
-        className="font-mono text-xs gap-1.5"
+        className={cn(
+          "min-h-11 font-mono text-xs gap-1.5 border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] cursor-pointer",
+          className,
+        )}
       >
-        <KeyRound className="size-3.5 text-[var(--color-accent)]" />
-        Klaim Akses Digital Buku Fisik
+        <KeyRound
+          className="size-3.5 text-[var(--color-accent)]"
+          aria-hidden="true"
+        />
+        <span>Klaim Akses Digital Buku Fisik</span>
       </Button>
 
-      {isOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="claim-dialog-title"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) handleClose();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") handleClose();
-          }}
-        >
-          <div className="bg-background border border-border rounded-[10px] shadow-2xl max-w-md w-full p-6 relative">
+      <dialog
+        ref={dialogRef}
+        closedby="any"
+        aria-labelledby={titleId}
+        onClose={() => {
+          if (dialogRef.current) dialogRef.current.returnValue = "";
+          if (isOpen) handleClose();
+        }}
+        onPointerDown={(e) => {
+          const el = dialogRef.current;
+          if (!el) return;
+          const r = el.getBoundingClientRect();
+          pressedOutsideRef.current =
+            e.clientX < r.left ||
+            e.clientX > r.right ||
+            e.clientY < r.top ||
+            e.clientY > r.bottom;
+        }}
+        onPointerUp={(e) => {
+          const el = dialogRef.current;
+          if (!el || "closedBy" in HTMLDialogElement.prototype) return;
+          const r = el.getBoundingClientRect();
+          const releasedOutside =
+            e.clientX < r.left ||
+            e.clientX > r.right ||
+            e.clientY < r.top ||
+            e.clientY > r.bottom;
+          if (pressedOutsideRef.current && releasedOutside) {
+            handleClose();
+          }
+          pressedOutsideRef.current = false;
+        }}
+        className="m-auto w-[min(92vw,28rem)] rounded-2xl border border-[var(--color-rule)] bg-[var(--color-sheet)] p-6 text-[var(--color-ink)] shadow-[var(--shadow-lift)] backdrop:bg-black/60 backdrop:backdrop-blur-xs overscroll-contain"
+      >
+        {isOpen && (
+          <div className="relative">
             <button
               type="button"
               onClick={handleClose}
-              className="absolute right-4 top-4 p-1.5 rounded-[4px] text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-              aria-label="Tutup Dialog"
+              className="absolute -right-2 -top-2 inline-flex size-11 items-center justify-center rounded-lg text-[var(--color-muted)] hover:text-[var(--color-ink)] hover:bg-[var(--color-paper-3)] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+              aria-label="Tutup dialog"
             >
-              <X className="size-4" />
+              <X className="size-4" aria-hidden="true" />
             </button>
 
             {isSuccess ? (
-              <div className="text-center py-4">
-                <div className="size-12 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto mb-3">
-                  <CheckCircle2 className="size-6" />
+              <div className="text-center py-3">
+                <div className="size-12 rounded-full bg-[var(--color-green-soft)] text-[var(--color-green)] flex items-center justify-center mx-auto mb-3">
+                  <CheckCircle2 className="size-6" aria-hidden="true" />
                 </div>
-                <h3
-                  id="claim-dialog-title"
-                  className="font-serif text-xl font-bold text-foreground"
+                <h2
+                  id={titleId}
+                  className="font-serif text-xl font-bold text-[var(--color-ink)]"
                 >
                   Klaim Berhasil!
-                </h3>
-                <p className="text-sm text-muted-foreground mt-2">
+                </h2>
+                <p className="text-sm text-[var(--color-ink-2)] mt-2 leading-relaxed">
                   Akses web reader dwibahasa untuk <strong>{bookTitle}</strong>{" "}
                   kini terbuka penuh di akun Anda.
                 </p>
 
                 <div className="mt-6 flex flex-col gap-2">
-                  <Button asChild>
+                  <Button
+                    asChild
+                    autoFocus
+                    className="min-h-11 bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:brightness-95 font-semibold"
+                  >
                     <Link
                       to="/read/$slug"
                       params={{ slug }}
-                      search={{ mode: "full", chapter: 1 }}
+                      search={{
+                        mode: "full",
+                        chapter: 1,
+                        ...(returnTo ? { returnTo } : {}),
+                      }}
                       onClick={handleClose}
                     >
-                      <BookOpen className="size-4 mr-2" />
+                      <BookOpen className="size-4 mr-2" aria-hidden="true" />
                       Mulai Membaca Sekarang
                     </Link>
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={handleClose}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleClose}
+                    className="min-h-11 text-[var(--color-ink-2)] hover:bg-[var(--color-paper-3)] cursor-pointer"
+                  >
                     Tutup
                   </Button>
                 </div>
               </div>
             ) : (
               <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <KeyRound className="size-5 text-[var(--color-accent)]" />
-                  <h3
-                    id="claim-dialog-title"
-                    className="font-serif text-lg font-bold text-foreground"
+                <div className="flex items-center gap-2 pr-10 mb-2">
+                  <KeyRound
+                    className="size-5 text-[var(--color-accent)] shrink-0"
+                    aria-hidden="true"
+                  />
+                  <h2
+                    id={titleId}
+                    className="font-serif text-lg font-bold text-[var(--color-ink)]"
                   >
                     Klaim Pembelian Buku Fisik
-                  </h3>
+                  </h2>
                 </div>
 
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Beli edisi cetak di Gramedia atau gudang komunitas? Masukkan
-                  kode unik 16 karakter dari segel halaman belakang buku Anda
-                  untuk membuka web reader dwibahasa dan sinkronisasi audio.
+                <p className="text-xs text-[var(--color-muted)] leading-relaxed">
+                  Memiliki edisi cetak resmi? Masukkan kode unik 16 karakter
+                  dari segel halaman belakang buku Anda untuk membuka web reader
+                  dwibahasa dan sinkronisasi audio.
                 </p>
 
                 <form onSubmit={handleSubmit} className="mt-5 space-y-4">
                   <div>
                     <label
-                      htmlFor="claimCodeInput"
-                      className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1.5"
+                      htmlFor={inputId}
+                      className="block text-xs font-mono uppercase tracking-wider text-[var(--color-muted)] mb-1.5"
                     >
                       Kode Akses Unik
                     </label>
                     <Input
-                      id="claimCodeInput"
+                      id={inputId}
                       type="text"
                       placeholder="Contoh: ANZA-RAKYAT-2026"
                       value={code}
@@ -178,41 +248,50 @@ export function ClaimCodeDialog({
                         setCode(e.target.value.toUpperCase());
                         if (errorMessage) setErrorMessage(null);
                       }}
-                      className="font-mono text-center tracking-widest text-sm uppercase"
+                      className="min-h-11 font-mono text-center tracking-widest text-sm uppercase border-[var(--color-rule)] bg-[var(--color-paper)] text-[var(--color-ink)]"
                       disabled={claimMutation.isPending}
                       autoFocus
                     />
-                    <p className="text-[11px] font-mono text-muted-foreground mt-1">
+                    <p className="text-[11px] font-mono text-[var(--color-muted)] mt-1.5">
                       Tips pengujian: Gunakan kode demo{" "}
                       <code>ANZA-RAKYAT-2026</code>
                     </p>
                   </div>
 
                   {errorMessage && (
-                    <div className="p-2.5 rounded-[6px] bg-destructive/10 border border-destructive/20 text-destructive text-xs flex items-start gap-2">
-                      <ShieldAlert className="size-4 shrink-0 mt-0.5" />
+                    <div
+                      role="alert"
+                      className="p-3 rounded-lg bg-[var(--color-error-soft)] border border-[var(--color-error)]/30 text-[var(--color-error)] text-xs flex items-start gap-2"
+                    >
+                      <ShieldAlert
+                        className="size-4 shrink-0 mt-0.5"
+                        aria-hidden="true"
+                      />
                       <span>{errorMessage}</span>
                     </div>
                   )}
 
-                  <div className="pt-2 flex items-center justify-end gap-2">
+                  <div className="pt-3 border-t border-[var(--color-rule)] flex items-center justify-end gap-2">
                     <Button
                       type="button"
                       variant="ghost"
-                      size="sm"
                       onClick={handleClose}
                       disabled={claimMutation.isPending}
+                      className="min-h-11 text-xs text-[var(--color-ink-2)] hover:bg-[var(--color-paper-3)] cursor-pointer"
                     >
                       Batal
                     </Button>
                     <Button
                       type="submit"
-                      size="sm"
                       disabled={claimMutation.isPending || !code.trim()}
+                      className="min-h-11 px-4 text-xs font-semibold bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:brightness-95 cursor-pointer"
                     >
                       {claimMutation.isPending ? (
                         <>
-                          <Loader2 className="size-3.5 mr-1.5 animate-spin" />
+                          <Loader2
+                            className="size-3.5 mr-1.5 animate-spin"
+                            aria-hidden="true"
+                          />
                           Memverifikasi...
                         </>
                       ) : (
@@ -224,8 +303,8 @@ export function ClaimCodeDialog({
               </div>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </dialog>
     </>
   );
 }

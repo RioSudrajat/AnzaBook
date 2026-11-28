@@ -336,7 +336,7 @@ export function SubstackEditorToolbar({
     if (!activeInsertType) return;
     if (activeInsertType === "chapter") {
       const num = parseInt(val1, 10) || 1;
-      const title = val2 || `Bab ${num}`;
+      const title = val2 || `Chapter ${num}`;
       editor
         .chain()
         .focus()
@@ -774,7 +774,7 @@ export function SubstackEditorToolbar({
                 }`}
               >
                 <Heading1 className="size-3.5" />
-                <span>Judul Bab (H1)</span>
+                <span>Judul Chapter (H1)</span>
               </button>
               <button
                 type="button"
@@ -1220,17 +1220,17 @@ export function SubstackEditorToolbar({
         </div>
       </div>
 
-      {/* Right Dropdown Buttons Group (+ Bab Baru, Pemisah, Tombol, Templat, Lainnya) */}
+      {/* Right Dropdown Buttons Group (+ Chapter Baru, Pemisah, Tombol, Templat, Lainnya) */}
       <div className="flex items-center gap-1.5 shrink-0 pl-2">
-        {/* + Bab Baru (Direct Chapter Break CTA) */}
+        {/* + Chapter Baru (Direct Chapter Break CTA) */}
         <button
           type="button"
           onClick={() => handleInsertChapterBreak()}
           className="h-8 px-2.5 rounded-lg flex items-center gap-1.5 text-xs font-semibold bg-primary/10 hover:bg-primary/20 text-foreground border border-primary/20 transition-all cursor-pointer shrink-0"
-          title="Tambah Bab Baru (Bab 1: Format SS 1 / Bab 2+: Format SS 3)"
+          title="Tambah Chapter Baru (Chapter 1: Format SS 1 / Chapter 2+: Format SS 3)"
         >
           <BookOpen className="size-3.5 text-[var(--color-accent)]" />
-          <span>+ Bab Baru</span>
+          <span>+ Chapter Baru</span>
         </button>
 
         {/* Pemisah ▼ (Dividers: Thin, Medium, Scene Break, Bab, Paywall) */}
@@ -1310,10 +1310,10 @@ export function SubstackEditorToolbar({
               <div className="h-px bg-border/60 my-1" />
 
               <div className="px-2 py-0.5 text-[10px] font-mono uppercase text-muted-foreground font-bold">
-                Pembatas Bab & Dinding
+                Pembatas Chapter &amp; Dinding
               </div>
 
-              {/* 4. Pembatas Bab Baru */}
+              {/* 4. Pembatas Chapter Baru */}
               <button
                 type="button"
                 onClick={() => handleInsertChapterBreak()}
@@ -1321,7 +1321,7 @@ export function SubstackEditorToolbar({
               >
                 <div className="flex items-center gap-2">
                   <BookOpen className="size-3.5 text-sky-500" />
-                  <span className="font-medium">Pembatas Bab Baru</span>
+                  <span className="font-medium">Pembatas Chapter Baru</span>
                 </div>
                 <span className="text-[10px] text-muted-foreground font-mono">
                   Chapter
@@ -1422,7 +1422,7 @@ export function SubstackEditorToolbar({
           {isTemplateMenuOpen && (
             <div className="absolute top-full right-0 mt-1 w-60 rounded-xl border border-border bg-popover p-1.5 shadow-xl z-50 text-xs animate-in fade-in zoom-in-95 duration-100 space-y-0.5">
               <div className="px-2 py-0.5 text-[10px] font-mono uppercase text-muted-foreground font-bold">
-                Format Bab Sesuai Standar
+                Format Chapter Sesuai Standar
               </div>
               <button
                 type="button"
@@ -1431,7 +1431,7 @@ export function SubstackEditorToolbar({
               >
                 <BookOpen className="size-3.5 text-[var(--color-accent)] shrink-0" />
                 <div>
-                  <div className="font-medium">Bab 1: Permulaan</div>
+                  <div className="font-medium">Chapter 1: Permulaan</div>
                   <div className="text-[10px] text-muted-foreground">
                     Header garis atas & bawah (SS 1)
                   </div>
@@ -1444,7 +1444,7 @@ export function SubstackEditorToolbar({
               >
                 <BookOpen className="size-3.5 text-sky-500 shrink-0" />
                 <div>
-                  <div className="font-medium">Bab 2+: Lanjutan</div>
+                  <div className="font-medium">Chapter 2+: Lanjutan</div>
                   <div className="text-[10px] text-muted-foreground">
                     Transisi 4 manik bulat (SS 3)
                   </div>

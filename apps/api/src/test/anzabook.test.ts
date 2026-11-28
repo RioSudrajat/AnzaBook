@@ -6,7 +6,7 @@ describe("AnzaBook Core API", () => {
     const client = agent();
     await signUp(client, "Pembaca Scroll");
     const full = await client.get(
-      "/api/books/revolusi-cetak-kedaulatan-membaca/read?continuous=true",
+      "/api/books/madilog-tan-malaka/read?continuous=true",
     );
     expect(full.status).toBe(200);
     expect(
@@ -17,7 +17,7 @@ describe("AnzaBook Core API", () => {
     expect(full.body.data.chapters[1].contentId).toBeTruthy();
 
     const nextWindow = await client.get(
-      "/api/books/revolusi-cetak-kedaulatan-membaca/read?chapter=2&continuous=true",
+      "/api/books/madilog-tan-malaka/read?chapter=2&continuous=true",
     );
     expect(nextWindow.status).toBe(200);
     expect(

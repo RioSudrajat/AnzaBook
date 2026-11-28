@@ -24,13 +24,8 @@ const publisherWebsiteSchema = z
 
 export const DEFAULT_DIGITAL_BOOK_PRICE_IDR = 45_000;
 
-export function deriveAccessTier(
-  model: BookDistributionModel,
-  hasPhysical: boolean,
-): AccessTier {
+export function deriveAccessTier(model: BookDistributionModel): AccessTier {
   if (model === "free_open") return "free";
-  if (model === "print_code_only") return "premium_physical";
-  if (model === "nakama_or_purchase" && hasPhysical) return "premium_physical";
   return "premium";
 }
 
@@ -130,10 +125,8 @@ export const updatePublisherSchema = applyPublisherSchema.partial();
 
 export const bookDistributionModelEnum = z.enum([
   "free_open",
-  "print_code_only",
   "nakama_subscription",
   "single_purchase",
-  "nakama_or_purchase",
 ]);
 
 export const sourceLanguageEnum = z.enum(["id", "en"]);
@@ -156,8 +149,8 @@ export const submitManuscriptChapterSchema = z
   .object({
     id: z.string().uuid().optional(),
     chapterNumber: z.number().int().min(1, "Nomor bab minimal 1"),
-    titleId: z.string().min(1, "Judul bab wajib diisi").max(255),
-    contentId: z.string().min(1, "Konten bab wajib diisi"),
+    titleId: z.string().max(255),
+    contentId: z.string(),
     contentEn: z.string().optional().nullable(),
     blueprintContent: z.string().optional().nullable(),
     estimatedMinutes: z.number().int().min(1).default(5),
@@ -171,7 +164,7 @@ export const createManuscriptDraftSchema = z
       .uuid("ID penerbit tidak valid")
       .optional()
       .nullable(),
-    title: z.string().min(1, "Judul naskah wajib diisi").max(255),
+    title: z.string().max(255).default(""),
     slug: z.string().max(255).optional().nullable(),
     coverUrl: z.string().optional().nullable(),
     coverColor: z
@@ -186,8 +179,9 @@ export const createManuscriptDraftSchema = z
     authorNotes: z.string().max(2000).optional().nullable(),
     isbn: z.string().trim().max(32).optional().nullable(),
     estimatedPages: z.number().int().min(1).max(3000).optional().nullable(),
-    proposedDigitalPolicy:
-      bookDistributionModelEnum.default("nakama_or_purchase"),
+    proposedDigitalPolicy: bookDistributionModelEnum.default(
+      "nakama_subscription",
+    ),
     proposedDigitalPriceIdr: z
       .number()
       .int()
@@ -240,7 +234,7 @@ export const submitManuscriptSchema = z
   .strict();
 
 const manuscriptEditableFields = {
-  title: z.string().min(1).max(255).optional(),
+  title: z.string().max(255).optional(),
   slug: z.string().max(255).optional().nullable(),
   coverUrl: z.string().optional().nullable(),
   coverColor: z
@@ -387,9 +381,8 @@ export const updatePublisherBookSchema = z
   .strict()
   .superRefine((data, ctx) => {
     if (
-      (data.digitalPolicy === "single_purchase" ||
-        data.digitalPolicy === "nakama_or_purchase") &&
-      data.digitalPriceIdr === 0
+      data.digitalPolicy === "single_purchase" &&
+      (data.digitalPriceIdr === 0 || data.digitalPriceIdr === null)
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

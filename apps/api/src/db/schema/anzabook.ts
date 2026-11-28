@@ -54,10 +54,11 @@ export const books = pgTable(
     }),
     digitalPriceIdr: integer("digital_price_idr"),
     accessTier: varchar("access_tier", { length: 32 })
-      .$type<"free" | "premium" | "premium_physical">()
+      .$type<"free" | "premium">()
       .notNull()
       .default("free"),
-    hasPhysical: boolean("has_physical").notNull().default(true),
+    hasPhysical: boolean("has_physical").notNull().default(false),
+    isArchived: boolean("is_archived").notNull().default(false),
     securityLevel: varchar("security_level", { length: 32 })
       .notNull()
       .default("standard_blur"),

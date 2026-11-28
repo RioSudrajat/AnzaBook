@@ -137,7 +137,8 @@ describe("Admin Internal CMS API (/api/admin/*)", () => {
       publisherId: seededPub.id,
       title: "Jelajah Galaksi Timur",
       synopsis: "Petualangan penjelajah ruang angkasa di gugus bintang timur.",
-      proposedDigitalPolicy: "nakama_or_purchase",
+      proposedDigitalPolicy: "single_purchase",
+      proposedDigitalPriceIdr: 99_000,
       status: "pending_review",
     });
 
@@ -268,7 +269,7 @@ describe("Admin Internal CMS API (/api/admin/*)", () => {
         synopsis: "Kisah pengembara malam mencari jawaban teka-teki leluhur.",
         coverUrl: "/covers/kembara.jpg",
         pageCount: 220,
-        digitalPolicy: "nakama_or_purchase",
+        digitalPolicy: "nakama_subscription",
       })
       .returning();
 
@@ -403,7 +404,8 @@ describe("Admin Internal CMS API (/api/admin/*)", () => {
         author: "Penyair Muda",
         synopsis: "Antologi puisi pilihan nusantara.",
         coverUrl: "/covers/puisi.jpg",
-        digitalPolicy: "print_code_only",
+        digitalPolicy: "single_purchase",
+        digitalPriceIdr: 99_000,
         publisherId: pub.id,
         pageCount: 180,
       })

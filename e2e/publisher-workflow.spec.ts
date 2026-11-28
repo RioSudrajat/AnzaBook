@@ -62,6 +62,7 @@ test.describe("Publisher Studio, Dual Submission Flow, and Admin Cleanup (Issue 
   test("guards publisher studio from outsiders and supports Path 1 + Path 2 manuscript submission", async ({
     browser,
   }) => {
+    test.setTimeout(60_000);
     const suffix = randomUUID().slice(0, 8);
     const publisherSlug = `penerbit-uji-${suffix}`;
     const publisherName = `Penerbit Uji ${suffix}`;
@@ -152,16 +153,33 @@ test.describe("Publisher Studio, Dual Submission Flow, and Admin Cleanup (Issue 
     }
     await authorPage.reload();
 
-    // 3. Author clicks "Tulis Draf Baru" (Path 1) and opens Path 2 searchable picker
+    // 3. Author clicks "Tulis Draf Baru" (Path 1), fills Editor title/synopsis/body, and opens Path 2 searchable picker
     await authorPage.getByRole("button", { name: "Tulis Draf Baru" }).click();
     await expect(authorPage).toHaveURL(/\/read\/manuscript-/);
     await expect(
       authorPage.getByRole("button", { name: "Ajukan Naskah" }),
     ).toBeVisible();
 
+    const e2eTitle = `Naskah E2E ${suffix}`;
+    const e2eSynopsis =
+      "Sinopsis lengkap naskah pengujian end-to-end untuk redaksi.";
+    await authorPage.getByLabel("Judul buku atau naskah").fill(e2eTitle);
+    await authorPage.getByLabel("Sinopsis buku").fill(e2eSynopsis);
+    const authorCanvas = authorPage
+      .locator(".tiptap-editorial-canvas .ProseMirror p")
+      .first();
+    await authorCanvas.click();
+    await authorPage.keyboard.type(
+      "Paragraf pembuka naskah pengujian end-to-end di kanvas editorial.",
+    );
+
     await authorPage.getByRole("button", { name: "Ajukan Naskah" }).click();
     const configDialog = authorPage.locator("dialog[open]");
     await expect(configDialog).toBeVisible();
+    await expect(configDialog.getByText(e2eTitle)).toBeVisible();
+    await expect(
+      configDialog.getByLabel("Judul Naskah", { exact: true }),
+    ).toHaveCount(0);
 
     const searchInput = configDialog.locator("#publisher-target-search");
     await expect(searchInput).toBeVisible();
@@ -174,53 +192,80 @@ test.describe("Publisher Studio, Dual Submission Flow, and Admin Cleanup (Issue 
     await targetRadio.click();
 
     await configDialog
-      .getByLabel("Judul Naskah", { exact: true })
-      .fill(`Naskah E2E ${suffix}`);
-    await configDialog
-      .getByLabel(/Sinopsis Naskah/i)
-      .fill("Sinopsis lengkap naskah pengujian end-to-end untuk redaksi.");
-
-    await configDialog
       .getByRole("button", { name: /Kirim Naskah ke Penerbit/i })
       .click();
     await expect(authorPage).toHaveURL(/\/app/);
     await authorContext.close();
 
-    // 4. Publisher owner opens Dedicated Studio and verifies all 4 tabs & incoming manuscript
+    // 4. Publisher owner opens Dedicated Studio and verifies 3 tabs, Edit Profil modal, & incoming manuscript
     await ownerPage.goto(`/p/${publisherSlug}/studio`);
     await expect(
       ownerPage.getByRole("heading", { name: publisherName, exact: true }),
     ).toBeVisible();
     expect(await fitsWidth(ownerPage)).toBe(true);
 
-    const inboxTab = ownerPage.getByRole("tab", { name: /Inbox Naskah/i });
+    await expect(
+      ownerPage.getByRole("button", { name: "Kembali" }),
+    ).toBeVisible();
+
+    const inboxTab = ownerPage.getByRole("tab", {
+      name: /Kotak Masuk Naskah/i,
+    });
     const catalogTab = ownerPage.getByRole("tab", { name: /Katalog Terbit/i });
     const teamTab = ownerPage.getByRole("tab", { name: /Tim & Penulis/i });
-    const profileTab = ownerPage.getByRole("tab", {
-      name: /Profil & Topik Kurasi/i,
-    });
 
     await expect(inboxTab).toBeVisible();
     await expect(catalogTab).toBeVisible();
     await expect(teamTab).toBeVisible();
-    await expect(profileTab).toBeVisible();
-
-    await expect(ownerPage.getByText(`Naskah E2E ${suffix}`)).toBeVisible();
     await expect(
-      ownerPage.getByRole("button", { name: /Buka Editor Naskah/i }),
+      ownerPage.getByRole("tab", { name: /Profil & Topik Kurasi/i }),
+    ).toHaveCount(0);
+
+    await expect(
+      ownerPage.getByRole("button", { name: e2eTitle, exact: true }),
     ).toBeVisible();
+    await expect(
+      ownerPage.getByRole("button", {
+        name: new RegExp(`Opsi naskah ${e2eTitle}`, "i"),
+      }),
+    ).toBeVisible();
+
+    await expect(
+      ownerPage.getByRole("dialog", { name: "Prapemuat Literasi AnzaBook" }),
+    ).toHaveCount(0);
+
+    await ownerPage.evaluate(() => window.scrollTo(0, 140));
+    const scrollBeforeTabSwitch = await ownerPage.evaluate(
+      () => window.scrollY,
+    );
+    expect(scrollBeforeTabSwitch).toBeGreaterThan(100);
 
     await catalogTab.click();
     await expect(catalogTab).toHaveAttribute("aria-selected", "true");
+    expect(await ownerPage.evaluate(() => window.scrollY)).toBeGreaterThan(100);
 
     await teamTab.click();
     await expect(teamTab).toHaveAttribute("aria-selected", "true");
 
-    await profileTab.click();
-    await expect(profileTab).toHaveAttribute("aria-selected", "true");
+    const bgScrollBeforeModal = await ownerPage.evaluate(() => window.scrollY);
+    await ownerPage.getByRole("button", { name: "Sunting Profil" }).click();
+    const editPubDialog = ownerPage.locator("dialog[open]");
+    await expect(editPubDialog).toBeVisible();
     await expect(
-      ownerPage.getByLabel("Menerima Pengajuan Naskah Baru"),
+      editPubDialog.getByLabel(/Menerima Pengajuan Naskah Baru/i),
     ).toBeVisible();
+    const modalScrollContainer = editPubDialog.locator(".overflow-y-auto");
+    await modalScrollContainer.hover();
+    await ownerPage.mouse.wheel(0, 240);
+    await ownerPage.waitForTimeout(100);
+    const modalScrollTop = await modalScrollContainer.evaluate(
+      (el) => el.scrollTop,
+    );
+    expect(modalScrollTop).toBeGreaterThan(0);
+    const bgScrollAfterWheel = await ownerPage.evaluate(() => window.scrollY);
+    expect(bgScrollAfterWheel).toBe(bgScrollBeforeModal);
+    await ownerPage.keyboard.press("Escape");
+    await expect(editPubDialog).toHaveCount(0);
 
     await ownerContext.close();
   });
@@ -347,10 +392,13 @@ test.describe("Publisher Studio, Dual Submission Flow, and Admin Cleanup (Issue 
         .getByText("Penulis Rekanan E2E"),
     ).toBeVisible();
 
-    // Submit manuscript via Path 1 + inline synopsis + ManuscriptConfigDialog
+    // Submit manuscript via Path 1 + inline title/synopsis/body + read-only ManuscriptConfigDialog
     await writerPage.getByRole("button", { name: "Tulis Draf Baru" }).click();
     await expect(writerPage).toHaveURL(/\/read\/manuscript-/);
     await expect(writerPage.getByText(/\b\d+\s+chapters?\b/i)).toHaveCount(0);
+
+    const bookTitle = `Naskah Dwibahasa ${suffix}`;
+    await writerPage.getByLabel("Judul buku atau naskah").fill(bookTitle);
 
     const longSynopsis =
       "Sinopsis lengkap karya sastra dwibahasa untuk pengujian jalur prioritas.\n\nParagraf kedua mengenai sejarah panjang literasi Nusantara dari masa ke masa yang ditulis secara mendalam untuk menguji pemotongan pratinjau otomatis pada halaman baca.\n\nParagraf ketiga mengulas peran penting pembaca, penyunting, dan komunitas buku dalam merawat naskah berkualitas.";
@@ -360,23 +408,27 @@ test.describe("Publisher Studio, Dual Submission Flow, and Admin Cleanup (Issue 
     await expect(
       writerPage.getByText(/\d+\s*\/\s*5000 karakter/),
     ).toBeVisible();
+
+    const writerCanvas = writerPage
+      .locator(".tiptap-editorial-canvas .ProseMirror p")
+      .first();
+    await writerCanvas.click();
+    await writerPage.keyboard.type(
+      "Paragraf pembuka karya sastra dwibahasa yang membahas sejarah literasi Nusantara untuk menguji alur pratinjau terkunci.",
+    );
     await maybeCapture(writerPage, "02b-editor-inline-synopsis-desktop.png");
 
     await writerPage.getByRole("button", { name: "Ajukan Naskah" }).click();
 
     const configDialog = writerPage.locator("dialog[open]");
     await expect(configDialog).toBeVisible();
-    const bookTitle = `Naskah Dwibahasa ${suffix}`;
+    await expect(configDialog.getByText(bookTitle)).toBeVisible();
     await configDialog
-      .getByLabel("Judul Naskah", { exact: true })
-      .fill(bookTitle);
-    await configDialog
-      .getByRole("radio", { name: /Nakama & Beli Satuan/i })
+      .getByRole("radio", { name: /Beli Satuan Digital/i })
       .click();
     await configDialog
       .getByLabel("Usulan Harga Beli Satuan Digital (IDR)")
       .fill("52000");
-    await configDialog.getByLabel(/Sinopsis Naskah/i).fill(longSynopsis);
 
     await configDialog
       .locator("summary", { hasText: /Pengaturan Lanjutan/i })
@@ -403,7 +455,7 @@ test.describe("Publisher Studio, Dual Submission Flow, and Admin Cleanup (Issue 
       .click();
     await expect(writerPage).toHaveURL(/\/app/);
 
-    // Test "Tarik Kembali" (withdraw) on Studio Penulis tab, then resubmit
+    // Test ⋮ Action Drawer -> "Tarik Pengajuan" (withdraw) on Studio Penulis tab, then card click to reopen
     const studioPenulisBtn = writerPage
       .getByRole("tab", {
         name: /Studio Penulis/i,
@@ -411,9 +463,17 @@ test.describe("Publisher Studio, Dual Submission Flow, and Admin Cleanup (Issue 
       .first();
     await expect(studioPenulisBtn).toBeVisible();
     await studioPenulisBtn.click();
-    const withdrawBtn = writerPage
-      .getByRole("button", { name: /Tarik Kembali/i })
+
+    const authorActionTrigger = writerPage
+      .getByRole("button", {
+        name: new RegExp(`Tindakan untuk ${bookTitle}`, "i"),
+      })
       .first();
+    await expect(authorActionTrigger).toBeVisible();
+    await authorActionTrigger.click();
+    const withdrawBtn = writerPage.getByRole("menuitem", {
+      name: /Tarik Pengajuan/i,
+    });
     await expect(withdrawBtn).toBeVisible();
     await withdrawBtn.click();
     await expect(
@@ -421,7 +481,7 @@ test.describe("Publisher Studio, Dual Submission Flow, and Admin Cleanup (Issue 
     ).toBeVisible();
 
     await writerPage
-      .getByRole("button", { name: /Lanjutkan Menulis/i })
+      .getByRole("link", { name: new RegExp(`Buka naskah ${bookTitle}`, "i") })
       .first()
       .click();
     await expect(writerPage).toHaveURL(/\/read\/manuscript-/);
@@ -436,10 +496,12 @@ test.describe("Publisher Studio, Dual Submission Flow, and Admin Cleanup (Issue 
 
     // Owner checks Studio Inbox -> sees Penulis Rekanan badge & author notes
     await ownerPage.goto(`/p/${publisherSlug}/studio?tab=inbox`);
-    await expect(ownerPage.getByText(bookTitle)).toBeVisible();
+    await expect(
+      ownerPage.getByRole("button", { name: bookTitle, exact: true }),
+    ).toBeVisible();
     await expect(
       ownerPage
-        .getByRole("tabpanel", { name: /Inbox Naskah/i })
+        .getByRole("tabpanel", { name: /Kotak Masuk Naskah/i })
         .getByText("Penulis Rekanan", { exact: true }),
     ).toBeVisible();
     await expect(ownerPage.getByText(/Bahasa Inggris/i)).toBeVisible();
@@ -449,12 +511,12 @@ test.describe("Publisher Studio, Dual Submission Flow, and Admin Cleanup (Issue 
     );
 
     await ownerPage
-      .getByRole("button", { name: /Buka Editor Naskah/i })
+      .getByRole("button", { name: bookTitle, exact: true })
       .first()
       .click();
     await expect(ownerPage).toHaveURL(/\/read\/manuscript-/);
 
-    // Check Preview mode truncated synopsis & "Lihat selengkapnya" toggle
+    // Check Preview mode truncated synopsis, "Lihat selengkapnya", and Terbuka | Terkunci toggle
     const editUrl = new URL(ownerPage.url());
     await ownerPage.goto(
       `${editUrl.pathname}?editorial=preview&publisherSlug=${publisherSlug}`,
@@ -469,17 +531,22 @@ test.describe("Publisher Studio, Dual Submission Flow, and Admin Cleanup (Issue 
     await expect(
       ownerPage.getByRole("button", { name: /Ringkas/i }),
     ).toBeVisible();
+
+    const lockedToggle = ownerPage.getByRole("button", {
+      name: "Terkunci",
+      exact: true,
+    });
+    await expect(lockedToggle).toBeVisible();
+    await lockedToggle.click();
+    await expect(
+      ownerPage.getByText("Simulasi Pembaca Terkunci"),
+    ).toBeVisible();
+
     await ownerPage.goto(editUrl.toString());
     await ownerPage.waitForLoadState("networkidle");
 
-    await ownerPage
-      .getByRole("button", { name: "Setujui & Terbitkan", exact: true })
-      .click();
-    const publishDialog = ownerPage.locator("dialog[open]");
-    await expect(publishDialog).toBeVisible();
-
-    // Upload real PNG cover inside PublishManuscriptDialog -> hits /api/media/upload-image
-    const fileInput = publishDialog.locator('input[type="file"]');
+    // Upload real PNG cover directly inside Editor ReaderBookHeader -> hits /api/media/upload-image
+    const fileInput = ownerPage.locator("#reader-cover-upload");
     const uploadPromise = ownerPage.waitForResponse(
       (res) =>
         res.url().includes("/api/media/upload-image") &&
@@ -492,9 +559,16 @@ test.describe("Publisher Studio, Dual Submission Flow, and Admin Cleanup (Issue 
     });
     const uploadResp = await uploadPromise;
     expect(uploadResp.status()).toBe(201);
-    await expect(publishDialog.locator("#publish-cover-url")).toHaveValue(
-      /\/api\/media\/images\/.+\.png$/,
-    );
+    await expect(
+      ownerPage.locator('header img[src*="/api/media/images/"]').first(),
+    ).toBeVisible();
+
+    await ownerPage
+      .getByRole("button", { name: "Review & Terbitkan", exact: true })
+      .click();
+    const publishDialog = ownerPage.locator("dialog[open]");
+    await expect(publishDialog).toBeVisible();
+    await expect(publishDialog.getByText(bookTitle)).toBeVisible();
 
     // Fill collapsible bibliography
     await publishDialog.getByText(/Metadata Bibliografi/i).click();
@@ -510,44 +584,49 @@ test.describe("Publisher Studio, Dual Submission Flow, and Admin Cleanup (Issue 
       publishDialog.getByText("Buku Resmi Diterbitkan"),
     ).toBeVisible();
 
-    // Navigate to Studio Catalog -> inspect Stok Toko dialog & capture
+    // Navigate to Studio Catalog -> inspect Publish | Draft toggle & ⋮ drawer (no Stok Toko / Halaman Buku)
     await publishDialog
       .getByRole("link", { name: "Lihat di Studio Penerbit" })
       .click();
     await expect(ownerPage).toHaveURL(new RegExp(`/p/${publisherSlug}/studio`));
     await expect(
-      ownerPage.getByRole("heading", { name: bookTitle, level: 2 }),
+      ownerPage.getByRole("button", { name: new RegExp(`^Publish`, "i") }),
+    ).toBeVisible();
+    await expect(
+      ownerPage.getByRole("button", { name: new RegExp(`^Draft`, "i") }),
+    ).toBeVisible();
+    await expect(
+      ownerPage.getByRole("button", { name: /Stok Toko/i }),
+    ).toHaveCount(0);
+    await expect(
+      ownerPage.getByRole("link", { name: "Halaman Buku" }),
+    ).toHaveCount(0);
+
+    await expect(
+      ownerPage.getByRole("button", { name: bookTitle, exact: true }),
     ).toBeVisible();
     await maybeCapture(ownerPage, "05-studio-catalog-desktop.png");
 
-    // Ensure catalog seed populates partner store branches
-    await ownerPage.request.get(`${API_URL}/api/books?limit=1`);
-
-    const stockBtn = ownerPage
-      .getByRole("button", { name: /Stok Toko/i })
+    const bookActionTrigger = ownerPage
+      .getByRole("button", { name: new RegExp(`Opsi buku ${bookTitle}`, "i") })
       .first();
-    await expect(stockBtn).toBeVisible();
-    await stockBtn.click();
-    const invDialog = ownerPage.locator("dialog[open]");
-    await expect(invDialog).toBeVisible();
+    await bookActionTrigger.click();
     await expect(
-      invDialog.getByText("Stok Buku Cetak di Toko Mitra"),
+      ownerPage.getByRole("menuitem", { name: /Bagikan Tautan Buku/i }),
     ).toBeVisible();
-    const rakyatInput = invDialog.getByLabel("Stok Edisi Rakyat").first();
-    await expect(rakyatInput).toBeVisible();
-    await rakyatInput.fill("15");
-    await invDialog.getByLabel("Stok Edisi Standar").first().fill("7");
-    await invDialog.getByRole("button", { name: "Simpan Stok" }).click();
     await expect(
-      invDialog.getByText(
-        /Stok buku fisik di seluruh cabang berhasil diperbarui/i,
-      ),
+      ownerPage.getByRole("menuitem", { name: /Edit Buku/i }),
     ).toBeVisible();
-    await maybeCapture(ownerPage, "06-studio-inventory-dialog-desktop.png");
-    await invDialog.getByRole("button", { name: "Tutup", exact: true }).click();
+    await expect(
+      ownerPage.getByRole("menuitem", { name: /Hapus Buku/i }),
+    ).toBeVisible();
+    await ownerPage.keyboard.press("Escape");
 
-    // Verify published book page renders uploaded cover, metadata, bibliography, stock, and zero legacy distribution text
-    await ownerPage.getByRole("link", { name: "Halaman Buku" }).first().click();
+    // Clicking published book card title navigates directly to Book Detail page
+    await ownerPage
+      .getByRole("button", { name: bookTitle, exact: true })
+      .first()
+      .click();
     await expect(ownerPage).toHaveURL(/\/books\//);
     const bookDetailPath = new URL(ownerPage.url()).pathname;
     await expect(
@@ -556,16 +635,28 @@ test.describe("Publisher Studio, Dual Submission Flow, and Admin Cleanup (Issue 
     await expect(
       ownerPage.locator('img[src*="/api/media/images/"]:visible').first(),
     ).toBeVisible();
-    await expect(ownerPage.getByText("Premium", { exact: true })).toBeVisible();
-    await expect(ownerPage.getByText("Seri Pustaka Baru")).toBeVisible();
     await expect(
-      ownerPage.getByRole("button", { name: /Beli Akses Digital/i }).first(),
+      ownerPage
+        .getByText("Premium", { exact: true })
+        .locator(":visible")
+        .first(),
+    ).toBeVisible();
+    await expect(
+      ownerPage.getByText("Seri Pustaka Baru").first(),
+    ).toBeVisible();
+    await expect(
+      ownerPage.getByRole("button", { name: /Beli Buku Digital/i }).first(),
+    ).toBeVisible();
+    await expect(
+      ownerPage
+        .getByRole("button", { name: /Klaim Akses Digital Buku Fisik/i })
+        .first(),
     ).toBeVisible();
     await expect(
       ownerPage.getByRole("heading", {
         name: /Ketersediaan Fisik di Toko Rekanan/i,
       }),
-    ).toBeVisible();
+    ).toHaveCount(0);
 
     const bodyText = await ownerPage.locator("body").innerText();
     expect(bodyText.toLowerCase()).not.toContain(["ala", "carte"].join(""));
@@ -589,7 +680,7 @@ test.describe("Publisher Studio, Dual Submission Flow, and Admin Cleanup (Issue 
     expect(await fitsWidth(ownerPage)).toBe(true);
     await maybeCapture(ownerPage, "00c-explore-desktop.png");
 
-    // Seed and verify Community Profile + inline Pengaturan Profil tab
+    // Seed and verify Community Profile + Edit Profil modal dialog
     const communitySlug = `komunitas-uji-${suffix}`;
     const calRes = await ownerPage.request.post(
       `${API_URL}/api/events/calendars`,
@@ -612,12 +703,17 @@ test.describe("Publisher Studio, Dual Submission Flow, and Admin Cleanup (Issue 
     expect(await fitsWidth(ownerPage)).toBe(true);
     await maybeCapture(ownerPage, "00d-community-desktop.png");
 
-    // Inline community settings tab (zero modal dialog)
-    await ownerPage.getByRole("tab", { name: /Pengaturan Profil/i }).click();
-    await expect(ownerPage.locator("dialog[open]")).toHaveCount(0);
     await expect(
-      ownerPage.getByRole("button", { name: /Simpan Pengaturan Komunitas/i }),
+      ownerPage.getByRole("tab", { name: /Pengaturan Profil/i }),
+    ).toHaveCount(0);
+    await ownerPage.getByRole("button", { name: "Sunting Profil" }).click();
+    const editCommDialog = ownerPage.locator("dialog[open]");
+    await expect(editCommDialog).toBeVisible();
+    await expect(
+      editCommDialog.getByRole("button", { name: "Simpan", exact: true }),
     ).toBeVisible();
+    await ownerPage.keyboard.press("Escape");
+    await expect(editCommDialog).toHaveCount(0);
 
     // Mobile responsive check (390x844) across unified profiles, book detail, & studio
     await ownerPage.setViewportSize({ width: 390, height: 844 });

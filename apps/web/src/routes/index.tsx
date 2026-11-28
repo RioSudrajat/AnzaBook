@@ -290,7 +290,7 @@ function LandingPage() {
                               search={{ chapter: 1 }}
                             >
                               <BookOpen className="size-4 mr-2" />
-                              Baca Bab 1 (Sampel)
+                              Baca Chapter 1 (Sampel)
                             </Link>
                           </Button>
 
@@ -405,7 +405,7 @@ function LandingPage() {
               </div>
             ) : (
               <div className="space-y-10">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5 md:gap-6">
                   {filteredBooks.slice(0, visibleCount).map((book) => (
                     <BookCatalogCard key={book.id} book={book} />
                   ))}

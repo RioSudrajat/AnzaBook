@@ -4,6 +4,7 @@ import {
   Eye,
   Headphones,
   Languages,
+  Lock,
   Moon,
   MoveRight,
   PenTool,
@@ -14,6 +15,7 @@ import {
   Smartphone,
   Sun,
   Type,
+  Unlock,
   X,
 } from "lucide-react";
 import { AnzaLogoMark } from "@/components/brand";
@@ -66,6 +68,10 @@ type ReaderToolbarProps = {
   isAuthorOrPublisher?: boolean;
   editMode?: "preview" | "edit";
   onEditModeChange?: (mode: "preview" | "edit") => void;
+  showPreviewLockToggle?: boolean;
+  previewLockState?: "unlocked" | "locked";
+  onPreviewLockStateChange?: (state: "unlocked" | "locked") => void;
+  previewLockNote?: string | null;
   onSaveDraft?: () => void;
   onSubmitDraft?: () => void;
   submitDraftLabel?: string;
@@ -101,6 +107,10 @@ export function ReaderToolbar({
   isAuthorOrPublisher = false,
   editMode = "preview",
   onEditModeChange,
+  showPreviewLockToggle = false,
+  previewLockState = "unlocked",
+  onPreviewLockStateChange,
+  previewLockNote,
   onSaveDraft,
   onSubmitDraft,
   submitDraftLabel = "Ajukan Naskah",
@@ -117,6 +127,7 @@ export function ReaderToolbar({
   };
 
   const isSlideMode = readingLayout === "slide";
+  const displayBookTitle = bookTitle.trim();
 
   return (
     <header
@@ -146,7 +157,7 @@ export function ReaderToolbar({
             onClick={onExit}
             disabled={isSaving}
             className="min-h-11 min-w-11 shrink-0 p-1 sm:px-2.5 rounded-full hover:bg-muted/60"
-            aria-label="Keluar ke Home"
+            aria-label="Kembali"
           >
             <IosArrowLeft className="size-4" aria-hidden="true" />
             <span className="hidden sm:inline font-sans text-xs">
@@ -158,10 +169,14 @@ export function ReaderToolbar({
 
           <div className="min-w-0">
             <h1 className="font-serif text-xs sm:text-sm font-bold text-foreground truncate">
-              {bookTitle}
+              {displayBookTitle || (
+                <span className="italic text-muted-foreground font-normal">
+                  Naskah Tanpa Judul
+                </span>
+              )}
             </h1>
             <div className="flex items-center gap-1.5 whitespace-nowrap text-[10px] sm:text-[11px] font-mono text-muted-foreground">
-              <span>Bab {currentChapter}</span>
+              <span>Chapter {currentChapter}</span>
               {currentPage !== undefined && editMode === "edit" && (
                 <>
                   <span>&bull;</span>
@@ -169,12 +184,12 @@ export function ReaderToolbar({
                 </>
               )}
               <span>&bull;</span>
-              <span>{allChapters.length} Bab</span>
+              <span>{allChapters.length} Chapter</span>
             </div>
           </div>
         </div>
 
-        {/* Center: Scroll vs Slide Toggle (pinned dead-center in reader mode; inline flex in studio mode so it never overlaps Preview/Edit) */}
+        {/* Center: Scroll vs Slide Toggle */}
         <div
           className={`flex items-center justify-center shrink-0 order-3 md:order-2 w-full md:w-auto ${
             isSlideMode ? "pointer-events-auto" : ""
@@ -251,6 +266,57 @@ export function ReaderToolbar({
               </button>
             </div>
           )}
+
+          {/* Preview Lock / Unlock Toggle for Paid Manuscripts in Preview Mode */}
+          {isAuthorOrPublisher &&
+            editMode === "preview" &&
+            showPreviewLockToggle &&
+            onPreviewLockStateChange && (
+              <div
+                role="group"
+                aria-label="Simulasi akses pratinjau pembaca"
+                className="flex items-center gap-1 bg-muted/75 backdrop-blur-md p-1 rounded-full border border-border/70 text-xs font-mono shadow-xs"
+              >
+                <button
+                  type="button"
+                  onClick={() => onPreviewLockStateChange("unlocked")}
+                  aria-pressed={previewLockState === "unlocked"}
+                  className={`min-h-8 sm:min-h-9 px-2.5 rounded-full font-medium transition-all flex items-center gap-1 cursor-pointer ${
+                    previewLockState === "unlocked"
+                      ? "bg-background text-foreground shadow-xs font-bold"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  title="Tampilkan seluruh bab (sudah memiliki akses)"
+                >
+                  <Unlock className="size-3.5" aria-hidden="true" />
+                  <span>Terbuka</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onPreviewLockStateChange("locked")}
+                  aria-pressed={previewLockState === "locked"}
+                  className={`min-h-8 sm:min-h-9 px-2.5 rounded-full font-medium transition-all flex items-center gap-1 cursor-pointer ${
+                    previewLockState === "locked"
+                      ? "bg-foreground text-background shadow-xs font-bold"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  title="Simulasikan batas cuplikan dan dinding pembayaran"
+                >
+                  <Lock className="size-3.5" aria-hidden="true" />
+                  <span>Terkunci</span>
+                </button>
+              </div>
+            )}
+
+          {isAuthorOrPublisher &&
+            editMode === "preview" &&
+            !showPreviewLockToggle &&
+            previewLockNote && (
+              <span className="hidden xl:inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/60 px-3 py-1.5 text-[11px] font-mono text-muted-foreground">
+                <Unlock className="size-3 shrink-0" aria-hidden="true" />
+                <span>{previewLockNote}</span>
+              </span>
+            )}
 
           {/* Quick Editorial Actions: Save & Submit */}
           {isAuthorOrPublisher && editMode === "edit" && onSaveDraft && (
@@ -337,8 +403,8 @@ export function ReaderToolbar({
                   ? "bg-background text-foreground shadow-xs font-bold"
                   : "text-muted-foreground hover:text-foreground hover:bg-background/50"
               }`}
-              title="Daftar Bab"
-              aria-label="Daftar Bab"
+              title="Daftar Chapter"
+              aria-label="Daftar Chapter"
             >
               <IosList className="size-4" />
             </button>
@@ -441,8 +507,8 @@ export function ReaderToolbar({
       {/* 1. TOC Sheet */}
       {isTocOpen && (
         <div className="pointer-events-auto fixed inset-x-3 top-16 sm:absolute sm:inset-x-auto sm:right-6 sm:top-14 sm:w-68 bg-card border border-border rounded-[14px] shadow-2xl p-2.5 z-50 animate-in fade-in zoom-in-95 max-h-[75vh] flex flex-col">
-          <div className="flex items-center justify-between px-2 py-1.5 text-[11px] font-mono uppercase tracking-wider text-muted-foreground border-b border-border/60">
-            <span>Daftar Bab & Sampel</span>
+          <div className="flex items-center justify-between px-2 py-1 text-[11px] font-mono uppercase tracking-wider text-muted-foreground border-b border-border/60">
+            <span>Daftar Chapter &amp; Sampel</span>
             <button
               type="button"
               onClick={() => setIsTocOpen(false)}
@@ -453,30 +519,46 @@ export function ReaderToolbar({
             </button>
           </div>
           <div className="mt-1.5 overflow-y-auto space-y-1">
-            {allChapters.map((ch) => (
-              <button
-                key={ch.id}
-                type="button"
-                onClick={() => {
-                  onSelectChapter(ch.chapterNumber);
-                  setIsTocOpen(false);
-                }}
-                className={`w-full text-left px-2.5 py-1.5 rounded-[6px] text-xs font-sans transition-colors flex items-center justify-between cursor-pointer ${
-                  ch.chapterNumber === currentChapter
-                    ? "bg-[var(--color-accent)]/10 text-[var(--color-accent)] font-semibold"
-                    : "text-foreground hover:bg-muted/50"
-                }`}
-              >
-                <span className="truncate pr-2">
-                  {ch.chapterNumber}. {ch.title}
-                </span>
-                {ch.isSample && (
-                  <span className="shrink-0 text-[9px] font-mono uppercase px-1 py-0.2 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-[3px]">
-                    Sampel
+            {allChapters.map((ch) => {
+              const isChapterLocked =
+                showPreviewLockToggle &&
+                previewLockState === "locked" &&
+                !ch.isSample;
+              return (
+                <button
+                  key={ch.id}
+                  type="button"
+                  onClick={() => {
+                    onSelectChapter(ch.chapterNumber);
+                    setIsTocOpen(false);
+                  }}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-[6px] text-xs font-sans transition-colors flex items-center justify-between cursor-pointer ${
+                    ch.chapterNumber === currentChapter
+                      ? "bg-[var(--color-accent)]/10 text-[var(--color-accent)] font-semibold"
+                      : isChapterLocked
+                        ? "text-muted-foreground hover:bg-muted/40 opacity-75"
+                        : "text-foreground hover:bg-muted/50"
+                  }`}
+                >
+                  <span className="truncate pr-2">
+                    {ch.chapterNumber}.{" "}
+                    {ch.title || `Chapter ${ch.chapterNumber}`}
                   </span>
-                )}
-              </button>
-            ))}
+                  {isChapterLocked ? (
+                    <Lock
+                      className="size-3 shrink-0 text-muted-foreground"
+                      aria-label="Terkunci"
+                    />
+                  ) : (
+                    ch.isSample && (
+                      <span className="shrink-0 text-[9px] font-mono uppercase px-1 py-0.2 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-[3px]">
+                        Sampel
+                      </span>
+                    )
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -486,7 +568,7 @@ export function ReaderToolbar({
         <div className="pointer-events-auto fixed inset-x-3 top-16 sm:absolute sm:inset-x-auto sm:right-6 sm:top-14 sm:w-72 bg-card border border-border rounded-[14px] shadow-2xl p-4 z-50 space-y-4 animate-in fade-in zoom-in-95 max-h-[80vh] overflow-y-auto">
           <div className="flex items-center justify-between border-b border-border/60 pb-2">
             <span className="text-xs font-mono font-semibold uppercase text-foreground">
-              Tampilan & Tipografi
+              Tampilan &amp; Tipografi
             </span>
             <button
               type="button"
@@ -501,7 +583,7 @@ export function ReaderToolbar({
           {/* Theme Mode */}
           <div>
             <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground block mb-2">
-              Kertas & Pencahayaan
+              Kertas &amp; Pencahayaan
             </span>
             <div className="grid grid-cols-3 gap-2">
               <button

@@ -44,9 +44,9 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     );
     await expect(page.locator("#chapter-sec-2")).toHaveCount(0);
     await expect(
-      page.getByRole("link", { name: "Jadi Nakama" }),
+      page.getByRole("link", { name: "Langganan Nakama" }),
     ).toHaveAttribute("href", /\/membership\?book=/);
-    await page.getByRole("button", { name: "Keluar ke Home" }).click();
+    await page.getByRole("button", { name: "Kembali" }).click();
     await expect(page).toHaveURL(/\/app/);
     await expect(
       page.getByRole("region", { name: "Lanjutkan Membaca" }),
@@ -60,7 +60,7 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     page,
   }) => {
     await signUp(page.request, "Pembaca Scroll");
-    const slug = "revolusi-cetak-kedaulatan-membaca";
+    const slug = "kecerdasan-sosial-homo-sapiens";
     await page.goto(`/read/${slug}`);
     const secondChapter = page.locator("#chapter-sec-2");
     await expect(secondChapter.getByRole("heading")).toBeVisible();
@@ -76,7 +76,7 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     await expect(page.getByText("2/8", { exact: true })).toBeVisible();
     await expect(page.getByText(/^\d+(?:\.\d)?%$/)).toBeVisible();
 
-    await page.getByRole("button", { name: "Keluar ke Home" }).click();
+    await page.getByRole("button", { name: "Kembali" }).click();
     const exitDialog = page.getByRole("dialog", {
       name: "Ringkasan Sesi Baca",
     });
@@ -88,7 +88,7 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     ).toContainText(/\d+%/);
     await page
       .getByRole("region", { name: "Lanjutkan Membaca" })
-      .getByRole("link", { name: "Lanjut" })
+      .locator('a[href^="/read/"]')
       .first()
       .click();
     await expect(secondChapter.getByRole("heading")).toBeInViewport();
@@ -136,9 +136,15 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
       .evaluate((section) => section.scrollIntoView({ block: "start" }));
     await expect(page.locator("#chapter-sec-3")).toBeAttached();
 
+    await expect(
+      page
+        .locator("main header.border-b svg, main header.border-b img")
+        .first(),
+    ).toBeVisible();
+
     // Jump to final chapter via TOC sidebar, then scroll to bottom for 100% completion
     await page
-      .getByRole("navigation", { name: "Daftar Bab Naskah" })
+      .getByRole("navigation", { name: "Daftar Chapter Naskah" })
       .getByRole("button")
       .nth(7)
       .click();
@@ -174,7 +180,7 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
         }),
       )
       .toBeLessThanOrEqual(1);
-    await page.getByRole("button", { name: "Keluar ke Home" }).click();
+    await page.getByRole("button", { name: "Kembali" }).click();
     await page.goto("/app?tab=library");
     await expect(
       page
@@ -223,7 +229,7 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     expect(await fitsWidth(page)).toBe(true);
   });
 
-  test("book detail page displays author/editor avatars, interactive TOC, and live stock map", async ({
+  test("book detail page displays author/editor avatars, interactive TOC, claim code UI, and omits legacy physical stock section", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
@@ -240,10 +246,7 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
       }),
     ).toBeVisible();
     await expect(
-      page
-        .getByText(/AnzaBook/i)
-        .locator(":visible")
-        .first(),
+      page.getByRole("link", { name: /AnzaBook/i }).first(),
     ).toBeVisible();
     await expect(page.getByRole("img", { name: /^Anza ?Book$/ })).toBeVisible();
     await expect(
@@ -258,13 +261,15 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
       page.getByText(/Sains Sebagai Kunci Smart Living/i),
     ).toBeVisible();
 
-    // Live Stock Tracker & Map
+    // Physical Stock Map & Tracker removed, while Claim Print Code UI is preserved
     await expect(
       page.getByRole("heading", {
         name: /Ketersediaan Fisik di Toko Rekanan/i,
       }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: /Klaim Akses Digital Buku Fisik/i }),
     ).toBeVisible();
-    await expect(page.getByText(/Gramedia Matraman/i).first()).toBeVisible();
 
     // Action buttons
     await expect(
@@ -421,7 +426,7 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     await page.emulateMedia({ reducedMotion: "reduce" });
 
     const readerEmail = await signUp(page.request, "Rama Striker E2E");
-    const slug = "revolusi-cetak-kedaulatan-membaca";
+    const slug = "kecerdasan-sosial-homo-sapiens";
     await page.goto(`/read/${slug}?chapter=1`);
     await page.waitForLoadState("networkidle");
 
@@ -543,7 +548,9 @@ test.describe("AnzaBook Core End-to-End Flows", () => {
     await page.getByRole("button", { name: "Periksa Status Akses" }).click();
     await expect(page.locator("#chapter-sec-1")).toBeVisible();
     await expect(
-      page.getByText(/Anatomi Buku Mahal di Negeri Kepulauan/i).first(),
+      page
+        .getByText(/Social Intelligence: Senjata Utama Homo Sapiens/i)
+        .first(),
     ).toBeVisible();
 
     await triggerSevenHighRiskStrikes();
