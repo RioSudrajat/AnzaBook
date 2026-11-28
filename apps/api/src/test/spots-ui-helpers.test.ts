@@ -13,6 +13,7 @@ import {
   SPOT_REPORT_REASON_LABELS,
   SPOT_REVIEW_TAG_LABELS,
   SPOT_STATUS_META,
+  applySpotPinLocation,
   buildGoogleMapsDirectionsUrl,
   buildGoogleMapsPlaceUrl,
   buildSpotSubmissionPayload,
@@ -26,8 +27,10 @@ import {
   formatSpotCategory,
   formatVerifiedBadge,
   getActiveFacilityChips,
+  getUnrenderedFieldError,
   hasViewportShiftedSignificantly,
   isWithinIndonesiaBbox,
+  parseCoordinateDraft,
   parseSavedSpotRegion,
   projectSpotsToPreviewCanvas,
   resolveCityCameraTarget,
@@ -572,5 +575,67 @@ describe("Issue #23 reviews, submission & moderation helpers", () => {
     expect(createSpotSubmissionSchema.safeParse(badPayloadDocs).success).toBe(
       false,
     );
+  });
+
+  it("parses manual coordinate drafts without prematurely clamping incomplete keystrokes", () => {
+    expect(parseCoordinateDraft("")).toEqual({ kind: "incomplete" });
+    expect(parseCoordinateDraft("-")).toEqual({ kind: "incomplete" });
+    expect(parseCoordinateDraft("-6.")).toEqual({ kind: "incomplete" });
+    expect(parseCoordinateDraft("107.")).toEqual({ kind: "incomplete" });
+    expect(parseCoordinateDraft("abc")).toEqual({ kind: "incomplete" });
+    expect(parseCoordinateDraft("-6.9175")).toEqual({
+      kind: "valid",
+      value: -6.9175,
+    });
+    expect(parseCoordinateDraft("107.6098")).toEqual({
+      kind: "valid",
+      value: 107.6098,
+    });
+  });
+
+  it("overwrites both city and province when a preset city is selected on the pin picker", () => {
+    const updated = applySpotPinLocation(
+      {
+        city: "Jakarta",
+        province: "DKI Jakarta",
+        latitude: -6.2088,
+        longitude: 106.8456,
+      },
+      -6.9175,
+      107.6191,
+      { city: "Bandung", province: "Jawa Barat" },
+    );
+    expect(updated).toEqual({
+      city: "Bandung",
+      province: "Jawa Barat",
+      latitude: -6.9175,
+      longitude: 107.6191,
+    });
+
+    const dragOnly = applySpotPinLocation(updated, -6.9, 107.62);
+    expect(dragOnly).toEqual({
+      city: "Bandung",
+      province: "Jawa Barat",
+      latitude: -6.9,
+      longitude: 107.62,
+    });
+  });
+
+  it("surfaces unrendered validation errors so submission never fails silently", () => {
+    expect(
+      getUnrenderedFieldError({ name: "Nama terlalu pendek" }, [
+        "name",
+        "city",
+        "province",
+        "address",
+      ]),
+    ).toBeNull();
+
+    expect(
+      getUnrenderedFieldError(
+        { latitude: "Koordinat lintang berada di luar wilayah Indonesia" },
+        ["name", "city", "province", "address"],
+      ),
+    ).toBe("Koordinat lintang berada di luar wilayah Indonesia");
   });
 });

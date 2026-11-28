@@ -25,11 +25,13 @@ import {
   SPOT_CATEGORY_LABELS,
   SPOT_NOISE_LEVEL_OPTIONS,
   SPOT_PRICE_RANGE_OPTIONS,
+  applySpotPinLocation,
   buildSpotSubmissionPayload,
   clampIndonesiaCoordinate,
   formatDistanceMeters,
   formatSpotApiError,
   formatSpotCategory,
+  getUnrenderedFieldError,
 } from "../spots-helpers";
 import {
   INDONESIA_DEFAULT_VIEW,
@@ -51,6 +53,19 @@ type SubmitSpotDialogProps = {
 };
 
 type WizardStep = 1 | 2 | 3 | 4;
+
+const STEP_3_RENDERED_FIELDS = [
+  "name",
+  "city",
+  "province",
+  "district",
+  "address",
+  "openingHoursText",
+  "googleMapsUrl",
+  "instagramHandle",
+  "websiteUrl",
+  "description",
+] as const;
 
 const STEP_LABELS: ReadonlyArray<{ step: 1 | 2 | 3; label: string }> = [
   { step: 1, label: "Lokasi & Pin" },
@@ -454,16 +469,9 @@ function SubmitSpotWizard({
             lng={draft.longitude}
             onChange={(nextLat, nextLng, meta) => {
               onDirtyChange(true);
-              setDraft((prev) => ({
-                ...prev,
-                latitude: nextLat,
-                longitude: nextLng,
-                city: meta?.city && !prev.city ? meta.city : prev.city,
-                province:
-                  meta?.province && !prev.province
-                    ? meta.province
-                    : prev.province,
-              }));
+              setDraft((prev) =>
+                applySpotPinLocation(prev, nextLat, nextLng, meta),
+              );
             }}
           />
 
@@ -739,6 +747,7 @@ function SubmitSpotWizard({
                 id={`${idPrefix}-city`}
                 name="city"
                 required
+                maxLength={100}
                 value={draft.city}
                 onChange={(event) => updateDraft("city", event.target.value)}
                 aria-invalid={Boolean(fieldErrors.city)}
@@ -766,6 +775,7 @@ function SubmitSpotWizard({
                 id={`${idPrefix}-province`}
                 name="province"
                 required
+                maxLength={100}
                 value={draft.province}
                 onChange={(event) =>
                   updateDraft("province", event.target.value)
@@ -795,11 +805,21 @@ function SubmitSpotWizard({
             <Input
               id={`${idPrefix}-district`}
               name="district"
+              maxLength={120}
               value={draft.district}
               onChange={(event) => updateDraft("district", event.target.value)}
+              aria-invalid={Boolean(fieldErrors.district)}
               placeholder="Contoh: Cidadap / Kemang / Kotabaru"
               className="min-h-11 bg-background"
             />
+            {fieldErrors.district && (
+              <p
+                role="alert"
+                className="text-xs font-medium text-[var(--color-error)]"
+              >
+                {fieldErrors.district}
+              </p>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -813,6 +833,7 @@ function SubmitSpotWizard({
               id={`${idPrefix}-address`}
               name="address"
               required
+              maxLength={500}
               rows={2}
               autoComplete="street-address"
               value={draft.address}
@@ -841,13 +862,23 @@ function SubmitSpotWizard({
             <Input
               id={`${idPrefix}-hours`}
               name="openingHoursText"
+              maxLength={160}
               value={draft.openingHoursText}
               onChange={(event) =>
                 updateDraft("openingHoursText", event.target.value)
               }
+              aria-invalid={Boolean(fieldErrors.openingHoursText)}
               placeholder="Contoh: Sen–Min 09:00–21:00"
               className="min-h-11 bg-background"
             />
+            {fieldErrors.openingHoursText && (
+              <p
+                role="alert"
+                className="text-xs font-medium text-[var(--color-error)]"
+              >
+                {fieldErrors.openingHoursText}
+              </p>
+            )}
           </div>
 
           <fieldset className="space-y-2">
@@ -1007,6 +1038,7 @@ function SubmitSpotWizard({
               <Input
                 id={`${idPrefix}-ig`}
                 name="instagramHandle"
+                maxLength={80}
                 autoCorrect="off"
                 autoCapitalize="none"
                 spellCheck={false}
@@ -1014,9 +1046,18 @@ function SubmitSpotWizard({
                 onChange={(event) =>
                   updateDraft("instagramHandle", event.target.value)
                 }
+                aria-invalid={Boolean(fieldErrors.instagramHandle)}
                 placeholder="@kafebuku"
                 className="min-h-11 bg-background"
               />
+              {fieldErrors.instagramHandle && (
+                <p
+                  role="alert"
+                  className="text-xs font-medium text-[var(--color-error)]"
+                >
+                  {fieldErrors.instagramHandle}
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5">
@@ -1030,6 +1071,7 @@ function SubmitSpotWizard({
                 id={`${idPrefix}-web`}
                 name="websiteUrl"
                 type="url"
+                maxLength={500}
                 autoCorrect="off"
                 autoCapitalize="none"
                 spellCheck={false}
@@ -1068,17 +1110,28 @@ function SubmitSpotWizard({
               onChange={(event) =>
                 updateDraft("description", event.target.value)
               }
+              aria-invalid={Boolean(fieldErrors.description)}
               placeholder="Ceritakan singkat suasana tempat, pencahayaan, koleksi buku, atau spot duduk favorit..."
               className="text-base sm:text-sm bg-background"
             />
+            {fieldErrors.description && (
+              <p
+                role="alert"
+                className="text-xs font-medium text-[var(--color-error)]"
+              >
+                {fieldErrors.description}
+              </p>
+            )}
           </div>
 
-          {submitError && (
+          {(submitError ||
+            getUnrenderedFieldError(fieldErrors, STEP_3_RENDERED_FIELDS)) && (
             <div
               role="alert"
               className="rounded-xl border border-[var(--color-error)]/40 bg-[var(--color-error-soft)] px-3.5 py-2.5 text-xs font-medium text-[var(--color-error)]"
             >
-              {submitError}
+              {submitError ??
+                getUnrenderedFieldError(fieldErrors, STEP_3_RENDERED_FIELDS)}
             </div>
           )}
 
