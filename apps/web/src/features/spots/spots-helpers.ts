@@ -552,8 +552,7 @@ export function formatSpotApiError(
     const candidate = error as ApiErrorLike;
     if (Array.isArray(candidate.details) && candidate.details.length > 0) {
       const firstDetail = candidate.details[0] as
-        | { field?: unknown; message?: unknown }
-        | undefined;
+        { field?: unknown; message?: unknown } | undefined;
       if (
         firstDetail &&
         typeof firstDetail.message === "string" &&

@@ -26,27 +26,28 @@
 ## Approaches Considered (Key Design Calls)
 
 1. **Pin Precision Picker in `SubmitSpotDialog` Step 1:**
-   - *Chosen:* Lazy-loaded MapLibre GL JS mini picker (`SpotPinPickerMap`) with draggable marker + click-to-place constrained to `INDONESIA_BBOX`, paired with an automatic non-WebGL fallback (Indonesia city quick-presets + clamped lat/lng inputs). Matches `ReadingSpotsMap`, supports mobile touch/pinch-zoom, respects light/dark tokens, and stays deterministic in headless Chromium/WebGL-less devices.
-   - *Rejected:* Adapting `AdjustPinMapDialog` (3×3 CartoDB raster grid) — mouse-only drag, hardcoded dark styling, external raster dependency.
+   - _Chosen:_ Lazy-loaded MapLibre GL JS mini picker (`SpotPinPickerMap`) with draggable marker + click-to-place constrained to `INDONESIA_BBOX`, paired with an automatic non-WebGL fallback (Indonesia city quick-presets + clamped lat/lng inputs). Matches `ReadingSpotsMap`, supports mobile touch/pinch-zoom, respects light/dark tokens, and stays deterministic in headless Chromium/WebGL-less devices.
+   - _Rejected:_ Adapting `AdjustPinMapDialog` (3×3 CartoDB raster grid) — mouse-only drag, hardcoded dark styling, external raster dependency.
 2. **Modal & Drawer Primitive:**
-   - *Chosen:* Reusable native `<dialog>` wrapper (`SpotModalDialog`) using `showModal()`, `closedby="any" | "closerequest"` (with Safari pointer fallback for light-dismiss), `data-lenis-prevent`, and CSS `dialog:modal` + `dialog::backdrop` scroll containment per `modern-web-guidance`. Provides true top-layer stacking above MapLibre/AppShell without z-index wars or `body` overflow layout shifts.
-   - *Rejected:* Custom fixed `<div>` backdrops with manual focus traps and `useBodyScrollLock` mutating `document.body.style.overflow`.
+   - _Chosen:_ Reusable native `<dialog>` wrapper (`SpotModalDialog`) using `showModal()`, `closedby="any" | "closerequest"` (with Safari pointer fallback for light-dismiss), `data-lenis-prevent`, and CSS `dialog:modal` + `dialog::backdrop` scroll containment per `modern-web-guidance`. Provides true top-layer stacking above MapLibre/AppShell without z-index wars or `body` overflow layout shifts.
+   - _Rejected:_ Custom fixed `<div>` backdrops with manual focus traps and `useBodyScrollLock` mutating `document.body.style.overflow`.
 3. **Admin "Selesaikan Laporan" Flow:**
-   - *Chosen:* Use existing `PATCH /api/admin/spots/:id/moderate` (`moderateAdminSpot` atomically marks all `open` reports on that spot as `resolved` within the DB transaction). Sending `{ action: "approve", ...optionalEdits }` on a `published` spot resolves open reports while keeping it live; `{ action: "mark_closed" }` closes it and resolves open reports. Zero new backend routes required.
+   - _Chosen:_ Use existing `PATCH /api/admin/spots/:id/moderate` (`moderateAdminSpot` atomically marks all `open` reports on that spot as `resolved` within the DB transaction). Sending `{ action: "approve", ...optionalEdits }` on a `published` spot resolves open reports while keeping it live; `{ action: "mark_closed" }` closes it and resolves open reports. Zero new backend routes required.
 
 ## Review Focus (Edge Cases Pinned by Tests)
 
-1. **API Rate Limits (`429`) & Duplicate Reports (`409`):** Submitting past `postSpotRateLimit` (5/day), `putReviewRateLimit` (10/hr), `postReportRateLimit` (10/day), or reporting the same open reason twice (`409 DUPLICATE_OPEN_REPORT`) must display the API's Indonesian message via `role="alert"` without clearing user input or crashing. *(Pinned in Task 1 unit test + Task 2/3 components.)*
-2. **Nominatim Outage / Empty Geocode Results:** `GET /api/spots/geocode` fails open with `[]` on 5s timeout or offline CI. Step 1 of `SubmitSpotDialog` must let users pick an Indonesian city preset or adjust pin/coordinates directly without being blocked. *(Pinned in Task 3 + Task 5 E2E.)*
-3. **XSS & Malicious URL Schemes:** `javascript:`, `data:`, non-Maps Google domains (e.g. `https://docs.google.com/...`), and `http://maps.google.com/...` must be rejected by `createSpotSubmissionSchema`/`googleMapsUrlSchema` before submission and sanitized on render; review text renders as plain text only. *(Pinned in Task 1 unit test + Task 2/3.)*
-4. **Coordinate Clamping & Non-WebGL Fallback:** Coordinates outside `INDONESIA_BBOX` (`lat [-11.5, 6.5]`, `lng [94.5, 141.5]`) must be clamped/rejected with clear Indonesian feedback; missing WebGL context must render usable coordinate & preset controls instead of a blank box. *(Pinned in Task 1 unit test + Task 3.)*
-5. **Cross-Query Cache Coherency (Admin ↔ Public Map & Bookmarks ↔ Kontribusi Saya):** Moderating a spot in `/admin` must invalidate both `adminKeys.all` (sidebar badge counts) and `spotKeys.all` (public `/spots` list/cities); bookmarking or submitting a spot must invalidate `spotKeys.mine()`; review upsert/delete must invalidate `spotKeys.detail(slug)`, `spotKeys.reviews(slug)`, and `spotKeys.lists()`. *(Pinned in Task 1/4 hooks + Task 5 E2E.)*
+1. **API Rate Limits (`429`) & Duplicate Reports (`409`):** Submitting past `postSpotRateLimit` (5/day), `putReviewRateLimit` (10/hr), `postReportRateLimit` (10/day), or reporting the same open reason twice (`409 DUPLICATE_OPEN_REPORT`) must display the API's Indonesian message via `role="alert"` without clearing user input or crashing. _(Pinned in Task 1 unit test + Task 2/3 components.)_
+2. **Nominatim Outage / Empty Geocode Results:** `GET /api/spots/geocode` fails open with `[]` on 5s timeout or offline CI. Step 1 of `SubmitSpotDialog` must let users pick an Indonesian city preset or adjust pin/coordinates directly without being blocked. _(Pinned in Task 3 + Task 5 E2E.)_
+3. **XSS & Malicious URL Schemes:** `javascript:`, `data:`, non-Maps Google domains (e.g. `https://docs.google.com/...`), and `http://maps.google.com/...` must be rejected by `createSpotSubmissionSchema`/`googleMapsUrlSchema` before submission and sanitized on render; review text renders as plain text only. _(Pinned in Task 1 unit test + Task 2/3.)_
+4. **Coordinate Clamping & Non-WebGL Fallback:** Coordinates outside `INDONESIA_BBOX` (`lat [-11.5, 6.5]`, `lng [94.5, 141.5]`) must be clamped/rejected with clear Indonesian feedback; missing WebGL context must render usable coordinate & preset controls instead of a blank box. _(Pinned in Task 1 unit test + Task 3.)_
+5. **Cross-Query Cache Coherency (Admin ↔ Public Map & Bookmarks ↔ Kontribusi Saya):** Moderating a spot in `/admin` must invalidate both `adminKeys.all` (sidebar badge counts) and `spotKeys.all` (public `/spots` list/cities); bookmarking or submitting a spot must invalidate `spotKeys.mine()`; review upsert/delete must invalidate `spotKeys.detail(slug)`, `spotKeys.reviews(slug)`, and `spotKeys.lists()`. _(Pinned in Task 1/4 hooks + Task 5 E2E.)_
 
 ---
 
 ## File Map
 
 **Modify:**
+
 - `apps/web/src/styles/globals.css` — Add native `dialog:modal` & `dialog::backdrop` scroll containment rules.
 - `apps/web/src/features/spots/types.ts` — Re-export review, report, geocode, nearby-check, submission, and my-activity DTOs/input types from `@starter/shared`.
 - `apps/web/src/features/spots/spots-helpers.ts` — Add vibe tag labels, report reason labels, submission status metadata, rating distribution percentage helper, `clampIndonesiaCoordinate`, `buildSpotSubmissionPayload`, and `formatSpotApiError`.
@@ -63,6 +64,7 @@
 - `apps/api/src/test/spots-ui-helpers.test.ts` — Add unit tests for #23 pure helpers, payload builders, error formatting, and validation rules.
 
 **Create:**
+
 - `apps/web/src/features/spots/components/spot-modal-dialog.tsx` — Reusable native `<dialog>` modal & drawer shell.
 - `apps/web/src/features/spots/components/report-spot-dialog.tsx` — Spot info correction & review abuse report dialog.
 - `apps/web/src/features/spots/components/spot-reviews-section.tsx` — Aggregate rating, star distribution, vibe tags, review form/edit/delete, and paginated review list.
@@ -77,6 +79,7 @@
 ### Task 1: Spots Client Data Layer & Pure UI Helpers (TDD)
 
 **Files:**
+
 - Modify: `apps/web/src/features/spots/types.ts`
 - Modify: `apps/web/src/features/spots/spots-helpers.ts`
 - Modify: `apps/web/src/features/spots/api.ts`
@@ -85,6 +88,7 @@
 - Test: `apps/api/src/test/spots-ui-helpers.test.ts`
 
 **Interfaces:**
+
 - Consumes: `@starter/shared/validators/spots` (`createSpotSubmissionSchema`, `upsertSpotReviewSchema`, `createSpotReportSchema`, `spotReviewTagValues`, `spotReportReasonValues`, `INDONESIA_BBOX`), `@starter/shared/types` (`ReadingSpotReviewDto`, `ReadingSpotReportDto`, `SpotNearbyMatchDto`, `SpotGeocodeResultDto`, `ReadingSpotDetailDto`, `ReadingSpotSummaryDto`).
 - Produces:
   - Helpers in `spots-helpers.ts`:
@@ -113,6 +117,7 @@
 - [ ] **Step 1: Write failing unit tests in `apps/api/src/test/spots-ui-helpers.test.ts`**
 
 Add a `describe("Issue #23 reviews, submission & moderation helpers", ...)` block testing:
+
 1. `SPOT_REVIEW_TAG_LABELS` covers all 7 `spotReviewTagValues` with exact Indonesian labels (`Colokan banyak`, `Wi-Fi stabil`, `Tenang untuk fokus`, `Banyak koleksi buku`, `Kopi/minuman enak`, `Gratis masuk`, `Nyaman berlama-lama`).
 2. `toggleVibeTagSelection` adds up to 3 unique tags, ignores a 4th tag when already at 3, and removes an active tag when clicked again.
 3. `clampIndonesiaCoordinate` keeps Jakarta (`-6.2, 106.8`) unchanged (`wasClamped: false`) and clamps out-of-bounds Singapore/Tokyo coordinates (`35.6, 139.7`) inside `INDONESIA_BBOX` (`wasClamped: true`).
@@ -156,6 +161,7 @@ git commit -m "feat(spots): add review, submission, report, and my-activity clie
 ### Task 2: Accessible Native Dialog Shell, `SpotReviewsSection` & `ReportSpotDialog`
 
 **Files:**
+
 - Modify: `apps/web/src/styles/globals.css`
 - Create: `apps/web/src/features/spots/components/spot-modal-dialog.tsx`
 - Create: `apps/web/src/features/spots/components/report-spot-dialog.tsx`
@@ -163,6 +169,7 @@ git commit -m "feat(spots): add review, submission, report, and my-activity clie
 - Modify: `apps/web/src/features/spots/components/spot-detail-panel.tsx`
 
 **Interfaces:**
+
 - Consumes: Task 1 hooks (`useSpotReviews`, `useUpsertSpotReview`, `useDeleteSpotReview`, `useReportSpot`) and helpers (`SPOT_REVIEW_TAG_LABELS`, `SPOT_REPORT_REASON_LABELS`, `toggleVibeTagSelection`, `calculateRatingPercent`, `formatSpotApiError`).
 - Produces:
   - `SpotModalDialog({ open, onClose, title, description, variant?: "modal" | "drawer", dismissMode?: "any" | "closerequest", maxWidthClass?, children })`
@@ -172,6 +179,7 @@ git commit -m "feat(spots): add review, submission, report, and my-activity clie
 - [ ] **Step 1: Add native `<dialog>` scroll-containment CSS in `apps/web/src/styles/globals.css`**
 
 Add top-level rules:
+
 ```css
 dialog:modal {
   overscroll-behavior: contain;
@@ -182,6 +190,7 @@ dialog::backdrop {
   overscroll-behavior: contain;
 }
 ```
+
 Do NOT mutate `html`/`body` overflow or `position: fixed`.
 
 - [ ] **Step 2: Create `SpotModalDialog` in `apps/web/src/features/spots/components/spot-modal-dialog.tsx`**
@@ -240,6 +249,7 @@ git commit -m "feat(spots): add native dialog shell, spot reviews UI, and report
 ### Task 3: Community Submission Flow (`SpotPinPickerMap`, `SubmitSpotDialog`, `MySpotsDrawer`) & `/spots` Wiring
 
 **Files:**
+
 - Create: `apps/web/src/features/spots/components/spot-pin-picker-map.tsx`
 - Create: `apps/web/src/features/spots/components/submit-spot-dialog.tsx`
 - Create: `apps/web/src/features/spots/components/my-spots-drawer.tsx`
@@ -247,6 +257,7 @@ git commit -m "feat(spots): add native dialog shell, spot reviews UI, and report
 - Modify: `apps/web/src/routes/_protected/spots.tsx`
 
 **Interfaces:**
+
 - Consumes: Task 1 hooks (`useGeocodeSpot`, `useNearbySpotCheck`, `useSubmitReadingSpot`, `useMySpotActivity`, `useToggleSpotBookmark`), Task 2 (`SpotModalDialog`, `SpotReviewsSection`, `ReportSpotDialog`).
 - Produces:
   - `SpotPinPickerMap({ lat, lng, onChange }: { lat: number; lng: number; onChange: (lat: number, lng: number) => void })`
@@ -324,6 +335,7 @@ git commit -m "feat(spots): add community spot submission flow, duplicate guard,
 ### Task 4: Admin CMS Moderation Tab ("Sudut Baca") in `/admin`
 
 **Files:**
+
 - Modify: `apps/web/src/features/admin/api.ts`
 - Modify: `apps/web/src/features/admin/queries.ts`
 - Modify: `apps/web/src/features/admin/hooks.ts`
@@ -333,6 +345,7 @@ git commit -m "feat(spots): add community spot submission flow, duplicate guard,
 - Modify: `apps/web/src/features/admin/components/admin-cms-dashboard.tsx`
 
 **Interfaces:**
+
 - Consumes: `GET /api/admin/spots`, `PATCH /api/admin/spots/:id/moderate`, `GET /api/admin/overview` (`pendingSpotsCount`, `openSpotReportsCount`), `moderateSpotSchema` (`@starter/shared/validators/spots`), `AdminSpotModerationItemDto` (`@starter/shared/types`), `spotKeys` (`@/features/spots/queries`).
 - Produces:
   - `getAdminSpots(params?, signal?)`, `moderateAdminSpot(id, input)` in `admin/api.ts`
@@ -402,14 +415,17 @@ git commit -m "feat(admin): add Sudut Baca moderation tab with live pending/repo
 ### Task 5: Playwright E2E Suite (`e2e/reading-spots.spec.ts`) & Full Verification Gate
 
 **Files:**
+
 - Create: `e2e/reading-spots.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `e2e/helpers.ts` (`API_URL`, `WEB_URL`, `headers`, `signUp`, `setRole`, `fitsWidth`), seeded `reading_spots` automatically populated by `apps/api/src/migrate.ts` -> `seedCatalog` -> `seedSpots`.
 
 - [ ] **Step 1: Write `e2e/reading-spots.spec.ts` covering the full vertical lifecycle**
 
 Design deterministic, zero-external-network-dependency Playwright tests:
+
 1. **Home Banner -> Fullscreen Map -> Filter -> Google Maps Deep Link -> Review Lifecycle (Create, Reload, Edit, Delete) + Report Spot:**
    - Sign up regular user via `signUp(page.request, "Pembaca Peta")`.
    - Visit `/app?tab=home` at `1280x800`; verify `HomeSpotsBanner` shows seeded Indonesian spots; click `"Buka Peta Sudut Baca"` CTA -> verify URL navigates to `/spots` inside `AppShell` and `fitsWidth(page) === true`.
@@ -431,6 +447,7 @@ Design deterministic, zero-external-network-dependency Playwright tests:
 - [ ] **Step 2: Run targeted E2E test first, then full verification suite**
 
 Run:
+
 ```bash
 pnpm exec eslint apps packages e2e \
   && pnpm exec prettier --check apps packages e2e \
@@ -439,6 +456,7 @@ pnpm exec eslint apps packages e2e \
   && pnpm build \
   && pnpm test:e2e
 ```
+
 Expected: ALL commands exit `0` — ESLint 0 errors, Prettier clean, Typecheck 0 errors, Vitest 100% pass, Build pass, Playwright `e2e/reading-spots.spec.ts` + entire E2E suite 100% pass.
 
 - [ ] **Step 3: Commit Task 5, push branch, and open PR (`Closes #23`)**
@@ -448,4 +466,5 @@ git add e2e/reading-spots.spec.ts
 git commit -m "test(e2e): add vertical reading spots review, submission, and admin moderation suite (#23)"
 git push -u origin feat/23-reading-spots-reviews-moderation
 ```
+
 Open PR with `Closes #23`, watch all GitHub Actions CI checks (`lint-typecheck-build`, `unit-test`, `security-scan`, `e2e`), and report evidence to the founder.
