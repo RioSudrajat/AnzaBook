@@ -15,6 +15,7 @@ import {
   FileText,
   Library,
   LoaderCircle,
+  MapPin,
   Moon,
   RefreshCw,
   Search,
@@ -45,6 +46,7 @@ import { AnzaLogoMark } from "@/components/brand";
 import { SiteFooter } from "@/components/site-footer";
 import { useCatalogBooks } from "@/features/books/hooks";
 import { AdminSidebar, type AdminTab } from "./admin-sidebar";
+import { AdminSpotsTab } from "./admin-spots-tab";
 import { DrmSecurityTab } from "./drm-security-tab";
 import {
   useAdminAuthorApplications,
@@ -176,12 +178,16 @@ export function AdminCmsDashboard({
   };
 
   const pendingCalendars = overview?.pendingCalendarsCount ?? 0;
+  const pendingSpots =
+    (overview?.pendingSpotsCount ?? 0) + (overview?.openSpotReportsCount ?? 0);
   const pendingAuthors = overview?.pendingAuthorsCount ?? 0;
   const pendingPublishers = overview?.pendingPublishersCount ?? 0;
-  const totalPending = pendingCalendars + pendingAuthors + pendingPublishers;
+  const totalPending =
+    pendingCalendars + pendingSpots + pendingAuthors + pendingPublishers;
 
   const tabTitles: Record<TabId, string> = {
     calendars: "Komunitas & Acara",
+    spots: "Kurasi Sudut Baca",
     partners: "Penulis & Penerbit",
     "claim-batches": "Kode Klaim Phygital",
     financials: "Keuangan & Royalti",
@@ -200,6 +206,7 @@ export function AdminCmsDashboard({
         onToggleCollapse={handleToggleSidebar}
         pendingCounts={{
           calendars: pendingCalendars,
+          spots: pendingSpots,
           partners: pendingAuthors + pendingPublishers,
           drmHighRisk: overview?.highRiskDrmEvents24hCount ?? 0,
         }}
@@ -275,6 +282,7 @@ export function AdminCmsDashboard({
           className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 pt-6 pb-24 md:pb-12"
         >
           {activeTab === "calendars" && <TabCalendars />}
+          {activeTab === "spots" && <AdminSpotsTab overview={overview} />}
           {activeTab === "partners" && <TabPartners />}
           {activeTab === "claim-batches" && <TabClaimBatches />}
           {activeTab === "financials" && <TabFinancials overview={overview} />}
@@ -292,12 +300,12 @@ export function AdminCmsDashboard({
       {/* 3. Mobile Bottom Navigation Bar (WCAG AA 44px+ touch targets) */}
       <nav
         aria-label="Navigasi Admin Mobile"
-        className="md:hidden fixed bottom-0 inset-x-0 bg-background/95 backdrop-blur-md border-t border-border z-40 flex items-center justify-around py-1.5 px-1 shadow-lg"
+        className="md:hidden fixed bottom-0 inset-x-0 bg-background/95 backdrop-blur-md border-t border-border z-40 flex items-center justify-between gap-1 overflow-x-auto scrollbar-none py-1.5 px-2 shadow-lg"
       >
         <button
           type="button"
           onClick={() => setActiveTab("calendars")}
-          className={`flex flex-col items-center justify-center min-h-[48px] min-w-[50px] px-1 py-1 text-[10px] font-mono cursor-pointer rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
+          className={`shrink-0 flex flex-col items-center justify-center min-h-[48px] min-w-[52px] px-1.5 py-1 text-[10px] font-mono cursor-pointer rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
             activeTab === "calendars"
               ? "text-[var(--color-accent)] font-bold bg-muted/40"
               : "text-muted-foreground hover:text-foreground"
@@ -305,6 +313,22 @@ export function AdminCmsDashboard({
         >
           <Calendar className="size-4" />
           <span>Komunitas</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("spots")}
+          className={`relative shrink-0 flex flex-col items-center justify-center min-h-[48px] min-w-[52px] px-1.5 py-1 text-[10px] font-mono cursor-pointer rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
+            activeTab === "spots"
+              ? "text-[var(--color-accent)] font-bold bg-muted/40"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <MapPin className="size-4" />
+          <span>Sudut Baca</span>
+          {pendingSpots > 0 && (
+            <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-[var(--color-accent)]" />
+          )}
         </button>
 
         <button

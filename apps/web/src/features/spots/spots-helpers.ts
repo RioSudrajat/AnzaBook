@@ -6,12 +6,17 @@ import { safeExternalHref } from "../../lib/safe-url";
 import {
   INDONESIA_BBOX,
   INDONESIA_CITY_PRESETS,
+  type CreateSpotSubmissionInput,
   type ReadingSpotSummaryDto,
   type SavedSpotRegion,
   type SpotCategory,
   type SpotFacilitiesDto,
   type SpotNoiseLevel,
   type SpotPriceRange,
+  type SpotReportReason,
+  type SpotReviewTag,
+  type SpotStatus,
+  type SpotSubmissionFormDraft,
   type SpotVerifiedBadge,
 } from "./types";
 
@@ -459,4 +464,223 @@ export function projectSpotsToPreviewCanvas(
       y,
     };
   });
+}
+
+export const SPOT_REVIEW_TAG_LABELS: Record<SpotReviewTag, string> = {
+  colokan_banyak: "Colokan banyak",
+  wifi_stabil: "Wi-Fi stabil",
+  tenang_fokus: "Tenang untuk fokus",
+  koleksi_bagus: "Banyak koleksi buku",
+  kopi_enak: "Kopi/minuman enak",
+  gratis_masuk: "Gratis masuk",
+  nyaman_lama: "Nyaman berlama-lama",
+};
+
+export const SPOT_REPORT_REASON_LABELS: Record<SpotReportReason, string> = {
+  permanently_closed: "Tempat tutup permanen",
+  wrong_location: "Pin atau alamat tidak sesuai",
+  wrong_info: "Jam buka / informasi salah",
+  duplicate: "Duplikat sudut baca lain",
+  spam: "Spam atau bukan ruang baca",
+  review_abuse: "Ulasan tidak pantas / spam",
+};
+
+export const SPOT_STATUS_META: Record<
+  SpotStatus,
+  {
+    label: string;
+    tone: "pending" | "published" | "rejected" | "closed";
+  }
+> = {
+  pending_review: { label: "Menunggu Kurasi", tone: "pending" },
+  published: { label: "Tayang", tone: "published" },
+  rejected: { label: "Ditolak", tone: "rejected" },
+  closed: { label: "Tutup", tone: "closed" },
+};
+
+export const SPOT_PRICE_RANGE_OPTIONS: ReadonlyArray<{
+  value: SpotPriceRange;
+  label: string;
+  hint: string;
+}> = [
+  { value: "free", label: "Gratis", hint: "Tanpa biaya masuk" },
+  { value: "budget", label: "Terjangkau", hint: "< Rp50rb" },
+  { value: "moderate", label: "Menengah", hint: "Rp50rb–Rp100rb" },
+  { value: "premium", label: "Premium", hint: "> Rp100rb" },
+];
+
+export const SPOT_NOISE_LEVEL_OPTIONS: ReadonlyArray<{
+  value: SpotNoiseLevel;
+  label: string;
+  hint: string;
+}> = [
+  { value: "quiet", label: "Tenang", hint: "Cocok untuk fokus penuh" },
+  { value: "moderate", label: "Sedang", hint: "Nyaman dengan obrolan ringan" },
+  { value: "lively", label: "Ramai", hint: "Hidup dan sosial" },
+];
+
+export function toggleVibeTagSelection(
+  current: readonly SpotReviewTag[],
+  tag: SpotReviewTag,
+  maxTags = 3,
+): SpotReviewTag[] {
+  if (current.includes(tag)) {
+    return current.filter((item) => item !== tag);
+  }
+  if (current.length >= maxTags) {
+    return [...current];
+  }
+  return [...current, tag];
+}
+
+export function calculateRatingPercent(count: number, total: number): number {
+  if (!Number.isFinite(count) || !Number.isFinite(total) || total <= 0) {
+    return 0;
+  }
+  return Math.min(100, Math.max(0, Math.round((count / total) * 100)));
+}
+
+export function clampIndonesiaCoordinate(
+  lat: number,
+  lng: number,
+): { lat: number; lng: number; wasClamped: boolean } {
+  const safeLat = Number.isFinite(lat) ? lat : -6.2088;
+  const safeLng = Number.isFinite(lng) ? lng : 106.8456;
+  const clampedLat = Math.min(
+    INDONESIA_BBOX.maxLat,
+    Math.max(INDONESIA_BBOX.minLat, safeLat),
+  );
+  const clampedLng = Math.min(
+    INDONESIA_BBOX.maxLng,
+    Math.max(INDONESIA_BBOX.minLng, safeLng),
+  );
+  return {
+    lat: Number(clampedLat.toFixed(6)),
+    lng: Number(clampedLng.toFixed(6)),
+    wasClamped: clampedLat !== safeLat || clampedLng !== safeLng,
+  };
+}
+
+type ApiErrorLike = {
+  status?: unknown;
+  code?: unknown;
+  message?: unknown;
+  details?: unknown;
+};
+
+export function formatSpotApiError(
+  error: unknown,
+  fallback = "Terjadi kendala saat menghubungi server. Silakan coba lagi.",
+): string {
+  if (error && typeof error === "object") {
+    const candidate = error as ApiErrorLike;
+    if (Array.isArray(candidate.details) && candidate.details.length > 0) {
+      const firstDetail = candidate.details[0] as
+        { field?: unknown; message?: unknown } | undefined;
+      if (
+        firstDetail &&
+        typeof firstDetail.message === "string" &&
+        firstDetail.message.trim().length > 0
+      ) {
+        return firstDetail.message.trim();
+      }
+    }
+    if (
+      typeof candidate.message === "string" &&
+      candidate.message.trim().length > 0
+    ) {
+      return candidate.message.trim();
+    }
+  }
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message.trim();
+  }
+  return fallback;
+}
+
+export function buildSpotSubmissionPayload(
+  draft: SpotSubmissionFormDraft,
+): CreateSpotSubmissionInput {
+  const trimOptional = (value: string): string | undefined => {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  };
+
+  const normalizedInstagram = trimOptional(draft.instagramHandle)?.replace(
+    /^@+/,
+    "",
+  );
+  const googleMapsUrl = trimOptional(draft.googleMapsUrl);
+  const websiteUrl = trimOptional(draft.websiteUrl);
+
+  return {
+    name: draft.name.trim(),
+    category: draft.category,
+    description: trimOptional(draft.description),
+    address: draft.address.trim(),
+    district: trimOptional(draft.district),
+    city: draft.city.trim(),
+    province: draft.province.trim(),
+    latitude: Number(draft.latitude),
+    longitude: Number(draft.longitude),
+    ...(googleMapsUrl !== undefined ? { googleMapsUrl } : {}),
+    ...(normalizedInstagram ? { instagramHandle: normalizedInstagram } : {}),
+    ...(websiteUrl !== undefined ? { websiteUrl } : {}),
+    openingHoursText: trimOptional(draft.openingHoursText),
+    priceRange: draft.priceRange,
+    noiseLevel: draft.noiseLevel,
+    facilities: draft.facilities,
+  };
+}
+
+export type CoordinateDraftParseResult =
+  { kind: "incomplete" } | { kind: "valid"; value: number };
+
+const COMPLETE_DECIMAL_REGEX = /^-?\d+(?:\.\d+)?$/;
+
+export function parseCoordinateDraft(raw: string): CoordinateDraftParseResult {
+  const trimmed = raw.trim();
+  if (!COMPLETE_DECIMAL_REGEX.test(trimmed)) {
+    return { kind: "incomplete" };
+  }
+  const value = Number(trimmed);
+  if (!Number.isFinite(value)) {
+    return { kind: "incomplete" };
+  }
+  return { kind: "valid", value };
+}
+
+export function applySpotPinLocation<
+  T extends {
+    city: string;
+    province: string;
+    latitude: number;
+    longitude: number;
+  },
+>(
+  prev: T,
+  nextLat: number,
+  nextLng: number,
+  meta?: { city?: string; province?: string },
+): T {
+  return {
+    ...prev,
+    latitude: nextLat,
+    longitude: nextLng,
+    city: meta?.city ?? prev.city,
+    province: meta?.province ?? prev.province,
+  };
+}
+
+export function getUnrenderedFieldError(
+  fieldErrors: Record<string, string>,
+  renderedFields: readonly string[],
+): string | null {
+  const renderedSet = new Set(renderedFields);
+  for (const [key, message] of Object.entries(fieldErrors)) {
+    if (!renderedSet.has(key) && message.trim().length > 0) {
+      return message;
+    }
+  }
+  return null;
 }

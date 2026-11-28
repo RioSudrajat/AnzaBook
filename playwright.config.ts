@@ -9,8 +9,10 @@ if (!testUrl || !process.env.STARTER_TEST_RUN?.startsWith("starter-pg-test-")) {
   );
 }
 
-export const API_URL = "http://localhost:4101";
-export const WEB_URL = "http://localhost:3101";
+const API_PORT = process.env.STARTER_TEST_API_PORT || "4101";
+const WEB_PORT = process.env.STARTER_TEST_WEB_PORT || "3101";
+export const API_URL = `http://localhost:${API_PORT}`;
+export const WEB_URL = `http://localhost:${WEB_PORT}`;
 
 export default defineConfig({
   testDir: "./e2e",
@@ -29,7 +31,7 @@ export default defineConfig({
       timeout: 60_000,
       env: {
         NODE_ENV: "production",
-        PORT: "4101",
+        PORT: API_PORT,
         BETTER_AUTH_URL: API_URL,
         WEB_URL,
         DATABASE_URL: testUrl,
@@ -45,7 +47,7 @@ export default defineConfig({
       timeout: 60_000,
       env: {
         NODE_ENV: "production",
-        PORT: "3101",
+        PORT: WEB_PORT,
         API_INTERNAL_URL: API_URL,
         LOG_LEVEL: "warn",
       },

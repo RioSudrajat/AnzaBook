@@ -1,25 +1,44 @@
 import { describe, expect, it } from "vitest";
+import {
+  createSpotSubmissionSchema,
+  spotReportReasonValues,
+  spotReviewTagValues,
+  spotStatusValues,
+} from "@starter/shared/validators/spots";
 import type { ReadingSpotSummaryDto } from "../../../web/src/features/spots/types";
 import {
   SPOT_CATEGORY_STYLES,
+  SPOT_NOISE_LEVEL_OPTIONS,
+  SPOT_PRICE_RANGE_OPTIONS,
+  SPOT_REPORT_REASON_LABELS,
+  SPOT_REVIEW_TAG_LABELS,
+  SPOT_STATUS_META,
+  applySpotPinLocation,
   buildGoogleMapsDirectionsUrl,
   buildGoogleMapsPlaceUrl,
+  buildSpotSubmissionPayload,
   calculateDistanceMeters,
+  calculateRatingPercent,
+  clampIndonesiaCoordinate,
   clampMapBounds,
   formatDistanceMeters,
   formatNoiseLevel,
   formatPriceRange,
+  formatSpotApiError,
   formatSpotCategory,
   formatVerifiedBadge,
   getActiveFacilityChips,
+  getUnrenderedFieldError,
   hasViewportShiftedSignificantly,
   isWithinIndonesiaBbox,
+  parseCoordinateDraft,
   parseSavedSpotRegion,
   projectSpotsToPreviewCanvas,
   resolveCityCameraTarget,
   sanitizeExternalHttpUrl,
   serializeSavedSpotRegion,
   spotsToGeoJson,
+  toggleVibeTagSelection,
 } from "../../../web/src/features/spots/spots-helpers";
 
 function makeSpot(
@@ -357,5 +376,258 @@ describe("Reading Spots UI & Cartographic Helpers (Issue #22)", () => {
     expect(resolveCityCameraTarget("Tokyo", cities)).toBeNull();
     expect(resolveCityCameraTarget("Tidak Ada", cities)).toBeNull();
     expect(resolveCityCameraTarget("   ", cities)).toBeNull();
+  });
+});
+
+describe("Issue #23 reviews, submission & moderation helpers", () => {
+  it("provides Indonesian labels for all vibe tags, report reasons, statuses, and options", () => {
+    expect(Object.keys(SPOT_REVIEW_TAG_LABELS)).toEqual([
+      ...spotReviewTagValues,
+    ]);
+    expect(SPOT_REVIEW_TAG_LABELS.colokan_banyak).toBe("Colokan banyak");
+    expect(SPOT_REVIEW_TAG_LABELS.wifi_stabil).toBe("Wi-Fi stabil");
+    expect(SPOT_REVIEW_TAG_LABELS.tenang_fokus).toBe("Tenang untuk fokus");
+    expect(SPOT_REVIEW_TAG_LABELS.koleksi_bagus).toBe("Banyak koleksi buku");
+    expect(SPOT_REVIEW_TAG_LABELS.kopi_enak).toBe("Kopi/minuman enak");
+    expect(SPOT_REVIEW_TAG_LABELS.gratis_masuk).toBe("Gratis masuk");
+    expect(SPOT_REVIEW_TAG_LABELS.nyaman_lama).toBe("Nyaman berlama-lama");
+
+    expect(Object.keys(SPOT_REPORT_REASON_LABELS)).toEqual([
+      ...spotReportReasonValues,
+    ]);
+    expect(Object.keys(SPOT_STATUS_META)).toEqual([...spotStatusValues]);
+    expect(SPOT_PRICE_RANGE_OPTIONS.map((o) => o.value)).toEqual([
+      "free",
+      "budget",
+      "moderate",
+      "premium",
+    ]);
+    expect(SPOT_NOISE_LEVEL_OPTIONS.map((o) => o.value)).toEqual([
+      "quiet",
+      "moderate",
+      "lively",
+    ]);
+  });
+
+  it("toggles reading vibe tags with a strict maximum of 3 unique selections", () => {
+    let tags = toggleVibeTagSelection([], "colokan_banyak");
+    expect(tags).toEqual(["colokan_banyak"]);
+
+    tags = toggleVibeTagSelection(tags, "wifi_stabil");
+    tags = toggleVibeTagSelection(tags, "tenang_fokus");
+    expect(tags).toEqual(["colokan_banyak", "wifi_stabil", "tenang_fokus"]);
+
+    // 4th tag ignored while 3 are selected
+    expect(toggleVibeTagSelection(tags, "kopi_enak")).toEqual([
+      "colokan_banyak",
+      "wifi_stabil",
+      "tenang_fokus",
+    ]);
+
+    // Existing tag can still be toggled off
+    tags = toggleVibeTagSelection(tags, "wifi_stabil");
+    expect(tags).toEqual(["colokan_banyak", "tenang_fokus"]);
+  });
+
+  it("calculates rating distribution percentages safely including zero totals", () => {
+    expect(calculateRatingPercent(0, 0)).toBe(0);
+    expect(calculateRatingPercent(3, 4)).toBe(75);
+    expect(calculateRatingPercent(5, 3)).toBe(100);
+  });
+
+  it("clamps coordinates strictly within INDONESIA_BBOX", () => {
+    expect(clampIndonesiaCoordinate(-6.2, 106.8)).toEqual({
+      lat: -6.2,
+      lng: 106.8,
+      wasClamped: false,
+    });
+
+    const clamped = clampIndonesiaCoordinate(35.6762, 139.6503);
+    expect(clamped.wasClamped).toBe(true);
+    expect(clamped.lat).toBe(6.5);
+    expect(clamped.lng).toBe(139.6503);
+
+    const westClamped = clampIndonesiaCoordinate(-20, 80);
+    expect(westClamped).toEqual({
+      lat: -11.5,
+      lng: 94.5,
+      wasClamped: true,
+    });
+  });
+
+  it("formats ApiError 429 rate-limit, 409 duplicate report, and 400 validation errors cleanly", () => {
+    expect(
+      formatSpotApiError({
+        status: 429,
+        code: "RATE_LIMIT_EXCEEDED",
+        message: "Batas maksimal 5 usulan per hari tercapai.",
+      }),
+    ).toBe("Batas maksimal 5 usulan per hari tercapai.");
+
+    expect(
+      formatSpotApiError({
+        status: 409,
+        code: "DUPLICATE_OPEN_REPORT",
+        message:
+          "Anda sudah mengirimkan laporan serupa yang masih dalam peninjauan.",
+      }),
+    ).toBe(
+      "Anda sudah mengirimkan laporan serupa yang masih dalam peninjauan.",
+    );
+
+    expect(
+      formatSpotApiError({
+        status: 400,
+        code: "VALIDATION_ERROR",
+        message: "Invalid input",
+        details: [
+          {
+            field: "googleMapsUrl",
+            message: "Tautan harus berupa URL Google Maps resmi.",
+          },
+        ],
+      }),
+    ).toBe("Tautan harus berupa URL Google Maps resmi.");
+
+    expect(formatSpotApiError(null, "Gagal memuat data.")).toBe(
+      "Gagal memuat data.",
+    );
+  });
+
+  it("builds valid submission payloads and rejects malicious or non-Maps Google URLs", () => {
+    const validPayload = buildSpotSubmissionPayload({
+      name: "  Kafe Baca Merdeka  ",
+      category: "book_cafe",
+      description: "  Nyaman untuk membaca novel sore hari.  ",
+      address: "  Jl. Braga No. 42, Sumur Bandung  ",
+      district: "  Sumur Bandung ",
+      city: "  Bandung ",
+      province: "  Jawa Barat ",
+      latitude: -6.9175,
+      longitude: 107.6098,
+      googleMapsUrl: "  https://maps.app.goo.gl/abc123  ",
+      instagramHandle: "  @kafebacamerdeka  ",
+      websiteUrl: "   ",
+      openingHoursText: "  Sen-Min 09:00-21:00 ",
+      priceRange: "budget",
+      noiseLevel: "quiet",
+      facilities: { wifi: true, powerOutlets: true },
+    });
+
+    const parsedValid = createSpotSubmissionSchema.safeParse(validPayload);
+    expect(parsedValid.success).toBe(true);
+    if (parsedValid.success) {
+      expect(parsedValid.data.instagramHandle).toBe("kafebacamerdeka");
+      expect(parsedValid.data.websiteUrl).toBeUndefined();
+      expect(parsedValid.data.googleMapsUrl).toBe(
+        "https://maps.app.goo.gl/abc123",
+      );
+    }
+
+    const badPayloadJs = buildSpotSubmissionPayload({
+      name: "Spot Uji XSS",
+      category: "library",
+      description: "",
+      address: "Jl. Sudirman No. 10",
+      district: "",
+      city: "Jakarta",
+      province: "DKI Jakarta",
+      latitude: -6.2088,
+      longitude: 106.8456,
+      googleMapsUrl: "javascript:alert(1)",
+      instagramHandle: "",
+      websiteUrl: "",
+      openingHoursText: "",
+      priceRange: "free",
+      noiseLevel: "quiet",
+      facilities: {},
+    });
+    expect(createSpotSubmissionSchema.safeParse(badPayloadJs).success).toBe(
+      false,
+    );
+
+    const badPayloadDocs = buildSpotSubmissionPayload({
+      name: "Spot Uji Domain Asing",
+      category: "library",
+      description: "",
+      address: "Jl. Sudirman No. 10",
+      district: "",
+      city: "Jakarta",
+      province: "DKI Jakarta",
+      latitude: -6.2088,
+      longitude: 106.8456,
+      googleMapsUrl: "https://docs.google.com/document/d/123",
+      instagramHandle: "",
+      websiteUrl: "",
+      openingHoursText: "",
+      priceRange: "free",
+      noiseLevel: "quiet",
+      facilities: {},
+    });
+    expect(createSpotSubmissionSchema.safeParse(badPayloadDocs).success).toBe(
+      false,
+    );
+  });
+
+  it("parses manual coordinate drafts without prematurely clamping incomplete keystrokes", () => {
+    expect(parseCoordinateDraft("")).toEqual({ kind: "incomplete" });
+    expect(parseCoordinateDraft("-")).toEqual({ kind: "incomplete" });
+    expect(parseCoordinateDraft("-6.")).toEqual({ kind: "incomplete" });
+    expect(parseCoordinateDraft("107.")).toEqual({ kind: "incomplete" });
+    expect(parseCoordinateDraft("abc")).toEqual({ kind: "incomplete" });
+    expect(parseCoordinateDraft("-6.9175")).toEqual({
+      kind: "valid",
+      value: -6.9175,
+    });
+    expect(parseCoordinateDraft("107.6098")).toEqual({
+      kind: "valid",
+      value: 107.6098,
+    });
+  });
+
+  it("overwrites both city and province when a preset city is selected on the pin picker", () => {
+    const updated = applySpotPinLocation(
+      {
+        city: "Jakarta",
+        province: "DKI Jakarta",
+        latitude: -6.2088,
+        longitude: 106.8456,
+      },
+      -6.9175,
+      107.6191,
+      { city: "Bandung", province: "Jawa Barat" },
+    );
+    expect(updated).toEqual({
+      city: "Bandung",
+      province: "Jawa Barat",
+      latitude: -6.9175,
+      longitude: 107.6191,
+    });
+
+    const dragOnly = applySpotPinLocation(updated, -6.9, 107.62);
+    expect(dragOnly).toEqual({
+      city: "Bandung",
+      province: "Jawa Barat",
+      latitude: -6.9,
+      longitude: 107.62,
+    });
+  });
+
+  it("surfaces unrendered validation errors so submission never fails silently", () => {
+    expect(
+      getUnrenderedFieldError({ name: "Nama terlalu pendek" }, [
+        "name",
+        "city",
+        "province",
+        "address",
+      ]),
+    ).toBeNull();
+
+    expect(
+      getUnrenderedFieldError(
+        { latitude: "Koordinat lintang berada di luar wilayah Indonesia" },
+        ["name", "city", "province", "address"],
+      ),
+    ).toBe("Koordinat lintang berada di luar wilayah Indonesia");
   });
 });
