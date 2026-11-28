@@ -50,7 +50,11 @@ function SpotsPage() {
 
   return (
     <AppShell user={user} activeTab="home" title="Peta Sudut Baca" fullBleed>
-      <SpotsExplorerView search={search} onUpdateSearch={handleUpdateSearch} />
+      <SpotsExplorerView
+        currentUserId={user.id}
+        search={search}
+        onUpdateSearch={handleUpdateSearch}
+      />
     </AppShell>
   );
 }
