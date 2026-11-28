@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Bookmark,
   ChevronDown,
   ChevronUp,
   ExternalLink,
+  Flag,
   MapPin,
   Navigation,
+  Plus,
   RotateCcw,
   Search,
   SlidersHorizontal,
@@ -36,12 +39,16 @@ import {
   type SpotFacilitiesDto,
 } from "../types";
 import { useSpotRegion } from "../use-spot-region";
+import { MySpotsDrawer } from "./my-spots-drawer";
 import {
   ReadingSpotsMap,
   type MapBoundsPayload,
   type MapCameraRequest,
 } from "./reading-spots-map";
+import { ReportSpotDialog } from "./report-spot-dialog";
 import { SpotDetailPanel } from "./spot-detail-panel";
+import { SpotReviewsSection } from "./spot-reviews-section";
+import { SubmitSpotDialog } from "./submit-spot-dialog";
 
 export type SpotsSearchParams = {
   lat?: number;
@@ -55,6 +62,7 @@ export type SpotsSearchParams = {
 };
 
 type SpotsExplorerViewProps = {
+  currentUserId: string;
   search: SpotsSearchParams;
   onUpdateSearch: (
     patch: Partial<SpotsSearchParams>,
@@ -65,6 +73,7 @@ type SpotsExplorerViewProps = {
 type MobileSheetState = "collapsed" | "half" | "expanded";
 
 export function SpotsExplorerView({
+  currentUserId,
   search,
   onUpdateSearch,
 }: SpotsExplorerViewProps) {
@@ -86,6 +95,13 @@ export function SpotsExplorerView({
     },
     [search.q],
   );
+  const [isSubmitOpen, setIsSubmitOpen] = useState(false);
+  const [isMySpotsOpen, setIsMySpotsOpen] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{
+    spotSlug: string;
+    spotName: string;
+    reviewTarget: { id: string; authorName: string } | null;
+  } | null>(null);
   const [appliedBbox, setAppliedBbox] = useState<{
     minLat: number;
     maxLat: number;
@@ -264,6 +280,7 @@ export function SpotsExplorerView({
     if (!selectedSlug) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      if (document.querySelector("dialog[open]")) return;
       const tag = (event.target as HTMLElement | null)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       onUpdateSearch({ spot: undefined });
@@ -435,6 +452,25 @@ export function SpotsExplorerView({
         {!selectedSlug ? (
           <>
             <div className="px-5 pt-4 pb-3 border-b border-border space-y-2.5 shrink-0">
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  onClick={() => setIsSubmitOpen(true)}
+                  className="flex-1 min-h-11 bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:opacity-90 font-semibold text-xs px-3"
+                >
+                  <Plus className="size-4" aria-hidden="true" />
+                  <span>Usulkan Sudut Baca</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsMySpotsOpen(true)}
+                  className="min-h-11 text-xs px-3 shrink-0"
+                >
+                  <Bookmark className="size-3.5" aria-hidden="true" />
+                  <span>Kontribusi Saya</span>
+                </Button>
+              </div>
               <form
                 onSubmit={handleSearchSubmit}
                 role="search"
@@ -661,15 +697,51 @@ export function SpotsExplorerView({
                 isLoading={isLoading}
                 selectedSlug={selectedSlug}
                 hasActiveFilters={hasActiveFilters}
+                activeCity={search.city}
                 onSelectSpot={handleSelectSpot}
                 onResetFilters={handleResetFilters}
+                onOpenSubmitDialog={() => setIsSubmitOpen(true)}
               />
             </div>
           </>
         ) : (
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-4">
             {activeSpot ? (
-              <SpotDetailPanel spot={activeSpot} onClose={handleCloseDetail} />
+              <SpotDetailPanel
+                spot={activeSpot}
+                onClose={handleCloseDetail}
+                reportActionSlot={
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setReportTarget({
+                        spotSlug: activeSpot.slug,
+                        spotName: activeSpot.name,
+                        reviewTarget: null,
+                      })
+                    }
+                    className="min-h-11 inline-flex items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
+                  >
+                    <Flag className="size-3.5" aria-hidden="true" />
+                    <span>Laporkan / Koreksi</span>
+                  </button>
+                }
+                reviewsSlot={
+                  <SpotReviewsSection
+                    spotSlug={activeSpot.slug}
+                    spotName={activeSpot.name}
+                    currentUserId={currentUserId}
+                    initialMyReview={detailSpot?.myReview}
+                    onReportReview={(review) =>
+                      setReportTarget({
+                        spotSlug: activeSpot.slug,
+                        spotName: activeSpot.name,
+                        reviewTarget: review,
+                      })
+                    }
+                  />
+                }
+              />
             ) : isDetailLoading ? (
               <div
                 className="space-y-3 py-4"
@@ -905,6 +977,37 @@ export function SpotsExplorerView({
                   <SpotDetailPanel
                     spot={activeSpot}
                     onClose={handleCloseDetail}
+                    reportActionSlot={
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setReportTarget({
+                            spotSlug: activeSpot.slug,
+                            spotName: activeSpot.name,
+                            reviewTarget: null,
+                          })
+                        }
+                        className="min-h-11 inline-flex items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
+                      >
+                        <Flag className="size-3.5" aria-hidden="true" />
+                        <span>Laporkan</span>
+                      </button>
+                    }
+                    reviewsSlot={
+                      <SpotReviewsSection
+                        spotSlug={activeSpot.slug}
+                        spotName={activeSpot.name}
+                        currentUserId={currentUserId}
+                        initialMyReview={detailSpot?.myReview}
+                        onReportReview={(review) =>
+                          setReportTarget({
+                            spotSlug: activeSpot.slug,
+                            spotName: activeSpot.name,
+                            reviewTarget: review,
+                          })
+                        }
+                      />
+                    }
                   />
                 ) : isDetailLoading ? (
                   <div
@@ -934,6 +1037,26 @@ export function SpotsExplorerView({
             ) : (
               <div>
                 <div className="px-4 py-3 space-y-2.5 border-b border-border">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      onClick={() => setIsSubmitOpen(true)}
+                      className="flex-1 min-h-11 bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:opacity-90 font-semibold text-xs px-3"
+                    >
+                      <Plus className="size-4" aria-hidden="true" />
+                      <span>Usulkan Sudut Baca</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsMySpotsOpen(true)}
+                      className="min-h-11 text-xs px-3 shrink-0"
+                    >
+                      <Bookmark className="size-3.5" aria-hidden="true" />
+                      <span>Kontribusi</span>
+                    </Button>
+                  </div>
+
                   <div className="flex items-center gap-2">
                     <div className="relative flex-1 min-w-0">
                       <label
@@ -1037,14 +1160,51 @@ export function SpotsExplorerView({
                   isLoading={isLoading}
                   selectedSlug={selectedSlug}
                   hasActiveFilters={hasActiveFilters}
+                  activeCity={search.city}
                   onSelectSpot={handleSelectSpot}
                   onResetFilters={handleResetFilters}
+                  onOpenSubmitDialog={() => setIsSubmitOpen(true)}
                 />
               </div>
             )}
           </div>
         </section>
       </div>
+
+      <SubmitSpotDialog
+        open={isSubmitOpen}
+        onClose={() => setIsSubmitOpen(false)}
+        defaultCity={search.city}
+        defaultCenter={{
+          lat: search.lat ?? savedRegion.lat,
+          lng: search.lng ?? savedRegion.lng,
+        }}
+        onOpenExistingSpot={(slug) => {
+          setIsSubmitOpen(false);
+          handleSelectSpot(slug);
+        }}
+        onOpenMyContributions={() => {
+          setIsSubmitOpen(false);
+          setIsMySpotsOpen(true);
+        }}
+      />
+
+      <MySpotsDrawer
+        open={isMySpotsOpen}
+        onClose={() => setIsMySpotsOpen(false)}
+        onSelectSpot={handleSelectSpot}
+        onOpenSubmitDialog={() => setIsSubmitOpen(true)}
+      />
+
+      {reportTarget && (
+        <ReportSpotDialog
+          open={Boolean(reportTarget)}
+          onClose={() => setReportTarget(null)}
+          spotSlug={reportTarget.spotSlug}
+          spotName={reportTarget.spotName}
+          reviewTarget={reportTarget.reviewTarget}
+        />
+      )}
     </div>
   );
 }
@@ -1054,8 +1214,10 @@ type SpotListBodyProps = {
   isLoading: boolean;
   selectedSlug: string;
   hasActiveFilters: boolean;
+  activeCity?: string;
   onSelectSpot: (slug: string) => void;
   onResetFilters: () => void;
+  onOpenSubmitDialog: () => void;
 };
 
 function SpotListBody({
@@ -1063,8 +1225,10 @@ function SpotListBody({
   isLoading,
   selectedSlug,
   hasActiveFilters,
+  activeCity,
   onSelectSpot,
   onResetFilters,
+  onOpenSubmitDialog,
 }: SpotListBodyProps) {
   if (isLoading) {
     return (
@@ -1090,24 +1254,36 @@ function SpotListBody({
           />
           <div className="space-y-1">
             <p className="font-serif text-base font-bold text-foreground">
-              Belum ada sudut baca pada filter ini
+              {activeCity
+                ? `Belum ada sudut baca di ${activeCity}?`
+                : "Belum ada sudut baca pada filter ini"}
             </p>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Coba ganti kota Indonesia di atas, hapus kata kunci, atau geser
-              peta ke area lain.
+              Usulkan tempat pertamamu, atau coba ganti kota, hapus kata kunci,
+              dan geser peta ke area lain.
             </p>
           </div>
-          {hasActiveFilters && (
+          <div className="flex flex-wrap items-center justify-center gap-2">
             <Button
               type="button"
-              variant="outline"
-              onClick={onResetFilters}
-              className="min-h-11"
+              onClick={onOpenSubmitDialog}
+              className="min-h-11 bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:opacity-90 font-semibold text-xs"
             >
-              <RotateCcw className="size-4" aria-hidden="true" />
-              Reset Semua Filter
+              <Plus className="size-4" aria-hidden="true" />
+              <span>Usulkan Tempat Pertamamu</span>
             </Button>
-          )}
+            {hasActiveFilters && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onResetFilters}
+                className="min-h-11 text-xs"
+              >
+                <RotateCcw className="size-4" aria-hidden="true" />
+                Reset Semua Filter
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     );
