@@ -23,6 +23,7 @@ import {
   copyTextSilently,
   copyTextToClipboard,
   downloadCanvasPng,
+  downloadPngBlob,
   shareCanvasNative,
   sharePngFileNative,
 } from "@/features/share/web-share";
@@ -153,8 +154,26 @@ function EventShareDialogContent({
     blob: Blob;
     file: File;
   } | null>(null);
+  const activeRenderRef = React.useRef<{
+    key: string;
+    promise: Promise<boolean>;
+  } | null>(null);
+  const lastRenderedKeyRef = React.useRef<string | null>(null);
+  const copiedImageTimerRef = React.useRef<number | null>(null);
+  const copiedCaptionTimerRef = React.useRef<number | null>(null);
   const nameInputId = React.useId();
   const captionBoxId = React.useId();
+
+  React.useEffect(() => {
+    return () => {
+      if (copiedImageTimerRef.current !== null) {
+        window.clearTimeout(copiedImageTimerRef.current);
+      }
+      if (copiedCaptionTimerRef.current !== null) {
+        window.clearTimeout(copiedCaptionTimerRef.current);
+      }
+    };
+  }, []);
 
   const origin = React.useMemo(() => {
     try {
@@ -218,6 +237,7 @@ function EventShareDialogContent({
   React.useEffect(() => {
     let cancelled = false;
     prebakedRef.current = null;
+    lastRenderedKeyRef.current = null;
 
     const frameId = window.requestAnimationFrame(() => {
       if (cancelled) return;
@@ -227,7 +247,7 @@ function EventShareDialogContent({
         return;
       }
       setIsRendering(true);
-      void renderEventShareCard(
+      const renderPromise = renderEventShareCard(
         canvas,
         {
           event,
@@ -242,24 +262,33 @@ function EventShareDialogContent({
         },
       )
         .then(async (rendered) => {
-          if (!rendered || cancelled) return;
+          if (!rendered || cancelled) return false;
+          lastRenderedKeyRef.current = renderKey;
           try {
             const blob = await canvasToPngBlob(canvas);
-            if (cancelled) return;
+            if (cancelled) return true;
             const file = new File([blob], filename, { type: "image/png" });
             prebakedRef.current = { key: renderKey, blob, file };
           } catch {
             // Fall back to on-demand canvas export when triggered.
           }
+          return true;
         })
         .catch(() => {
           if (!cancelled) {
+            lastRenderedKeyRef.current = null;
             setFeedback("Pratinjau kanvas gagal dimuat. Coba ulangi lagi.");
           }
+          return false;
         })
         .finally(() => {
+          if (activeRenderRef.current?.key === renderKey) {
+            activeRenderRef.current = null;
+          }
           if (!cancelled) setIsRendering(false);
         });
+
+      activeRenderRef.current = { key: renderKey, promise: renderPromise };
     });
 
     return () => {
@@ -282,8 +311,11 @@ function EventShareDialogContent({
     if (!canvas) {
       throw new Error("Kanvas kartu tidak tersedia.");
     }
-    if (isRendering) {
-      await renderEventShareCard(canvas, {
+    if (activeRenderRef.current?.key === renderKey) {
+      await activeRenderRef.current.promise;
+    }
+    if (lastRenderedKeyRef.current !== renderKey) {
+      const rendered = await renderEventShareCard(canvas, {
         event,
         template,
         aspect,
@@ -291,8 +323,23 @@ function EventShareDialogContent({
         readerName,
         shareHostLabel: hostLabel,
       });
+      if (!rendered) {
+        throw new Error("Kanvas kartu gagal dirender.");
+      }
+      lastRenderedKeyRef.current = renderKey;
     }
     return canvas;
+  };
+
+  const triggerPngDownload = async () => {
+    const prebaked =
+      prebakedRef.current?.key === renderKey ? prebakedRef.current : null;
+    if (prebaked) {
+      downloadPngBlob(prebaked.blob, filename);
+      return;
+    }
+    const canvas = await ensureReadyCanvas();
+    await downloadCanvasPng(canvas, filename);
   };
 
   const handleInstagramStory = async () => {
@@ -305,29 +352,32 @@ function EventShareDialogContent({
         copyTextSilently(shareUrl);
         const prebaked =
           prebakedRef.current?.key === renderKey ? prebakedRef.current : null;
-        const result = prebaked
-          ? await sharePngFileNative(prebaked.file)
-          : await shareCanvasNative({
-              canvas: await ensureReadyCanvas(),
-              filename,
-              title: event.title,
-              text: caption,
-              url: shareUrl,
-            });
-        if (result === "shared") {
-          setShowInstagramGuide(false);
-          setFeedback(
-            "Poster dikirim ke lembar bagikan dan tautan acara otomatis disalin. Di IG Story, tinggal tempel pada Stiker Tautan.",
-          );
-          return;
-        }
-        if (result === "cancelled") {
-          return;
+        try {
+          const result = prebaked
+            ? await sharePngFileNative(prebaked.file)
+            : await shareCanvasNative({
+                canvas: await ensureReadyCanvas(),
+                filename,
+                title: event.title,
+                text: caption,
+                url: shareUrl,
+              });
+          if (result === "shared") {
+            setShowInstagramGuide(false);
+            setFeedback(
+              "Poster dikirim ke lembar bagikan. Di IG Story, tempel tautan acara pada Stiker Tautan.",
+            );
+            return;
+          }
+          if (result === "cancelled") {
+            return;
+          }
+        } catch {
+          // Fall back to direct PNG download if Web Share API rejects (e.g. NotAllowedError).
         }
       }
 
-      const canvas = await ensureReadyCanvas();
-      await downloadCanvasPng(canvas, filename);
+      await triggerPngDownload();
       setShowInstagramGuide(true);
       setFeedback(
         "Poster PNG 1080p sudah diunduh. Unggah lewat Instagram Story lalu tempel tautan acara pada stiker.",
@@ -343,26 +393,38 @@ function EventShareDialogContent({
     if (isExporting) return;
     setIsExporting(true);
     try {
+      copyTextSilently(shareUrl);
       const prebaked =
         prebakedRef.current?.key === renderKey ? prebakedRef.current : null;
-      const result = prebaked
-        ? await sharePngFileNative(prebaked.file)
-        : await shareCanvasNative({
-            canvas: await ensureReadyCanvas(),
-            filename,
-            title: event.title,
-            text: caption,
-            url: shareUrl,
-          });
-      if (result === "shared") {
+      let shouldFallbackToDownload = false;
+      try {
+        const result = prebaked
+          ? await sharePngFileNative(prebaked.file)
+          : await shareCanvasNative({
+              canvas: await ensureReadyCanvas(),
+              filename,
+              title: event.title,
+              text: caption,
+              url: shareUrl,
+            });
+        if (result === "shared") {
+          setFeedback(
+            "Poster kartu dikirim ke aplikasi pilihanmu tanpa unduh file.",
+          );
+          return;
+        }
+        if (result === "cancelled") {
+          return;
+        }
+        shouldFallbackToDownload = result === "unsupported";
+      } catch {
+        shouldFallbackToDownload = true;
+      }
+
+      if (shouldFallbackToDownload) {
+        await triggerPngDownload();
         setFeedback(
-          "Poster kartu dikirim ke aplikasi pilihanmu tanpa unduh file.",
-        );
-      } else if (result === "unsupported") {
-        const canvas = await ensureReadyCanvas();
-        await downloadCanvasPng(canvas, filename);
-        setFeedback(
-          "Perangkat tidak mendukung bagikan file langsung; PNG diunduh.",
+          "Perangkat belum mengizinkan bagikan file langsung; poster PNG 1080p diunduh.",
         );
       }
     } catch {
@@ -378,16 +440,23 @@ function EventShareDialogContent({
     try {
       const prebaked =
         prebakedRef.current?.key === renderKey ? prebakedRef.current : null;
-      const blob = prebaked
+      // Pass a Blob or Promise<Blob> synchronously inside the click handler so Safari preserves user activation.
+      const blobOrPromise = prebaked
         ? prebaked.blob
-        : await canvasToPngBlob(await ensureReadyCanvas());
-      const ok = await copyPngBlobToClipboard(blob);
+        : ensureReadyCanvas().then((canvas) => canvasToPngBlob(canvas));
+      const ok = await copyPngBlobToClipboard(blobOrPromise);
       if (ok) {
         setCopiedImage(true);
         setFeedback(
           "Poster PNG disalin ke clipboard. Langsung tempel di WhatsApp Web, Telegram Desktop, atau X tanpa unduh file.",
         );
-        window.setTimeout(() => setCopiedImage(false), 2400);
+        if (copiedImageTimerRef.current !== null) {
+          window.clearTimeout(copiedImageTimerRef.current);
+        }
+        copiedImageTimerRef.current = window.setTimeout(
+          () => setCopiedImage(false),
+          2400,
+        );
       } else {
         setFeedback(
           "Browser belum mengizinkan salin gambar ke clipboard. Gunakan Unduh PNG.",
@@ -405,8 +474,7 @@ function EventShareDialogContent({
     setIsExporting(true);
     setShowInstagramGuide(false);
     try {
-      const canvas = await ensureReadyCanvas();
-      await downloadCanvasPng(canvas, filename);
+      await triggerPngDownload();
       setFeedback(`Kartu PNG (${filename}) berhasil diunduh.`);
     } catch {
       setFeedback("Gagal mengunduh gambar kartu. Coba lagi.");
@@ -420,7 +488,13 @@ function EventShareDialogContent({
     if (ok) {
       setCopiedCaption(true);
       setFeedback("Teks undangan WhatsApp disalin.");
-      window.setTimeout(() => setCopiedCaption(false), 2200);
+      if (copiedCaptionTimerRef.current !== null) {
+        window.clearTimeout(copiedCaptionTimerRef.current);
+      }
+      copiedCaptionTimerRef.current = window.setTimeout(
+        () => setCopiedCaption(false),
+        2200,
+      );
     } else {
       setFeedback("Gagal menyalin teks undangan.");
     }
@@ -638,7 +712,7 @@ function EventShareDialogContent({
                     rel="noopener noreferrer"
                   >
                     <MessageCircle
-                      className="size-4 text-emerald-700 dark:text-emerald-400"
+                      className="size-4 text-[var(--color-green)]"
                       aria-hidden="true"
                     />
                     <span>Kirim ke WhatsApp</span>
@@ -714,7 +788,7 @@ function EventShareDialogContent({
                     {copiedImage ? (
                       <>
                         <Check
-                          className="size-3.5 shrink-0 text-emerald-700 dark:text-emerald-400"
+                          className="size-3.5 shrink-0 text-[var(--color-green)]"
                           aria-hidden="true"
                         />
                         <span>Poster Tersalin</span>
@@ -771,12 +845,14 @@ function EventShareDialogContent({
                   </a>
                 </Button>
 
-                <CopyLinkButton
-                  url={shareUrl}
-                  label="Salin Tautan"
-                  copiedLabel="Tersalin"
-                  className="w-full rounded-xl text-xs px-2.5 whitespace-nowrap"
-                />
+                <div className="w-full [&>span]:w-full">
+                  <CopyLinkButton
+                    url={shareUrl}
+                    label="Salin Tautan"
+                    copiedLabel="Tersalin"
+                    className="w-full rounded-xl text-xs px-2.5 whitespace-nowrap"
+                  />
+                </div>
               </div>
             </div>
 

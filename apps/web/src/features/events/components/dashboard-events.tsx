@@ -28,6 +28,7 @@ import {
 } from "@starter/shared/validators/community";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
+import { isUsableAssetUrl } from "@/lib/media-url";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import {
   eventDescriptionToPlainExcerpt,
@@ -305,6 +306,8 @@ export function DashboardEvents({ initialView }: DashboardEventsProps) {
     filterTab === "hosting" || filterTab === "my_rsvps"
       ? lifecycleScope
       : undefined;
+  const showCategoryChips = filterTab === "upcoming" || filterTab === "past";
+  const showViewToggle = filterTab !== "hosting";
 
   const {
     data: eventsPages,
@@ -317,22 +320,47 @@ export function DashboardEvents({ initialView }: DashboardEventsProps) {
     filter: filterTab,
     timeScope: activeTimeScope,
     format: selectedFormat === "all" ? undefined : selectedFormat,
-    eventType: selectedEventType === "all" ? undefined : selectedEventType,
+    eventType:
+      showCategoryChips && selectedEventType !== "all"
+        ? selectedEventType
+        : undefined,
     q: debouncedQ || undefined,
     limit: 8,
   });
 
-  const events = React.useMemo(
-    () => eventsPages?.pages.flatMap((page) => page.data) ?? [],
-    [eventsPages?.pages],
-  );
+  const events = React.useMemo(() => {
+    const seen = new Set<string>();
+    const deduped: CommunityEventSummaryDto[] = [];
+    for (const page of eventsPages?.pages ?? []) {
+      for (const item of page.data) {
+        if (!seen.has(item.id)) {
+          seen.add(item.id);
+          deduped.push(item);
+        }
+      }
+    }
+    return deduped;
+  }, [eventsPages?.pages]);
 
   const totalEventsCount = eventsPages?.pages[0]?.meta.total ?? events.length;
 
   const hasActiveFilters =
     Boolean(debouncedQ) ||
     selectedFormat !== "all" ||
-    selectedEventType !== "all";
+    (showCategoryChips && selectedEventType !== "all");
+
+  useBodyScrollLock(isHostGateOpen);
+
+  React.useEffect(() => {
+    if (!isHostGateOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsHostGateOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isHostGateOpen]);
 
   const handleResetFilters = () => {
     setSearchInput("");
@@ -446,9 +474,6 @@ export function DashboardEvents({ initialView }: DashboardEventsProps) {
     list.push({ id: "past", label: "Riwayat Acara" });
     return list;
   }, [canHostEvents, totalPendingApprovals]);
-
-  const showCategoryChips = filterTab === "upcoming" || filterTab === "past";
-  const showViewToggle = filterTab !== "hosting";
 
   return (
     <div className="relative flex flex-col space-y-6 pb-12">
@@ -830,23 +855,38 @@ export function DashboardEvents({ initialView }: DashboardEventsProps) {
                 aria-hidden="true"
               />
               <h3 className="font-serif text-base font-bold text-foreground">
-                {lifecycleScope === "past"
-                  ? "Belum Ada Riwayat Kehadiran"
-                  : "Belum Ada Pendaftaran Aktif"}
+                {hasActiveFilters
+                  ? "Tidak Ada Pendaftaran yang Cocok"
+                  : lifecycleScope === "past"
+                    ? "Belum Ada Riwayat Kehadiran"
+                    : "Belum Ada Pendaftaran Aktif"}
               </h3>
               <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                {lifecycleScope === "past"
-                  ? "Acara yang pernah kamu ikuti akan tampil di sini setelah sesi berakhir."
-                  : "Jelajahi Acara Terdekat dan daftarkan diri untuk mendapatkan kode tiket check-in."}
+                {hasActiveFilters
+                  ? "Coba ubah kata kunci pencarian atau reset filter aktif."
+                  : lifecycleScope === "past"
+                    ? "Acara yang pernah kamu ikuti akan tampil di sini setelah sesi berakhir."
+                    : "Jelajahi Acara Terdekat dan daftarkan diri untuk mendapatkan kode tiket check-in."}
               </p>
-              {lifecycleScope === "upcoming" && (
+              {hasActiveFilters ? (
                 <Button
                   type="button"
-                  onClick={() => handleSelectTab("upcoming")}
-                  className="min-h-11 bg-[var(--color-accent)] text-[var(--color-accent-ink)] font-semibold text-xs"
+                  variant="outline"
+                  onClick={handleResetFilters}
+                  className="min-h-11 text-xs"
                 >
-                  Jelajahi Acara Terdekat
+                  Reset Filter
                 </Button>
+              ) : (
+                lifecycleScope === "upcoming" && (
+                  <Button
+                    type="button"
+                    onClick={() => handleSelectTab("upcoming")}
+                    className="min-h-11 bg-[var(--color-accent)] text-[var(--color-accent-ink)] font-semibold text-xs"
+                  >
+                    Jelajahi Acara Terdekat
+                  </Button>
+                )
               )}
             </>
           ) : filterTab === "past" ? (
@@ -927,11 +967,18 @@ export function DashboardEvents({ initialView }: DashboardEventsProps) {
                 className="rounded-2xl border border-border bg-card p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
               >
                 <div className="flex items-start gap-4 min-w-0">
-                  <img
-                    src={ev.coverUrl}
-                    alt={ev.title}
-                    className="size-20 sm:size-24 rounded-xl border border-border object-cover shrink-0 bg-muted"
-                  />
+                  {isUsableAssetUrl(ev.coverUrl) ? (
+                    <img
+                      src={ev.coverUrl}
+                      alt={ev.title}
+                      className="size-20 sm:size-24 rounded-xl border border-border object-cover shrink-0 bg-muted"
+                    />
+                  ) : (
+                    <div
+                      aria-hidden="true"
+                      className="size-20 sm:size-24 rounded-xl border border-border shrink-0 bg-muted"
+                    />
+                  )}
                   <div className="min-w-0 space-y-1.5">
                     <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-muted-foreground tabular-nums">
                       <span
@@ -1236,6 +1283,9 @@ export function DashboardEvents({ initialView }: DashboardEventsProps) {
           role="dialog"
           aria-modal="true"
           aria-labelledby="host-gate-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsHostGateOpen(false);
+          }}
         >
           <div
             data-lenis-prevent
@@ -1250,7 +1300,7 @@ export function DashboardEvents({ initialView }: DashboardEventsProps) {
                 type="button"
                 onClick={() => setIsHostGateOpen(false)}
                 aria-label="Tutup"
-                className="size-10 flex items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+                className="size-11 flex items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
               >
                 <X className="size-4" aria-hidden="true" />
               </button>
@@ -1638,6 +1688,7 @@ function TimelineEventCard({
   ev: CommunityEventSummaryDto;
   onShare: (ev: CommunityEventSummaryDto) => void;
 }) {
+  const shouldReduceMotion = useReducedMotion();
   const evSpec = parseEventThemeSpec(ev.themePreset);
   const evVars = resolveEventThemeVars(evSpec);
   const locationLabel = getLocationLabel(ev);
@@ -1722,11 +1773,17 @@ function TimelineEventCard({
       </div>
 
       <div className="w-28 sm:w-44 aspect-[4/3] shrink-0 self-center overflow-hidden rounded-xl border border-border bg-muted">
-        <img
-          src={ev.coverUrl}
-          alt={ev.title}
-          className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-        />
+        {isUsableAssetUrl(ev.coverUrl) && (
+          <img
+            src={ev.coverUrl}
+            alt={ev.title}
+            className={`size-full object-cover ${
+              shouldReduceMotion
+                ? ""
+                : "transition-transform duration-300 group-hover:scale-[1.03]"
+            }`}
+          />
+        )}
       </div>
     </article>
   );

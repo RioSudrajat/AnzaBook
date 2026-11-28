@@ -27,6 +27,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { uploadMediaImage } from "@/features/social/api";
+import { isUsableAssetUrl } from "@/lib/media-url";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import {
   formatEventApiError,
@@ -83,10 +84,13 @@ type EditEventFormProps = {
 
 function EditEventForm({ onClose, event }: EditEventFormProps) {
   const updateMutation = useUpdateEvent(event.slug);
-  const { data: fullEvent, isLoading: isLoadingDetail } = useEventDetail(
-    event.slug,
-  );
+  const {
+    data: fullEvent,
+    isLoading: isLoadingDetail,
+    isError: isDetailError,
+  } = useEventDetail(event.slug);
   const detail = (fullEvent ?? event) as Partial<CommunityEventDetailDto>;
+  const isWaitingForDetail = isLoadingDetail && !fullEvent;
 
   const [title, setTitle] = React.useState(event.title);
   const [description, setDescription] = React.useState(event.description);
@@ -219,12 +223,24 @@ function EditEventForm({ onClose, event }: EditEventFormProps) {
     e.preventDefault();
     setErrorMsg(null);
 
+    if (isWaitingForDetail) {
+      showFormError(
+        "Detail acara masih dimuat. Tunggu sebentar sebelum menyimpan perubahan.",
+      );
+      return;
+    }
     if (title.trim().length < 3) {
       showFormError("Judul acara minimal 3 karakter.");
       return;
     }
     if (description.trim().length < 10) {
       showFormError("Deskripsi acara minimal 10 karakter.");
+      return;
+    }
+    if (!isUsableAssetUrl(coverUrl.trim())) {
+      showFormError(
+        "URL poster acara tidak valid. Gunakan gambar unggahan atau tautan HTTPS valid.",
+      );
       return;
     }
 
@@ -268,9 +284,13 @@ function EditEventForm({ onClose, event }: EditEventFormProps) {
     const parsedCapacity = capacity.trim() ? Number(capacity.trim()) : null;
     if (
       parsedCapacity !== null &&
-      (!Number.isInteger(parsedCapacity) || parsedCapacity < 1)
+      (!Number.isInteger(parsedCapacity) ||
+        parsedCapacity < 1 ||
+        parsedCapacity > 10000)
     ) {
-      showFormError("Kapasitas kursi harus berupa angka bulat minimal 1.");
+      showFormError(
+        "Kapasitas kursi harus berupa angka bulat antara 1 hingga 10.000.",
+      );
       return;
     }
 
@@ -289,10 +309,24 @@ function EditEventForm({ onClose, event }: EditEventFormProps) {
         })
         .filter((item) => Boolean(item.name));
 
+      const detailLoaded = Boolean(hydratedRef.current);
+      const shouldSendLogistics =
+        detailLoaded || dirtyFieldsRef.current.has("logisticsNotes");
+      const shouldSendMeetingUrl =
+        format === "offline" ||
+        detailLoaded ||
+        dirtyFieldsRef.current.has("onlineMeetingUrl");
+
       await updateMutation.mutateAsync({
         title: title.trim(),
         description: description.trim(),
-        logisticsNotes: logisticsNotes.trim() ? logisticsNotes.trim() : null,
+        ...(shouldSendLogistics
+          ? {
+              logisticsNotes: logisticsNotes.trim()
+                ? logisticsNotes.trim()
+                : null,
+            }
+          : {}),
         eventType,
         categoryTag: categoryTag.trim() || "Literasi",
         visibility,
@@ -303,8 +337,12 @@ function EditEventForm({ onClose, event }: EditEventFormProps) {
         venueAddress: format !== "online" ? venueAddress.trim() || null : null,
         hideAddressUntilApproved:
           format !== "online" ? hideAddressUntilApproved : false,
-        onlineMeetingUrl:
-          format !== "offline" ? (normalizedMeeting ?? null) : null,
+        ...(shouldSendMeetingUrl
+          ? {
+              onlineMeetingUrl:
+                format !== "offline" ? (normalizedMeeting ?? null) : null,
+            }
+          : {}),
         startsAt: startsAtDate.toISOString(),
         endsAt: endsAtDate.toISOString(),
         capacity: parsedCapacity,
@@ -360,6 +398,17 @@ function EditEventForm({ onClose, event }: EditEventFormProps) {
           className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 text-xs"
           style={{ overscrollBehavior: "contain" }}
         >
+          {isDetailError && !fullEvent && (
+            <div
+              role="alert"
+              className="rounded-xl border border-[var(--color-error)]/40 bg-[var(--color-error-soft)] p-3 text-xs font-medium text-[var(--color-error)]"
+            >
+              Gagal memuat detail lengkap acara (tautan rapat &amp; catatan
+              logistik). Kolom yang belum Anda ubah tidak akan ditimpa saat
+              disimpan.
+            </div>
+          )}
+
           {errorMsg && (
             <div
               ref={errorBannerRef}
@@ -497,11 +546,20 @@ function EditEventForm({ onClose, event }: EditEventFormProps) {
               Banner Poster Acara
             </label>
             <div className="flex flex-wrap items-center gap-3">
-              <img
-                src={coverUrl}
-                alt="Pratinjau poster"
-                className="h-14 w-20 rounded-lg border border-border object-cover shrink-0 bg-muted"
-              />
+              {isUsableAssetUrl(coverUrl) ? (
+                <img
+                  src={coverUrl}
+                  alt="Pratinjau poster"
+                  className="h-14 w-20 rounded-lg border border-border object-cover shrink-0 bg-muted"
+                />
+              ) : (
+                <div
+                  aria-label="Pratinjau poster tidak tersedia"
+                  className="h-14 w-20 rounded-lg border border-border shrink-0 bg-muted flex items-center justify-center text-[10px] text-muted-foreground"
+                >
+                  Poster
+                </div>
+              )}
               <div className="min-w-0 flex-1 space-y-2">
                 <Input
                   id="edit-event-cover"
@@ -665,11 +723,17 @@ function EditEventForm({ onClose, event }: EditEventFormProps) {
             <span className="font-semibold text-foreground block">
               Format Pertemuan
             </span>
-            <div className="flex flex-wrap items-center gap-2">
+            <div
+              role="radiogroup"
+              aria-label="Format pertemuan acara"
+              className="flex flex-wrap items-center gap-2"
+            >
               <button
                 type="button"
+                role="radio"
+                aria-checked={format === "offline"}
                 onClick={() => setFormat("offline")}
-                className={`min-h-11 flex-1 rounded-xl border p-2.5 text-center font-medium transition-colors cursor-pointer ${
+                className={`min-h-11 flex-1 rounded-xl border p-2.5 text-center font-medium transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring ${
                   format === "offline"
                     ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-foreground font-semibold"
                     : "border-border bg-[var(--color-paper-2)] text-muted-foreground hover:text-foreground"
@@ -679,8 +743,10 @@ function EditEventForm({ onClose, event }: EditEventFormProps) {
               </button>
               <button
                 type="button"
+                role="radio"
+                aria-checked={format === "online"}
                 onClick={() => setFormat("online")}
-                className={`min-h-11 flex-1 rounded-xl border p-2.5 text-center font-medium transition-colors cursor-pointer ${
+                className={`min-h-11 flex-1 rounded-xl border p-2.5 text-center font-medium transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring ${
                   format === "online"
                     ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-foreground font-semibold"
                     : "border-border bg-[var(--color-paper-2)] text-muted-foreground hover:text-foreground"
@@ -690,8 +756,10 @@ function EditEventForm({ onClose, event }: EditEventFormProps) {
               </button>
               <button
                 type="button"
+                role="radio"
+                aria-checked={format === "hybrid"}
                 onClick={() => setFormat("hybrid")}
-                className={`min-h-11 flex-1 rounded-xl border p-2.5 text-center font-medium transition-colors cursor-pointer ${
+                className={`min-h-11 flex-1 rounded-xl border p-2.5 text-center font-medium transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring ${
                   format === "hybrid"
                     ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-foreground font-semibold"
                     : "border-border bg-[var(--color-paper-2)] text-muted-foreground hover:text-foreground"
@@ -960,10 +1028,14 @@ function EditEventForm({ onClose, event }: EditEventFormProps) {
             </Button>
             <Button
               type="submit"
-              disabled={updateMutation.isPending}
+              disabled={updateMutation.isPending || isWaitingForDetail}
               className="min-h-11 bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:opacity-90 font-semibold px-5"
             >
-              {updateMutation.isPending ? "Menyimpan..." : "Simpan Perubahan"}
+              {updateMutation.isPending
+                ? "Menyimpan..."
+                : isWaitingForDetail
+                  ? "Memuat detail..."
+                  : "Simpan Perubahan"}
             </Button>
           </div>
         </form>

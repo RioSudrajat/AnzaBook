@@ -32,8 +32,11 @@ import {
 } from "@starter/shared/validators/community";
 import { Button } from "@/components/ui/button";
 import { BookCover } from "@/features/books/components/book-cover";
+import { copyTextToClipboard } from "@/features/share/web-share";
 import { authClient } from "@/lib/auth-client";
+import { isUsableAssetUrl } from "@/lib/media-url";
 import { safeExternalHref } from "@/lib/safe-url";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import {
   useCancelRsvp,
   useEventDetail,
@@ -173,17 +176,51 @@ export function EventDetailView({
     }
   };
 
+  const copiedLinkTimerRef = React.useRef<number | null>(null);
+  const copiedTicketTimerRef = React.useRef<number | null>(null);
+  const reportCloseTimerRef = React.useRef<number | null>(null);
+
+  useBodyScrollLock(reportModalOpen);
+
+  React.useEffect(() => {
+    if (!reportModalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setReportModalOpen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [reportModalOpen]);
+
+  React.useEffect(() => {
+    return () => {
+      if (copiedLinkTimerRef.current !== null) {
+        window.clearTimeout(copiedLinkTimerRef.current);
+      }
+      if (copiedTicketTimerRef.current !== null) {
+        window.clearTimeout(copiedTicketTimerRef.current);
+      }
+      if (reportCloseTimerRef.current !== null) {
+        window.clearTimeout(reportCloseTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleCopyShareLink = async () => {
-    try {
-      const shareUrl =
-        typeof window !== "undefined"
-          ? `${window.location.origin}/events/${event.slug}`
-          : `/events/${event.slug}`;
-      await navigator.clipboard.writeText(shareUrl);
+    const encodedSlug = encodeURIComponent(event.slug);
+    const shareUrl =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/events/${encodedSlug}`
+        : `/events/${encodedSlug}`;
+    const ok = await copyTextToClipboard(shareUrl);
+    if (ok) {
       setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2200);
-    } catch {
-      // Ignore clipboard failures on restricted contexts.
+      if (copiedLinkTimerRef.current !== null) {
+        window.clearTimeout(copiedLinkTimerRef.current);
+      }
+      copiedLinkTimerRef.current = window.setTimeout(
+        () => setCopiedLink(false),
+        2200,
+      );
     }
   };
 
@@ -203,19 +240,26 @@ export function EventDetailView({
     if (!reportReason.trim()) return;
     await reportMutation.mutateAsync({ reason: reportReason.trim() });
     setReportSent(true);
-    setTimeout(() => {
+    if (reportCloseTimerRef.current !== null) {
+      window.clearTimeout(reportCloseTimerRef.current);
+    }
+    reportCloseTimerRef.current = window.setTimeout(() => {
       setReportSent(false);
       setReportModalOpen(false);
       setReportReason("");
     }, 1400);
   };
 
-  const googleMapsUrl =
-    event.latitude && event.longitude
-      ? `https://www.google.com/maps/dir/?api=1&destination=${event.latitude},${event.longitude}`
-      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-          `${event.venueName || ""} ${event.district || ""} ${event.city || "Jakarta"}`.trim(),
-        )}`;
+  const hasExactCoords =
+    typeof event.latitude === "number" &&
+    Number.isFinite(event.latitude) &&
+    typeof event.longitude === "number" &&
+    Number.isFinite(event.longitude);
+  const googleMapsUrl = hasExactCoords
+    ? `https://www.google.com/maps/dir/?api=1&destination=${event.latitude},${event.longitude}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+        `${event.venueName || ""} ${event.district || ""} ${event.city || "Jakarta"}`.trim(),
+      )}`;
 
   const isFull =
     event.capacity !== null &&
@@ -450,7 +494,7 @@ export function EventDetailView({
                     <dd className="font-serif text-sm font-bold text-foreground leading-snug">
                       {platformMeta.label}
                     </dd>
-                    {isGoing && meetingHref ? (
+                    {(isGoing || event.canManage) && meetingHref ? (
                       <dd className="pt-0.5">
                         <Button
                           asChild
@@ -493,18 +537,22 @@ export function EventDetailView({
           </div>
 
           <div className="relative order-1 @2xl:order-2 w-full max-w-[260px] @2xl:max-w-none mx-auto">
-            <img
-              src={event.coverUrl}
-              alt=""
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-2 scale-105 rounded-2xl object-cover blur-2xl opacity-35"
-            />
-            <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-[var(--evt-border-subtle,var(--border))] bg-muted shadow-sm">
+            {isUsableAssetUrl(event.coverUrl) && (
               <img
                 src={event.coverUrl}
-                alt={event.title}
-                className="size-full object-cover"
+                alt=""
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-2 scale-105 rounded-2xl object-cover blur-2xl opacity-35"
               />
+            )}
+            <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-[var(--evt-border-subtle,var(--border))] bg-muted shadow-sm">
+              {isUsableAssetUrl(event.coverUrl) && (
+                <img
+                  src={event.coverUrl}
+                  alt={event.title}
+                  className="size-full object-cover"
+                />
+              )}
             </div>
           </div>
         </header>
@@ -620,16 +668,17 @@ export function EventDetailView({
                   Akan Hadir
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  <a
-                    href={`mailto:${event.calendarName.toLowerCase().replace(/\s+/g, "")}@anzabook.com`}
-                    className="min-h-10 inline-flex items-center hover:text-foreground transition-colors"
+                  <Link
+                    to="/c/$slug"
+                    params={{ slug: event.calendarSlug }}
+                    className="min-h-11 inline-flex items-center hover:text-foreground transition-colors focus-visible:outline-2 focus-visible:outline-ring rounded-sm"
                   >
                     Hubungi Penyelenggara
-                  </a>
+                  </Link>
                   <button
                     type="button"
                     onClick={() => setReportModalOpen(true)}
-                    className="min-h-10 inline-flex items-center gap-1 hover:text-[var(--color-error)] transition-colors cursor-pointer"
+                    className="min-h-11 inline-flex items-center gap-1 hover:text-[var(--color-error)] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring rounded-sm"
                   >
                     <Flag className="size-3.5" aria-hidden="true" />
                     <span>Laporkan</span>
@@ -645,14 +694,14 @@ export function EventDetailView({
                         key={idx}
                         className="size-8 rounded-full ring-2 ring-background bg-[var(--color-accent-soft)] text-foreground text-xs font-bold flex items-center justify-center overflow-hidden"
                       >
-                        {att.image ? (
+                        {isUsableAssetUrl(att.image) ? (
                           <img
                             src={att.image}
                             alt={att.name}
                             className="size-full object-cover"
                           />
                         ) : (
-                          att.name[0]
+                          att.name?.trim()?.[0]?.toUpperCase() || "?"
                         )}
                       </div>
                     ))}
@@ -774,15 +823,24 @@ export function EventDetailView({
                           <button
                             type="button"
                             onClick={() => {
-                              if (detail.userRsvp?.checkinCode) {
-                                void navigator.clipboard.writeText(
-                                  detail.userRsvp.checkinCode,
-                                );
+                              const code = detail.userRsvp?.checkinCode;
+                              if (!code) return;
+                              void copyTextToClipboard(code).then((ok) => {
+                                if (!ok) return;
                                 setCopiedTicket(true);
-                                setTimeout(() => setCopiedTicket(false), 2000);
-                              }
+                                if (copiedTicketTimerRef.current !== null) {
+                                  window.clearTimeout(
+                                    copiedTicketTimerRef.current,
+                                  );
+                                }
+                                copiedTicketTimerRef.current =
+                                  window.setTimeout(
+                                    () => setCopiedTicket(false),
+                                    2000,
+                                  );
+                              });
                             }}
-                            className="min-h-9 inline-flex items-center gap-1 px-2 text-xs font-semibold text-[var(--color-accent)] hover:underline cursor-pointer"
+                            className="min-h-11 inline-flex items-center gap-1 px-2 text-xs font-semibold text-[var(--color-accent)] hover:underline cursor-pointer focus-visible:outline-2 focus-visible:outline-ring rounded-sm"
                           >
                             {copiedTicket ? (
                               <>
@@ -987,6 +1045,14 @@ export function EventDetailView({
                         : "Daftar Tunggu"}
                     </Button>
                   </div>
+                ) : isFull && !event.allowWaitlist ? (
+                  <Button
+                    type="button"
+                    disabled
+                    className="w-full min-h-11 rounded-xl font-semibold text-sm opacity-60 cursor-not-allowed"
+                  >
+                    Kapasitas Penuh
+                  </Button>
                 ) : (
                   <Button
                     type="button"
@@ -1086,6 +1152,9 @@ export function EventDetailView({
             role="dialog"
             aria-modal="true"
             aria-labelledby="report-event-title"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setReportModalOpen(false);
+            }}
           >
             <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 text-foreground shadow-2xl">
               <div className="flex items-center justify-between pb-3 border-b border-border">
@@ -1105,7 +1174,7 @@ export function EventDetailView({
                   type="button"
                   onClick={() => setReportModalOpen(false)}
                   aria-label="Tutup dialog laporan"
-                  className="size-10 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
+                  className="size-11 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
                 >
                   <X className="size-4" aria-hidden="true" />
                 </button>

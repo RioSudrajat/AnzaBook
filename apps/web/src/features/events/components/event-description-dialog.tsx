@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { uploadMediaImage } from "@/features/social/api";
+import { isUsableAssetUrl } from "@/lib/media-url";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import {
   markdownToTiptapDoc,
@@ -272,12 +273,24 @@ function TiptapBlockCanvas({
   const canvasRef = React.useRef<HTMLDivElement | null>(null);
   const gutterButtonRef = React.useRef<HTMLButtonElement | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const onLiveChangeRef = React.useRef(onLiveChange);
+  React.useEffect(() => {
+    onLiveChangeRef.current = onLiveChange;
+  }, [onLiveChange]);
 
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
+        link: {
+          openOnClick: false,
+          defaultProtocol: "https",
+          HTMLAttributes: {
+            rel: "noopener noreferrer",
+            target: "_blank",
+          },
+        },
       }),
       Placeholder.configure({
         placeholder: DESCRIPTION_PLACEHOLDER,
@@ -306,7 +319,7 @@ function TiptapBlockCanvas({
       const nextMarkdown = tiptapDocToMarkdown(editor.getJSON());
       setCharCount(nextMarkdown.length);
       if (emitLiveUpdate) {
-        onLiveChange?.(nextMarkdown);
+        onLiveChangeRef.current?.(nextMarkdown);
       }
 
       try {
@@ -333,7 +346,7 @@ function TiptapBlockCanvas({
         // Ignore transient selection positions while ProseMirror mounts.
       }
     },
-    [editor, onLiveChange],
+    [editor],
   );
 
   React.useEffect(() => {
@@ -380,17 +393,20 @@ function TiptapBlockCanvas({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       if (isMenuOpen) {
-        event.stopPropagation();
+        event.preventDefault();
+        event.stopImmediatePropagation();
         setIsMenuOpen(false);
         return;
       }
       if (variant === "modal") {
-        event.stopPropagation();
+        event.preventDefault();
+        event.stopImmediatePropagation();
         onCancel();
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
+    return () =>
+      window.removeEventListener("keydown", handleKeyDown, { capture: true });
   }, [isMenuOpen, onCancel, variant]);
 
   const handleImageFileChange = async (
@@ -404,6 +420,10 @@ function TiptapBlockCanvas({
     setIsUploadingImage(true);
     try {
       const uploaded = await uploadMediaImage(file);
+      if (!isUsableAssetUrl(uploaded.url)) {
+        setUploadError("URL gambar yang dikembalikan server tidak valid.");
+        return;
+      }
       editor
         .chain()
         .focus()

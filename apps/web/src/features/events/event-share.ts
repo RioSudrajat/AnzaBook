@@ -37,6 +37,7 @@ export type EventShareSource = Pick<
   | "city"
   | "venueName"
   | "venueAddress"
+  | "hideAddressUntilApproved"
   | "isAddressHidden"
   | "meetingPlatform"
   | "startsAt"
@@ -427,8 +428,11 @@ export function getSafeEventShareLocation(
     | "city"
     | "isAddressHidden"
     | "meetingPlatform"
-  >,
+  > & { hideAddressUntilApproved?: boolean },
 ): SafeEventShareLocation {
+  const shouldMaskAddress = Boolean(
+    event.hideAddressUntilApproved || event.isAddressHidden,
+  );
   const area = [event.district, event.city]
     .map((part) => part?.trim())
     .filter((part): part is string => Boolean(part))
@@ -446,7 +450,7 @@ export function getSafeEventShareLocation(
 
   if (event.format === "hybrid") {
     const platform = getMeetingPlatformMeta(event.meetingPlatform).label;
-    if (event.isAddressHidden) {
+    if (shouldMaskAddress) {
       return {
         modeLabel: "Hibrida",
         primaryLine: area
@@ -466,7 +470,7 @@ export function getSafeEventShareLocation(
     };
   }
 
-  if (event.isAddressHidden) {
+  if (shouldMaskAddress) {
     return {
       modeLabel: "Tatap Muka",
       primaryLine: area || "Lokasi diumumkan setelah disetujui",

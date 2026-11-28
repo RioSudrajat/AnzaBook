@@ -63,15 +63,16 @@ export function EventAtmosphereDock({
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        event.stopPropagation();
+        event.preventDefault();
+        event.stopImmediatePropagation();
         setOpenPopover(null);
       }
     };
     window.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
     return () => {
       window.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keydown", handleKeyDown, { capture: true });
     };
   }, [openPopover]);
 
@@ -142,7 +143,7 @@ export function EventAtmosphereDock({
                   className="group flex shrink-0 flex-col items-center gap-1.5 rounded-xl p-1 text-center transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
                 >
                   <div
-                    className={`rounded-xl transition-all ${
+                    className={`rounded-xl transition-shadow ${
                       selected
                         ? "ring-2 ring-[var(--color-accent)] ring-offset-2 ring-offset-background"
                         : "ring-1 ring-transparent group-hover:ring-foreground/25"
@@ -429,7 +430,7 @@ export function EventAtmosphereDock({
                     backgroundColor: "var(--popover)",
                     borderColor: "var(--evt-border-subtle, var(--border))",
                   }}
-                  className="absolute inset-x-0 bottom-[calc(100%+0.5rem)] sm:inset-x-auto sm:bottom-13 sm:left-0 z-40 sm:w-64 rounded-2xl border p-3 text-popover-foreground shadow-2xl space-y-2"
+                  className="absolute inset-x-0 bottom-[calc(100%+0.5rem)] sm:inset-x-auto sm:bottom-13 sm:right-0 sm:left-auto z-40 sm:w-64 rounded-2xl border p-3 text-popover-foreground shadow-2xl space-y-2"
                 >
                   <div className="px-1 text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
                     Gaya Huruf Judul
@@ -524,7 +525,7 @@ export function EventAtmosphereDock({
                     backgroundColor: "var(--popover)",
                     borderColor: "var(--evt-border-subtle, var(--border))",
                   }}
-                  className="absolute inset-x-0 bottom-[calc(100%+0.5rem)] sm:inset-x-auto sm:bottom-13 sm:left-0 z-40 sm:w-48 rounded-2xl border p-2 text-popover-foreground shadow-2xl space-y-1"
+                  className="absolute inset-x-0 bottom-[calc(100%+0.5rem)] sm:inset-x-auto sm:bottom-13 sm:right-0 sm:left-auto z-40 sm:w-48 rounded-2xl border p-2 text-popover-foreground shadow-2xl space-y-1"
                 >
                   {EVENT_THEME_MODES.map((modeOpt) => {
                     const active = value.mode === modeOpt.id;
