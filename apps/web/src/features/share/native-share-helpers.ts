@@ -9,7 +9,18 @@ type ShareableNavigator = {
   };
 };
 
-type ClipboardItemConstructor = new (data: Record<string, Blob>) => unknown;
+type ClipboardItemConstructor = new (
+  data: Record<string, Blob | Promise<Blob>>,
+) => unknown;
+
+function isAbortError(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "name" in err &&
+    (err as { name?: unknown }).name === "AbortError"
+  );
+}
 
 function getShareRuntime(): {
   navigator?: ShareableNavigator;
@@ -41,7 +52,7 @@ export async function sharePngFileNative(
     });
     return "shared";
   } catch (err) {
-    if (err instanceof Error && err.name === "AbortError") {
+    if (isAbortError(err)) {
       return "cancelled";
     }
     throw err;
@@ -58,7 +69,9 @@ export function canCopyPngToClipboard(): boolean {
   );
 }
 
-export async function copyPngBlobToClipboard(blob: Blob): Promise<boolean> {
+export async function copyPngBlobToClipboard(
+  blobOrPromise: Blob | Promise<Blob>,
+): Promise<boolean> {
   if (!canCopyPngToClipboard()) {
     return false;
   }
@@ -70,7 +83,7 @@ export async function copyPngBlobToClipboard(blob: Blob): Promise<boolean> {
   try {
     await nav.clipboard.write([
       new ClipboardItemCtor({
-        "image/png": blob,
+        "image/png": blobOrPromise,
       }),
     ]);
     return true;

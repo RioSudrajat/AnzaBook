@@ -44,6 +44,7 @@ function makeEventFixture(
     city: "Jakarta Selatan",
     venueName: "Pasar Santa Lt. 2",
     venueAddress: "Jl. Cipaku I No. 233, Jakarta Selatan",
+    hideAddressUntilApproved: false,
     isAddressHidden: false,
     meetingPlatform: null,
     startsAt: "2026-11-28T12:00:00.000Z", // 19:00 WIB
@@ -71,6 +72,7 @@ describe("Event Share Helpers & OG Preview SVG", () => {
     const offlineHidden = getSafeEventShareLocation(
       makeEventFixture({
         format: "offline",
+        hideAddressUntilApproved: true,
         isAddressHidden: true,
         venueName: "Apartemen Pribadi Unit 12B",
       }),
@@ -78,6 +80,37 @@ describe("Event Share Helpers & OG Preview SVG", () => {
     expect(offlineHidden.isMaskedAddress).toBe(true);
     expect(offlineHidden.primaryLine).toBe("Kebayoran Baru, Jakarta Selatan");
     expect(offlineHidden.primaryLine).not.toContain("Apartemen Pribadi");
+
+    // Host / approved attendee view has isAddressHidden=false while hideAddressUntilApproved=true:
+    // public share outputs MUST STILL mask the private venueName!
+    const hostSharingPrivateVenue = getSafeEventShareLocation(
+      makeEventFixture({
+        format: "offline",
+        hideAddressUntilApproved: true,
+        isAddressHidden: false,
+        venueName: "Rumah Host Rahasia 42",
+      }),
+    );
+    expect(hostSharingPrivateVenue.isMaskedAddress).toBe(true);
+    expect(hostSharingPrivateVenue.primaryLine).toBe(
+      "Kebayoran Baru, Jakarta Selatan",
+    );
+    expect(hostSharingPrivateVenue.primaryLine).not.toContain("Rumah Host");
+
+    const hostCaption = buildEventShareCaption(
+      makeEventFixture({
+        format: "hybrid",
+        meetingPlatform: "google_meet",
+        hideAddressUntilApproved: true,
+        isAddressHidden: false,
+        venueName: "Studio Pribadi Host",
+      }),
+      "https://anzabook.id/events/privat",
+    );
+    expect(hostCaption).not.toContain("Studio Pribadi Host");
+    expect(hostCaption).toContain(
+      "Kebayoran Baru, Jakarta Selatan & Google Meet",
+    );
 
     const online = getSafeEventShareLocation(
       makeEventFixture({
@@ -211,17 +244,21 @@ describe("Event Share Helpers & OG Preview SVG", () => {
     shareMock.mockRejectedValueOnce(abortErr);
     expect(await sharePngFileNative(file)).toBe("cancelled");
 
+    // Non-Error DOMException shape on older WebViews
+    shareMock.mockRejectedValueOnce({ name: "AbortError" });
+    expect(await sharePngFileNative(file)).toBe("cancelled");
+
     canShareMock.mockReturnValueOnce(false);
     expect(await sharePngFileNative(file)).toBe("unsupported");
   });
 
-  it("copies PNG blobs to clipboard when ClipboardItem is supported and falls back cleanly", async () => {
+  it("copies PNG blobs (and Promise<Blob> for Safari) to clipboard when ClipboardItem is supported and falls back cleanly", async () => {
     const blob = new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" });
     const writeMock = vi.fn().mockResolvedValue(undefined);
 
     class FakeClipboardItem {
-      data: Record<string, Blob>;
-      constructor(data: Record<string, Blob>) {
+      data: Record<string, Blob | Promise<Blob>>;
+      constructor(data: Record<string, Blob | Promise<Blob>>) {
         this.data = data;
       }
     }
@@ -232,7 +269,8 @@ describe("Event Share Helpers & OG Preview SVG", () => {
     });
 
     expect(await copyPngBlobToClipboard(blob)).toBe(true);
-    expect(writeMock).toHaveBeenCalledTimes(1);
+    expect(await copyPngBlobToClipboard(Promise.resolve(blob))).toBe(true);
+    expect(writeMock).toHaveBeenCalledTimes(2);
 
     writeMock.mockRejectedValueOnce(new Error("Denied"));
     expect(await copyPngBlobToClipboard(blob)).toBe(false);

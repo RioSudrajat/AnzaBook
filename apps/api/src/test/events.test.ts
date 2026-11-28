@@ -1449,4 +1449,122 @@ describe("Community Calendars & Events API", () => {
     expect(checkinCanceled.status).toBe(409);
     expect(checkinCanceled.body.error.code).toBe("RSVP_NOT_CONFIRMED");
   });
+
+  it("blocks unverified calendars from upgrading private_link to public via PATCH and returns 404 for unknown bookId", async () => {
+    const owner = agent();
+    await signUp(owner, "Pemilik Kalender Pending");
+
+    const calSlug = `cal-pending-patch-${Date.now()}`;
+    const calRes = await owner
+      .post("/api/events/calendars")
+      .set(originHeader)
+      .send({ name: "Komunitas Belum Verifikasi", slug: calSlug });
+    expect(calRes.status).toBe(201);
+    expect(calRes.body.data.verificationStatus).toBe("pending");
+
+    const evRes = await owner
+      .post("/api/events")
+      .set(originHeader)
+      .send({
+        calendarId: calRes.body.data.id,
+        title: "Diskusi Privat Awal",
+        description: "Acara privat untuk uji proteksi verifikasi kalender.",
+        coverUrl: "https://example.com/private.jpg",
+        visibility: "private_link",
+        format: "online",
+        onlineMeetingUrl: "https://meet.google.com/private-only",
+        startsAt: new Date(Date.now() + 86400_000).toISOString(),
+        endsAt: new Date(Date.now() + 90000_000).toISOString(),
+      });
+    expect(evRes.status).toBe(201);
+    const slug = evRes.body.data.slug;
+
+    const upgradeRes = await owner
+      .patch(`/api/events/${slug}`)
+      .set(originHeader)
+      .send({ visibility: "public" });
+    expect(upgradeRes.status).toBe(403);
+    expect(upgradeRes.body.error.code).toBe("CALENDAR_NOT_VERIFIED");
+
+    const badBookRes = await owner
+      .patch(`/api/events/${slug}`)
+      .set(originHeader)
+      .send({ bookId: "00000000-0000-4000-8000-000000000099" });
+    expect(badBookRes.status).toBe(404);
+    expect(badBookRes.body.error.code).toBe("BOOK_NOT_FOUND");
+  });
+
+  it("prevents ?q= search oracle from leaking hidden venueName to anonymous or unapproved users", async () => {
+    const host = agent();
+    const hostEmail = await signUp(host, "Host Oracle Guard");
+    await setRole(hostEmail, "admin");
+
+    const calSlug = `cal-oracle-${Date.now()}`;
+    const calRes = await host
+      .post("/api/events/calendars")
+      .set(originHeader)
+      .send({ name: "Komunitas Rahasia", slug: calSlug });
+    expect(calRes.status).toBe(201);
+
+    const secretVenue = `StudioRahasiaUnik${Date.now()}`;
+    const evRes = await host
+      .post("/api/events")
+      .set(originHeader)
+      .send({
+        calendarId: calRes.body.data.id,
+        title: "Diskusi Sastra Tertutup",
+        description:
+          "Acara tatap muka dengan alamat disembunyikan sebelum disetujui.",
+        coverUrl: "https://example.com/hidden-venue.jpg",
+        visibility: "public",
+        format: "offline",
+        venueName: secretVenue,
+        venueAddress: "Jl. Rahasia No. 88",
+        district: "Kemang",
+        city: "Jakarta Selatan",
+        hideAddressUntilApproved: true,
+        requiresApproval: true,
+        startsAt: new Date(Date.now() + 86400_000).toISOString(),
+        endsAt: new Date(Date.now() + 90000_000).toISOString(),
+      });
+    expect(evRes.status).toBe(201);
+    const slug = evRes.body.data.slug;
+
+    // Anonymous search by hidden venueName must return 0 matches
+    const anonSearch = await agent().get(
+      `/api/events?calendarSlug=${calSlug}&q=${encodeURIComponent(secretVenue)}`,
+    );
+    expect(anonSearch.status).toBe(200);
+    expect(anonSearch.body.data).toHaveLength(0);
+
+    // Pending (unapproved) attendee search must also return 0 matches
+    const reader = agent();
+    await signUp(reader, "Pembaca Pending Oracle");
+    const rsvpRes = await reader
+      .post(`/api/events/${slug}/rsvp`)
+      .set(originHeader)
+      .send({});
+    expect(rsvpRes.status).toBe(201);
+    expect(rsvpRes.body.data.status).toBe("pending_approval");
+
+    const pendingSearch = await reader.get(
+      `/api/events?calendarSlug=${calSlug}&q=${encodeURIComponent(secretVenue)}`,
+    );
+    expect(pendingSearch.status).toBe(200);
+    expect(pendingSearch.body.data).toHaveLength(0);
+
+    // Once approved (going), reader can find it by venueName
+    const approveRes = await host
+      .post(`/api/events/${slug}/rsvp/${rsvpRes.body.data.id}/approve`)
+      .set(originHeader)
+      .send();
+    expect(approveRes.status).toBe(200);
+
+    const approvedSearch = await reader.get(
+      `/api/events?calendarSlug=${calSlug}&q=${encodeURIComponent(secretVenue)}`,
+    );
+    expect(approvedSearch.status).toBe(200);
+    expect(approvedSearch.body.data).toHaveLength(1);
+    expect(approvedSearch.body.data[0].slug).toBe(slug);
+  });
 });

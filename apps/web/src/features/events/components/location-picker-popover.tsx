@@ -53,12 +53,14 @@ export function LocationPickerPopover({
     if (!isOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        event.stopPropagation();
+        event.preventDefault();
+        event.stopImmediatePropagation();
         setIsOpen(false);
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
+    return () =>
+      window.removeEventListener("keydown", handleKeyDown, { capture: true });
   }, [isOpen]);
 
   React.useEffect(() => {
@@ -67,6 +69,7 @@ export function LocationPickerPopover({
       return;
     }
 
+    const controller = new AbortController();
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(
@@ -74,12 +77,13 @@ export function LocationPickerPopover({
             searchQuery,
           )}&format=json&addressdetails=1&limit=5&countrycodes=id`,
           {
+            signal: controller.signal,
             headers: {
               "Accept-Language": "id",
             },
           },
         );
-        if (res.ok) {
+        if (res.ok && !controller.signal.aborted) {
           interface NominatimItem {
             namedetails?: { name?: string };
             name?: string;
@@ -95,29 +99,39 @@ export function LocationPickerPopover({
             };
           }
           const items = (await res.json()) as NominatimItem[];
-          const parsed = items.map((item) => ({
-            name:
-              item.namedetails?.name ||
-              item.name ||
-              item.display_name.split(",")[0],
-            address: item.display_name,
-            lat: Number.parseFloat(item.lat),
-            lng: Number.parseFloat(item.lon),
-            city:
-              item.address?.city ||
-              item.address?.town ||
-              item.address?.county ||
-              "Jakarta",
-            district: item.address?.suburb || item.address?.city_district || "",
-          }));
-          setOsmResults(parsed);
+          const parsed = items
+            .map((item) => ({
+              name:
+                item.namedetails?.name ||
+                item.name ||
+                item.display_name.split(",")[0],
+              address: item.display_name,
+              lat: Number.parseFloat(item.lat),
+              lng: Number.parseFloat(item.lon),
+              city:
+                item.address?.city ||
+                item.address?.town ||
+                item.address?.county ||
+                "",
+              district:
+                item.address?.suburb || item.address?.city_district || "",
+            }))
+            .filter(
+              (item) => Number.isFinite(item.lat) && Number.isFinite(item.lng),
+            );
+          if (!controller.signal.aborted) {
+            setOsmResults(parsed);
+          }
         }
       } catch {
-        // Fallback gracefully on network timeout
+        // Fallback gracefully on network timeout or abort
       }
     }, 400);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [searchQuery]);
 
   const handleSelectVenue = (venue: {
@@ -157,6 +171,14 @@ export function LocationPickerPopover({
   };
 
   const hasLocation = Boolean(value.venueName || value.onlineMeetingUrl);
+  const isTemplateMeetingUrl =
+    value.onlineMeetingUrl === "https://zoom.us/j/anzabook-session" ||
+    value.onlineMeetingUrl === "https://meet.google.com/anzabook-diskusi";
+  const hasSourceCoords =
+    typeof value.placeSourceLat === "number" &&
+    Number.isFinite(value.placeSourceLat) &&
+    typeof value.placeSourceLng === "number" &&
+    Number.isFinite(value.placeSourceLng);
 
   return (
     <div className="relative w-full">
@@ -196,7 +218,9 @@ export function LocationPickerPopover({
                 </span>
               ) : (
                 <span className="ml-2 text-xs text-muted-foreground">
-                  · Tautan tersemat
+                  {isTemplateMeetingUrl
+                    ? "· Tautan contoh (ubah sebelum publikasi)"
+                    : "· Tautan tersemat"}
                 </span>
               )}
             </span>
@@ -219,7 +243,7 @@ export function LocationPickerPopover({
 
       {isOpen && (
         <div
-          className="absolute top-full left-0 z-40 mt-2 w-full min-w-[300px] max-w-full rounded-xl border border-border bg-card p-3 text-foreground shadow-2xl"
+          className="absolute top-full left-0 z-40 mt-2 w-full min-w-0 max-w-full rounded-xl border border-border bg-card p-3 text-foreground shadow-2xl"
           style={{ overscrollBehavior: "contain" }}
         >
           <div className="relative mb-3">
@@ -257,7 +281,7 @@ export function LocationPickerPopover({
                 const rawQuery = searchQuery.trim();
                 const looksVirtual =
                   /^https?:\/\//i.test(rawQuery) ||
-                  /^(meet\.google\.com|zoom\.us|teams\.microsoft\.com)\//i.test(
+                  /^(meet\.google\.com|g\.co\/meet|zoom\.us|[a-z0-9-]+\.zoom\.us|teams\.microsoft\.com|teams\.live\.com|discord\.gg|discord\.com|youtu\.be|youtube\.com)\//i.test(
                     rawQuery,
                   );
                 const virtualUrl = looksVirtual
@@ -310,7 +334,7 @@ export function LocationPickerPopover({
                         venueName: rawQuery,
                         venueAddress: rawQuery,
                         district: "",
-                        city: value.city || "Jakarta",
+                        city: value.city || "",
                         latitude: undefined,
                         longitude: undefined,
                         placeSourceLat: undefined,
@@ -467,26 +491,30 @@ export function LocationPickerPopover({
         </div>
       )}
 
-      {value.venueName && value.placeSourceLat && value.placeSourceLng && (
+      {value.venueName && (
         <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-[var(--color-paper-2)] px-3 py-2 text-xs">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Sliders
               className="size-3.5 text-[var(--color-accent)]"
               aria-hidden="true"
             />
-            <span>Pin Peta Lokasi</span>
+            <span>
+              {hasSourceCoords ? "Pin Peta Lokasi" : "Privasi Lokasi"}
+            </span>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setIsAdjustingPin(true)}
-              className="min-h-10 font-semibold text-[var(--color-accent)] hover:underline underline-offset-2 cursor-pointer"
-            >
-              Sesuaikan Pin
-            </button>
+            {hasSourceCoords && (
+              <button
+                type="button"
+                onClick={() => setIsAdjustingPin(true)}
+                className="min-h-11 font-semibold text-[var(--color-accent)] hover:underline underline-offset-2 cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                Sesuaikan Pin
+              </button>
+            )}
 
-            <label className="min-h-10 flex items-center gap-1.5 cursor-pointer text-muted-foreground hover:text-foreground">
+            <label className="min-h-11 flex items-center gap-1.5 cursor-pointer text-muted-foreground hover:text-foreground">
               <input
                 type="checkbox"
                 checked={value.hideAddressUntilApproved}
@@ -506,23 +534,33 @@ export function LocationPickerPopover({
         </div>
       )}
 
-      {value.placeSourceLat && value.placeSourceLng && (
-        <AdjustPinMapDialog
-          open={isAdjustingPin}
-          onClose={() => setIsAdjustingPin(false)}
-          sourceLat={value.placeSourceLat}
-          sourceLng={value.placeSourceLng}
-          currentLat={value.latitude || value.placeSourceLat}
-          currentLng={value.longitude || value.placeSourceLng}
-          onSave={(lat, lng) =>
-            onChange({
-              ...value,
-              latitude: lat,
-              longitude: lng,
-            })
-          }
-        />
-      )}
+      {hasSourceCoords &&
+        typeof value.placeSourceLat === "number" &&
+        typeof value.placeSourceLng === "number" && (
+          <AdjustPinMapDialog
+            open={isAdjustingPin}
+            onClose={() => setIsAdjustingPin(false)}
+            sourceLat={value.placeSourceLat}
+            sourceLng={value.placeSourceLng}
+            currentLat={
+              typeof value.latitude === "number"
+                ? value.latitude
+                : value.placeSourceLat
+            }
+            currentLng={
+              typeof value.longitude === "number"
+                ? value.longitude
+                : value.placeSourceLng
+            }
+            onSave={(lat, lng) =>
+              onChange({
+                ...value,
+                latitude: lat,
+                longitude: lng,
+              })
+            }
+          />
+        )}
     </div>
   );
 }

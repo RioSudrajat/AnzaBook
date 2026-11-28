@@ -33,11 +33,7 @@ export async function canvasToPngBlob(
   });
 }
 
-export async function downloadCanvasPng(
-  canvas: HTMLCanvasElement,
-  filename: string,
-): Promise<void> {
-  const blob = await canvasToPngBlob(canvas);
+export function downloadPngBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -47,6 +43,14 @@ export async function downloadCanvasPng(
   link.click();
   document.body.removeChild(link);
   window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+export async function downloadCanvasPng(
+  canvas: HTMLCanvasElement,
+  filename: string,
+): Promise<void> {
+  const blob = await canvasToPngBlob(canvas);
+  downloadPngBlob(blob, filename);
 }
 
 export function canShareFilesNatively(): boolean {

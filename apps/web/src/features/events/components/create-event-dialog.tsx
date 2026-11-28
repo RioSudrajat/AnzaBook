@@ -25,12 +25,14 @@ import {
   encodeEventThemeSpec,
   getMeetingPlatformMeta,
   parseEventThemeSpec,
+  sanitizeCoHostAvatarUrl,
   type CreateEventInput,
   type EventThemeSpec,
 } from "@starter/shared/validators/community";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
+import { isUsableAssetUrl } from "@/lib/media-url";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { useCatalogBooks } from "@/features/books/hooks";
 import { uploadMediaImage } from "@/features/social/api";
@@ -98,6 +100,40 @@ const INDONESIAN_MONTHS_SHORT = [
   "Des",
 ] as const;
 
+function getJakartaDateParts(date: Date): {
+  weekday: string;
+  day: number;
+  month: string;
+} {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Jakarta",
+    weekday: "short",
+    day: "numeric",
+    month: "numeric",
+  }).formatToParts(date);
+  const lookup = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value ?? "";
+  const weekdayMap: Record<string, number> = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  };
+  const weekdayIdx = weekdayMap[lookup("weekday")] ?? date.getUTCDay();
+  const monthIdx = Math.max(
+    0,
+    Math.min(11, (Number(lookup("month")) || 1) - 1),
+  );
+  return {
+    weekday: INDONESIAN_WEEKDAYS[weekdayIdx] ?? "Agenda",
+    day: Number(lookup("day")) || date.getUTCDate(),
+    month: INDONESIAN_MONTHS_SHORT[monthIdx] ?? "Jan",
+  };
+}
+
 function formatSchedulePreview(
   startDate: string,
   startTime: string,
@@ -116,13 +152,12 @@ function formatSchedulePreview(
   }
 
   const diffMinutes = Math.round((end.getTime() - start.getTime()) / 60000);
-  const weekday = INDONESIAN_WEEKDAYS[start.getDay()];
-  const day = start.getDate();
-  const month = INDONESIAN_MONTHS_SHORT[start.getMonth()];
+  const startParts = getJakartaDateParts(start);
+  const endParts = getJakartaDateParts(end);
 
   if (diffMinutes <= 0) {
     return {
-      label: `${weekday}, ${day} ${month} · ${startTime} WIB`,
+      label: `${startParts.weekday}, ${startParts.day} ${startParts.month} · ${startTime} WIB`,
       durationLabel: "Waktu selesai harus setelah waktu mulai",
       isInvalid: true,
     };
@@ -137,10 +172,10 @@ function formatSchedulePreview(
   const sameDay = startDate === endDate;
   const timeRange = sameDay
     ? `${startTime}–${endTime} WIB`
-    : `${startTime} WIB s.d. ${endDate}`;
+    : `${startTime} WIB s.d. ${endParts.day} ${endParts.month} ${endTime} WIB`;
 
   return {
-    label: `${weekday}, ${day} ${month} · ${timeRange}`,
+    label: `${startParts.weekday}, ${startParts.day} ${startParts.month} · ${timeRange}`,
     durationLabel: durationParts.join(" "),
     isInvalid: false,
   };
@@ -211,10 +246,10 @@ function CreateEventForm({ onClose, onSuccess }: CreateEventFormProps) {
   const [endTime, setEndTime] = React.useState(defaults.endTime);
 
   const [locationState, setLocationState] =
-    React.useState<SelectedLocationState>(defaults.locationState);
-  const [onlineMeetingUrl, setOnlineMeetingUrl] = React.useState(
-    defaults.onlineMeetingUrl,
-  );
+    React.useState<SelectedLocationState>({
+      ...defaults.locationState,
+      onlineMeetingUrl: defaults.onlineMeetingUrl || undefined,
+    });
 
   const [description, setDescription] = React.useState(defaults.description);
   const [logisticsNotes, setLogisticsNotes] = React.useState(
@@ -330,36 +365,18 @@ function CreateEventForm({ onClose, onSuccess }: CreateEventFormProps) {
     setIsUploadingPoster(true);
     try {
       const uploaded = await uploadMediaImage(file);
+      if (!isUsableAssetUrl(uploaded.url)) {
+        reportFormError("URL poster yang dikembalikan server tidak valid.");
+        return;
+      }
       setCoverUrl(uploaded.url);
-    } catch {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          const maxDim = 800;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height && width > maxDim) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          } else if (height > maxDim) {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, width, height);
-            setCoverUrl(canvas.toDataURL("image/jpeg", 0.8));
-          }
-        };
-        img.src = String(event.target?.result || "");
-      };
-      reader.readAsDataURL(file);
+    } catch (err: unknown) {
+      reportFormError(
+        formatEventApiError(
+          err,
+          "Gagal mengunggah poster (JPG/PNG/WebP maks. 5 MB).",
+        ),
+      );
     } finally {
       setIsUploadingPoster(false);
     }
@@ -381,8 +398,7 @@ function CreateEventForm({ onClose, onSuccess }: CreateEventFormProps) {
     }
 
     const activeFormat = locationState.format;
-    const rawMeetingUrl =
-      onlineMeetingUrl.trim() || locationState.onlineMeetingUrl?.trim() || "";
+    const rawMeetingUrl = locationState.onlineMeetingUrl?.trim() || "";
     const normalizedMeetingUrl = normalizeOptionalHttpUrl(rawMeetingUrl);
     const hasPhysicalVenue = Boolean(
       locationState.venueName?.trim() || locationState.venueAddress?.trim(),
@@ -417,15 +433,25 @@ function CreateEventForm({ onClose, onSuccess }: CreateEventFormProps) {
       return;
     }
 
-    const startIso = new Date(
-      `${startDate}T${startTime}:00+07:00`,
-    ).toISOString();
-    const endIso = new Date(`${endDate}T${endTime}:00+07:00`).toISOString();
-
-    if (new Date(endIso) <= new Date(startIso)) {
+    const startDateObj = new Date(`${startDate}T${startTime}:00+07:00`);
+    const endDateObj = new Date(`${endDate}T${endTime}:00+07:00`);
+    if (
+      !startDate ||
+      !startTime ||
+      !endDate ||
+      !endTime ||
+      Number.isNaN(startDateObj.getTime()) ||
+      Number.isNaN(endDateObj.getTime())
+    ) {
+      reportFormError("Tanggal dan jam mulai maupun selesai wajib diisi.");
+      return;
+    }
+    if (endDateObj <= startDateObj) {
       reportFormError("Waktu selesai harus setelah waktu mulai.");
       return;
     }
+    const startIso = startDateObj.toISOString();
+    const endIso = endDateObj.toISOString();
 
     const normalizedWorkUrl = workUrl.trim()
       ? normalizeOptionalHttpUrl(workUrl)
@@ -437,15 +463,41 @@ function CreateEventForm({ onClose, onSuccess }: CreateEventFormProps) {
       return;
     }
 
-    const parsedCapacity = Math.min(
-      10000,
-      Math.max(1, Number.parseInt(capacityInput, 10) || 1),
-    );
+    let parsedCapacity: number | undefined;
+    if (!isUnlimitedCapacity) {
+      const numericCap = Number(capacityInput.trim());
+      if (
+        !capacityInput.trim() ||
+        !Number.isInteger(numericCap) ||
+        numericCap < 1 ||
+        numericCap > 10000
+      ) {
+        reportFormError(
+          "Kapasitas kursi harus berupa angka bulat antara 1 hingga 10.000.",
+        );
+        return;
+      }
+      parsedCapacity = numericCap;
+    }
+
+    const sanitizedCoHosts: EventCoHostDto[] = coHosts
+      .map((item) => {
+        const cleanName = item.name.trim();
+        const cleanRole = item.roleLabel?.trim();
+        const cleanAvatar = sanitizeCoHostAvatarUrl(item.avatarUrl);
+        return {
+          ...(item.userId ? { userId: item.userId } : {}),
+          name: cleanName,
+          ...(cleanAvatar ? { avatarUrl: cleanAvatar } : {}),
+          ...(cleanRole ? { roleLabel: cleanRole } : {}),
+        };
+      })
+      .filter((item) => Boolean(item.name));
 
     try {
       const payload: CreateEventInput = {
         calendarId: effectiveCalendarId,
-        bookId: selectedBookId || undefined,
+        bookId: isLinkingWork && selectedBookId ? selectedBookId : undefined,
         title: title.trim(),
         description: description.trim(),
         logisticsNotes: logisticsNotes.trim() || undefined,
@@ -475,6 +527,10 @@ function CreateEventForm({ onClose, onSuccess }: CreateEventFormProps) {
           activeFormat !== "online" ? locationState.latitude : undefined,
         longitude:
           activeFormat !== "online" ? locationState.longitude : undefined,
+        placeSourceLat:
+          activeFormat !== "online" ? locationState.placeSourceLat : undefined,
+        placeSourceLng:
+          activeFormat !== "online" ? locationState.placeSourceLng : undefined,
         onlineMeetingUrl:
           activeFormat !== "offline" ? normalizedMeetingUrl : undefined,
         hideAddressUntilApproved:
@@ -484,10 +540,10 @@ function CreateEventForm({ onClose, onSuccess }: CreateEventFormProps) {
         startsAt: startIso,
         endsAt: endIso,
         timezone: "Asia/Jakarta",
-        capacity: isUnlimitedCapacity ? undefined : parsedCapacity,
+        capacity: parsedCapacity,
         requiresApproval,
         allowWaitlist: true,
-        coHosts,
+        coHosts: sanitizedCoHosts,
       };
 
       if (isLinkingWork && workTitle.trim()) {
@@ -512,8 +568,10 @@ function CreateEventForm({ onClose, onSuccess }: CreateEventFormProps) {
     EVENT_TYPE_OPTIONS.find((item) => item.id === eventType) ||
     EVENT_TYPE_OPTIONS[0];
   const descriptionExcerpt = eventDescriptionToPlainExcerpt(description);
-  const effectiveMeetingUrl =
-    onlineMeetingUrl || locationState.onlineMeetingUrl || "";
+  const effectiveMeetingUrl = locationState.onlineMeetingUrl || "";
+  const isTemplateMeetingUrl =
+    effectiveMeetingUrl === "https://zoom.us/j/anzabook-session" ||
+    effectiveMeetingUrl === "https://meet.google.com/anzabook-diskusi";
   const normalizedPreviewMeeting =
     normalizeOptionalHttpUrl(effectiveMeetingUrl);
   const detectedMeetingPlatform = detectMeetingPlatform(
@@ -1095,13 +1153,12 @@ function CreateEventForm({ onClose, onSuccess }: CreateEventFormProps) {
                               onClick={() => {
                                 const url =
                                   "https://meet.google.com/anzabook-diskusi";
-                                setOnlineMeetingUrl(url);
                                 setLocationState((prev) => ({
                                   ...prev,
                                   onlineMeetingUrl: url,
                                 }));
                               }}
-                              className="min-h-9 rounded-lg border border-[var(--evt-border-subtle,var(--border))] bg-card px-2.5 text-[11px] font-medium text-foreground hover:border-[var(--color-accent)] transition-colors cursor-pointer"
+                              className="min-h-11 rounded-lg border border-[var(--evt-border-subtle,var(--border))] bg-card px-2.5 text-[11px] font-medium text-foreground hover:border-[var(--color-accent)] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
                             >
                               + Google Meet
                             </button>
@@ -1110,13 +1167,12 @@ function CreateEventForm({ onClose, onSuccess }: CreateEventFormProps) {
                               onClick={() => {
                                 const url =
                                   "https://zoom.us/j/anzabook-session";
-                                setOnlineMeetingUrl(url);
                                 setLocationState((prev) => ({
                                   ...prev,
                                   onlineMeetingUrl: url,
                                 }));
                               }}
-                              className="min-h-9 rounded-lg border border-[var(--evt-border-subtle,var(--border))] bg-card px-2.5 text-[11px] font-medium text-foreground hover:border-[var(--color-accent)] transition-colors cursor-pointer"
+                              className="min-h-11 rounded-lg border border-[var(--evt-border-subtle,var(--border))] bg-card px-2.5 text-[11px] font-medium text-foreground hover:border-[var(--color-accent)] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
                             >
                               + Zoom
                             </button>
@@ -1133,7 +1189,6 @@ function CreateEventForm({ onClose, onSuccess }: CreateEventFormProps) {
                           value={effectiveMeetingUrl}
                           onChange={(e) => {
                             const val = e.target.value;
-                            setOnlineMeetingUrl(val);
                             setLocationState((prev) => ({
                               ...prev,
                               onlineMeetingUrl: val,
@@ -1150,11 +1205,24 @@ function CreateEventForm({ onClose, onSuccess }: CreateEventFormProps) {
                               aria-hidden="true"
                             />
                             <span>
-                              Terdeteksi{" "}
-                              <strong>{previewPlatformMeta.label}</strong>:
-                              peserta hanya melihat tombol{" "}
-                              <strong>{previewPlatformMeta.ctaLabel}</strong>{" "}
-                              tanpa alamat URL mentah.
+                              {isTemplateMeetingUrl ? (
+                                <>
+                                  Menggunakan tautan contoh{" "}
+                                  <strong>{previewPlatformMeta.label}</strong>.
+                                  Ganti dengan tautan ruang rapat aslimu sebelum
+                                  mempublikasikan acara.
+                                </>
+                              ) : (
+                                <>
+                                  Terdeteksi{" "}
+                                  <strong>{previewPlatformMeta.label}</strong>:
+                                  peserta hanya melihat tombol{" "}
+                                  <strong>
+                                    {previewPlatformMeta.ctaLabel}
+                                  </strong>{" "}
+                                  tanpa alamat URL mentah.
+                                </>
+                              )}
                             </span>
                           </div>
                         ) : (

@@ -536,10 +536,36 @@ export async function listEvents(
   }
   if (query.q && query.q.trim()) {
     const pattern = `%${escapeIlikePattern(query.q.trim())}%`;
+    const canMatchVenue =
+      currentUserId && currentUserRole === "admin"
+        ? ilike(communityEvents.venueName, pattern)
+        : currentUserId
+          ? and(
+              ilike(communityEvents.venueName, pattern),
+              or(
+                eq(communityEvents.hideAddressUntilApproved, false),
+                sql`EXISTS (
+                  SELECT 1 FROM ${communityCalendarMembers}
+                  WHERE ${communityCalendarMembers.calendarId} = ${communityEvents.calendarId}
+                    AND ${communityCalendarMembers.userId} = ${currentUserId}
+                    AND ${communityCalendarMembers.role} IN ('owner', 'admin')
+                )`,
+                sql`EXISTS (
+                  SELECT 1 FROM ${eventRsvps}
+                  WHERE ${eventRsvps.eventId} = ${communityEvents.id}
+                    AND ${eventRsvps.userId} = ${currentUserId}
+                    AND ${eventRsvps.status} = 'going'
+                )`,
+              ),
+            )
+          : and(
+              eq(communityEvents.hideAddressUntilApproved, false),
+              ilike(communityEvents.venueName, pattern),
+            );
     conditions.push(
       or(
         ilike(communityEvents.title, pattern),
-        ilike(communityEvents.venueName, pattern),
+        canMatchVenue,
         ilike(communityEvents.city, pattern),
         ilike(communityEvents.district, pattern),
         ilike(communityEvents.categoryTag, pattern),
@@ -710,6 +736,26 @@ export async function listEvents(
   const eventIds = items.map((r) => r.event.id);
   const calendarIds = [...new Set(items.map((r) => r.calendar.id))];
 
+  const rankedPreviews = db
+    .select({
+      eventId: eventRsvps.eventId,
+      userId: user.id,
+      name: user.name,
+      image: user.image,
+      rn: sql<number>`row_number() over (partition by ${eventRsvps.eventId} order by ${eventRsvps.createdAt} asc, ${eventRsvps.id} asc)`.as(
+        "rn",
+      ),
+    })
+    .from(eventRsvps)
+    .innerJoin(user, eq(eventRsvps.userId, user.id))
+    .where(
+      and(
+        inArray(eventRsvps.eventId, eventIds),
+        eq(eventRsvps.status, "going"),
+      ),
+    )
+    .as("ranked_event_previews");
+
   const [goingCounts, previewRows, userRsvpRows, managerRows] =
     await Promise.all([
       db
@@ -727,20 +773,13 @@ export async function listEvents(
         .groupBy(eventRsvps.eventId),
       db
         .select({
-          eventId: eventRsvps.eventId,
-          userId: user.id,
-          name: user.name,
-          image: user.image,
+          eventId: rankedPreviews.eventId,
+          userId: rankedPreviews.userId,
+          name: rankedPreviews.name,
+          image: rankedPreviews.image,
         })
-        .from(eventRsvps)
-        .innerJoin(user, eq(eventRsvps.userId, user.id))
-        .where(
-          and(
-            inArray(eventRsvps.eventId, eventIds),
-            eq(eventRsvps.status, "going"),
-          ),
-        )
-        .orderBy(eventRsvps.createdAt),
+        .from(rankedPreviews)
+        .where(sql`${rankedPreviews.rn} <= 5`),
       currentUserId
         ? db
             .select({
@@ -1566,6 +1605,39 @@ export async function updateEvent(
       "FORBIDDEN",
       "Hanya pengelola kalender yang dapat memperbarui acara.",
     );
+  }
+
+  if (input.visibility === "public" && userRole !== "admin") {
+    const [calendar] = await db
+      .select({ verificationStatus: communityCalendars.verificationStatus })
+      .from(communityCalendars)
+      .where(eq(communityCalendars.id, event.calendarId))
+      .limit(1);
+    const isVerified =
+      calendar?.verificationStatus === "verified" ||
+      calendar?.verificationStatus === "trusted";
+    if (!isVerified) {
+      throw new HttpError(
+        403,
+        "CALENDAR_NOT_VERIFIED",
+        "Komunitas harus terverifikasi oleh kurasi admin sebelum dapat mempublikasikan acara publik.",
+      );
+    }
+  }
+
+  if (input.bookId) {
+    const [linkedBook] = await db
+      .select({ id: books.id })
+      .from(books)
+      .where(eq(books.id, input.bookId))
+      .limit(1);
+    if (!linkedBook) {
+      throw new HttpError(
+        404,
+        "BOOK_NOT_FOUND",
+        "Buku yang ditautkan tidak ditemukan.",
+      );
+    }
   }
 
   const nextStartsAt = input.startsAt

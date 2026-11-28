@@ -208,6 +208,22 @@ function drawClampedLines(
   return { nextY: cursorY, lineCount: visible.length };
 }
 
+function truncateSingleLine(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+): string {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let candidate = text.trim();
+  while (
+    candidate.length > 1 &&
+    ctx.measureText(`${candidate}...`).width > maxWidth
+  ) {
+    candidate = candidate.slice(0, -1).trimEnd();
+  }
+  return `${candidate}...`;
+}
+
 function drawPill(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -221,6 +237,7 @@ function drawPill(
     padX?: number;
     height?: number;
     radius?: number;
+    maxWidth?: number;
   },
 ): number {
   const padX = options.padX ?? 20;
@@ -229,8 +246,15 @@ function drawPill(
 
   ctx.save();
   ctx.font = options.font;
-  const textW = ctx.measureText(text).width;
-  const width = textW + padX * 2;
+  const label =
+    options.maxWidth && options.maxWidth > padX * 2
+      ? truncateSingleLine(ctx, text, options.maxWidth - padX * 2)
+      : text;
+  const textW = ctx.measureText(label).width;
+  const width = Math.min(
+    textW + padX * 2,
+    options.maxWidth ?? textW + padX * 2,
+  );
 
   drawRoundedRectPath(ctx, x, y, width, height, radius);
   ctx.fillStyle = options.bg;
@@ -243,7 +267,7 @@ function drawPill(
 
   ctx.fillStyle = options.fg;
   ctx.textBaseline = "middle";
-  ctx.fillText(text, x + padX, y + height / 2 + 1);
+  ctx.fillText(label, x + padX, y + height / 2 + 1);
   ctx.restore();
   return width;
 }
@@ -436,12 +460,14 @@ function drawCardFooter(
 
   ctx.fillStyle = palette.inkMuted;
   ctx.font = `500 18px ${FONT_MONO}`;
-  ctx.fillText(hostLabel, x + 46, y + 44);
+  const maxHostW = Math.max(120, Math.floor(w * 0.46) - 46);
+  ctx.fillText(truncateSingleLine(ctx, hostLabel, maxHostW), x + 46, y + 44);
 
   ctx.textAlign = "right";
   ctx.fillStyle = palette.accent;
   ctx.font = `600 19px ${FONT_SANS}`;
-  ctx.fillText(hintText, x + w, y + 24);
+  const maxHintW = Math.max(140, Math.floor(w * 0.48));
+  ctx.fillText(truncateSingleLine(ctx, hintText, maxHintW), x + w, y + 24);
   ctx.restore();
 }
 
@@ -665,6 +691,7 @@ function renderInvitationPoster(
         font: `700 21px ${FONT_SANS}`,
         height: 44,
         padX: 20,
+        maxWidth: contentW - 48,
       },
     );
   }
@@ -919,6 +946,7 @@ function renderEditorialFolio(
           font: `700 18px ${FONT_MONO}`,
           height: 38,
           padX: 16,
+          maxWidth: textW,
         },
       );
       y += 66;
@@ -1014,6 +1042,7 @@ function renderEditorialFolio(
         font: `700 18px ${FONT_MONO}`,
         height: 38,
         padX: 16,
+        maxWidth: innerW,
       },
     );
     y += 72;
@@ -1113,27 +1142,35 @@ function renderEditorialFolio(
 
   ctx.fillStyle = palette.ink;
   ctx.font = `700 25px ${FONT_SANS}`;
-  drawClampedLines(ctx, schedule.dateLine, innerX, gridY + 72, halfW, 32, 2);
-  drawClampedLines(
+  const dateRes = drawClampedLines(
+    ctx,
+    schedule.dateLine,
+    innerX,
+    gridY + 72,
+    halfW,
+    30,
+    2,
+  );
+  const locRes = drawClampedLines(
     ctx,
     location.primaryLine,
     innerX + halfW + 36,
     gridY + 72,
     halfW,
-    32,
+    30,
     2,
   );
 
   ctx.fillStyle = palette.inkMuted;
   ctx.font = `600 21px ${FONT_MONO}`;
-  ctx.fillText(schedule.timeRange, innerX, gridY + 114);
+  ctx.fillText(schedule.timeRange, innerX, dateRes.nextY + 8);
   if (location.secondaryLine) {
     ctx.font = `500 20px ${FONT_SANS}`;
     drawClampedLines(
       ctx,
       location.secondaryLine,
       innerX + halfW + 36,
-      gridY + 116,
+      locRes.nextY + 8,
       halfW,
       26,
       1,

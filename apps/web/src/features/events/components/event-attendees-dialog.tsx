@@ -26,6 +26,23 @@ export function EventAttendeesDialog({
 }: EventAttendeesDialogProps) {
   useBodyScrollLock(open);
 
+  if (!open) return null;
+
+  return (
+    <EventAttendeesDialogContent
+      key={eventSlug}
+      onClose={onClose}
+      eventSlug={eventSlug}
+      eventTitle={eventTitle}
+    />
+  );
+}
+
+function EventAttendeesDialogContent({
+  onClose,
+  eventSlug,
+  eventTitle,
+}: Omit<EventAttendeesDialogProps, "open">) {
   const {
     data: attendees = [],
     isLoading,
@@ -48,20 +65,26 @@ export function EventAttendeesDialog({
     ok: boolean;
     text: string;
   } | null>(null);
-  const [activeRsvpActionId, setActiveRsvpActionId] = React.useState<
-    string | null
-  >(null);
+  const [busyRsvpIds, setBusyRsvpIds] = React.useState<Set<string>>(
+    () => new Set(),
+  );
+
+  const setRsvpBusy = (rsvpId: string, busy: boolean) => {
+    setBusyRsvpIds((prev) => {
+      const next = new Set(prev);
+      if (busy) next.add(rsvpId);
+      else next.delete(rsvpId);
+      return next;
+    });
+  };
 
   React.useEffect(() => {
-    if (!open) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, open]);
-
-  if (!open) return null;
+  }, [onClose]);
 
   const pendingCount = attendees.filter(
     (a) => a.status === "pending_approval",
@@ -111,7 +134,7 @@ export function EventAttendeesDialog({
 
   const handleApprove = async (rsvpId: string, name: string) => {
     setActionFeedback(null);
-    setActiveRsvpActionId(rsvpId);
+    setRsvpBusy(rsvpId, true);
     try {
       await approveMutation.mutateAsync(rsvpId);
       setActionFeedback({
@@ -124,13 +147,13 @@ export function EventAttendeesDialog({
         text: formatEventApiError(err, "Gagal menyetujui pendaftar."),
       });
     } finally {
-      setActiveRsvpActionId(null);
+      setRsvpBusy(rsvpId, false);
     }
   };
 
   const handleReject = async (rsvpId: string, name: string) => {
     setActionFeedback(null);
-    setActiveRsvpActionId(rsvpId);
+    setRsvpBusy(rsvpId, true);
     try {
       await rejectMutation.mutateAsync(rsvpId);
       setActionFeedback({
@@ -143,7 +166,7 @@ export function EventAttendeesDialog({
         text: formatEventApiError(err, "Gagal menolak pendaftar."),
       });
     } finally {
-      setActiveRsvpActionId(null);
+      setRsvpBusy(rsvpId, false);
     }
   };
 
@@ -153,7 +176,7 @@ export function EventAttendeesDialog({
     name: string,
   ) => {
     setActionFeedback(null);
-    setActiveRsvpActionId(rsvpId);
+    setRsvpBusy(rsvpId, true);
     try {
       await checkInMutation.mutateAsync({ checkinCode: code });
       setActionFeedback({
@@ -166,7 +189,7 @@ export function EventAttendeesDialog({
         text: formatEventApiError(err, "Gagal mencatat kehadiran peserta."),
       });
     } finally {
-      setActiveRsvpActionId(null);
+      setRsvpBusy(rsvpId, false);
     }
   };
 
@@ -296,16 +319,15 @@ export function EventAttendeesDialog({
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border p-4">
           <div
-            role="tablist"
+            role="group"
             aria-label="Filter status peserta"
             className="flex flex-wrap items-center gap-1 rounded-xl bg-[var(--color-paper-2)] p-1 text-xs"
           >
             <button
               type="button"
-              role="tab"
-              aria-selected={filterTab === "all"}
+              aria-pressed={filterTab === "all"}
               onClick={() => setFilterTab("all")}
-              className={`min-h-10 rounded-lg px-2.5 font-medium transition-colors cursor-pointer ${
+              className={`min-h-11 rounded-lg px-2.5 font-medium transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring ${
                 filterTab === "all"
                   ? "bg-background text-foreground shadow-xs font-semibold"
                   : "text-muted-foreground hover:text-foreground"
@@ -315,10 +337,9 @@ export function EventAttendeesDialog({
             </button>
             <button
               type="button"
-              role="tab"
-              aria-selected={filterTab === "pending"}
+              aria-pressed={filterTab === "pending"}
               onClick={() => setFilterTab("pending")}
-              className={`min-h-10 rounded-lg px-2.5 font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+              className={`min-h-11 rounded-lg px-2.5 font-medium transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring flex items-center gap-1.5 ${
                 filterTab === "pending"
                   ? "bg-background text-foreground shadow-xs font-semibold"
                   : "text-muted-foreground hover:text-foreground"
@@ -326,17 +347,16 @@ export function EventAttendeesDialog({
             >
               <span>Perlu Persetujuan</span>
               {pendingCount > 0 && (
-                <span className="rounded-full bg-[var(--color-error)] px-1.5 text-[10px] font-bold text-white tabular-nums">
+                <span className="rounded-full border border-[var(--color-error)]/40 bg-[var(--color-error-soft)] px-1.5 text-[10px] font-bold text-[var(--color-error)] tabular-nums">
                   {pendingCount}
                 </span>
               )}
             </button>
             <button
               type="button"
-              role="tab"
-              aria-selected={filterTab === "going"}
+              aria-pressed={filterTab === "going"}
               onClick={() => setFilterTab("going")}
-              className={`min-h-10 rounded-lg px-2.5 font-medium transition-colors cursor-pointer ${
+              className={`min-h-11 rounded-lg px-2.5 font-medium transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring ${
                 filterTab === "going"
                   ? "bg-background text-foreground shadow-xs font-semibold"
                   : "text-muted-foreground hover:text-foreground"
@@ -346,10 +366,9 @@ export function EventAttendeesDialog({
             </button>
             <button
               type="button"
-              role="tab"
-              aria-selected={filterTab === "waitlisted"}
+              aria-pressed={filterTab === "waitlisted"}
               onClick={() => setFilterTab("waitlisted")}
-              className={`min-h-10 rounded-lg px-2.5 font-medium transition-colors cursor-pointer ${
+              className={`min-h-11 rounded-lg px-2.5 font-medium transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring ${
                 filterTab === "waitlisted"
                   ? "bg-background text-foreground shadow-xs font-semibold"
                   : "text-muted-foreground hover:text-foreground"
@@ -393,7 +412,7 @@ export function EventAttendeesDialog({
                 type="button"
                 onClick={() => setActionFeedback(null)}
                 aria-label="Tutup pesan"
-                className="size-7 inline-flex items-center justify-center rounded-md hover:bg-black/5 cursor-pointer"
+                className="size-11 -mr-2 inline-flex items-center justify-center rounded-md hover:bg-black/5 cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
               >
                 <X className="size-3.5" aria-hidden="true" />
               </button>
@@ -419,7 +438,7 @@ export function EventAttendeesDialog({
             filteredAttendees.map((att) => {
               const isCheckedIn = Boolean(att.checkedInAt);
               const badge = renderStatusBadge(att.status);
-              const isBusy = activeRsvpActionId === att.id;
+              const isBusy = busyRsvpIds.has(att.id);
               return (
                 <div
                   key={att.id}
@@ -427,7 +446,7 @@ export function EventAttendeesDialog({
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-border bg-[var(--color-accent-soft)] text-foreground font-bold text-xs uppercase">
-                      {att.userName[0]}
+                      {att.userName?.trim()?.[0]?.toUpperCase() || "?"}
                     </div>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">

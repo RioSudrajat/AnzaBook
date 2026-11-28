@@ -129,8 +129,9 @@ export async function loadCanvasImage(
 ): Promise<HTMLImageElement | null> {
   if (!src?.trim() || typeof Image === "undefined") return null;
   const trimmed = src.trim();
-  const isLocalBlobOrData =
-    trimmed.startsWith("blob:") || trimmed.startsWith("data:");
+  const isSafeRasterDataUri =
+    /^data:image\/(?:png|jpeg|jpg|webp|gif|avif);base64,/i.test(trimmed);
+  const isLocalBlobOrData = trimmed.startsWith("blob:") || isSafeRasterDataUri;
   const isRemoteUrl =
     trimmed.startsWith("https://") || trimmed.startsWith("http://");
   const isUploadedRootRelative =
