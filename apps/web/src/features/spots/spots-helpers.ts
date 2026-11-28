@@ -632,3 +632,55 @@ export function buildSpotSubmissionPayload(
     facilities: draft.facilities,
   };
 }
+
+export type CoordinateDraftParseResult =
+  { kind: "incomplete" } | { kind: "valid"; value: number };
+
+const COMPLETE_DECIMAL_REGEX = /^-?\d+(?:\.\d+)?$/;
+
+export function parseCoordinateDraft(raw: string): CoordinateDraftParseResult {
+  const trimmed = raw.trim();
+  if (!COMPLETE_DECIMAL_REGEX.test(trimmed)) {
+    return { kind: "incomplete" };
+  }
+  const value = Number(trimmed);
+  if (!Number.isFinite(value)) {
+    return { kind: "incomplete" };
+  }
+  return { kind: "valid", value };
+}
+
+export function applySpotPinLocation<
+  T extends {
+    city: string;
+    province: string;
+    latitude: number;
+    longitude: number;
+  },
+>(
+  prev: T,
+  nextLat: number,
+  nextLng: number,
+  meta?: { city?: string; province?: string },
+): T {
+  return {
+    ...prev,
+    latitude: nextLat,
+    longitude: nextLng,
+    city: meta?.city ?? prev.city,
+    province: meta?.province ?? prev.province,
+  };
+}
+
+export function getUnrenderedFieldError(
+  fieldErrors: Record<string, string>,
+  renderedFields: readonly string[],
+): string | null {
+  const renderedSet = new Set(renderedFields);
+  for (const [key, message] of Object.entries(fieldErrors)) {
+    if (!renderedSet.has(key) && message.trim().length > 0) {
+      return message;
+    }
+  }
+  return null;
+}

@@ -4,6 +4,7 @@ import { Compass, MapPin } from "lucide-react";
 import {
   PARTNER_SPOT_COLOR_HEX,
   clampIndonesiaCoordinate,
+  parseCoordinateDraft,
 } from "../spots-helpers";
 import { INDONESIA_BBOX, INDONESIA_CITY_PRESETS } from "../types";
 
@@ -53,6 +54,19 @@ export function SpotPinPickerMap({
     "loading",
   );
   const [clampedNotice, setClampedNotice] = useState<string | null>(null);
+  const [latDraftState, setLatDraftState] = useState<{
+    source: number;
+    text: string;
+  }>({ source: lat, text: String(lat) });
+  const [lngDraftState, setLngDraftState] = useState<{
+    source: number;
+    text: string;
+  }>({ source: lng, text: String(lng) });
+
+  const latText =
+    latDraftState.source === lat ? latDraftState.text : String(lat);
+  const lngText =
+    lngDraftState.source === lng ? lngDraftState.text : String(lng);
 
   const latInputId = useId();
   const lngInputId = useId();
@@ -202,14 +216,27 @@ export function SpotPinPickerMap({
     }
   }, [lat, lng]);
 
-  const handleManualCoordinateChange = (nextLat: number, nextLng: number) => {
-    if (!Number.isFinite(nextLat) || !Number.isFinite(nextLng)) return;
+  const commitManualCoordinate = (axis: "lat" | "lng", rawValue: string) => {
+    const parsed = parseCoordinateDraft(rawValue);
+    if (parsed.kind === "incomplete") {
+      if (axis === "lat") {
+        setLatDraftState({ source: lat, text: String(lat) });
+      } else {
+        setLngDraftState({ source: lng, text: String(lng) });
+      }
+      return;
+    }
+
+    const nextLat = axis === "lat" ? parsed.value : lat;
+    const nextLng = axis === "lng" ? parsed.value : lng;
     const clamped = clampIndonesiaCoordinate(nextLat, nextLng);
     setClampedNotice(
       clamped.wasClamped
         ? "Koordinat otomatis dibatasi ke wilayah Indonesia."
         : null,
     );
+    setLatDraftState({ source: clamped.lat, text: String(clamped.lat) });
+    setLngDraftState({ source: clamped.lng, text: String(clamped.lng) });
     onChange(clamped.lat, clamped.lng);
   };
 
@@ -288,18 +315,34 @@ export function SpotPinPickerMap({
           </label>
           <input
             id={latInputId}
-            type="number"
-            step="0.0001"
-            min={INDONESIA_BBOX.minLat}
-            max={INDONESIA_BBOX.maxLat}
-            value={lat}
+            type="text"
+            inputMode="decimal"
+            value={latText}
             onChange={(event) => {
-              const parsed = Number(event.target.value);
-              if (Number.isFinite(parsed)) {
-                handleManualCoordinateChange(parsed, lng);
+              const raw = event.target.value;
+              const parsed = parseCoordinateDraft(raw);
+              if (
+                parsed.kind === "valid" &&
+                parsed.value >= INDONESIA_BBOX.minLat &&
+                parsed.value <= INDONESIA_BBOX.maxLat
+              ) {
+                setClampedNotice(null);
+                setLatDraftState({ source: parsed.value, text: raw });
+                onChange(parsed.value, lng);
+              } else {
+                setLatDraftState({ source: lat, text: raw });
               }
             }}
-            className="w-full min-h-11 rounded-lg border border-border bg-background px-3 font-mono text-sm tabular-nums text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+            onBlur={(event) =>
+              commitManualCoordinate("lat", event.target.value)
+            }
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                commitManualCoordinate("lat", event.currentTarget.value);
+              }
+            }}
+            className="w-full min-h-11 rounded-lg border border-border bg-background px-3 font-mono text-base sm:text-sm tabular-nums text-foreground focus-visible:outline-2 focus-visible:outline-ring"
           />
         </div>
 
@@ -312,18 +355,34 @@ export function SpotPinPickerMap({
           </label>
           <input
             id={lngInputId}
-            type="number"
-            step="0.0001"
-            min={INDONESIA_BBOX.minLng}
-            max={INDONESIA_BBOX.maxLng}
-            value={lng}
+            type="text"
+            inputMode="decimal"
+            value={lngText}
             onChange={(event) => {
-              const parsed = Number(event.target.value);
-              if (Number.isFinite(parsed)) {
-                handleManualCoordinateChange(lat, parsed);
+              const raw = event.target.value;
+              const parsed = parseCoordinateDraft(raw);
+              if (
+                parsed.kind === "valid" &&
+                parsed.value >= INDONESIA_BBOX.minLng &&
+                parsed.value <= INDONESIA_BBOX.maxLng
+              ) {
+                setClampedNotice(null);
+                setLngDraftState({ source: parsed.value, text: raw });
+                onChange(lat, parsed.value);
+              } else {
+                setLngDraftState({ source: lng, text: raw });
               }
             }}
-            className="w-full min-h-11 rounded-lg border border-border bg-background px-3 font-mono text-sm tabular-nums text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+            onBlur={(event) =>
+              commitManualCoordinate("lng", event.target.value)
+            }
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                commitManualCoordinate("lng", event.currentTarget.value);
+              }
+            }}
+            className="w-full min-h-11 rounded-lg border border-border bg-background px-3 font-mono text-base sm:text-sm tabular-nums text-foreground focus-visible:outline-2 focus-visible:outline-ring"
           />
         </div>
       </div>
