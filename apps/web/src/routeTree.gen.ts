@@ -20,6 +20,7 @@ import { Route as AuthSignUpRouteImport } from './routes/_auth/sign-up'
 import { Route as ProtectedAdminRouteImport } from './routes/_protected/admin'
 import { Route as ProtectedAppRouteImport } from './routes/_protected/app'
 import { Route as ProtectedNotesRouteImport } from './routes/_protected/notes'
+import { Route as ProtectedSpotsRouteImport } from './routes/_protected/spots'
 import { Route as BookPreviewSlugRouteImport } from './routes/book-preview.$slug'
 import { Route as BooksSlugRouteImport } from './routes/books.$slug'
 import { Route as CSlugRouteImport } from './routes/c.$slug'
@@ -88,6 +89,11 @@ const ProtectedAppRoute = ProtectedAppRouteImport.update({
 const ProtectedNotesRoute = ProtectedNotesRouteImport.update({
   id: '/notes',
   path: '/notes',
+  getParentRoute: () => ProtectedRoute,
+} as any)
+const ProtectedSpotsRoute = ProtectedSpotsRouteImport.update({
+  id: '/spots',
+  path: '/spots',
   getParentRoute: () => ProtectedRoute,
 } as any)
 const BookPreviewSlugRoute = BookPreviewSlugRouteImport.update({
@@ -182,6 +188,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof ProtectedAdminRoute
   '/app': typeof ProtectedAppRoute
   '/notes': typeof ProtectedNotesRoute
+  '/spots': typeof ProtectedSpotsRoute
   '/book-preview/$slug': typeof BookPreviewSlugRoute
   '/books/$slug': typeof BooksSlugRoute
   '/c/$slug': typeof CSlugRoute
@@ -209,6 +216,7 @@ export interface FileRoutesByTo {
   '/admin': typeof ProtectedAdminRoute
   '/app': typeof ProtectedAppRoute
   '/notes': typeof ProtectedNotesRoute
+  '/spots': typeof ProtectedSpotsRoute
   '/book-preview/$slug': typeof BookPreviewSlugRoute
   '/books/$slug': typeof BooksSlugRoute
   '/c/$slug': typeof CSlugRoute
@@ -239,6 +247,7 @@ export interface FileRoutesById {
   '/_protected/admin': typeof ProtectedAdminRoute
   '/_protected/app': typeof ProtectedAppRoute
   '/_protected/notes': typeof ProtectedNotesRoute
+  '/_protected/spots': typeof ProtectedSpotsRoute
   '/book-preview/$slug': typeof BookPreviewSlugRoute
   '/books/$slug': typeof BooksSlugRoute
   '/c/$slug': typeof CSlugRoute
@@ -268,6 +277,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/app'
     | '/notes'
+    | '/spots'
     | '/book-preview/$slug'
     | '/books/$slug'
     | '/c/$slug'
@@ -295,6 +305,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/app'
     | '/notes'
+    | '/spots'
     | '/book-preview/$slug'
     | '/books/$slug'
     | '/c/$slug'
@@ -324,6 +335,7 @@ export interface FileRouteTypes {
     | '/_protected/admin'
     | '/_protected/app'
     | '/_protected/notes'
+    | '/_protected/spots'
     | '/book-preview/$slug'
     | '/books/$slug'
     | '/c/$slug'
@@ -437,6 +449,13 @@ declare module '@tanstack/react-router' {
       path: '/notes'
       fullPath: '/notes'
       preLoaderRoute: typeof ProtectedNotesRouteImport
+      parentRoute: typeof ProtectedRoute
+    }
+    '/_protected/spots': {
+      id: '/_protected/spots'
+      path: '/spots'
+      fullPath: '/spots'
+      preLoaderRoute: typeof ProtectedSpotsRouteImport
       parentRoute: typeof ProtectedRoute
     }
     '/book-preview/$slug': {
@@ -570,6 +589,7 @@ interface ProtectedRouteChildren {
   ProtectedAdminRoute: typeof ProtectedAdminRoute
   ProtectedAppRoute: typeof ProtectedAppRoute
   ProtectedNotesRoute: typeof ProtectedNotesRoute
+  ProtectedSpotsRoute: typeof ProtectedSpotsRoute
   ProtectedAuthorsNewRoute: typeof ProtectedAuthorsNewRoute
   ProtectedCommunitiesNewRoute: typeof ProtectedCommunitiesNewRoute
   ProtectedProfileEditRoute: typeof ProtectedProfileEditRoute
@@ -583,6 +603,7 @@ const ProtectedRouteChildren: ProtectedRouteChildren = {
   ProtectedAdminRoute: ProtectedAdminRoute,
   ProtectedAppRoute: ProtectedAppRoute,
   ProtectedNotesRoute: ProtectedNotesRoute,
+  ProtectedSpotsRoute: ProtectedSpotsRoute,
   ProtectedAuthorsNewRoute: ProtectedAuthorsNewRoute,
   ProtectedCommunitiesNewRoute: ProtectedCommunitiesNewRoute,
   ProtectedProfileEditRoute: ProtectedProfileEditRoute,
