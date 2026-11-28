@@ -18,16 +18,8 @@ type SpotPinPickerMapProps = {
   ) => void;
 };
 
-const OPENFREEMAP_LIGHT_STYLE = "https://tiles.openfreemap.org/styles/positron";
-const OPENFREEMAP_DARK_STYLE = "https://tiles.openfreemap.org/styles/dark";
-
-function detectIsDark(): boolean {
-  if (typeof document === "undefined") return false;
-  return (
-    document.documentElement.classList.contains("dark") ||
-    document.documentElement.getAttribute("data-theme") === "night"
-  );
-}
+const OPENFREEMAP_BASEMAP_STYLE =
+  "https://tiles.openfreemap.org/styles/positron";
 
 function prefersReducedMotion(): boolean {
   if (
@@ -115,9 +107,7 @@ export function SpotPinPickerMap({
 
         const map = new maplibregl.Map({
           container: containerRef.current,
-          style: detectIsDark()
-            ? OPENFREEMAP_DARK_STYLE
-            : OPENFREEMAP_LIGHT_STYLE,
+          style: OPENFREEMAP_BASEMAP_STYLE,
           center: [startCoords.lng, startCoords.lat],
           zoom: 15,
           minZoom: 4,
@@ -245,7 +235,7 @@ export function SpotPinPickerMap({
       {mapState !== "fallback" ? (
         <div
           data-lenis-prevent
-          className="relative h-56 sm:h-64 w-full rounded-xl border border-border bg-[var(--color-paper-2)] overflow-hidden"
+          className="relative h-56 sm:h-64 w-full rounded-xl border border-border bg-[#EDEAE2] overflow-hidden"
         >
           <div
             ref={containerRef}
@@ -253,11 +243,13 @@ export function SpotPinPickerMap({
             aria-label="Peta penempatan pin sudut baca"
           />
           {mapState === "loading" && (
-            <div className="absolute inset-0 flex items-center justify-center bg-[var(--color-paper-2)]/90 text-xs font-mono text-muted-foreground">
-              Memuat peta penempatan pin...
+            <div className="absolute inset-0 flex items-center justify-center bg-[#EDEAE2]/85 text-xs font-mono text-foreground">
+              <span className="rounded-lg border border-foreground/15 dark:border-white/15 bg-card/95 px-3 py-1.5 shadow-sm">
+                Memuat peta penempatan pin...
+              </span>
             </div>
           )}
-          <div className="pointer-events-none absolute top-2.5 left-2.5 rounded-lg border border-border bg-background/90 px-2.5 py-1 text-[11px] font-medium text-foreground backdrop-blur-xs shadow-xs flex items-center gap-1.5">
+          <div className="pointer-events-none absolute top-2.5 left-2.5 rounded-lg border border-foreground/15 dark:border-white/15 bg-card/95 px-2.5 py-1 text-[11px] font-medium text-foreground backdrop-blur-xs shadow-sm flex items-center gap-1.5">
             <MapPin
               className="size-3.5 text-[var(--color-accent)]"
               aria-hidden="true"

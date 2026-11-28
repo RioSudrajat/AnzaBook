@@ -41,7 +41,7 @@ test.describe("Issue #23 Reading Spots Reviews, Community Submissions & Admin Mo
 
     // Verify SpotDetailPanel opens with valid Google Maps universal directions link
     const directionsLink = sidebar.getByRole("link", {
-      name: /Buka di Google Maps/i,
+      name: /Buka Rute di Google Maps/i,
     });
     await expect(directionsLink).toBeVisible({ timeout: 15_000 });
     const mapsHref = await directionsLink.getAttribute("href");
@@ -153,9 +153,36 @@ test.describe("Issue #23 Reading Spots Reviews, Community Submissions & Admin Mo
     ).toBeVisible({ timeout: 10_000 });
     await reportDialog.getByRole("button", { name: "Selesai" }).click();
     await expect(reportDialog).toHaveCount(0);
+
+    // 8. Verify 409 duplicate open report inline error, auto-clear on edit, and Escape dialog guard
+    await reloadedSidebar
+      .getByRole("button", { name: /Laporkan \/ Koreksi/i })
+      .click();
+    await expect(reportDialog).toBeVisible();
+    await reportDialog
+      .locator('textarea[name="details"]')
+      .fill("Laporan duplikat jam buka untuk verifikasi 409.");
+    await reportDialog.getByRole("button", { name: "Kirim Laporan" }).click();
+    const duplicateAlert = reportDialog.locator('[role="alert"]');
+    await expect(duplicateAlert).toBeVisible({ timeout: 10_000 });
+
+    // Editing details clears stale submitError immediately
+    await reportDialog
+      .locator('textarea[name="details"]')
+      .fill(
+        "Mengubah detail laporan harus membersihkan pesan galat sebelumnya.",
+      );
+    await expect(duplicateAlert).toHaveCount(0);
+
+    // Pressing Escape closes only the dialog, keeping SpotDetailPanel open
+    await page.keyboard.press("Escape");
+    await expect(reportDialog).toHaveCount(0);
+    await expect(
+      reloadedSidebar.getByRole("link", { name: /Buka Rute di Google Maps/i }),
+    ).toBeVisible();
   });
 
-  test("submits a new reading spot, tracks pending_review in Kontribusi Saya, approves in /admin, and sees it live on /spots", async ({
+  test("submits a new reading spot with geocode fallback, 429 guard, 100m duplicate guard, admin approval, and review_abuse report", async ({
     browser,
   }) => {
     const suffix = randomUUID().slice(0, 8);
@@ -167,8 +194,18 @@ test.describe("Issue #23 Reading Spots Reviews, Community Submissions & Admin Mo
     await userPage.setViewportSize({ width: 1280, height: 800 });
     await signUp(userPage.request, "Kontributor Sudut Baca");
 
-    // Deterministic geocode proxy mock so CI never depends on external Nominatim availability
+    // Deterministic geocode proxy mock: empty [] for unknown query, Bandung match otherwise
     await userPage.route("**/api/spots/geocode*", async (route) => {
+      const url = new URL(route.request().url());
+      const q = (url.searchParams.get("q") ?? "").toLowerCase();
+      if (q.includes("tidak ditemukan")) {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ data: [] }),
+        });
+        return;
+      }
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -198,10 +235,23 @@ test.describe("Issue #23 Reading Spots Reviews, Community Submissions & Admin Mo
     const submitDialog = userPage.locator("dialog[open]");
     await expect(submitDialog).toBeVisible();
 
-    // Step 1: Search geocode & pick result
+    // Step 1a: Empty geocode [] -> fallback hint -> city preset click
+    const geocodeInput = submitDialog.getByPlaceholder(
+      "Contoh: Jl. Braga Bandung, Kemang Jakarta...",
+    );
+    await geocodeInput.fill("Lokasi Tidak Ditemukan XYZ");
     await submitDialog
-      .getByPlaceholder("Contoh: Jl. Braga Bandung, Kemang Jakarta...")
-      .fill("Ciumbuleuit Bandung");
+      .getByRole("button", { name: "Cari", exact: true })
+      .click();
+    await expect(
+      submitDialog.getByText(/Hasil pencarian tidak ditemukan\?/i),
+    ).toBeVisible({ timeout: 10_000 });
+    await submitDialog
+      .getByRole("button", { name: "Bandung", exact: true })
+      .click();
+
+    // Step 1b: Search geocode & pick result
+    await geocodeInput.fill("Ciumbuleuit Bandung");
     await submitDialog
       .getByRole("button", { name: "Cari", exact: true })
       .click();
@@ -237,6 +287,42 @@ test.describe("Issue #23 Reading Spots Reviews, Community Submissions & Admin Mo
         "Ruang baca tenang dengan jendela menghadap pepohonan dan banyak colokan.",
       );
 
+    // Intercept once with 429 to verify rate-limit UI feedback preserves draft
+    let interceptedRateLimit = false;
+    await userPage.route("**/api/spots", async (route) => {
+      const reqUrl = new URL(route.request().url());
+      if (
+        route.request().method() === "POST" &&
+        reqUrl.pathname === "/api/spots" &&
+        !interceptedRateLimit
+      ) {
+        interceptedRateLimit = true;
+        await route.fulfill({
+          status: 429,
+          contentType: "application/json",
+          body: JSON.stringify({
+            error: {
+              code: "RATE_LIMIT_EXCEEDED",
+              message: "Batas maksimal 5 usulan per hari tercapai.",
+            },
+          }),
+        });
+        return;
+      }
+      await route.continue();
+    });
+
+    await submitDialog
+      .getByRole("button", { name: "Kirim Usulan Sudut Baca" })
+      .click();
+    await expect(
+      submitDialog.getByText("Batas maksimal 5 usulan per hari tercapai."),
+    ).toBeVisible({ timeout: 10_000 });
+    await expect(submitDialog.locator('input[name="name"]')).toHaveValue(
+      spotName,
+    );
+
+    // Retry submit hits live backend cleanly
     await submitDialog
       .getByRole("button", { name: "Kirim Usulan Sudut Baca" })
       .click();
@@ -287,9 +373,8 @@ test.describe("Issue #23 Reading Spots Reviews, Community Submissions & Admin Mo
     // Mobile responsive check on /admin?tab=spots
     await adminPage.setViewportSize({ width: 390, height: 844 });
     expect(await fitsWidth(adminPage)).toBe(true);
-    await adminContext.close();
 
-    // 3. Regular user now sees the newly approved spot publicly on /spots
+    // 3. Regular user sees the newly approved spot live on /spots AND verifies 100m duplicate guard UI
     await userPage.goto(`/spots?q=${encodeURIComponent(spotName)}`);
     const publicSidebar = userPage.locator(
       'aside[aria-label="Daftar dan penyaring sudut baca"]',
@@ -298,10 +383,88 @@ test.describe("Issue #23 Reading Spots Reviews, Community Submissions & Admin Mo
       timeout: 15_000,
     });
 
+    // Open SubmitSpotDialog at the exact coordinates of the published spot -> verify 100m duplicate warning
+    await publicSidebar
+      .getByRole("button", { name: /Usulkan Sudut Baca/i })
+      .click();
+    const dupDialog = userPage.locator("dialog[open]");
+    await expect(dupDialog).toBeVisible();
+    await dupDialog.getByLabel("Lintang (Latitude)").fill("-6.87123");
+    await dupDialog.getByLabel("Lintang (Latitude)").blur();
+    await dupDialog.getByLabel("Bujur (Longitude)").fill("107.60891");
+    await dupDialog.getByLabel("Bujur (Longitude)").blur();
+    await dupDialog
+      .getByRole("button", { name: /Lanjut Cek Duplikat/i })
+      .click();
+
+    await expect(
+      dupDialog.getByText(/Ditemukan \d+ sudut baca berdekatan/i),
+    ).toBeVisible({ timeout: 10_000 });
+    await expect(
+      dupDialog.getByRole("button", { name: /Lanjut ke Detail/i }),
+    ).toBeDisabled();
+    await dupDialog
+      .getByRole("button", { name: /Buka Spot & Tulis Ulasan/i })
+      .first()
+      .click();
+    await expect(dupDialog).toHaveCount(0);
+
+    // 4. First user posts a review on the approved spot; second user reports it via review_abuse
+    const reviewSection = publicSidebar.locator(
+      'section[aria-label^="Ulasan dan rating untuk"]',
+    );
+    await expect(reviewSection).toBeVisible({ timeout: 15_000 });
+    await reviewSection
+      .locator("label", {
+        has: userPage.getByRole("radio", { name: "5 bintang" }),
+      })
+      .click();
+    await reviewSection
+      .locator('textarea[name="content"]')
+      .fill("Ulasan uji coba untuk memverifikasi pelaporan review_abuse.");
+    await reviewSection.getByRole("button", { name: "Kirim Ulasan" }).click();
+    await expect(
+      reviewSection.getByText("Ulasan Anda", { exact: true }),
+    ).toBeVisible({ timeout: 10_000 });
+
     // Mobile responsive check on /spots
     await userPage.setViewportSize({ width: 390, height: 844 });
     expect(await fitsWidth(userPage)).toBe(true);
-
     await userContext.close();
+
+    // Second user (adminPage) switches to desktop, opens spotName, and reports the review
+    await adminPage.setViewportSize({ width: 1280, height: 800 });
+    await adminPage.goto(`/spots?q=${encodeURIComponent(spotName)}`);
+    const adminSidebar = adminPage.locator(
+      'aside[aria-label="Daftar dan penyaring sudut baca"]',
+    );
+    await adminSidebar
+      .locator('ul[aria-label="Hasil sudut baca"] li button')
+      .first()
+      .click();
+    const adminReviewSection = adminSidebar.locator(
+      'section[aria-label^="Ulasan dan rating untuk"]',
+    );
+    await expect(adminReviewSection).toBeVisible({ timeout: 15_000 });
+    await adminReviewSection
+      .getByRole("button", { name: /Laporkan ulasan dari/i })
+      .first()
+      .click();
+
+    const reviewReportDialog = adminPage.locator("dialog[open]");
+    await expect(reviewReportDialog).toBeVisible();
+    await expect(
+      reviewReportDialog.getByText(/Ulasan tidak pantas \/ spam/i),
+    ).toBeVisible();
+    await reviewReportDialog
+      .locator('textarea[name="details"]')
+      .fill("Ulasan ini dilaporkan untuk verifikasi alur review_abuse.");
+    await reviewReportDialog
+      .getByRole("button", { name: "Kirim Laporan" })
+      .click();
+    await expect(
+      reviewReportDialog.getByText("Laporan berhasil dikirim"),
+    ).toBeVisible({ timeout: 10_000 });
+    await adminContext.close();
   });
 });

@@ -182,7 +182,10 @@ function ReportSpotForm({
                     name="spot-report-reason"
                     value={reason}
                     checked={checked}
-                    onChange={() => setReasonType(reason)}
+                    onChange={() => {
+                      setReasonType(reason);
+                      if (submitError) setSubmitError(null);
+                    }}
                     className="size-4 accent-[var(--color-accent)] shrink-0"
                   />
                   <span>{SPOT_REPORT_REASON_LABELS[reason]}</span>
@@ -227,6 +230,9 @@ function ReportSpotForm({
           onChange={(event) => {
             const next = event.target.value;
             setDetails(next);
+            if (submitError) {
+              setSubmitError(null);
+            }
             if (detailsError && next.trim().length >= 5) {
               setDetailsError(null);
             }

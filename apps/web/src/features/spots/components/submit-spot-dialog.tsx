@@ -96,9 +96,7 @@ export function SubmitSpotDialog({
       maxWidthClass="max-w-2xl"
     >
       <SubmitSpotWizard
-        key={
-          open ? `${defaultCity ?? "id"}:${defaultCenter?.lat ?? ""}` : "closed"
-        }
+        key={open ? "open" : "closed"}
         defaultCity={defaultCity}
         defaultCenter={defaultCenter}
         onDirtyChange={setIsDirty}
@@ -390,7 +388,7 @@ function SubmitSpotWizard({
                   }}
                   placeholder="Contoh: Jl. Braga Bandung, Kemang Jakarta..."
                   enterKeyHint="search"
-                  className="w-full min-h-11 rounded-lg border border-border bg-background pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                  className="w-full min-h-11 rounded-lg border border-border bg-background pl-9 pr-3 text-base sm:text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
                 />
               </div>
               <Button

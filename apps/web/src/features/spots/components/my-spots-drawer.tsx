@@ -40,16 +40,22 @@ export function MySpotsDrawer({
   onOpenSubmitDialog,
 }: MySpotsDrawerProps) {
   const [activeTab, setActiveTab] = useState<DrawerTab>("submissions");
+  const [bookmarkError, setBookmarkError] = useState<string | null>(null);
   const { data, isLoading, isError, error } = useMySpotActivity(open);
   const toggleBookmark = useToggleSpotBookmark();
 
   const submissions = data?.submissions ?? [];
   const bookmarks = data?.bookmarks ?? [];
 
+  const handleClose = () => {
+    setBookmarkError(null);
+    onClose();
+  };
+
   return (
     <SpotModalDialog
       open={open}
-      onClose={onClose}
+      onClose={handleClose}
       variant="drawer"
       title="Kontribusi & Favorit Saya"
       description="Pantau status usulan sudut baca dan akses cepat tempat baca favoritmu."
@@ -64,7 +70,10 @@ export function MySpotsDrawer({
             type="button"
             role="tab"
             aria-selected={activeTab === "submissions"}
-            onClick={() => setActiveTab("submissions")}
+            onClick={() => {
+              setBookmarkError(null);
+              setActiveTab("submissions");
+            }}
             className={`min-h-11 rounded-lg px-3 text-xs font-semibold transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring ${
               activeTab === "submissions"
                 ? "bg-background text-foreground shadow-xs border border-border"
@@ -80,7 +89,10 @@ export function MySpotsDrawer({
             type="button"
             role="tab"
             aria-selected={activeTab === "bookmarks"}
-            onClick={() => setActiveTab("bookmarks")}
+            onClick={() => {
+              setBookmarkError(null);
+              setActiveTab("bookmarks");
+            }}
             className={`min-h-11 rounded-lg px-3 text-xs font-semibold transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring ${
               activeTab === "bookmarks"
                 ? "bg-background text-foreground shadow-xs border border-border"
@@ -227,63 +239,85 @@ export function MySpotsDrawer({
             </p>
           </div>
         ) : (
-          <ul className="ruled-index" aria-label="Daftar sudut baca favorit">
-            {bookmarks.map((spot) => (
-              <li key={spot.id} className="py-3.5 space-y-2.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <span className="rounded border border-border bg-[var(--color-paper-2)] px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
-                        {formatSpotCategory(spot.category)}
-                      </span>
-                      {spot.ratingCount > 0 && (
-                        <span className="inline-flex items-center gap-0.5 font-mono text-[11px] tabular-nums text-foreground">
-                          <Star
-                            className="size-3 fill-[var(--color-accent)] text-[var(--color-accent)]"
-                            aria-hidden="true"
-                          />
-                          {spot.ratingAvg.toFixed(1)}
+          <div className="space-y-3">
+            {bookmarkError && (
+              <div
+                role="alert"
+                className="rounded-xl border border-[var(--color-error)]/40 bg-[var(--color-error-soft)] px-3.5 py-2.5 text-xs font-medium text-[var(--color-error)]"
+              >
+                {bookmarkError}
+              </div>
+            )}
+            <ul className="ruled-index" aria-label="Daftar sudut baca favorit">
+              {bookmarks.map((spot) => (
+                <li key={spot.id} className="py-3.5 space-y-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="rounded border border-border bg-[var(--color-paper-2)] px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+                          {formatSpotCategory(spot.category)}
                         </span>
-                      )}
+                        {spot.ratingCount > 0 && (
+                          <span className="inline-flex items-center gap-0.5 font-mono text-[11px] tabular-nums text-foreground">
+                            <Star
+                              className="size-3 fill-[var(--color-accent)] text-[var(--color-accent)]"
+                              aria-hidden="true"
+                            />
+                            {spot.ratingAvg.toFixed(1)}
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="font-serif text-sm font-bold text-foreground">
+                        {spot.name}
+                      </h3>
+                      <p className="text-xs text-muted-foreground line-clamp-1">
+                        {spot.address} · {spot.city}
+                      </p>
                     </div>
-                    <h3 className="font-serif text-sm font-bold text-foreground">
-                      {spot.name}
-                    </h3>
-                    <p className="text-xs text-muted-foreground line-clamp-1">
-                      {spot.address} · {spot.city}
-                    </p>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      onClose();
-                      onSelectSpot(spot.slug);
-                    }}
-                    className="min-h-11 text-xs"
-                  >
-                    <MapPin className="size-3.5" aria-hidden="true" />
-                    <span>Buka di Peta</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={toggleBookmark.isPending}
-                    onClick={() => toggleBookmark.mutate(spot.slug)}
-                    className="min-h-11 text-xs text-muted-foreground hover:text-[var(--color-error)]"
-                  >
-                    <Trash2 className="size-3.5" aria-hidden="true" />
-                    <span>Hapus Simpanan</span>
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        handleClose();
+                        onSelectSpot(spot.slug);
+                      }}
+                      className="min-h-11 text-xs"
+                    >
+                      <MapPin className="size-3.5" aria-hidden="true" />
+                      <span>Buka di Peta</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={toggleBookmark.isPending}
+                      onClick={() => {
+                        setBookmarkError(null);
+                        toggleBookmark.mutate(spot.slug, {
+                          onError: (err) => {
+                            setBookmarkError(
+                              formatSpotApiError(
+                                err,
+                                "Gagal menghapus sudut baca dari favorit. Silakan coba lagi.",
+                              ),
+                            );
+                          },
+                        });
+                      }}
+                      className="min-h-11 text-xs text-muted-foreground hover:text-[var(--color-error)]"
+                    >
+                      <Trash2 className="size-3.5" aria-hidden="true" />
+                      <span>Hapus Simpanan</span>
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
     </SpotModalDialog>

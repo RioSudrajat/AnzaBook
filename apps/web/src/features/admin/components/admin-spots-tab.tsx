@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -93,6 +93,7 @@ function getStatusBadgeClass(status: SpotStatus): string {
 }
 
 export function AdminSpotsTab({ overview }: { overview?: AdminOverviewDto }) {
+  const searchInputId = useId();
   const [filter, setFilter] = useState<AdminSpotsFilter>("pending_review");
   const [searchInput, setSearchInput] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
@@ -249,11 +250,15 @@ export function AdminSpotsTab({ overview }: { overview?: AdminOverviewDto }) {
           className="flex items-center gap-2 w-full lg:w-auto"
         >
           <div className="relative flex-1 lg:w-64">
+            <label htmlFor={searchInputId} className="sr-only">
+              Cari nama, kota, atau alamat sudut baca
+            </label>
             <Search
               className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
               aria-hidden="true"
             />
             <Input
+              id={searchInputId}
               type="search"
               value={searchInput}
               onChange={(event) => {
@@ -360,6 +365,7 @@ function SpotModerationCard({
   isMutating: boolean;
   onModerate: (input: ModerateSpotInput, successLabel: string) => void;
 }) {
+  const fieldIdPrefix = useId();
   const [isExpanded, setIsExpanded] = useState(
     spot.status === "pending_review" || spot.openReportsCount > 0,
   );
@@ -577,10 +583,14 @@ function SpotModerationCard({
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-foreground">
+                <label
+                  htmlFor={`${fieldIdPrefix}-name`}
+                  className="text-xs font-medium text-foreground"
+                >
                   Nama tempat
                 </label>
                 <Input
+                  id={`${fieldIdPrefix}-name`}
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
                   className="min-h-11 bg-card"
@@ -588,10 +598,14 @@ function SpotModerationCard({
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-foreground">
+                <label
+                  htmlFor={`${fieldIdPrefix}-category`}
+                  className="text-xs font-medium text-foreground"
+                >
                   Kategori
                 </label>
                 <select
+                  id={`${fieldIdPrefix}-category`}
                   value={editCategory}
                   onChange={(e) =>
                     setEditCategory(e.target.value as SpotCategory)
@@ -607,10 +621,14 @@ function SpotModerationCard({
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-foreground">
+                <label
+                  htmlFor={`${fieldIdPrefix}-badge`}
+                  className="text-xs font-medium text-foreground"
+                >
                   Lencana verifikasi
                 </label>
                 <select
+                  id={`${fieldIdPrefix}-badge`}
                   value={editBadge}
                   onChange={(e) =>
                     setEditBadge(e.target.value as SpotVerifiedBadge)
@@ -626,10 +644,14 @@ function SpotModerationCard({
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-foreground">
+                <label
+                  htmlFor={`${fieldIdPrefix}-city`}
+                  className="text-xs font-medium text-foreground"
+                >
                   Kota
                 </label>
                 <Input
+                  id={`${fieldIdPrefix}-city`}
                   value={editCity}
                   onChange={(e) => setEditCity(e.target.value)}
                   className="min-h-11 bg-card"
@@ -637,10 +659,14 @@ function SpotModerationCard({
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-foreground">
+                <label
+                  htmlFor={`${fieldIdPrefix}-province`}
+                  className="text-xs font-medium text-foreground"
+                >
                   Provinsi
                 </label>
                 <Input
+                  id={`${fieldIdPrefix}-province`}
                   value={editProvince}
                   onChange={(e) => setEditProvince(e.target.value)}
                   className="min-h-11 bg-card"
@@ -648,10 +674,14 @@ function SpotModerationCard({
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-foreground">
+                <label
+                  htmlFor={`${fieldIdPrefix}-opening-hours`}
+                  className="text-xs font-medium text-foreground"
+                >
                   Jam operasional
                 </label>
                 <Input
+                  id={`${fieldIdPrefix}-opening-hours`}
                   value={editOpeningHours}
                   onChange={(e) => setEditOpeningHours(e.target.value)}
                   className="min-h-11 bg-card"
@@ -659,10 +689,14 @@ function SpotModerationCard({
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-foreground">
+                <label
+                  htmlFor={`${fieldIdPrefix}-price-range`}
+                  className="text-xs font-medium text-foreground"
+                >
                   Kisaran biaya
                 </label>
                 <select
+                  id={`${fieldIdPrefix}-price-range`}
                   value={editPriceRange}
                   onChange={(e) =>
                     setEditPriceRange(e.target.value as SpotPriceRange)
@@ -678,10 +712,14 @@ function SpotModerationCard({
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-foreground">
+                <label
+                  htmlFor={`${fieldIdPrefix}-noise-level`}
+                  className="text-xs font-medium text-foreground"
+                >
                   Suasana
                 </label>
                 <select
+                  id={`${fieldIdPrefix}-noise-level`}
                   value={editNoiseLevel}
                   onChange={(e) =>
                     setEditNoiseLevel(e.target.value as SpotNoiseLevel)
@@ -697,10 +735,14 @@ function SpotModerationCard({
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-foreground">
+                <label
+                  htmlFor={`${fieldIdPrefix}-maps-url`}
+                  className="text-xs font-medium text-foreground"
+                >
                   Tautan Google Maps
                 </label>
                 <Input
+                  id={`${fieldIdPrefix}-maps-url`}
                   value={editMapsUrl}
                   onChange={(e) => setEditMapsUrl(e.target.value)}
                   placeholder="https://maps.app.goo.gl/..."
@@ -711,10 +753,14 @@ function SpotModerationCard({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-foreground">
+                <label
+                  htmlFor={`${fieldIdPrefix}-address`}
+                  className="text-xs font-medium text-foreground"
+                >
                   Alamat lengkap
                 </label>
                 <Textarea
+                  id={`${fieldIdPrefix}-address`}
                   rows={2}
                   value={editAddress}
                   onChange={(e) => setEditAddress(e.target.value)}
@@ -722,10 +768,14 @@ function SpotModerationCard({
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-foreground">
+                <label
+                  htmlFor={`${fieldIdPrefix}-description`}
+                  className="text-xs font-medium text-foreground"
+                >
                   Deskripsi
                 </label>
                 <Textarea
+                  id={`${fieldIdPrefix}-description`}
                   rows={2}
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
@@ -739,11 +789,15 @@ function SpotModerationCard({
         {/* Rejection Reason Box */}
         {showRejectBox && (
           <div className="rounded-lg border border-[var(--color-error)]/40 bg-[var(--color-error-soft)]/50 p-3.5 space-y-2.5">
-            <label className="block text-xs font-semibold text-foreground">
+            <label
+              htmlFor={`${fieldIdPrefix}-rejection-reason`}
+              className="block text-xs font-semibold text-foreground"
+            >
               Alasan penolakan (wajib minimal 5 karakter — ditampilkan kepada
               pengusul)
             </label>
             <Textarea
+              id={`${fieldIdPrefix}-rejection-reason`}
               rows={2}
               value={rejectionReason}
               onChange={(e) => {
