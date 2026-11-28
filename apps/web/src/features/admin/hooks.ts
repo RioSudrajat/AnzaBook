@@ -17,11 +17,17 @@ import type {
 } from "@starter/shared/validators/drm";
 import type { ListNotesInput } from "@starter/shared/validators/notes";
 import type { CreateClaimBatchInput } from "@starter/shared/validators/publisher";
+import type {
+  ListAdminSpotsQueryInput,
+  ModerateSpotInput,
+} from "@starter/shared/validators/spots";
 import { booksKeys } from "@/features/books/queries";
 import { notesKeys } from "@/features/notes/queries";
+import { spotKeys } from "@/features/spots/queries";
 import {
   createClaimBatch,
   deleteAnyNote,
+  moderateAdminSpot,
   reviewAdminDrmSuspension,
   reviewAuthorApplication,
   verifyCalendar,
@@ -38,6 +44,7 @@ import {
   adminNotesQuery,
   adminOverviewQuery,
   adminPublishersQuery,
+  adminSpotsQuery,
 } from "./queries";
 
 // ---------------- Admin Overview ---------------- //
@@ -192,6 +199,25 @@ export function useDeleteAnyNote() {
       Promise.all([
         queryClient.invalidateQueries({ queryKey: adminKeys.all }),
         queryClient.invalidateQueries({ queryKey: notesKeys.all }),
+      ]),
+  });
+}
+
+// ---------------- Reading Spots Moderation ---------------- //
+
+export function useAdminSpots(params?: ListAdminSpotsQueryInput) {
+  return useQuery(adminSpotsQuery(params));
+}
+
+export function useModerateAdminSpot() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: ModerateSpotInput }) =>
+      moderateAdminSpot(id, input),
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: adminKeys.all }),
+        queryClient.invalidateQueries({ queryKey: spotKeys.all }),
       ]),
   });
 }
