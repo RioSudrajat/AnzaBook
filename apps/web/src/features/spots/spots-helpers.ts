@@ -1,10 +1,14 @@
-import { haversineDistanceMeters } from "@starter/shared/validators/community";
+import {
+  googleMapsUrlSchema,
+  haversineDistanceMeters,
+} from "@starter/shared/validators/spots";
 import {
   INDONESIA_BBOX,
   INDONESIA_CITY_PRESETS,
   type ReadingSpotSummaryDto,
   type SavedSpotRegion,
   type SpotCategory,
+  type SpotCitySummaryDto,
   type SpotFacilitiesDto,
   type SpotNoiseLevel,
   type SpotPriceRange,
@@ -125,9 +129,11 @@ export function buildGoogleMapsDirectionsUrl(
 export function buildGoogleMapsPlaceUrl(
   spot: Pick<ReadingSpotSummaryDto, "googleMapsUrl" | "name" | "city">,
 ): string {
-  const safeDirect = sanitizeExternalHttpUrl(spot.googleMapsUrl);
-  if (safeDirect) {
-    return safeDirect;
+  if (spot.googleMapsUrl) {
+    const parsed = googleMapsUrlSchema.safeParse(spot.googleMapsUrl);
+    if (parsed.success) {
+      return parsed.data;
+    }
   }
   const query = `${spot.name} ${spot.city}`.trim();
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
@@ -288,6 +294,45 @@ export function findNearestIndonesianCityPreset(lat: number, lng: number) {
     }
   }
   return { preset: nearest, distanceMeters: minDistance };
+}
+
+export function resolveCityCameraTarget(
+  cityName: string,
+  citiesData?: readonly SpotCitySummaryDto[],
+): { city: string; lat: number; lng: number; zoom: number } | null {
+  const normalized = cityName.trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+
+  const preset = INDONESIA_CITY_PRESETS.find(
+    (item) => item.city.toLowerCase() === normalized,
+  );
+  if (preset) {
+    return {
+      city: preset.city,
+      lat: preset.lat,
+      lng: preset.lng,
+      zoom: preset.zoom,
+    };
+  }
+
+  const cityMatch = citiesData?.find(
+    (item) => item.city.trim().toLowerCase() === normalized,
+  );
+  if (
+    cityMatch &&
+    isWithinIndonesiaBbox(cityMatch.latitude, cityMatch.longitude)
+  ) {
+    return {
+      city: cityMatch.city,
+      lat: cityMatch.latitude,
+      lng: cityMatch.longitude,
+      zoom: 12,
+    };
+  }
+
+  return null;
 }
 
 export function calculateDistanceMeters(

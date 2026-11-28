@@ -22,6 +22,7 @@ import {
   getActiveFacilityChips,
   hasViewportShiftedSignificantly,
   isWithinIndonesiaBbox,
+  resolveCityCameraTarget,
 } from "../spots-helpers";
 import {
   INDONESIA_CITY_PRESETS,
@@ -122,7 +123,7 @@ export function SpotsExplorerView({
       facility: search.facility,
       q: search.q,
       sort: appliedBbox ? "rating" : "nearest",
-      limit: 60,
+      limit: 200,
     }),
     [
       appliedBbox,
@@ -195,29 +196,27 @@ export function SpotsExplorerView({
       return;
     }
 
-    const preset = INDONESIA_CITY_PRESETS.find(
-      (item) => item.city.toLowerCase() === cityName.toLowerCase(),
-    );
-    if (preset) {
+    const target = resolveCityCameraTarget(cityName, citiesData);
+    if (target) {
       setSavedRegion({
-        city: preset.city,
-        lat: preset.lat,
-        lng: preset.lng,
-        zoom: preset.zoom,
+        city: target.city,
+        lat: target.lat,
+        lng: target.lng,
+        zoom: target.zoom,
         source: "preset",
       });
       setLastQueriedCenter({
-        lat: preset.lat,
-        lng: preset.lng,
-        zoom: preset.zoom,
+        lat: target.lat,
+        lng: target.lng,
+        zoom: target.zoom,
       });
-      requestCameraMove(preset.lat, preset.lng, preset.zoom);
+      requestCameraMove(target.lat, target.lng, target.zoom);
       onUpdateSearch(
         {
-          city: preset.city,
-          lat: preset.lat,
-          lng: preset.lng,
-          z: preset.zoom,
+          city: target.city,
+          lat: target.lat,
+          lng: target.lng,
+          z: target.zoom,
           spot: undefined,
         },
         { replace: true },
@@ -701,6 +700,19 @@ export function SpotsExplorerView({
                 );
               })}
             </div>
+
+            {gpsStatus && (
+              <p
+                role={gpsStatus.tone === "error" ? "alert" : "status"}
+                className={`px-1 text-xs font-medium ${
+                  gpsStatus.tone === "error"
+                    ? "text-[var(--color-error)]"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {gpsStatus.text}
+              </p>
+            )}
           </div>
 
           {showSearchAreaButton && (
@@ -782,6 +794,77 @@ export function SpotsExplorerView({
               )}
             </button>
           </div>
+
+          {!(selectedSlug && activeSpot) && (
+            <div className="shrink-0 border-b border-border px-4 py-2.5 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <label
+                    htmlFor="spots-city-select-mobile"
+                    className="text-xs font-mono text-muted-foreground shrink-0"
+                  >
+                    Kota:
+                  </label>
+                  <select
+                    id="spots-city-select-mobile"
+                    value={search.city ?? ""}
+                    onChange={(event) =>
+                      handleSelectCity(event.target.value || undefined)
+                    }
+                    className="h-11 flex-1 min-w-0 rounded-lg border border-border bg-background px-2.5 text-xs font-medium text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                  >
+                    <option value="">Sekitar tampilan peta</option>
+                    {cityChoices.map((city) => (
+                      <option key={city} value={city}>
+                        {city}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={handleResetFilters}
+                    className="min-h-11 shrink-0 inline-flex items-center gap-1 rounded-lg border border-border px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
+                  >
+                    <RotateCcw className="size-3.5" aria-hidden="true" />
+                    <span>Reset</span>
+                  </button>
+                )}
+              </div>
+
+              <div
+                className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none"
+                role="group"
+                aria-label="Filter fasilitas kenyamanan di ponsel"
+              >
+                {FACILITY_CHIP_ORDER.map(({ key, label }) => {
+                  const active = search.facility === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() =>
+                        onUpdateSearch(
+                          { facility: active ? undefined : key },
+                          { replace: true },
+                        )
+                      }
+                      aria-pressed={active}
+                      className={`min-h-11 shrink-0 rounded-md border px-2.5 text-xs cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
+                        active
+                          ? "border-foreground bg-foreground text-background font-semibold"
+                          : "border-border bg-[var(--color-paper-2)] text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
             {selectedSlug && activeSpot ? (

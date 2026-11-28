@@ -95,8 +95,9 @@ function syncSpotsSourceAndLayers(
   spots: readonly ReadingSpotSummaryDto[],
   selectedSlug: string,
   isDark: boolean,
+  forceStyleReady = false,
 ) {
-  if (!map.isStyleLoaded()) {
+  if (!forceStyleReady && !map.isStyleLoaded()) {
     return;
   }
 
@@ -238,6 +239,7 @@ export function ReadingSpotsMap({
   const onSelectSpotRef = useRef(onSelectSpot);
   const onViewportChangeRef = useRef(onViewportChange);
   const isDarkRef = useRef(isDark);
+  const prevIsDarkRef = useRef(isDark);
 
   useEffect(() => {
     spotsRef.current = spots;
@@ -304,6 +306,7 @@ export function ReadingSpotsMap({
           attributionControl: { compact: false },
         });
 
+        prevIsDarkRef.current = isDarkRef.current;
         mapRef.current = map;
 
         const handleSyncLayers = () => {
@@ -313,6 +316,7 @@ export function ReadingSpotsMap({
             spotsRef.current,
             selectedSlugRef.current,
             isDarkRef.current,
+            true,
           );
         };
 
@@ -406,6 +410,8 @@ export function ReadingSpotsMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || mapState !== "ready") return;
+    if (prevIsDarkRef.current === isDark) return;
+    prevIsDarkRef.current = isDark;
     map.setStyle(getBasemapStyleUrl(isDark));
   }, [isDark, mapState]);
 

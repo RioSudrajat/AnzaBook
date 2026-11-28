@@ -1,23 +1,15 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
+import {
+  spotCategoryValues,
+  spotFacilityKeyValues,
+} from "@starter/shared/validators/spots";
 import { siteConfig } from "@/config/site";
 import { AppShell } from "@/features/dashboard/components/app-shell";
 import {
   SpotsExplorerView,
   type SpotsSearchParams,
 } from "@/features/spots/components/spots-explorer-view";
-import { spotCategoryValues } from "@/features/spots/types";
-
-const facilityKeyValues = [
-  "wifi",
-  "powerOutlets",
-  "airConditioned",
-  "quietZone",
-  "hasBookCollection",
-  "outdoorSeating",
-  "prayerRoom",
-  "parking",
-] as const;
 
 const spotsSearchSchema = z.object({
   lat: z.coerce.number().min(-90).max(90).optional().catch(undefined),
@@ -26,7 +18,7 @@ const spotsSearchSchema = z.object({
   spot: z.string().min(1).max(160).optional().catch(undefined),
   category: z.enum(spotCategoryValues).optional().catch(undefined),
   city: z.string().min(1).max(100).optional().catch(undefined),
-  facility: z.enum(facilityKeyValues).optional().catch(undefined),
+  facility: z.enum(spotFacilityKeyValues).optional().catch(undefined),
   q: z.string().max(120).optional().catch(undefined),
 });
 

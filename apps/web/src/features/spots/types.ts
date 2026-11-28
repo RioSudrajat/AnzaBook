@@ -1,40 +1,28 @@
-export const spotCategoryValues = [
-  "book_cafe",
-  "library",
-  "tbm",
-  "indie_bookstore",
-  "reading_lounge",
-] as const;
-export type SpotCategory = (typeof spotCategoryValues)[number];
+export type {
+  ListSpotsResponseDto,
+  ReadingSpotDetailDto,
+  ReadingSpotSummaryDto,
+  ReadingSpotUpcomingEventDto,
+  SpotCategory,
+  SpotCitySummaryDto,
+  SpotFacilitiesDto,
+  SpotNoiseLevel,
+  SpotPriceRange,
+  SpotStatus,
+  SpotVerifiedBadge,
+} from "@starter/shared/types";
 
-export const spotPriceRangeValues = [
-  "free",
-  "budget",
-  "moderate",
-  "premium",
-] as const;
-export type SpotPriceRange = (typeof spotPriceRangeValues)[number];
-
-export const spotNoiseLevelValues = ["quiet", "moderate", "lively"] as const;
-export type SpotNoiseLevel = (typeof spotNoiseLevelValues)[number];
-
-export const spotStatusValues = [
-  "pending_review",
-  "published",
-  "rejected",
-  "closed",
-] as const;
-export type SpotStatus = (typeof spotStatusValues)[number];
-
-export const spotVerifiedBadgeValues = ["none", "curated", "partner"] as const;
-export type SpotVerifiedBadge = (typeof spotVerifiedBadgeValues)[number];
-
-export const INDONESIA_BBOX = {
-  minLat: -11.5,
-  maxLat: 6.5,
-  minLng: 94.5,
-  maxLng: 141.5,
-} as const;
+export {
+  INDONESIA_BBOX,
+  spotCategoryValues,
+  spotFacilityKeyValues,
+  spotNoiseLevelValues,
+  spotPriceRangeValues,
+  spotStatusValues,
+  spotVerifiedBadgeValues,
+  type ListSpotsQueryInput,
+  type SpotFacilityKey,
+} from "@starter/shared/validators/spots";
 
 export const INDONESIA_DEFAULT_VIEW = {
   lat: -6.2088,
@@ -102,97 +90,6 @@ export const INDONESIA_CITY_PRESETS: readonly SpotCityPreset[] = [
     zoom: 11,
   },
 ] as const;
-
-export type SpotFacilitiesDto = {
-  wifi?: boolean;
-  powerOutlets?: boolean;
-  airConditioned?: boolean;
-  quietZone?: boolean;
-  hasBookCollection?: boolean;
-  outdoorSeating?: boolean;
-  prayerRoom?: boolean;
-  parking?: boolean;
-};
-
-export type ReadingSpotSummaryDto = {
-  id: string;
-  slug: string;
-  name: string;
-  category: SpotCategory;
-  description: string | null;
-  address: string;
-  district: string | null;
-  city: string;
-  province: string | null;
-  latitude: number;
-  longitude: number;
-  googleMapsUrl: string | null;
-  googlePlaceId: string | null;
-  instagramHandle: string | null;
-  websiteUrl: string | null;
-  openingHoursText: string | null;
-  priceRange: SpotPriceRange;
-  noiseLevel: SpotNoiseLevel;
-  facilities: SpotFacilitiesDto;
-  coverUrl: string | null;
-  verifiedBadge: SpotVerifiedBadge;
-  linkedBranchId: string | null;
-  linkedCalendarId: string | null;
-  ratingAvg: number;
-  ratingCount: number;
-  bookmarkCount: number;
-  distanceMeters?: number | null;
-  isBookmarked?: boolean;
-};
-
-export type ReadingSpotUpcomingEventDto = {
-  id: string;
-  slug: string;
-  title: string;
-  startAt: string;
-};
-
-export type ReadingSpotDetailDto = ReadingSpotSummaryDto & {
-  linkedBranchName?: string | null;
-  linkedCalendarSlug?: string | null;
-  linkedCalendarName?: string | null;
-  upcomingEvents?: ReadingSpotUpcomingEventDto[];
-};
-
-export type SpotCitySummaryDto = {
-  city: string;
-  province?: string | null;
-  count: number;
-  latitude?: number;
-  longitude?: number;
-};
-
-export type ListSpotsQueryInput = {
-  minLat?: number;
-  maxLat?: number;
-  minLng?: number;
-  maxLng?: number;
-  lat?: number;
-  lng?: number;
-  radiusKm?: number;
-  city?: string;
-  province?: string;
-  category?: SpotCategory;
-  facility?: keyof SpotFacilitiesDto;
-  q?: string;
-  sort?: "nearest" | "rating" | "popular";
-  limit?: number;
-  offset?: number;
-};
-
-export type ListSpotsResponseDto = {
-  data: ReadingSpotSummaryDto[];
-  meta: {
-    total: number;
-    limit?: number;
-    offset?: number;
-  };
-};
 
 export type SavedSpotRegion = {
   city: string;
