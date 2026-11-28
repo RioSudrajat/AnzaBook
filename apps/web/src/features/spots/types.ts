@@ -1,19 +1,7 @@
-export type {
-  ListSpotsResponseDto,
-  ReadingSpotDetailDto,
-  ReadingSpotSummaryDto,
-  ReadingSpotUpcomingEventDto,
-  SpotCategory,
-  SpotCitySummaryDto,
-  SpotFacilitiesDto,
-  SpotNoiseLevel,
-  SpotPriceRange,
-  SpotStatus,
-  SpotVerifiedBadge,
-} from "@starter/shared/types";
-
 export {
   INDONESIA_BBOX,
+  expandSpotCityFilterValues,
+  googleMapsUrlSchema,
   spotCategoryValues,
   spotFacilityKeyValues,
   spotNoiseLevelValues,
@@ -21,8 +9,23 @@ export {
   spotStatusValues,
   spotVerifiedBadgeValues,
   type ListSpotsQueryInput,
+  type SpotCategory,
   type SpotFacilityKey,
+  type SpotNoiseLevel,
+  type SpotPriceRange,
+  type SpotStatus,
+  type SpotVerifiedBadge,
 } from "@starter/shared/validators/spots";
+
+export type {
+  ListSpotsResponseDto,
+  ReadingSpotDetailDto,
+  ReadingSpotReviewDto,
+  ReadingSpotSummaryDto,
+  ReadingSpotUpcomingEventDto,
+  SpotCitySummaryDto,
+  SpotFacilitiesDto,
+} from "@starter/shared/types";
 
 export const INDONESIA_DEFAULT_VIEW = {
   lat: -6.2088,

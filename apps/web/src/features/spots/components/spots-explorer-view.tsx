@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronUp,
@@ -7,6 +7,7 @@ import {
   Navigation,
   RotateCcw,
   Search,
+  SlidersHorizontal,
   Star,
   X,
 } from "lucide-react";
@@ -15,6 +16,7 @@ import { useSpotCities, useSpotDetail, useSpots } from "../hooks";
 import {
   FACILITY_CHIP_ORDER,
   SPOT_CATEGORY_LABELS,
+  SPOT_CATEGORY_STYLES,
   buildGoogleMapsDirectionsUrl,
   formatDistanceMeters,
   formatSpotCategory,
@@ -67,7 +69,23 @@ export function SpotsExplorerView({
   onUpdateSearch,
 }: SpotsExplorerViewProps) {
   const [savedRegion, setSavedRegion] = useSpotRegion();
-  const [searchDraft, setSearchDraft] = useState(search.q ?? "");
+  const [searchDraftState, setSearchDraftState] = useState<{
+    sourceQ: string | undefined;
+    value: string;
+  }>({
+    sourceQ: search.q,
+    value: search.q ?? "",
+  });
+  const searchDraft =
+    searchDraftState.sourceQ === search.q
+      ? searchDraftState.value
+      : (search.q ?? "");
+  const setSearchDraft = useCallback(
+    (nextValue: string) => {
+      setSearchDraftState({ sourceQ: search.q, value: nextValue });
+    },
+    [search.q],
+  );
   const [appliedBbox, setAppliedBbox] = useState<{
     minLat: number;
     maxLat: number;
@@ -82,6 +100,8 @@ export function SpotsExplorerView({
   const [sheetState, setSheetState] = useState<MobileSheetState>(
     search.spot ? "half" : "collapsed",
   );
+  const [showDesktopFacilities, setShowDesktopFacilities] = useState(false);
+  const [showMobileFacilities, setShowMobileFacilities] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [gpsStatus, setGpsStatus] = useState<{
     tone: "info" | "error";
@@ -240,6 +260,18 @@ export function SpotsExplorerView({
     onUpdateSearch({ spot: undefined });
   };
 
+  useEffect(() => {
+    if (!selectedSlug) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      const tag = (event.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      onUpdateSearch({ spot: undefined });
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedSlug, onUpdateSearch]);
+
   const handleSearchThisArea = () => {
     if (!pendingViewport) return;
     setAppliedBbox({
@@ -374,22 +406,35 @@ export function SpotsExplorerView({
     return [...INDONESIA_CITY_PRESETS.map((p) => p.city), ...extras];
   }, [citiesData]);
 
+  const activeFacilityLabel = useMemo(
+    () =>
+      FACILITY_CHIP_ORDER.find((item) => item.key === search.facility)?.label ??
+      null,
+    [search.facility],
+  );
+  const desktopFacilitiesOpen =
+    showDesktopFacilities || Boolean(search.facility);
+  const mobileFacilitiesOpen = showMobileFacilities || Boolean(search.facility);
+
   const sheetTranslateClass =
     sheetState === "expanded"
       ? "translate-y-0"
       : sheetState === "half"
         ? "translate-y-[38dvh]"
-        : "translate-y-[calc(78dvh-72px)]";
+        : "translate-y-[calc(78dvh-64px)]";
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col lg:grid lg:grid-cols-[410px_minmax(0,1fr)] relative overflow-hidden">
+    <div
+      data-lenis-prevent
+      className="flex-1 min-h-0 flex flex-col lg:grid lg:grid-cols-[420px_minmax(0,1fr)] xl:grid-cols-[440px_minmax(0,1fr)] relative overflow-hidden"
+    >
       <aside
         aria-label="Daftar dan penyaring sudut baca"
         className="hidden lg:flex lg:flex-col min-h-0 border-r border-border bg-background"
       >
         {!selectedSlug ? (
           <>
-            <div className="p-4 border-b border-border space-y-3 shrink-0">
+            <div className="px-5 pt-4 pb-3 border-b border-border space-y-2.5 shrink-0">
               <form
                 onSubmit={handleSearchSubmit}
                 role="search"
@@ -416,20 +461,92 @@ export function SpotsExplorerView({
                       }
                     }}
                     placeholder="Cari kafe buku, perpus, kota..."
-                    className="w-full min-h-11 rounded-lg border border-border bg-[var(--color-paper-2)] pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                    className="w-full min-h-11 rounded-lg border border-border bg-card pl-9 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
                   />
+                  {searchDraft && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchDraft("");
+                        onUpdateSearch({ q: undefined }, { replace: true });
+                      }}
+                      aria-label="Bersihkan kata kunci"
+                      className="size-11 absolute right-0 top-1/2 -translate-y-1/2 flex items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer rounded-r-lg focus-visible:outline-2 focus-visible:outline-ring"
+                    >
+                      <X className="size-4" aria-hidden="true" />
+                    </button>
+                  )}
                 </div>
                 <Button
                   type="submit"
                   variant="outline"
-                  className="min-h-11 px-3"
+                  className="min-h-11 px-3.5"
                 >
                   Cari
                 </Button>
               </form>
 
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1 min-w-0">
+                  <label htmlFor="spots-city-select" className="sr-only">
+                    Pilih kota Indonesia
+                  </label>
+                  <MapPin
+                    className="size-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                    aria-hidden="true"
+                  />
+                  <select
+                    id="spots-city-select"
+                    value={search.city ?? ""}
+                    onChange={(event) =>
+                      handleSelectCity(event.target.value || undefined)
+                    }
+                    className="spots-city-select h-11 w-full rounded-lg border border-border bg-card pl-8 pr-8 text-xs font-medium text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                  >
+                    <option value="">Sekitar tampilan peta</option>
+                    {cityChoices.map((city) => (
+                      <option key={city} value={city}>
+                        {city}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    className="size-4 text-muted-foreground absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                    aria-hidden="true"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowDesktopFacilities((prev) => !prev)}
+                  aria-expanded={desktopFacilitiesOpen}
+                  className={`min-h-11 shrink-0 inline-flex items-center gap-1.5 rounded-lg border px-3 text-xs font-medium cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
+                    search.facility
+                      ? "border-foreground bg-foreground text-background font-semibold"
+                      : desktopFacilitiesOpen
+                        ? "border-foreground/40 bg-card text-foreground"
+                        : "border-border bg-card text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <SlidersHorizontal className="size-3.5" aria-hidden="true" />
+                  <span>{activeFacilityLabel ?? "Fasilitas"}</span>
+                </button>
+
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={handleResetFilters}
+                    aria-label="Reset semua filter"
+                    title="Reset filter"
+                    className="size-11 shrink-0 inline-flex items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
+                  >
+                    <RotateCcw className="size-3.5" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+
               <div
-                className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none"
+                className="flex gap-1.5 overflow-x-auto pb-0.5 pr-5 scrollbar-none [mask-image:linear-gradient(to_right,black_calc(100%-24px),transparent)]"
                 role="group"
                 aria-label="Filter kategori sudut baca"
               >
@@ -441,8 +558,8 @@ export function SpotsExplorerView({
                   aria-pressed={!search.category}
                   className={`min-h-11 shrink-0 rounded-lg border px-3 text-xs font-medium cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
                     !search.category
-                      ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-foreground font-semibold"
-                      : "border-border bg-background text-muted-foreground hover:text-foreground"
+                      ? "border-foreground bg-foreground text-background font-semibold"
+                      : "border-border bg-card text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   Semua
@@ -460,84 +577,58 @@ export function SpotsExplorerView({
                         )
                       }
                       aria-pressed={active}
-                      className={`min-h-11 shrink-0 rounded-lg border px-3 text-xs font-medium cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
-                        active
-                          ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-foreground font-semibold"
-                          : "border-border bg-background text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {SPOT_CATEGORY_LABELS[cat]}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div
-                className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none"
-                role="group"
-                aria-label="Filter fasilitas kenyamanan"
-              >
-                {FACILITY_CHIP_ORDER.map(({ key, label }) => {
-                  const active = search.facility === key;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() =>
-                        onUpdateSearch(
-                          { facility: active ? undefined : key },
-                          { replace: true },
-                        )
-                      }
-                      aria-pressed={active}
-                      className={`min-h-11 shrink-0 rounded-md border px-2.5 text-xs cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
+                      className={`min-h-11 shrink-0 inline-flex items-center gap-1.5 rounded-lg border px-3 text-xs font-medium cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
                         active
                           ? "border-foreground bg-foreground text-background font-semibold"
-                          : "border-border bg-[var(--color-paper-2)] text-muted-foreground hover:text-foreground"
+                          : "border-border bg-card text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      {label}
+                      <span
+                        className="size-2 rounded-full shrink-0"
+                        style={{
+                          backgroundColor: active
+                            ? "currentColor"
+                            : SPOT_CATEGORY_STYLES[cat].colorHex,
+                        }}
+                        aria-hidden="true"
+                      />
+                      <span>{SPOT_CATEGORY_LABELS[cat]}</span>
                     </button>
                   );
                 })}
               </div>
 
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <label
-                    htmlFor="spots-city-select"
-                    className="text-xs font-mono text-muted-foreground shrink-0"
-                  >
-                    Kota:
-                  </label>
-                  <select
-                    id="spots-city-select"
-                    value={search.city ?? ""}
-                    onChange={(event) =>
-                      handleSelectCity(event.target.value || undefined)
-                    }
-                    className="h-11 flex-1 min-w-0 rounded-lg border border-border bg-background px-2.5 text-xs font-medium text-foreground focus-visible:outline-2 focus-visible:outline-ring"
-                  >
-                    <option value="">Sekitar tampilan peta</option>
-                    {cityChoices.map((city) => (
-                      <option key={city} value={city}>
-                        {city}
-                      </option>
-                    ))}
-                  </select>
+              {desktopFacilitiesOpen && (
+                <div
+                  className="flex flex-wrap gap-1.5 pt-1"
+                  role="group"
+                  aria-label="Filter fasilitas kenyamanan"
+                >
+                  {FACILITY_CHIP_ORDER.map(({ key, label }) => {
+                    const active = search.facility === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() =>
+                          onUpdateSearch(
+                            { facility: active ? undefined : key },
+                            { replace: true },
+                          )
+                        }
+                        aria-pressed={active}
+                        className={`min-h-11 rounded-md border px-2.5 text-xs cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
+                          active
+                            ? "border-foreground bg-foreground text-background font-semibold"
+                            : "border-border bg-card text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
                 </div>
-
-                {hasActiveFilters && (
-                  <button
-                    type="button"
-                    onClick={handleResetFilters}
-                    className="min-h-11 inline-flex items-center gap-1 px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground cursor-pointer rounded-lg focus-visible:outline-2 focus-visible:outline-ring"
-                  >
-                    <RotateCcw className="size-3.5" aria-hidden="true" />
-                    Reset
-                  </button>
-                )}
-              </div>
+              )}
 
               {gpsStatus && (
                 <p
@@ -553,8 +644,8 @@ export function SpotsExplorerView({
               )}
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
-              <div className="flex items-center justify-between gap-2 pb-2.5">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+              <div className="px-5 pt-3.5 pb-2.5 flex items-baseline justify-between gap-2">
                 <h2 className="font-serif text-base font-bold text-foreground">
                   {search.city
                     ? `Sudut Baca di ${search.city}`
@@ -576,7 +667,7 @@ export function SpotsExplorerView({
             </div>
           </>
         ) : (
-          <div className="flex-1 min-h-0 overflow-y-auto p-4">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-4">
             {activeSpot ? (
               <SpotDetailPanel spot={activeSpot} onClose={handleCloseDetail} />
             ) : isDetailLoading ? (
@@ -609,7 +700,7 @@ export function SpotsExplorerView({
 
       <div className="relative flex-1 min-h-0 h-full">
         <div className="lg:hidden absolute top-3 inset-x-3 z-20 flex flex-col gap-2 pointer-events-none">
-          <div className="pointer-events-auto rounded-xl border border-border bg-background/95 p-2 shadow-md backdrop-blur-md space-y-2">
+          <div className="pointer-events-auto rounded-xl border border-foreground/15 dark:border-white/15 bg-card/95 p-2.5 shadow-lg backdrop-blur-md space-y-2">
             <form
               onSubmit={handleSearchSubmit}
               role="search"
@@ -636,7 +727,7 @@ export function SpotsExplorerView({
                     }
                   }}
                   placeholder="Cari sudut baca, kota..."
-                  className="w-full min-h-11 rounded-lg border border-border bg-[var(--color-paper-2)] pl-9 pr-8 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                  className="w-full min-h-11 rounded-lg border border-border bg-background pl-9 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
                 />
                 {searchDraft && (
                   <button
@@ -652,13 +743,13 @@ export function SpotsExplorerView({
                   </button>
                 )}
               </div>
-              <Button type="submit" size="sm" className="min-h-11 px-3">
+              <Button type="submit" size="sm" className="min-h-11 px-3.5">
                 Cari
               </Button>
             </form>
 
             <div
-              className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none"
+              className="flex gap-1.5 overflow-x-auto pb-0.5 pr-4 scrollbar-none [mask-image:linear-gradient(to_right,black_calc(100%-20px),transparent)]"
               role="group"
               aria-label="Filter cepat kategori"
             >
@@ -670,7 +761,7 @@ export function SpotsExplorerView({
                 aria-pressed={!search.category}
                 className={`min-h-11 shrink-0 rounded-lg border px-3 text-xs font-medium cursor-pointer ${
                   !search.category
-                    ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-foreground font-semibold"
+                    ? "border-foreground bg-foreground text-background font-semibold"
                     : "border-border bg-background text-muted-foreground"
                 }`}
               >
@@ -689,13 +780,22 @@ export function SpotsExplorerView({
                       )
                     }
                     aria-pressed={active}
-                    className={`min-h-11 shrink-0 rounded-lg border px-3 text-xs font-medium cursor-pointer ${
+                    className={`min-h-11 shrink-0 inline-flex items-center gap-1.5 rounded-lg border px-3 text-xs font-medium cursor-pointer ${
                       active
-                        ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-foreground font-semibold"
+                        ? "border-foreground bg-foreground text-background font-semibold"
                         : "border-border bg-background text-muted-foreground"
                     }`}
                   >
-                    {SPOT_CATEGORY_LABELS[cat]}
+                    <span
+                      className="size-2 rounded-full shrink-0"
+                      style={{
+                        backgroundColor: active
+                          ? "currentColor"
+                          : SPOT_CATEGORY_STYLES[cat].colorHex,
+                      }}
+                      aria-hidden="true"
+                    />
+                    <span>{SPOT_CATEGORY_LABELS[cat]}</span>
                   </button>
                 );
               })}
@@ -704,7 +804,7 @@ export function SpotsExplorerView({
             {gpsStatus && (
               <p
                 role={gpsStatus.tone === "error" ? "alert" : "status"}
-                className={`px-1 text-xs font-medium ${
+                className={`text-xs font-medium px-1 ${
                   gpsStatus.tone === "error"
                     ? "text-[var(--color-error)]"
                     : "text-muted-foreground"
@@ -720,10 +820,10 @@ export function SpotsExplorerView({
               <button
                 type="button"
                 onClick={handleSearchThisArea}
-                className="pointer-events-auto min-h-11 inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/95 px-4 py-2 text-xs font-semibold text-foreground shadow-md backdrop-blur-sm cursor-pointer"
+                className="pointer-events-auto min-h-11 inline-flex items-center gap-1.5 rounded-lg border border-foreground/15 dark:border-white/15 bg-card/95 px-4 py-2 text-xs font-semibold text-foreground shadow-md backdrop-blur-sm cursor-pointer"
               >
                 <Search
-                  className="size-3.5 text-[var(--color-accent)]"
+                  className="size-3.5 text-[var(--color-accent-text)]"
                   aria-hidden="true"
                 />
                 <span>Cari di area ini</span>
@@ -753,9 +853,9 @@ export function SpotsExplorerView({
 
         <section
           aria-label="Panel daftar dan detail sudut baca"
-          className={`lg:hidden absolute inset-x-0 bottom-0 z-20 h-[78dvh] flex flex-col rounded-t-2xl border-t border-border bg-background shadow-2xl pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] transition-transform duration-200 ease-out ${sheetTranslateClass}`}
+          className={`lg:hidden absolute inset-x-0 bottom-0 z-30 h-[78dvh] flex flex-col rounded-t-2xl border-t border-border bg-background shadow-[0_-12px_32px_-8px_rgba(0,0,0,0.22)] pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] transition-transform duration-200 ease-out ${sheetTranslateClass}`}
         >
-          <div className="h-[72px] shrink-0 px-4 flex items-center justify-between gap-2 border-b border-border">
+          <div className="h-16 shrink-0 px-4 flex items-center justify-between gap-2 border-b border-border">
             <button
               type="button"
               onClick={cycleSheetState}
@@ -785,7 +885,7 @@ export function SpotsExplorerView({
                   ? "Buka panel daftar sudut baca"
                   : "Tutup panel daftar sudut baca"
               }
-              className="size-11 shrink-0 rounded-lg border border-border bg-[var(--color-paper-2)] flex items-center justify-center text-foreground cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
+              className="size-11 shrink-0 rounded-lg border border-border bg-card flex items-center justify-center text-foreground cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
             >
               {sheetState === "collapsed" ? (
                 <ChevronUp className="size-4" aria-hidden="true" />
@@ -795,89 +895,152 @@ export function SpotsExplorerView({
             </button>
           </div>
 
-          {!(selectedSlug && activeSpot) && (
-            <div className="shrink-0 border-b border-border px-4 py-2.5 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <label
-                    htmlFor="spots-city-select-mobile"
-                    className="text-xs font-mono text-muted-foreground shrink-0"
+          <div
+            inert={sheetState === "collapsed"}
+            className="flex-1 min-h-0 overflow-y-auto overscroll-contain"
+          >
+            {selectedSlug ? (
+              <div className="px-4 py-3">
+                {activeSpot ? (
+                  <SpotDetailPanel
+                    spot={activeSpot}
+                    onClose={handleCloseDetail}
+                  />
+                ) : isDetailLoading ? (
+                  <div
+                    className="space-y-3 py-4"
+                    aria-label="Memuat detail sudut baca"
                   >
-                    Kota:
-                  </label>
-                  <select
-                    id="spots-city-select-mobile"
-                    value={search.city ?? ""}
-                    onChange={(event) =>
-                      handleSelectCity(event.target.value || undefined)
-                    }
-                    className="h-11 flex-1 min-w-0 rounded-lg border border-border bg-background px-2.5 text-xs font-medium text-foreground focus-visible:outline-2 focus-visible:outline-ring"
-                  >
-                    <option value="">Sekitar tampilan peta</option>
-                    {cityChoices.map((city) => (
-                      <option key={city} value={city}>
-                        {city}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {hasActiveFilters && (
-                  <button
-                    type="button"
-                    onClick={handleResetFilters}
-                    className="min-h-11 shrink-0 inline-flex items-center gap-1 rounded-lg border border-border px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
-                  >
-                    <RotateCcw className="size-3.5" aria-hidden="true" />
-                    <span>Reset</span>
-                  </button>
+                    <div className="h-11 w-36 rounded-lg bg-muted animate-pulse" />
+                    <div className="h-44 rounded-xl bg-muted animate-pulse" />
+                    <div className="h-24 rounded-xl bg-muted animate-pulse" />
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-border p-5 space-y-3 text-center">
+                    <p className="text-sm font-medium text-foreground">
+                      Detail sudut baca belum tersedia atau sudah dipindahkan.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleCloseDetail}
+                      className="min-h-11"
+                    >
+                      Kembali ke daftar
+                    </Button>
+                  </div>
                 )}
               </div>
+            ) : (
+              <div>
+                <div className="px-4 py-3 space-y-2.5 border-b border-border">
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1 min-w-0">
+                      <label
+                        htmlFor="spots-city-select-mobile"
+                        className="sr-only"
+                      >
+                        Pilih kota Indonesia
+                      </label>
+                      <MapPin
+                        className="size-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                        aria-hidden="true"
+                      />
+                      <select
+                        id="spots-city-select-mobile"
+                        value={search.city ?? ""}
+                        onChange={(event) =>
+                          handleSelectCity(event.target.value || undefined)
+                        }
+                        className="spots-city-select h-11 w-full rounded-lg border border-border bg-card pl-8 pr-8 text-xs font-medium text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                      >
+                        <option value="">Sekitar tampilan peta</option>
+                        {cityChoices.map((city) => (
+                          <option key={city} value={city}>
+                            {city}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown
+                        className="size-4 text-muted-foreground absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                        aria-hidden="true"
+                      />
+                    </div>
 
-              <div
-                className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none"
-                role="group"
-                aria-label="Filter fasilitas kenyamanan di ponsel"
-              >
-                {FACILITY_CHIP_ORDER.map(({ key, label }) => {
-                  const active = search.facility === key;
-                  return (
                     <button
-                      key={key}
                       type="button"
-                      onClick={() =>
-                        onUpdateSearch(
-                          { facility: active ? undefined : key },
-                          { replace: true },
-                        )
-                      }
-                      aria-pressed={active}
-                      className={`min-h-11 shrink-0 rounded-md border px-2.5 text-xs cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
-                        active
+                      onClick={() => setShowMobileFacilities((prev) => !prev)}
+                      aria-expanded={mobileFacilitiesOpen}
+                      className={`min-h-11 shrink-0 inline-flex items-center gap-1.5 rounded-lg border px-3 text-xs font-medium cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
+                        search.facility
                           ? "border-foreground bg-foreground text-background font-semibold"
-                          : "border-border bg-[var(--color-paper-2)] text-muted-foreground hover:text-foreground"
+                          : mobileFacilitiesOpen
+                            ? "border-foreground/40 bg-card text-foreground"
+                            : "border-border bg-card text-muted-foreground"
                       }`}
                     >
-                      {label}
+                      <SlidersHorizontal
+                        className="size-3.5"
+                        aria-hidden="true"
+                      />
+                      <span>{activeFacilityLabel ?? "Fasilitas"}</span>
                     </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
-          <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
-            {selectedSlug && activeSpot ? (
-              <SpotDetailPanel spot={activeSpot} onClose={handleCloseDetail} />
-            ) : (
-              <SpotListBody
-                spots={spots}
-                isLoading={isLoading}
-                selectedSlug={selectedSlug}
-                hasActiveFilters={hasActiveFilters}
-                onSelectSpot={handleSelectSpot}
-                onResetFilters={handleResetFilters}
-              />
+                    {hasActiveFilters && (
+                      <button
+                        type="button"
+                        onClick={handleResetFilters}
+                        aria-label="Reset semua filter"
+                        title="Reset filter"
+                        className="size-11 shrink-0 inline-flex items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
+                      >
+                        <RotateCcw className="size-3.5" aria-hidden="true" />
+                      </button>
+                    )}
+                  </div>
+
+                  {mobileFacilitiesOpen && (
+                    <div
+                      className="flex flex-wrap gap-1.5 pt-0.5"
+                      role="group"
+                      aria-label="Filter fasilitas kenyamanan di ponsel"
+                    >
+                      {FACILITY_CHIP_ORDER.map(({ key, label }) => {
+                        const active = search.facility === key;
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() =>
+                              onUpdateSearch(
+                                { facility: active ? undefined : key },
+                                { replace: true },
+                              )
+                            }
+                            aria-pressed={active}
+                            className={`min-h-11 rounded-md border px-2.5 text-xs cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
+                              active
+                                ? "border-foreground bg-foreground text-background font-semibold"
+                                : "border-border bg-card text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <SpotListBody
+                  spots={spots}
+                  isLoading={isLoading}
+                  selectedSlug={selectedSlug}
+                  hasActiveFilters={hasActiveFilters}
+                  onSelectSpot={handleSelectSpot}
+                  onResetFilters={handleResetFilters}
+                />
+              </div>
             )}
           </div>
         </section>
@@ -905,12 +1068,13 @@ function SpotListBody({
 }: SpotListBodyProps) {
   if (isLoading) {
     return (
-      <div className="space-y-3" aria-label="Memuat sudut baca">
+      <div className="ruled-index" aria-label="Memuat sudut baca">
         {[0, 1, 2, 3].map((idx) => (
-          <div
-            key={idx}
-            className="h-24 rounded-xl border border-border bg-card animate-pulse"
-          />
+          <div key={idx} className="px-5 py-4 space-y-2">
+            <div className="h-3 w-24 rounded bg-muted animate-pulse" />
+            <div className="h-5 w-3/4 rounded bg-muted animate-pulse" />
+            <div className="h-3 w-1/2 rounded bg-muted animate-pulse" />
+          </div>
         ))}
       </div>
     );
@@ -918,125 +1082,144 @@ function SpotListBody({
 
   if (spots.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-border bg-[var(--color-paper-2)] p-5 text-center space-y-3">
-        <MapPin
-          className="size-6 text-muted-foreground mx-auto"
-          aria-hidden="true"
-        />
-        <div className="space-y-1">
-          <p className="font-serif text-base font-bold text-foreground">
-            Belum ada sudut baca pada filter ini
-          </p>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Coba ganti kota Indonesia di atas, hapus kata kunci, atau geser peta
-            ke area lain.
-          </p>
+      <div className="px-5 py-4">
+        <div className="rounded-xl border border-dashed border-border bg-card p-5 text-center space-y-3">
+          <MapPin
+            className="size-6 text-muted-foreground mx-auto"
+            aria-hidden="true"
+          />
+          <div className="space-y-1">
+            <p className="font-serif text-base font-bold text-foreground">
+              Belum ada sudut baca pada filter ini
+            </p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Coba ganti kota Indonesia di atas, hapus kata kunci, atau geser
+              peta ke area lain.
+            </p>
+          </div>
+          {hasActiveFilters && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onResetFilters}
+              className="min-h-11"
+            >
+              <RotateCcw className="size-4" aria-hidden="true" />
+              Reset Semua Filter
+            </Button>
+          )}
         </div>
-        {hasActiveFilters && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onResetFilters}
-            className="min-h-11"
-          >
-            <RotateCcw className="size-4" aria-hidden="true" />
-            Reset Semua Filter
-          </Button>
-        )}
       </div>
     );
   }
 
   return (
-    <ul className="ruled-index" aria-label="Hasil sudut baca">
+    <ul className="ruled-index pb-4" aria-label="Hasil sudut baca">
       {spots.map((spot) => {
         const isSelected = spot.slug === selectedSlug;
         const verifiedLabel = formatVerifiedBadge(spot.verifiedBadge);
         const distanceLabel = formatDistanceMeters(spot.distanceMeters);
         const facilities = getActiveFacilityChips(spot.facilities).slice(0, 3);
         const directionsUrl = buildGoogleMapsDirectionsUrl(spot);
+        const categoryStyle = SPOT_CATEGORY_STYLES[spot.category];
 
         return (
-          <li key={spot.id} className="py-3">
-            <div
-              className={`rounded-xl border p-3.5 transition-colors space-y-2.5 ${
-                isSelected
-                  ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)]/50"
-                  : "border-border bg-card hover:border-foreground/30"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={() => onSelectSpot(spot.slug)}
-                  className="min-h-11 flex-1 min-w-0 text-left cursor-pointer focus-visible:outline-2 focus-visible:outline-ring rounded-xs"
-                >
-                  <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                    <span className="rounded border border-border bg-[var(--color-paper-2)] px-2 py-0.5 font-mono text-[10px] font-semibold text-foreground">
-                      {formatSpotCategory(spot.category)}
-                    </span>
-                    {verifiedLabel && (
+          <li
+            key={spot.id}
+            className={`relative transition-colors ${
+              isSelected ? "bg-card" : "hover:bg-card/70"
+            }`}
+          >
+            {isSelected && (
+              <span
+                aria-hidden="true"
+                className="absolute inset-y-0 left-0 w-[3px] bg-[var(--color-accent)]"
+              />
+            )}
+
+            <div className="px-5 py-3.5 flex items-start justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => onSelectSpot(spot.slug)}
+                className="min-h-11 flex-1 min-w-0 text-left cursor-pointer focus-visible:outline-2 focus-visible:outline-ring rounded-xs"
+              >
+                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px]">
+                  <span
+                    className="size-2 rounded-full shrink-0"
+                    style={{ backgroundColor: categoryStyle.colorHex }}
+                    aria-hidden="true"
+                  />
+                  <span className="font-medium text-muted-foreground">
+                    {formatSpotCategory(spot.category)}
+                  </span>
+                  {verifiedLabel && (
+                    <>
                       <span
-                        className={`rounded px-2 py-0.5 font-mono text-[10px] font-semibold ${
+                        className="text-muted-foreground/60"
+                        aria-hidden="true"
+                      >
+                        ·
+                      </span>
+                      <span
+                        className={
                           spot.verifiedBadge === "partner"
-                            ? "bg-[var(--color-accent-soft)] text-foreground border border-[var(--color-accent)]/40"
-                            : "bg-[var(--color-green-soft)] text-[var(--color-green)] border border-[var(--color-green)]/30"
-                        }`}
+                            ? "font-semibold text-[var(--color-accent-text)]"
+                            : "font-medium text-[var(--color-green)]"
+                        }
                       >
                         {verifiedLabel}
                       </span>
-                    )}
+                    </>
+                  )}
+                </div>
+
+                <h3 className="font-serif text-[15.5px] font-semibold text-foreground leading-snug mt-0.5">
+                  {spot.name}
+                </h3>
+
+                <p className="text-xs text-muted-foreground truncate mt-0.5">
+                  {spot.address} · {spot.city}
+                </p>
+
+                {(facilities.length > 0 ||
+                  spot.ratingCount > 0 ||
+                  distanceLabel) && (
+                  <div className="flex items-center justify-between gap-3 mt-2">
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      {facilities.map((fac) => fac.label).join(" · ")}
+                    </p>
+
+                    <div className="flex items-center gap-2.5 font-mono text-[11px] tabular-nums text-muted-foreground shrink-0 ml-auto">
+                      {spot.ratingCount > 0 && (
+                        <span className="inline-flex items-center gap-1 text-foreground">
+                          <Star
+                            className="size-3 text-[var(--color-accent)]"
+                            aria-hidden="true"
+                          />
+                          {spot.ratingAvg.toFixed(1)}
+                        </span>
+                      )}
+                      {distanceLabel && (
+                        <span className="inline-flex items-center gap-1">
+                          <Navigation className="size-3" aria-hidden="true" />
+                          {distanceLabel}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <h3 className="font-serif text-base font-bold text-foreground leading-snug">
-                    {spot.name}
-                  </h3>
-                  <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
-                    {spot.address} · {spot.city}
-                  </p>
-                </button>
+                )}
+              </button>
 
-                <a
-                  href={directionsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`Buka rute Google Maps ke ${spot.name}`}
-                  title="Buka di Google Maps"
-                  className="size-11 shrink-0 rounded-lg border border-border bg-background flex items-center justify-center text-foreground hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] focus-visible:outline-2 focus-visible:outline-ring"
-                >
-                  <ExternalLink className="size-4" aria-hidden="true" />
-                </a>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
-                <div className="flex flex-wrap gap-1.5">
-                  {facilities.map((fac) => (
-                    <span
-                      key={fac.key}
-                      className="rounded border border-border/80 bg-background px-2 py-0.5 text-[11px] text-muted-foreground"
-                    >
-                      {fac.label}
-                    </span>
-                  ))}
-                </div>
-
-                <div className="flex items-center gap-2.5 font-mono text-xs tabular-nums text-muted-foreground ml-auto">
-                  {spot.ratingCount > 0 && (
-                    <span className="inline-flex items-center gap-1 text-foreground">
-                      <Star
-                        className="size-3.5 text-[var(--color-accent)]"
-                        aria-hidden="true"
-                      />
-                      {spot.ratingAvg.toFixed(1)}
-                    </span>
-                  )}
-                  {distanceLabel && (
-                    <span className="inline-flex items-center gap-1">
-                      <Navigation className="size-3" aria-hidden="true" />
-                      {distanceLabel}
-                    </span>
-                  )}
-                </div>
-              </div>
+              <a
+                href={directionsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Buka rute Google Maps ke ${spot.name}`}
+                title="Buka di Google Maps"
+                className="size-11 shrink-0 rounded-lg border border-border/80 bg-background/80 flex items-center justify-center text-muted-foreground hover:border-foreground/40 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                <ExternalLink className="size-4" aria-hidden="true" />
+              </a>
             </div>
           </li>
         );

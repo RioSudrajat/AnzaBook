@@ -1,13 +1,6 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import {
-  Compass,
-  Crosshair,
-  Loader2,
-  MapPin,
-  Navigation,
-  Star,
-} from "lucide-react";
+import { Crosshair, Loader2, MapPin, Navigation, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSpotCities, useSpots } from "../hooks";
 import {
@@ -20,7 +13,11 @@ import {
   isWithinIndonesiaBbox,
   projectSpotsToPreviewCanvas,
 } from "../spots-helpers";
-import { INDONESIA_CITY_PRESETS } from "../types";
+import {
+  INDONESIA_CITY_PRESETS,
+  INDONESIA_DEFAULT_VIEW,
+  expandSpotCityFilterValues,
+} from "../types";
 import { useSpotRegion } from "../use-spot-region";
 
 export function HomeSpotsBanner() {
@@ -35,7 +32,7 @@ export function HomeSpotsBanner() {
   const { data: spotsData, isLoading } = useSpots({
     lat: region.lat,
     lng: region.lng,
-    radiusKm: 25,
+    radiusKm: region.source === "geolocation" ? 25 : undefined,
     city: region.source === "preset" ? region.city : undefined,
     sort: "nearest",
     limit: 5,
@@ -49,8 +46,20 @@ export function HomeSpotsBanner() {
   });
 
   const cityCounts = new Map<string, number>();
-  for (const item of citiesData ?? []) {
-    cityCounts.set(item.city.toLowerCase(), item.count);
+  for (const preset of INDONESIA_CITY_PRESETS) {
+    const aliasSet = new Set(
+      expandSpotCityFilterValues(preset.city).map((name) => name.toLowerCase()),
+    );
+    let totalForPreset = 0;
+    for (const item of citiesData ?? []) {
+      if (
+        aliasSet.has(item.city.toLowerCase()) ||
+        (item.province && aliasSet.has(item.province.toLowerCase()))
+      ) {
+        totalForPreset += item.count;
+      }
+    }
+    cityCounts.set(preset.city.toLowerCase(), totalForPreset);
   }
 
   const handleSelectCityPreset = (
@@ -89,6 +98,13 @@ export function HomeSpotsBanner() {
         const lng = Number(position.coords.longitude.toFixed(5));
 
         if (!isWithinIndonesiaBbox(lat, lng)) {
+          setRegion({
+            city: INDONESIA_DEFAULT_VIEW.city,
+            lat: INDONESIA_DEFAULT_VIEW.lat,
+            lng: INDONESIA_DEFAULT_VIEW.lng,
+            zoom: INDONESIA_DEFAULT_VIEW.zoom,
+            source: "preset",
+          });
           setLocationNotice({
             tone: "info",
             text: "Lokasi di luar jangkauan Indonesia. Menampilkan area default Jakarta.",
@@ -147,15 +163,14 @@ export function HomeSpotsBanner() {
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
         <div className="p-5 sm:p-6 flex flex-col justify-between gap-5">
           <div className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-muted-foreground">
-                <Compass
-                  className="size-4 text-[var(--color-accent)]"
-                  aria-hidden="true"
-                />
-                <span>Jelajah Ruang Baca Indonesia</span>
-              </div>
-              <span className="inline-flex items-center rounded-md border border-border bg-[var(--color-paper-2)] px-2.5 py-1 font-mono text-xs tabular-nums text-foreground">
+            <div className="flex flex-wrap items-start justify-between gap-2.5">
+              <h2
+                id="spots-banner-heading"
+                className="font-serif text-xl sm:text-2xl font-bold text-foreground leading-tight"
+              >
+                Sudut Baca di sekitar {region.city}
+              </h2>
+              <span className="inline-flex items-center rounded-md border border-border bg-[var(--color-paper-2)] px-2.5 py-1 font-mono text-xs tabular-nums text-foreground shrink-0">
                 {isLoading
                   ? "Memuat area..."
                   : totalSpots > 0
@@ -164,18 +179,10 @@ export function HomeSpotsBanner() {
               </span>
             </div>
 
-            <div className="space-y-1.5">
-              <h2
-                id="spots-banner-heading"
-                className="font-serif text-xl sm:text-2xl font-bold text-foreground leading-tight"
-              >
-                Sudut Baca di sekitar {region.city}
-              </h2>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Temukan kafe buku, perpustakaan umum, taman bacaan masyarakat,
-                dan toko buku independen dengan rute langsung ke Google Maps.
-              </p>
-            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Temukan kafe buku, perpustakaan umum, taman bacaan masyarakat, dan
+              toko buku independen dengan rute langsung ke Google Maps.
+            </p>
 
             <div
               className="flex flex-wrap gap-2 pt-1"
@@ -195,7 +202,7 @@ export function HomeSpotsBanner() {
                     aria-pressed={isSelected}
                     className={`min-h-11 inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring ${
                       isSelected
-                        ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-foreground font-semibold"
+                        ? "border-foreground bg-foreground text-background font-semibold"
                         : "border-border bg-background text-muted-foreground hover:text-foreground hover:border-foreground/30"
                     }`}
                   >
@@ -386,11 +393,11 @@ export function HomeSpotsBanner() {
                         z: 14,
                         city: spot.city,
                       }}
-                      className="min-h-11 py-2.5 flex items-center justify-between gap-3 group hover:text-[var(--color-accent)] focus-visible:outline-2 focus-visible:outline-ring rounded-xs"
+                      className="min-h-11 py-2.5 flex items-center justify-between gap-3 group hover:text-[var(--color-accent-text)] focus-visible:outline-2 focus-visible:outline-ring rounded-xs"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="font-serif text-sm font-bold text-foreground truncate group-hover:text-[var(--color-accent)]">
+                          <span className="font-serif text-sm font-bold text-foreground truncate group-hover:text-[var(--color-accent-text)]">
                             {spot.name}
                           </span>
                           {verifiedLabel && (
@@ -451,7 +458,7 @@ export function HomeSpotsBanner() {
                   z: region.zoom,
                   city: region.source === "preset" ? region.city : undefined,
                 }}
-                className="shrink-0 min-h-11 inline-flex items-center px-2.5 text-xs font-semibold text-[var(--color-accent)] hover:underline"
+                className="shrink-0 min-h-11 inline-flex items-center px-2.5 text-xs font-semibold text-[var(--color-accent-text)] hover:underline focus-visible:outline-2 focus-visible:outline-ring rounded-sm"
               >
                 Lihat Peta
               </Link>

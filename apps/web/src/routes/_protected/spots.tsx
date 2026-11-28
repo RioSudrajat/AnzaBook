@@ -10,6 +10,12 @@ import {
   SpotsExplorerView,
   type SpotsSearchParams,
 } from "@/features/spots/components/spots-explorer-view";
+import {
+  spotCitiesQuery,
+  spotDetailQuery,
+  spotsListQuery,
+} from "@/features/spots/queries";
+import { INDONESIA_DEFAULT_VIEW } from "@/features/spots/types";
 
 const spotsSearchSchema = z.object({
   lat: z.coerce.number().min(-90).max(90).optional().catch(undefined),
@@ -24,6 +30,38 @@ const spotsSearchSchema = z.object({
 
 export const Route = createFileRoute("/_protected/spots")({
   validateSearch: spotsSearchSchema,
+  loaderDeps: ({ search }) => ({
+    lat: search.lat,
+    lng: search.lng,
+    spot: search.spot,
+    category: search.category,
+    city: search.city,
+    facility: search.facility,
+    q: search.q,
+  }),
+  loader: async ({ context, deps }) => {
+    const prefetches: Promise<unknown>[] = [
+      context.queryClient.ensureQueryData(spotCitiesQuery()),
+      context.queryClient.ensureQueryData(
+        spotsListQuery({
+          lat: deps.lat ?? INDONESIA_DEFAULT_VIEW.lat,
+          lng: deps.lng ?? INDONESIA_DEFAULT_VIEW.lng,
+          city: deps.city,
+          category: deps.category,
+          facility: deps.facility,
+          q: deps.q,
+          sort: "nearest",
+          limit: 200,
+        }),
+      ),
+    ];
+    if (deps.spot) {
+      prefetches.push(
+        context.queryClient.ensureQueryData(spotDetailQuery(deps.spot)),
+      );
+    }
+    await Promise.all(prefetches);
+  },
   head: () => ({
     meta: [{ title: `Peta Sudut Baca | ${siteConfig.name}` }],
   }),
