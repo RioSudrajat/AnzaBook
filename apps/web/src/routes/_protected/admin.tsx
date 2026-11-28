@@ -12,6 +12,7 @@ const adminSearchSchema = z.object({
   tab: z
     .enum([
       "calendars",
+      "spots",
       "partners",
       "claim-batches",
       "financials",
@@ -31,9 +32,12 @@ export const Route = createFileRoute("/_protected/admin")({
     const userRole = context.session?.user.role || "";
     const roles = userRole.split(",").map((r) => r.trim());
     const isAdmin = roles.includes("admin");
+    const canManageSpots = roleHasPermission(userRole, {
+      spots: ["manage-any"],
+    });
     const canReadNotes = roleHasPermission(userRole, { notes: ["read-any"] });
 
-    if (!isAdmin && !canReadNotes) {
+    if (!isAdmin && !canManageSpots && !canReadNotes) {
       throw notFound();
     }
   },

@@ -5,6 +5,7 @@ import {
   Coins,
   FileCode,
   FileText,
+  MapPin,
   ShieldAlert,
   UserCheck,
 } from "lucide-react";
@@ -14,6 +15,7 @@ import { SidebarToggleIcon } from "@/features/dashboard/components/app-sidebar";
 
 export type AdminTab =
   | "calendars"
+  | "spots"
   | "partners"
   | "claim-batches"
   | "financials"
@@ -34,6 +36,7 @@ type AdminSidebarProps = {
   onToggleCollapse: () => void;
   pendingCounts?: {
     calendars: number;
+    spots?: number;
     partners: number;
     drmHighRisk?: number;
   };
@@ -45,7 +48,7 @@ export function AdminSidebar({
   user,
   isCollapsed,
   onToggleCollapse,
-  pendingCounts = { calendars: 0, partners: 0 },
+  pendingCounts = { calendars: 0, spots: 0, partners: 0 },
 }: AdminSidebarProps) {
   const navItems = [
     {
@@ -53,6 +56,12 @@ export function AdminSidebar({
       label: "Komunitas & Acara",
       icon: Calendar,
       badge: pendingCounts.calendars,
+    },
+    {
+      id: "spots" as const,
+      label: "Sudut Baca",
+      icon: MapPin,
+      badge: pendingCounts.spots ?? 0,
     },
     {
       id: "partners" as const,

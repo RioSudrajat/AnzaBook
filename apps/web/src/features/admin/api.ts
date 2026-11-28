@@ -7,6 +7,7 @@ import type {
   AdminDrmSuspensionsListResponse,
   AdminNoteDto,
   AdminOverviewDto,
+  AdminSpotModerationItemDto,
   DataResponse,
   DrmReaderSuspensionDto,
   DrmWatermarkTraceDto,
@@ -26,6 +27,10 @@ import type {
 } from "@starter/shared/validators/admin";
 import type { ListNotesInput } from "@starter/shared/validators/notes";
 import type { CreateClaimBatchInput } from "@starter/shared/validators/publisher";
+import type {
+  ListAdminSpotsQueryInput,
+  ModerateSpotInput,
+} from "@starter/shared/validators/spots";
 import { apiFetch } from "@/lib/api/client";
 
 // Cross-account & admin-only endpoints. The API answers 403 unless the caller's stored role
@@ -214,6 +219,42 @@ export async function reviewAdminDrmSuspension(
 ): Promise<DrmReaderSuspensionDto> {
   const { data } = await apiFetch<DataResponse<DrmReaderSuspensionDto>>(
     `/api/admin/drm-suspensions/${encodeURIComponent(id)}/review`,
+    {
+      method: "PATCH",
+      body: input,
+    },
+  );
+  return data;
+}
+
+// ---------------- Reading Spots Moderation ---------------- //
+
+export async function getAdminSpots(
+  params?: ListAdminSpotsQueryInput,
+  signal?: AbortSignal,
+): Promise<AdminSpotModerationItemDto[]> {
+  const { data } = await apiFetch<DataResponse<AdminSpotModerationItemDto[]>>(
+    "/api/admin/spots",
+    {
+      query: {
+        status: params?.status,
+        hasOpenReports: params?.hasOpenReports,
+        q: params?.q?.trim() || undefined,
+        limit: params?.limit,
+        offset: params?.offset,
+      },
+      signal,
+    },
+  );
+  return Array.isArray(data) ? data : [];
+}
+
+export async function moderateAdminSpot(
+  id: string,
+  input: ModerateSpotInput,
+): Promise<AdminSpotModerationItemDto> {
+  const { data } = await apiFetch<DataResponse<AdminSpotModerationItemDto>>(
+    `/api/admin/spots/${encodeURIComponent(id)}/moderate`,
     {
       method: "PATCH",
       body: input,

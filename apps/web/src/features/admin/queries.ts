@@ -5,6 +5,7 @@ import type {
   AdminDrmSuspensionsQueryInput,
 } from "@starter/shared/validators/drm";
 import type { ListNotesInput } from "@starter/shared/validators/notes";
+import type { ListAdminSpotsQueryInput } from "@starter/shared/validators/spots";
 import {
   getAdminAuthorApplications,
   getAdminCalendars,
@@ -12,6 +13,7 @@ import {
   getAdminDrmSuspensions,
   getAdminOverview,
   getAdminPublishers,
+  getAdminSpots,
   getClaimBatchCodes,
   listAnyNotes,
   traceAdminDrmWatermark,
@@ -34,6 +36,8 @@ export const adminKeys = {
     [...adminKeys.all, "drm-trace", watermarkCode] as const,
   drmSuspensions: (params?: AdminDrmSuspensionsQueryInput) =>
     [...adminKeys.all, "drm-suspensions", params ?? {}] as const,
+  spots: (params?: ListAdminSpotsQueryInput) =>
+    [...adminKeys.all, "spots", params ?? {}] as const,
   notes: (params: ListNotesInput) =>
     [...adminKeys.all, "notes", params] as const,
 };
@@ -105,5 +109,12 @@ export function adminDrmSuspensionsQuery(
   return queryOptions({
     queryKey: adminKeys.drmSuspensions(params),
     queryFn: ({ signal }) => getAdminDrmSuspensions(params, signal),
+  });
+}
+
+export function adminSpotsQuery(params?: ListAdminSpotsQueryInput) {
+  return queryOptions({
+    queryKey: adminKeys.spots(params),
+    queryFn: ({ signal }) => getAdminSpots(params, signal),
   });
 }
