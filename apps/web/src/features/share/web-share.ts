@@ -1,6 +1,19 @@
-export { sanitizeShareFilename } from "./card-helpers";
+import {
+  canCopyPngToClipboard,
+  copyPngBlobToClipboard,
+  copyTextSilently,
+  sharePngFileNative,
+  type NativeShareResult,
+} from "./native-share-helpers";
 
-export type NativeShareResult = "shared" | "cancelled" | "unsupported";
+export { sanitizeShareFilename } from "./card-helpers";
+export {
+  canCopyPngToClipboard,
+  copyPngBlobToClipboard,
+  copyTextSilently,
+  sharePngFileNative,
+};
+export type { NativeShareResult };
 
 export async function canvasToPngBlob(
   canvas: HTMLCanvasElement,
@@ -66,27 +79,7 @@ export async function shareCanvasNative(params: {
 
   const blob = await canvasToPngBlob(params.canvas);
   const file = new File([blob], params.filename, { type: "image/png" });
-
-  if (
-    typeof navigator.canShare !== "function" ||
-    !navigator.canShare({ files: [file] })
-  ) {
-    return "unsupported";
-  }
-
-  try {
-    // Share an image-only payload so mobile OS share sheets (Android Chrome / iOS Safari)
-    // expose image-first targets like Instagram Stories instead of link/text-only targets.
-    await navigator.share({
-      files: [file],
-    });
-    return "shared";
-  } catch (err) {
-    if (err instanceof Error && err.name === "AbortError") {
-      return "cancelled";
-    }
-    throw err;
-  }
+  return sharePngFileNative(file);
 }
 
 export async function copyTextToClipboard(text: string): Promise<boolean> {

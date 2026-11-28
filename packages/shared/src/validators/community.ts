@@ -85,7 +85,150 @@ export const eventThemeValues = [
   "midnight_ink",
   "terracotta",
 ] as const;
-export type EventTheme = (typeof eventThemeValues)[number];
+export type LegacyEventTheme = (typeof eventThemeValues)[number];
+
+export const eventThemePresetCodeValues = [
+  "min",
+  "ris",
+  "nbk",
+  "sln",
+  "bot",
+  "cin",
+  "mus",
+] as const;
+export type EventThemePresetCode = (typeof eventThemePresetCodeValues)[number];
+
+export const eventThemeAccentCodeValues = [
+  "or",
+  "sa",
+  "co",
+  "pl",
+  "am",
+  "in",
+] as const;
+export type EventThemeAccentCode = (typeof eventThemeAccentCodeValues)[number];
+
+export const eventThemeStyleCodeValues = [
+  "pl",
+  "gr",
+  "ln",
+  "ht",
+  "dg",
+  "hj",
+  "lb",
+  "ms",
+] as const;
+export type EventThemeStyleCode = (typeof eventThemeStyleCodeValues)[number];
+
+export const eventThemeFontCodeValues = ["li", "jk", "mn", "cl"] as const;
+export type EventThemeFontCode = (typeof eventThemeFontCodeValues)[number];
+
+export const eventThemeModeCodeValues = ["l", "d", "a"] as const;
+export type EventThemeModeCode = (typeof eventThemeModeCodeValues)[number];
+
+export type EventThemeSpec = {
+  preset: EventThemePresetCode;
+  accent: EventThemeAccentCode;
+  style: EventThemeStyleCode;
+  font: EventThemeFontCode;
+  mode: EventThemeModeCode;
+};
+
+export type EventTheme =
+  | LegacyEventTheme
+  | `v2:${EventThemePresetCode}:${EventThemeAccentCode}:${EventThemeStyleCode}:${EventThemeFontCode}:${EventThemeModeCode}`;
+
+const DEFAULT_EVENT_THEME_SPEC: EventThemeSpec = {
+  preset: "min",
+  accent: "or",
+  style: "pl",
+  font: "li",
+  mode: "a",
+};
+
+const LEGACY_THEME_SPECS: Record<LegacyEventTheme, EventThemeSpec> = {
+  minimal: { preset: "min", accent: "or", style: "pl", font: "li", mode: "a" },
+  classic_paper: {
+    preset: "nbk",
+    accent: "am",
+    style: "ln",
+    font: "li",
+    mode: "l",
+  },
+  midnight_ink: {
+    preset: "sln",
+    accent: "or",
+    style: "lb",
+    font: "li",
+    mode: "d",
+  },
+  terracotta: {
+    preset: "ris",
+    accent: "or",
+    style: "ht",
+    font: "li",
+    mode: "l",
+  },
+};
+
+const PRESET_SET = new Set<string>(eventThemePresetCodeValues);
+const ACCENT_SET = new Set<string>(eventThemeAccentCodeValues);
+const STYLE_SET = new Set<string>(eventThemeStyleCodeValues);
+const FONT_SET = new Set<string>(eventThemeFontCodeValues);
+const MODE_SET = new Set<string>(eventThemeModeCodeValues);
+const LEGACY_SET = new Set<string>(eventThemeValues);
+
+/**
+ * Validates either a legacy event theme key or a compact 5-axis v2 theme token
+ * stored inside the existing 32-char theme_preset column.
+ */
+export function isValidEventTheme(value: string): value is EventTheme {
+  if (LEGACY_SET.has(value)) return true;
+  if (value.length > 32 || !value.startsWith("v2:")) return false;
+  const parts = value.split(":");
+  if (parts.length !== 6) return false;
+  const [, preset, accent, style, font, mode] = parts;
+  return (
+    PRESET_SET.has(preset) &&
+    ACCENT_SET.has(accent) &&
+    STYLE_SET.has(style) &&
+    FONT_SET.has(font) &&
+    MODE_SET.has(mode)
+  );
+}
+
+/** Encodes a 5-axis event theme configuration into a 17-char token. */
+export function encodeEventThemeSpec(spec: EventThemeSpec): EventTheme {
+  return `v2:${spec.preset}:${spec.accent}:${spec.style}:${spec.font}:${spec.mode}`;
+}
+
+/** Parses any stored legacy or v2 event theme string into a safe configuration. */
+export function parseEventThemeSpec(raw?: string | null): EventThemeSpec {
+  if (!raw) return { ...DEFAULT_EVENT_THEME_SPEC };
+  if (LEGACY_SET.has(raw)) {
+    return { ...LEGACY_THEME_SPECS[raw as LegacyEventTheme] };
+  }
+  if (isValidEventTheme(raw) && raw.startsWith("v2:")) {
+    const [, preset, accent, style, font, mode] = raw.split(":");
+    return {
+      preset: preset as EventThemePresetCode,
+      accent: accent as EventThemeAccentCode,
+      style: style as EventThemeStyleCode,
+      font: font as EventThemeFontCode,
+      mode: mode as EventThemeModeCode,
+    };
+  }
+  return { ...DEFAULT_EVENT_THEME_SPEC };
+}
+
+export const eventThemeInputSchema = z
+  .string()
+  .max(32, "Kode tema acara terlalu panjang")
+  .refine((val): val is EventTheme => isValidEventTheme(val), {
+    message: "Format tema acara tidak valid",
+  });
+
+export const eventThemeSchema = eventThemeInputSchema.default("minimal");
 
 export const eventVisibilityValues = ["public", "private_link"] as const;
 export type EventVisibility = (typeof eventVisibilityValues)[number];
@@ -147,6 +290,7 @@ export const featuredWorkSchema = z.object({
 
 export const coHostSchema = z
   .object({
+    userId: z.string().trim().min(1).max(128).optional(),
     name: z
       .string()
       .trim()
@@ -295,7 +439,7 @@ export const eventBaseSchema = z
       .max(10000),
     logisticsNotes: z.string().max(3000).optional(),
     coverUrl: bannerUrlSchema,
-    themePreset: z.enum(eventThemeValues).default("minimal"),
+    themePreset: eventThemeSchema,
     visibility: z.enum(eventVisibilityValues).default("public"),
     eventType: z.enum(eventTypeValues).default("book_club"),
     categoryTag: z.string().max(50).default("Literasi"),
@@ -386,7 +530,61 @@ export const createEventSchema = eventBaseSchema.superRefine((data, ctx) => {
   }
 });
 
-export const updateEventSchema = eventBaseSchema.partial();
+export const updateEventSchema = eventBaseSchema
+  .omit({ calendarId: true })
+  .extend({
+    bookId: z
+      .string()
+      .uuid("ID buku harus berupa UUID valid")
+      .nullable()
+      .optional(),
+    featuredWork: featuredWorkSchema.nullable().optional(),
+    themePreset: eventThemeInputSchema,
+    visibility: z.enum(eventVisibilityValues),
+    eventType: z.enum(eventTypeValues),
+    categoryTag: z.string().max(50),
+    coHosts: z.array(coHostSchema).max(5),
+    format: z.enum(eventFormatValues),
+    hideAddressUntilApproved: z.boolean(),
+    timezone: z.string(),
+    requiresApproval: z.boolean(),
+    allowWaitlist: z.boolean(),
+    capacity: z
+      .number()
+      .int()
+      .min(1, "Kapasitas minimal 1 orang")
+      .max(10000)
+      .nullable()
+      .optional(),
+    logisticsNotes: z.string().max(3000).nullable().optional(),
+    onlineMeetingUrl: z
+      .string()
+      .trim()
+      .refine((val) => val === "" || isSafeHttpUrl(val), {
+        message: "Tautan rapat virtual harus berupa URL HTTP(S) valid",
+      })
+      .nullable()
+      .optional(),
+    venueName: z.string().max(160).nullable().optional(),
+    venueAddress: z.string().max(500).nullable().optional(),
+    district: z.string().max(100).nullable().optional(),
+    city: z.string().max(80).nullable().optional(),
+    latitude: z.number().min(-90).max(90).nullable().optional(),
+    longitude: z.number().min(-180).max(180).nullable().optional(),
+  })
+  .partial()
+  .strict()
+  .superRefine((data, ctx) => {
+    if (data.startsAt && data.endsAt) {
+      if (new Date(data.endsAt) <= new Date(data.startsAt)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["endsAt"],
+          message: "Waktu selesai harus setelah waktu mulai acara",
+        });
+      }
+    }
+  });
 
 export const rsvpEventSchema = z
   .object({
@@ -418,11 +616,13 @@ export const listEventsQuerySchema = z
     calendarSlug: z.string().optional(),
     bookId: z.string().uuid().optional(),
     city: z.string().optional(),
+    q: z.string().trim().max(120).optional(),
     format: z.enum(eventFormatValues).optional(),
     eventType: z.enum(eventTypeValues).optional(),
     filter: z
       .enum(["upcoming", "past", "my_rsvps", "hosting"])
       .default("upcoming"),
+    timeScope: z.enum(["upcoming", "past", "all"]).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(30),
     offset: z.coerce.number().int().min(0).default(0),
   })
@@ -452,3 +652,119 @@ export type CheckInRsvpInput = z.infer<typeof checkInRsvpSchema>;
 export type ReportEventInput = z.infer<typeof reportEventSchema>;
 export type ListEventsInput = z.input<typeof listEventsQuerySchema>;
 export type ListEventsQuery = z.infer<typeof listEventsQuerySchema>;
+
+export const meetingPlatformValues = [
+  "google_meet",
+  "zoom",
+  "teams",
+  "discord",
+  "youtube",
+  "virtual",
+] as const;
+export type MeetingPlatform = (typeof meetingPlatformValues)[number];
+
+/**
+ * Infers the virtual meeting provider from a submitted meeting URL so cards
+ * and event detail buttons can label the platform cleanly without exposing raw URLs.
+ */
+export function detectMeetingPlatform(
+  url?: string | null,
+): MeetingPlatform | null {
+  const trimmed = url?.trim();
+  if (!trimmed) return null;
+  if (
+    /^(javascript|data|vbscript|file):/i.test(trimmed) ||
+    trimmed.startsWith("/")
+  ) {
+    return null;
+  }
+  const candidate = /^https?:\/\//i.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+  try {
+    const parsed = new URL(candidate);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+    const host = parsed.hostname.toLowerCase();
+    if (!host || (!host.includes(".") && host !== "localhost")) {
+      return null;
+    }
+    if (
+      host === "meet.google.com" ||
+      (host === "g.co" && parsed.pathname.toLowerCase().startsWith("/meet"))
+    ) {
+      return "google_meet";
+    }
+    if (
+      host === "zoom.us" ||
+      host.endsWith(".zoom.us") ||
+      host === "zoom.com" ||
+      host.endsWith(".zoom.com")
+    ) {
+      return "zoom";
+    }
+    if (host === "teams.microsoft.com" || host === "teams.live.com") {
+      return "teams";
+    }
+    if (
+      host === "discord.gg" ||
+      host === "discord.com" ||
+      host.endsWith(".discord.com")
+    ) {
+      return "discord";
+    }
+    if (
+      host === "youtube.com" ||
+      host.endsWith(".youtube.com") ||
+      host === "youtu.be"
+    ) {
+      return "youtube";
+    }
+    return "virtual";
+  } catch {
+    return null;
+  }
+}
+
+export function getMeetingPlatformMeta(platform?: MeetingPlatform | null): {
+  id: MeetingPlatform;
+  label: string;
+  ctaLabel: string;
+} {
+  switch (platform) {
+    case "google_meet":
+      return {
+        id: "google_meet",
+        label: "Google Meet",
+        ctaLabel: "Buka Google Meet",
+      };
+    case "zoom":
+      return { id: "zoom", label: "Zoom", ctaLabel: "Gabung via Zoom" };
+    case "teams":
+      return {
+        id: "teams",
+        label: "Microsoft Teams",
+        ctaLabel: "Buka Microsoft Teams",
+      };
+    case "discord":
+      return {
+        id: "discord",
+        label: "Discord",
+        ctaLabel: "Masuk ke Discord",
+      };
+    case "youtube":
+      return {
+        id: "youtube",
+        label: "YouTube Live",
+        ctaLabel: "Tonton di YouTube",
+      };
+    case "virtual":
+    default:
+      return {
+        id: "virtual",
+        label: "Ruang Virtual",
+        ctaLabel: "Buka Ruang Rapat",
+      };
+  }
+}

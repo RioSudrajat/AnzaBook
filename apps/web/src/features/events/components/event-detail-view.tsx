@@ -1,71 +1,100 @@
 import * as React from "react";
+import { Link } from "@tanstack/react-router";
 import {
-  MapPin,
-  Lock,
-  ExternalLink,
-  Users,
-  CheckCircle2,
+  ArrowRight,
   BookOpen,
+  Calendar as CalendarIcon,
+  Check,
+  CheckCircle2,
+  Copy,
+  ExternalLink,
   Film,
   Flag,
-  Pencil,
-  Trash2,
-  Sparkles,
-  Ticket,
-  Video,
-  Copy,
-  Check,
   Info,
+  Lock,
+  MapPin,
+  Navigation,
+  Settings2,
+  Share2,
+  Ticket,
+  Users,
+  Video,
+  X,
 } from "lucide-react";
 import type {
   CommunityEventDetailDto,
   CommunityEventSummaryDto,
 } from "@starter/shared/types";
+import {
+  detectMeetingPlatform,
+  getMeetingPlatformMeta,
+  parseEventThemeSpec,
+} from "@starter/shared/validators/community";
 import { Button } from "@/components/ui/button";
 import { BookCover } from "@/features/books/components/book-cover";
+import { authClient } from "@/lib/auth-client";
+import { safeExternalHref } from "@/lib/safe-url";
 import {
   useCancelRsvp,
-  useDeleteEvent,
   useEventDetail,
   useReportEvent,
   useRsvpEvent,
 } from "../hooks";
-import { EventAttendeesDialog } from "./event-attendees-dialog";
-import { EditEventDialog } from "./edit-event-dialog";
-import { safeExternalHref } from "@/lib/safe-url";
+import type { EventShareMode, EventShareTemplate } from "../event-share";
+import { EventDescriptionRenderer } from "./event-description-renderer";
+import { EventShareDialog } from "./event-share-dialog";
+import {
+  EventAtmosphereBackdrop,
+  resolveEventThemeVars,
+} from "./event-theme-atmosphere";
 
 interface EventDetailViewProps {
   event: CommunityEventDetailDto | CommunityEventSummaryDto;
   isDrawer?: boolean;
+  isInsideAppShell?: boolean;
+  currentUserName?: string | null;
 }
 
-export function EventDetailView({ event: initialEvent }: EventDetailViewProps) {
+const EVENT_TYPE_BADGES: Record<string, string> = {
+  book_club: "Klub Buku",
+  film_discussion: "Diskusi Film",
+  silent_reading: "Silent Reading",
+  book_launch: "Peluncuran Buku",
+  writing_session: "Sesi Menulis",
+  community_meetup: "Temu Komunitas",
+};
+
+export function EventDetailView({
+  event: initialEvent,
+  isInsideAppShell = false,
+  currentUserName,
+}: EventDetailViewProps) {
   const { data: fullDetail } = useEventDetail(initialEvent.slug);
+  const { data: session } = authClient.useSession();
   const event = fullDetail || initialEvent;
   const detail = event as Partial<CommunityEventDetailDto>;
+  const resolvedUserName =
+    currentUserName?.trim() || session?.user?.name?.trim() || null;
 
   const [copiedTicket, setCopiedTicket] = React.useState(false);
+  const [copiedLink, setCopiedLink] = React.useState(false);
+  const [shareModalOpen, setShareModalOpen] = React.useState(false);
+  const [sharePreset, setSharePreset] = React.useState<{
+    template: EventShareTemplate;
+    mode: EventShareMode;
+  }>({
+    template: "invitation_poster",
+    mode: "invite",
+  });
+  const [confirmCancelRsvp, setConfirmCancelRsvp] = React.useState(false);
   const [reportModalOpen, setReportModalOpen] = React.useState(false);
   const [reportReason, setReportReason] = React.useState("");
   const [reportSent, setReportSent] = React.useState(false);
-  const [isAttendeesModalOpen, setIsAttendeesModalOpen] = React.useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
+  const [rsvpError, setRsvpError] = React.useState<string | null>(null);
 
   const rsvpMutation = useRsvpEvent(event.slug);
   const cancelRsvpMutation = useCancelRsvp(event.slug);
   const reportMutation = useReportEvent(event.slug);
-  const deleteMutation = useDeleteEvent();
-
-  const handleDeleteEvent = async () => {
-    if (
-      confirm(
-        "Apakah Anda yakin ingin membatalkan/menghapus acara ini secara permanen?",
-      )
-    ) {
-      await deleteMutation.mutateAsync(event.slug);
-      window.location.reload();
-    }
-  };
 
   const startDate = new Date(event.startsAt);
   const endDate = new Date(event.endsAt);
@@ -98,7 +127,7 @@ export function EventDetailView({ event: initialEvent }: EventDetailViewProps) {
     .slice(0, 3)
     .toUpperCase();
   const dayName = dayNames[startDate.getDay()];
-  const dateFormatted = `${dayName}, ${startDate.getDate()} ${monthNames[startDate.getMonth()]}`;
+  const dateFormatted = `${dayName}, ${startDate.getDate()} ${monthNames[startDate.getMonth()]} ${startDate.getFullYear()}`;
 
   const formatTime = (d: Date) =>
     d
@@ -111,32 +140,62 @@ export function EventDetailView({ event: initialEvent }: EventDetailViewProps) {
 
   const timeFormatted = `${formatTime(startDate)} - ${formatTime(endDate)} WIB`;
 
-  // Attendee names text (Luma Screenshots 5 & 8)
   const previews = event.attendeesPreview || [];
   const attendeeCount = event.attendeeCount || 0;
   let attendeeNamesText = "";
   if (previews.length > 0) {
     const firstTwo = previews.slice(0, 2).map((p) => p.name);
     const remaining = Math.max(0, attendeeCount - 2);
-    if (remaining > 0) {
-      attendeeNamesText = `${firstTwo.join(", ")} dan ${remaining} lainnya`;
-    } else {
-      attendeeNamesText = firstTwo.join(" dan ");
-    }
+    attendeeNamesText =
+      remaining > 0
+        ? `${firstTwo.join(", ")} dan ${remaining} lainnya`
+        : firstTwo.join(" dan ");
   }
 
   const handleRsvp = async () => {
+    setRsvpError(null);
     try {
       await rsvpMutation.mutateAsync({});
-    } catch {
-      // handled by mutation error
+    } catch (err: unknown) {
+      const apiErr = err as { message?: string };
+      setRsvpError(apiErr?.message || "Gagal memproses pendaftaran acara.");
     }
   };
 
-  const handleCancelRsvp = async () => {
-    if (confirm("Apakah Anda yakin ingin membatalkan pendaftaran acara ini?")) {
+  const handleConfirmCancelRsvp = async () => {
+    setRsvpError(null);
+    try {
       await cancelRsvpMutation.mutateAsync();
+      setConfirmCancelRsvp(false);
+    } catch (err: unknown) {
+      const apiErr = err as { message?: string };
+      setRsvpError(apiErr?.message || "Gagal membatalkan pendaftaran.");
     }
+  };
+
+  const handleCopyShareLink = async () => {
+    try {
+      const shareUrl =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/events/${event.slug}`
+          : `/events/${event.slug}`;
+      await navigator.clipboard.writeText(shareUrl);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2200);
+    } catch {
+      // Ignore clipboard failures on restricted contexts.
+    }
+  };
+
+  const openShareStudio = (
+    template?: EventShareTemplate,
+    mode?: EventShareMode,
+  ) => {
+    setSharePreset({
+      template: template ?? (isGoing ? "attending_pass" : "invitation_poster"),
+      mode: mode ?? (isGoing ? "attending" : "invite"),
+    });
+    setShareModalOpen(true);
   };
 
   const handleSendReport = async (e: React.FormEvent) => {
@@ -148,14 +207,14 @@ export function EventDetailView({ event: initialEvent }: EventDetailViewProps) {
       setReportSent(false);
       setReportModalOpen(false);
       setReportReason("");
-    }, 1500);
+    }, 1400);
   };
 
   const googleMapsUrl =
     event.latitude && event.longitude
-      ? `https://www.google.com/maps/search/?api=1&query=${event.latitude}%2C${event.longitude}`
+      ? `https://www.google.com/maps/dir/?api=1&destination=${event.latitude},${event.longitude}`
       : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-          `${event.district || ""} ${event.city || "Jakarta"}`,
+          `${event.venueName || ""} ${event.district || ""} ${event.city || "Jakarta"}`.trim(),
         )}`;
 
   const isFull =
@@ -165,745 +224,954 @@ export function EventDetailView({ event: initialEvent }: EventDetailViewProps) {
   const isGoing = event.userRsvpStatus === "going";
   const isPending = event.userRsvpStatus === "pending_approval";
   const isWaitlisted = event.userRsvpStatus === "waitlisted";
+  const isRejected = event.userRsvpStatus === "rejected";
+
+  const eventTypeLabel =
+    EVENT_TYPE_BADGES[event.eventType] || "Agenda Komunitas";
+  const meetingPlatform =
+    event.meetingPlatform ?? detectMeetingPlatform(detail.onlineMeetingUrl);
+  const platformMeta = getMeetingPlatformMeta(meetingPlatform);
+  const meetingHref = safeExternalHref(detail.onlineMeetingUrl);
+  const themeSpec = React.useMemo(
+    () => parseEventThemeSpec(event.themePreset),
+    [event.themePreset],
+  );
+  const themeVars = resolveEventThemeVars(themeSpec);
 
   return (
-    <div className="flex flex-col space-y-6 text-white text-xs">
-      {/* 1:1 Aspect Ratio Banner Poster (Luma UI) */}
-      <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-white/10 bg-black/40 shadow-xl">
-        <img
-          src={event.coverUrl}
-          alt={event.title}
-          className="size-full object-cover"
-        />
-        {event.categoryTag && (
-          <span className="absolute top-3 left-3 rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white/90 backdrop-blur-xs border border-white/10">
-            #{event.categoryTag}
-          </span>
-        )}
-      </div>
+    <div
+      style={themeVars.pageContainerStyle}
+      className={`@container relative overflow-hidden rounded-2xl sm:rounded-3xl border p-5 sm:p-7 lg:p-10 shadow-xs ${themeVars.darkClass}`}
+    >
+      <EventAtmosphereBackdrop spec={themeSpec} variant="page" />
 
-      {/* Title & Host info */}
-      <div className="space-y-2">
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white leading-snug">
-          {event.title}
-        </h1>
-
-        <div className="flex items-center gap-2 text-white/70">
-          <div className="flex size-5 items-center justify-center rounded-full bg-amber-500/20 text-amber-300 font-semibold text-[10px]">
-            {event.calendarName[0]}
-          </div>
-          <span>
-            Diselenggarakan oleh{" "}
-            <strong className="text-white font-medium">
-              {event.calendarName}
-            </strong>
-          </span>
-        </div>
-      </div>
-
-      {/* Date & Time Row */}
-      <div className="flex items-start gap-3.5 rounded-xl border border-white/10 bg-white/5 p-3.5">
-        <div className="flex size-11 flex-col items-center justify-center rounded-lg border border-white/10 bg-white/10 text-center font-bold">
-          <span className="text-[9px] uppercase tracking-wider text-white/60">
-            {dateShortMonth}
-          </span>
-          <span className="text-base leading-none text-white">
-            {startDate.getDate()}
-          </span>
-        </div>
-        <div className="flex-1 space-y-0.5">
-          <div className="font-semibold text-white text-sm">
-            {dateFormatted}
-          </div>
-          <div className="text-white/60">{timeFormatted}</div>
-        </div>
-      </div>
-
-      {/* Location Row (Luma Screenshot 4) */}
-      <div className="flex items-start gap-3.5 rounded-xl border border-white/10 bg-white/5 p-3.5">
-        {event.format === "online" &&
-        !event.venueName &&
-        !event.venueAddress ? (
-          <>
-            <Video className="mt-0.5 size-5 shrink-0 text-blue-400" />
-            <div className="flex-1 space-y-0.5">
-              <div className="font-semibold text-white text-sm">
-                Sesi Daring (Virtual)
-              </div>
-              <div className="text-white/60">
-                Tautan rapat tersedia untuk peserta terdaftar
-              </div>
+      <div className="relative z-10 text-foreground">
+        <header className="grid grid-cols-1 @2xl:grid-cols-[minmax(0,1fr)_240px] @4xl:grid-cols-[minmax(0,1fr)_280px] gap-6 @4xl:gap-10 items-start pb-8 border-b border-[var(--evt-border-subtle,var(--border))]">
+          <div className="@container min-w-0 space-y-5 order-2 @2xl:order-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                style={themeVars.badgeStyle}
+                className="rounded-lg border px-2.5 py-1 font-mono text-[11px] font-semibold"
+              >
+                {eventTypeLabel}
+              </span>
+              {event.categoryTag && (
+                <span className="rounded-lg bg-[var(--color-accent-soft)] px-2.5 py-1 font-mono text-[11px] font-semibold text-foreground">
+                  #{event.categoryTag}
+                </span>
+              )}
+              <span
+                style={themeVars.badgeStyle}
+                className="rounded-lg border px-2.5 py-1 font-mono text-[11px] text-muted-foreground"
+              >
+                {event.format === "online"
+                  ? "Daring"
+                  : event.format === "hybrid"
+                    ? "Hibrida"
+                    : "Tatap Muka"}
+              </span>
             </div>
-          </>
-        ) : (
-          <>
-            <MapPin className="mt-0.5 size-5 shrink-0 text-amber-400" />
-            <div className="flex-1 space-y-0.5">
-              {event.isAddressHidden ? (
-                <div>
-                  <div className="font-semibold text-white text-sm">
-                    Daftar untuk Melihat Alamat
-                  </div>
-                  <div className="text-white/60">
-                    {event.district ? `${event.district}, ` : ""}
-                    {event.city || "Jakarta"}
-                  </div>
+
+            {isInsideAppShell ? (
+              <h2
+                style={{ fontFamily: themeVars.fontFamily }}
+                className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-[-0.025em] text-foreground leading-[1.15]"
+              >
+                {event.title}
+              </h2>
+            ) : (
+              <h1
+                style={{ fontFamily: themeVars.fontFamily }}
+                className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-[-0.025em] text-foreground leading-[1.15]"
+              >
+                {event.title}
+              </h1>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <span>Diselenggarakan oleh</span>
+              <Link
+                to="/c/$slug"
+                params={{ slug: event.calendarSlug }}
+                style={themeVars.badgeStyle}
+                className="inline-flex min-h-9 items-center gap-2 rounded-xl border px-3 py-1.5 font-semibold text-foreground hover:border-[var(--color-accent)] transition-colors"
+              >
+                <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-[10px] font-bold text-foreground">
+                  {event.calendarName[0]}
+                </span>
+                <span>{event.calendarName}</span>
+              </Link>
+              {event.coHosts &&
+                event.coHosts.map((ch, idx) => (
+                  <span
+                    key={`${ch.name}-${idx}`}
+                    style={themeVars.badgeStyle}
+                    className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs text-foreground"
+                  >
+                    {ch.avatarUrl ? (
+                      <img
+                        src={ch.avatarUrl}
+                        alt={ch.name}
+                        className="size-4 shrink-0 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-[9px] font-bold text-foreground">
+                        {ch.name.slice(0, 1).toUpperCase()}
+                      </span>
+                    )}
+                    <span className="font-medium">{ch.name}</span>
+                    {ch.roleLabel && (
+                      <span className="text-muted-foreground">
+                        · {ch.roleLabel}
+                      </span>
+                    )}
+                  </span>
+                ))}
+            </div>
+
+            <dl className="grid grid-cols-1 @lg:grid-cols-2 gap-3 pt-1 text-sm">
+              <div
+                style={themeVars.glassSurfaceStyle}
+                className="evt-glass rounded-2xl border p-4 flex items-start gap-3.5"
+              >
+                <div
+                  style={{
+                    backgroundColor: "var(--evt-control-bg, var(--background))",
+                    borderColor: "var(--evt-border-subtle, var(--border))",
+                  }}
+                  className="flex size-11 shrink-0 flex-col items-center justify-center rounded-xl border text-center font-mono"
+                >
+                  <span className="text-[9px] uppercase tracking-wider text-muted-foreground">
+                    {dateShortMonth}
+                  </span>
+                  <span className="text-sm font-bold leading-none text-foreground">
+                    {startDate.getDate()}
+                  </span>
                 </div>
-              ) : (
-                <div>
-                  <div className="font-semibold text-white text-sm">
-                    {event.venueName || "Lokasi Acara"}
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <dt className="sr-only">Tanggal dan Waktu</dt>
+                  <dd className="font-serif text-sm font-bold text-foreground leading-snug">
+                    {dateFormatted}
+                  </dd>
+                  <dd className="font-mono text-xs tabular-nums text-muted-foreground">
+                    {timeFormatted}
+                  </dd>
+                </div>
+              </div>
+
+              {event.format !== "online" && (
+                <div
+                  style={themeVars.glassSurfaceStyle}
+                  className="evt-glass rounded-2xl border p-4 flex items-start gap-3.5"
+                >
+                  <div
+                    style={{
+                      backgroundColor:
+                        "var(--evt-control-bg, var(--background))",
+                      borderColor: "var(--evt-border-subtle, var(--border))",
+                    }}
+                    className="flex size-11 shrink-0 items-center justify-center rounded-xl border"
+                  >
+                    <MapPin
+                      className="size-4 text-[var(--color-accent)]"
+                      aria-hidden="true"
+                    />
                   </div>
-                  <div className="text-white/60">
-                    {event.venueAddress ||
-                      [event.district, event.city].filter(Boolean).join(", ") ||
-                      "Lokasi ditentukan penyelenggara"}
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <dt className="sr-only">Lokasi Tatap Muka</dt>
+                    {event.isAddressHidden ? (
+                      <>
+                        <dd className="font-serif text-sm font-bold text-foreground leading-snug">
+                          Alamat dibagikan setelah disetujui
+                        </dd>
+                        <dd className="text-xs text-muted-foreground">
+                          {event.district ? `${event.district}, ` : ""}
+                          {event.city || "Jakarta"}
+                        </dd>
+                      </>
+                    ) : (
+                      <>
+                        <dd className="font-serif text-sm font-bold text-foreground leading-snug">
+                          {event.venueName || "Lokasi Acara"}
+                        </dd>
+                        <dd className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+                          {event.venueAddress ||
+                            [event.district, event.city]
+                              .filter(Boolean)
+                              .join(", ") ||
+                            "Lokasi ditentukan penyelenggara"}
+                        </dd>
+                        <dd className="pt-0.5">
+                          <a
+                            href={googleMapsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="min-h-8 inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--color-accent)] hover:underline"
+                          >
+                            <Navigation
+                              className="size-3.5"
+                              aria-hidden="true"
+                            />
+                            <span>Buka rute di Google Maps</span>
+                            <ExternalLink
+                              className="size-3"
+                              aria-hidden="true"
+                            />
+                          </a>
+                        </dd>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
-            </div>
-          </>
-        )}
-      </div>
 
-      {/* Dynamic Registration Box or Host Panel */}
-      {event.canManage ? (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-3.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400">
-              <Sparkles className="size-4" />
-              <span>Panel Penyelenggara (Host)</span>
-            </div>
-            <span className="rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-semibold">
-              Tayang Publik
-            </span>
+              {(event.format === "online" || event.format === "hybrid") && (
+                <div
+                  style={themeVars.glassSurfaceStyle}
+                  className={`evt-glass rounded-2xl border p-4 flex items-start gap-3.5 ${
+                    event.format === "hybrid" ? "@lg:col-span-2" : ""
+                  }`}
+                >
+                  <div
+                    style={{
+                      backgroundColor:
+                        "var(--evt-control-bg, var(--background))",
+                      borderColor: "var(--evt-border-subtle, var(--border))",
+                    }}
+                    className="flex size-11 shrink-0 items-center justify-center rounded-xl border"
+                  >
+                    <Video
+                      className="size-4 text-[var(--color-water)]"
+                      aria-hidden="true"
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <dt className="sr-only">Ruang Rapat Virtual</dt>
+                    <dd className="font-serif text-sm font-bold text-foreground leading-snug">
+                      {platformMeta.label}
+                    </dd>
+                    {isGoing && meetingHref ? (
+                      <dd className="pt-0.5">
+                        <Button
+                          asChild
+                          variant="outline"
+                          className="min-h-11 gap-2 border-[var(--color-water)]/40 bg-[var(--evt-control-bg,var(--background))] text-xs font-semibold text-foreground hover:border-[var(--color-accent)]"
+                        >
+                          <a
+                            href={meetingHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Video
+                              className="size-4 text-[var(--color-water)]"
+                              aria-hidden="true"
+                            />
+                            <span>{platformMeta.ctaLabel}</span>
+                            <ExternalLink
+                              className="size-3.5"
+                              aria-hidden="true"
+                            />
+                          </a>
+                        </Button>
+                      </dd>
+                    ) : (
+                      <dd className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Lock
+                          className="size-3.5 shrink-0"
+                          aria-hidden="true"
+                        />
+                        <span>
+                          Tautan {platformMeta.label} terbuka otomatis setelah
+                          pendaftaran terkonfirmasi.
+                        </span>
+                      </dd>
+                    )}
+                  </div>
+                </div>
+              )}
+            </dl>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="rounded-lg bg-black/40 border border-white/10 p-2.5">
-              <span className="text-[10px] text-white/50 block">Pendaftar</span>
-              <span className="text-base font-bold text-white">
-                {event.attendeeCount} Orang
-              </span>
-            </div>
-            <div className="rounded-lg bg-black/40 border border-white/10 p-2.5">
-              <span className="text-[10px] text-white/50 block">Kapasitas</span>
-              <span className="text-base font-bold text-white">
-                {event.capacity ? `${event.capacity} Kursi` : "Tak Terbatas"}
-              </span>
+          <div className="relative order-1 @2xl:order-2 w-full max-w-[260px] @2xl:max-w-none mx-auto">
+            <img
+              src={event.coverUrl}
+              alt=""
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-2 scale-105 rounded-2xl object-cover blur-2xl opacity-35"
+            />
+            <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-[var(--evt-border-subtle,var(--border))] bg-muted shadow-sm">
+              <img
+                src={event.coverUrl}
+                alt={event.title}
+                className="size-full object-cover"
+              />
             </div>
           </div>
+        </header>
 
-          {/* Action buttons */}
-          <div className="flex flex-col gap-2 pt-1">
-            <Button
-              type="button"
-              onClick={() => setIsAttendeesModalOpen(true)}
-              className="w-full h-10 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs shadow-md cursor-pointer flex items-center justify-center gap-1.5"
+        <div className="grid grid-cols-1 @3xl:grid-cols-[minmax(0,1fr)_350px] gap-6 @3xl:gap-8 items-start pt-8">
+          <div className="min-w-0 space-y-6">
+            <section
+              aria-labelledby="event-about-heading"
+              style={themeVars.glassSurfaceStyle}
+              className="evt-glass rounded-2xl border p-5 sm:p-7 space-y-4"
             >
-              <Users className="size-4" />
-              <span>Kelola Peserta & Persetujuan</span>
-              {event.pendingRsvpCount !== undefined &&
-                event.pendingRsvpCount > 0 && (
-                  <span className="rounded-full bg-rose-600 px-1.5 py-0.2 text-[10px] font-bold text-white ml-1">
-                    {event.pendingRsvpCount}
-                  </span>
+              <h3
+                id="event-about-heading"
+                className="font-serif text-lg font-bold text-foreground border-b border-[var(--evt-border-subtle,var(--border))] pb-2.5"
+              >
+                Tentang Acara
+              </h3>
+              <EventDescriptionRenderer description={event.description} />
+            </section>
+
+            {(event.bookSummary || event.featuredWork) && (
+              <section
+                aria-label="Karya yang dibahas"
+                style={themeVars.glassSurfaceStyle}
+                className="evt-glass rounded-2xl border p-5 sm:p-6 space-y-3.5"
+              >
+                <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                  {event.featuredWork?.mediaType === "film" ? (
+                    <Film
+                      className="size-4 text-[var(--color-water)]"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <BookOpen
+                      className="size-4 text-[var(--color-accent)]"
+                      aria-hidden="true"
+                    />
+                  )}
+                  <span>Membahas Karya Ini</span>
+                </div>
+
+                {event.bookSummary ? (
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <BookCover
+                        book={event.bookSummary}
+                        className="w-12 shrink-0"
+                        decorative
+                      />
+                      <div className="min-w-0">
+                        <div className="font-serif text-base font-bold text-foreground truncate">
+                          {event.bookSummary.title}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {event.bookSummary.author}
+                        </div>
+                      </div>
+                    </div>
+                    <Link
+                      to="/read/$slug"
+                      params={{ slug: event.bookSummary.slug }}
+                      style={{
+                        backgroundColor:
+                          "var(--evt-control-bg, var(--background))",
+                        borderColor: "var(--evt-border-subtle, var(--border))",
+                      }}
+                      className="min-h-11 inline-flex items-center gap-1.5 rounded-xl border px-4 text-xs font-semibold text-foreground hover:border-[var(--color-accent)] transition-colors"
+                    >
+                      <span>Baca Sampel</span>
+                      <ArrowRight className="size-3.5" aria-hidden="true" />
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <div className="font-serif text-base font-bold text-foreground">
+                      {event.featuredWork?.title}
+                    </div>
+                    {event.featuredWork?.creator && (
+                      <div className="text-xs text-muted-foreground">
+                        {event.featuredWork.creator}
+                      </div>
+                    )}
+                    {(() => {
+                      const featuredHref = safeExternalHref(
+                        event.featuredWork?.externalUrl,
+                      );
+                      return featuredHref ? (
+                        <a
+                          href={featuredHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="min-h-10 inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-accent)] hover:underline pt-1"
+                        >
+                          Buka Tautan Karya
+                          <ExternalLink className="size-3" aria-hidden="true" />
+                        </a>
+                      ) : null;
+                    })()}
+                  </div>
                 )}
-            </Button>
+              </section>
+            )}
 
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setIsEditModalOpen(true)}
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white cursor-pointer text-xs"
-              >
-                <Pencil className="size-3.5 mr-1 text-white/70" />
-                Edit Acara
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleDeleteEvent}
-                className="bg-rose-500/10 border-rose-500/30 text-rose-300 hover:bg-rose-500/20 hover:text-rose-200 cursor-pointer text-xs"
-              >
-                <Trash2 className="size-3.5 mr-1 text-rose-400" />
-                Hapus Acara
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3.5">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-white/50">
-            Pendaftaran
-          </div>
-
-          {/* State 1: Already Registered */}
-          {event.userRsvpStatus ? (
-            <div className="space-y-3">
-              <div
-                className={`flex items-start gap-2 rounded-lg p-3 ${
-                  isGoing
-                    ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-200"
-                    : isPending
-                      ? "bg-amber-500/15 border border-amber-500/30 text-amber-200"
-                      : "bg-blue-500/15 border border-blue-500/30 text-blue-200"
-                }`}
-              >
-                <CheckCircle2 className="size-4 shrink-0 mt-0.5" />
-                <div>
-                  <div className="font-semibold">
-                    {isGoing && "Pendaftaran Dikonfirmasi (Going)"}
-                    {isPending && "Menunggu Persetujuan Host"}
-                    {isWaitlisted && "Dalam Antrean Daftar Tunggu"}
-                  </div>
-                  <div className="text-[11px] opacity-80 mt-0.5">
-                    {isGoing &&
-                      "Tiket dan lokasi lengkap telah terbuka untuk Anda."}
-                    {isPending &&
-                      "Host akan meninjau pendaftaran Anda sebelum membuka alamat acara."}
-                    {isWaitlisted &&
-                      "Anda akan otomatis dipromosikan jika kursi tersedia."}
-                  </div>
+            <section
+              aria-label="Peserta yang mendaftar"
+              className="border-t border-[var(--evt-border-subtle,var(--border))] pt-5 space-y-3"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="font-serif text-base font-bold text-foreground">
+                  <span className="font-mono tabular-nums">
+                    {attendeeCount}
+                  </span>{" "}
+                  Akan Hadir
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <a
+                    href={`mailto:${event.calendarName.toLowerCase().replace(/\s+/g, "")}@anzabook.com`}
+                    className="min-h-10 inline-flex items-center hover:text-foreground transition-colors"
+                  >
+                    Hubungi Penyelenggara
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setReportModalOpen(true)}
+                    className="min-h-10 inline-flex items-center gap-1 hover:text-[var(--color-error)] transition-colors cursor-pointer"
+                  >
+                    <Flag className="size-3.5" aria-hidden="true" />
+                    <span>Laporkan</span>
+                  </button>
                 </div>
               </div>
 
-              {/* Detail Akses Khusus Peserta 'Going' */}
-              {isGoing && (
-                <>
-                  {/* Kode Tiket Check-in */}
-                  {detail.userRsvp?.checkinCode && (
-                    <div className="rounded-xl border border-white/10 bg-black/40 p-3 space-y-2">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="flex items-center gap-1.5 font-medium text-white/90">
-                          <Ticket className="size-3.5 text-amber-400" />
-                          Kode Tiket Check-in
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (detail.userRsvp?.checkinCode) {
-                              navigator.clipboard.writeText(
-                                detail.userRsvp.checkinCode,
-                              );
-                              setCopiedTicket(true);
-                              setTimeout(() => setCopiedTicket(false), 2000);
-                            }
-                          }}
-                          className="flex items-center gap-1 text-[10px] text-amber-300 hover:text-amber-200 transition-colors"
-                        >
-                          {copiedTicket ? (
-                            <>
-                              <Check className="size-3 text-emerald-400" />
-                              <span className="text-emerald-300">Tersalin</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="size-3" />
-                              <span>Salin Kode</span>
-                            </>
-                          )}
-                        </button>
+              {previews.length > 0 && (
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex -space-x-2 overflow-hidden py-1">
+                    {previews.map((att, idx) => (
+                      <div
+                        key={idx}
+                        className="size-8 rounded-full ring-2 ring-background bg-[var(--color-accent-soft)] text-foreground text-xs font-bold flex items-center justify-center overflow-hidden"
+                      >
+                        {att.image ? (
+                          <img
+                            src={att.image}
+                            alt={att.name}
+                            className="size-full object-cover"
+                          />
+                        ) : (
+                          att.name[0]
+                        )}
                       </div>
-                      <div className="font-mono text-base font-bold tracking-widest text-amber-300 text-center py-2 bg-white/5 rounded-lg border border-white/5">
-                        {detail.userRsvp.checkinCode}
-                      </div>
-                      <p className="text-[10px] text-white/40 text-center">
-                        Tunjukkan kode tiket ini kepada host saat verifikasi
-                        kedatangan
-                      </p>
-                    </div>
-                  )}
+                    ))}
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {attendeeNamesText}
+                  </span>
+                </div>
+              )}
+            </section>
+          </div>
 
-                  {/* Tautan Rapat Virtual */}
-                  {(() => {
-                    const meetingHref = safeExternalHref(
-                      detail.onlineMeetingUrl,
-                    );
-                    if (!meetingHref) return null;
-                    return (
-                      <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-3.5 space-y-2">
-                        <div className="flex items-center justify-between text-xs font-semibold text-blue-300">
-                          <span className="flex items-center gap-1.5">
-                            <Video className="size-4 text-blue-400" />
-                            Tautan Sesi Virtual
-                          </span>
+          <aside
+            aria-label="Pendaftaran dan tiket acara"
+            className="@3xl:sticky @3xl:top-24 space-y-4"
+          >
+            <div
+              style={themeVars.glassElevatedStyle}
+              className="evt-glass-elevated rounded-2xl border overflow-hidden shadow-sm"
+            >
+              <div
+                style={{
+                  backgroundColor: "var(--evt-control-bg, transparent)",
+                  borderColor: "var(--evt-border-subtle, var(--border))",
+                }}
+                className="flex items-center justify-between gap-2 border-b px-5 py-3.5"
+              >
+                <div>
+                  <h3 className="font-serif text-base font-bold text-foreground">
+                    Pendaftaran Peserta
+                  </h3>
+                  <p className="font-mono text-xs tabular-nums text-muted-foreground mt-0.5">
+                    {event.capacity
+                      ? `${attendeeCount}/${event.capacity} kursi terisi`
+                      : `${attendeeCount} peserta terdaftar`}
+                  </p>
+                </div>
+                <span className="rounded-lg bg-[var(--color-green-soft)] text-[var(--color-green)] border border-[var(--color-green)]/30 px-2.5 py-1 font-mono text-[11px] font-semibold">
+                  Gratis
+                </span>
+              </div>
+
+              <div className="p-5 space-y-4">
+                {rsvpError && (
+                  <div
+                    role="alert"
+                    className="rounded-xl border border-[var(--color-error)]/40 bg-[var(--color-error-soft)] p-3 text-xs font-medium text-[var(--color-error)]"
+                  >
+                    {rsvpError}
+                  </div>
+                )}
+
+                {event.userRsvpStatus ? (
+                  <div className="space-y-3.5">
+                    <div
+                      className={`flex items-start gap-2.5 rounded-xl border p-3.5 text-xs ${
+                        isGoing
+                          ? "bg-[var(--color-green-soft)] border-[var(--color-green)]/35 text-foreground"
+                          : isPending
+                            ? "bg-[var(--color-accent-soft)] border-[var(--color-accent)]/40 text-foreground"
+                            : isRejected
+                              ? "bg-[var(--color-error-soft)] border-[var(--color-error)]/35 text-foreground"
+                              : "bg-[var(--evt-control-bg,var(--background))] border-[var(--evt-border-subtle,var(--border))] text-foreground"
+                      }`}
+                    >
+                      {isRejected ? (
+                        <X
+                          className="size-4 shrink-0 mt-0.5 text-[var(--color-error)]"
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <CheckCircle2
+                          className={`size-4 shrink-0 mt-0.5 ${
+                            isGoing
+                              ? "text-[var(--color-green)]"
+                              : "text-[var(--color-accent)]"
+                          }`}
+                          aria-hidden="true"
+                        />
+                      )}
+                      <div>
+                        <div className="font-semibold">
+                          {isGoing && "Terdaftar (Akan Hadir)"}
+                          {isPending && "Menunggu Persetujuan Host"}
+                          {isWaitlisted && "Masuk Daftar Tunggu"}
+                          {isRejected && "Pendaftaran Tidak Disetujui"}
                         </div>
+                        <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                          {isGoing &&
+                            "Tiket check-in serta akses lokasi lengkap telah aktif untuk akunmu."}
+                          {isPending &&
+                            "Penyelenggara akan meninjau permohonanmu sebelum alamat lengkap dibuka."}
+                          {isWaitlisted &&
+                            "Kamu akan otomatis naik status jika ada kursi tersedia."}
+                          {isRejected &&
+                            "Penyelenggara belum dapat menyetujui permohonanmu untuk sesi ini."}
+                        </p>
+                      </div>
+                    </div>
+
+                    {isGoing && detail.userRsvp?.checkinCode && (
+                      <div
+                        style={{
+                          backgroundColor:
+                            "var(--evt-control-bg, var(--background))",
+                          borderColor:
+                            "var(--evt-border-subtle, var(--border))",
+                        }}
+                        className="rounded-xl border border-dashed p-3.5 space-y-2"
+                      >
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+                            <Ticket
+                              className="size-3.5 text-[var(--color-accent)]"
+                              aria-hidden="true"
+                            />
+                            Kode Tiket Check-in
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (detail.userRsvp?.checkinCode) {
+                                void navigator.clipboard.writeText(
+                                  detail.userRsvp.checkinCode,
+                                );
+                                setCopiedTicket(true);
+                                setTimeout(() => setCopiedTicket(false), 2000);
+                              }
+                            }}
+                            className="min-h-9 inline-flex items-center gap-1 px-2 text-xs font-semibold text-[var(--color-accent)] hover:underline cursor-pointer"
+                          >
+                            {copiedTicket ? (
+                              <>
+                                <Check
+                                  className="size-3.5"
+                                  aria-hidden="true"
+                                />
+                                <span>Tersalin</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="size-3.5" aria-hidden="true" />
+                                <span>Salin</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        <div className="font-mono text-lg font-bold tracking-widest text-foreground text-center py-2 bg-card rounded-lg border border-border tabular-nums">
+                          {detail.userRsvp.checkinCode}
+                        </div>
+                      </div>
+                    )}
+
+                    {isGoing && meetingHref && (
+                      <Button
+                        asChild
+                        style={themeVars.ctaPrimaryStyle}
+                        className="w-full min-h-11 rounded-xl font-semibold text-xs hover:opacity-90"
+                      >
                         <a
                           href={meetingHref}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 py-2 px-3 text-xs font-semibold text-white transition-colors shadow-sm"
                         >
-                          <span>Gabung Ruang Rapat</span>
-                          <ExternalLink className="size-3.5" />
+                          <Video className="size-4" aria-hidden="true" />
+                          <span>{platformMeta.ctaLabel}</span>
+                          <ExternalLink
+                            className="size-3.5 ml-auto"
+                            aria-hidden="true"
+                          />
                         </a>
-                        <p className="text-[10px] text-blue-200/60 truncate text-center">
-                          {meetingHref}
+                      </Button>
+                    )}
+
+                    {isGoing && detail.logisticsNotes && (
+                      <div
+                        style={{
+                          backgroundColor:
+                            "var(--evt-control-bg, var(--background))",
+                          borderColor:
+                            "var(--evt-border-subtle, var(--border))",
+                        }}
+                        className="rounded-xl border p-3.5 space-y-1"
+                      >
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                          <Info
+                            className="size-3.5 text-[var(--color-accent)]"
+                            aria-hidden="true"
+                          />
+                          <span>Catatan Logistik</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">
+                          {detail.logisticsNotes}
                         </p>
                       </div>
-                    );
-                  })()}
+                    )}
 
-                  {/* Catatan Logistik Peserta */}
-                  {detail.logisticsNotes && (
-                    <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3.5 space-y-1.5">
-                      <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-300">
-                        <Info className="size-3.5 text-amber-400 shrink-0" />
-                        Catatan Logistik & Ketentuan Peserta
-                      </span>
-                      <p className="text-xs text-white/80 leading-relaxed whitespace-pre-line">
-                        {detail.logisticsNotes}
-                      </p>
+                    {isGoing && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() =>
+                          openShareStudio("attending_pass", "attending")
+                        }
+                        className="w-full min-h-11 rounded-xl text-xs font-semibold bg-[var(--evt-control-bg,transparent)] border-[var(--evt-border-subtle,var(--border))]"
+                      >
+                        <Share2
+                          className="size-3.5 text-[var(--color-accent-text)]"
+                          aria-hidden="true"
+                        />
+                        <span>Bagikan Kartu &quot;Saya Akan Hadir&quot;</span>
+                      </Button>
+                    )}
+
+                    {!isRejected &&
+                      (!confirmCancelRsvp ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setConfirmCancelRsvp(true)}
+                          className="w-full min-h-11 rounded-xl text-xs bg-[var(--evt-control-bg,transparent)] border-[var(--evt-border-subtle,var(--border))]"
+                        >
+                          Batalkan Pendaftaran
+                        </Button>
+                      ) : (
+                        <div
+                          style={{
+                            backgroundColor:
+                              "var(--evt-control-bg, var(--background))",
+                            borderColor:
+                              "var(--evt-border-subtle, var(--border))",
+                          }}
+                          className="rounded-xl border p-3 space-y-2.5"
+                        >
+                          <p className="text-xs font-medium text-foreground">
+                            Yakin ingin membatalkan keikutsertaanmu di acara
+                            ini?
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              disabled={cancelRsvpMutation.isPending}
+                              onClick={() => void handleConfirmCancelRsvp()}
+                              className="flex-1 min-h-11 text-xs text-[var(--color-error)] border-[var(--color-error)]/40"
+                            >
+                              {cancelRsvpMutation.isPending
+                                ? "Membatalkan..."
+                                : "Ya, Batalkan"}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setConfirmCancelRsvp(false)}
+                              className="min-h-11 text-xs"
+                            >
+                              Batal
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                ) : event.requiresApproval ? (
+                  <div className="space-y-3">
+                    <div
+                      style={{
+                        backgroundColor:
+                          "var(--evt-control-bg, var(--background))",
+                        borderColor: "var(--evt-border-subtle, var(--border))",
+                      }}
+                      className="flex items-start gap-2.5 rounded-xl border p-3 text-xs"
+                    >
+                      <Lock
+                        className="size-4 text-[var(--color-accent)] shrink-0 mt-0.5"
+                        aria-hidden="true"
+                      />
+                      <div>
+                        <div className="font-semibold text-foreground">
+                          Persetujuan Host Diperlukan
+                        </div>
+                        <p className="text-muted-foreground mt-0.5">
+                          Host akan meninjau pendaftaran sebelum tiket dan
+                          alamat penuh terbuka.
+                        </p>
+                      </div>
                     </div>
-                  )}
-                </>
-              )}
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={cancelRsvpMutation.isPending}
-                onClick={handleCancelRsvp}
-                className="w-full bg-transparent border-white/20 text-white/70 hover:bg-white/10 hover:text-white cursor-pointer"
-              >
-                {cancelRsvpMutation.isPending
-                  ? "Membatalkan..."
-                  : "Batalkan Pendaftaran"}
-              </Button>
-            </div>
-          ) : event.requiresApproval ? (
-            /* State 2: Requires Approval (Screenshot 4) */
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-white/80">
-                <Lock className="size-4 text-amber-400" />
-                <div>
-                  <div className="font-semibold text-white">
-                    Persetujuan Diperlukan
+                    <Button
+                      type="button"
+                      disabled={rsvpMutation.isPending}
+                      onClick={() => void handleRsvp()}
+                      style={themeVars.ctaPrimaryStyle}
+                      className="w-full min-h-11 rounded-xl hover:opacity-90 font-semibold text-sm"
+                    >
+                      {rsvpMutation.isPending
+                        ? "Mengirim Permintaan..."
+                        : "Minta untuk Bergabung"}
+                    </Button>
                   </div>
-                  <div className="text-[11px] text-white/50">
-                    Pendaftaran Anda memerlukan persetujuan host.
+                ) : isFull && event.allowWaitlist ? (
+                  <div className="space-y-3">
+                    <div
+                      style={{
+                        backgroundColor:
+                          "var(--evt-control-bg, var(--background))",
+                        borderColor: "var(--evt-border-subtle, var(--border))",
+                      }}
+                      className="flex items-start gap-2.5 rounded-xl border p-3 text-xs"
+                    >
+                      <Users
+                        className="size-4 text-[var(--color-accent)] shrink-0 mt-0.5"
+                        aria-hidden="true"
+                      />
+                      <div>
+                        <div className="font-semibold text-foreground">
+                          Kapasitas Penuh
+                        </div>
+                        <p className="text-muted-foreground mt-0.5">
+                          Kamu dapat masuk ke daftar tunggu dan otomatis
+                          dipromosikan jika kursi kosong.
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      disabled={rsvpMutation.isPending}
+                      onClick={() => void handleRsvp()}
+                      style={themeVars.ctaPrimaryStyle}
+                      className="w-full min-h-11 rounded-xl hover:opacity-90 font-semibold text-sm"
+                    >
+                      {rsvpMutation.isPending
+                        ? "Memproses..."
+                        : "Daftar Tunggu"}
+                    </Button>
                   </div>
-                </div>
-              </div>
-
-              <p className="text-white/70 text-[11px]">
-                Silakan klik tombol di bawah untuk meminta akses bergabung ke
-                acara ini.
-              </p>
-
-              <Button
-                type="button"
-                disabled={rsvpMutation.isPending}
-                onClick={handleRsvp}
-                className="w-full h-11 rounded-xl bg-white text-black font-semibold hover:bg-white/90 text-sm shadow-lg cursor-pointer"
-              >
-                {rsvpMutation.isPending
-                  ? "Mengirim Permintaan..."
-                  : "Minta untuk Bergabung"}
-              </Button>
-            </div>
-          ) : isFull && event.allowWaitlist ? (
-            /* State 3: Full Capacity -> Waitlist (Screenshot 6) */
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-amber-300">
-                <Users className="size-4 text-amber-400" />
-                <div>
-                  <div className="font-semibold text-white">Acara Penuh</div>
-                  <div className="text-[11px] text-white/50">
-                    Kapasitas kursi penuh. Anda dapat bergabung dengan daftar
-                    tunggu.
-                  </div>
-                </div>
-              </div>
-
-              <p className="text-white/70 text-[11px]">
-                Klik tombol di bawah untuk bergabung dengan daftar tunggu. Anda
-                akan otomatis masuk jika tempat tambahan tersedia.
-              </p>
-
-              <Button
-                type="button"
-                disabled={rsvpMutation.isPending}
-                onClick={handleRsvp}
-                className="w-full h-11 rounded-xl bg-white text-black font-semibold hover:bg-white/90 text-sm shadow-lg cursor-pointer"
-              >
-                {rsvpMutation.isPending ? "Memproses..." : "Daftar Tunggu"}
-              </Button>
-            </div>
-          ) : (
-            /* State 4: Standard Open Registration */
-            <div className="space-y-3">
-              <Button
-                type="button"
-                disabled={rsvpMutation.isPending}
-                onClick={handleRsvp}
-                className="w-full h-11 rounded-xl bg-white text-black font-semibold hover:bg-white/90 text-sm shadow-lg cursor-pointer"
-              >
-                {rsvpMutation.isPending ? "Mendaftar..." : "Daftar Acara"}
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Featured Work / Linked Book (if available) */}
-      {(event.bookSummary || event.featuredWork) && (
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-2">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
-            {event.featuredWork?.mediaType === "film" ? (
-              <Film className="size-3.5 text-blue-400" />
-            ) : (
-              <BookOpen className="size-3.5 text-amber-400" />
-            )}
-            <span>Membahas Karya Ini</span>
-          </div>
-
-          {event.bookSummary ? (
-            <div className="flex items-center justify-between gap-3 pt-1">
-              <div className="flex items-center gap-3">
-                <BookCover
-                  book={event.bookSummary}
-                  className="w-10 shrink-0"
-                  decorative
-                />
-                <div>
-                  <div className="font-semibold text-white">
-                    {event.bookSummary.title}
-                  </div>
-                  <div className="text-white/50">
-                    {event.bookSummary.author}
-                  </div>
-                </div>
-              </div>
-              <a
-                href={`/read/${event.bookSummary.slug}`}
-                className="rounded-lg bg-amber-400/20 px-3 py-1.5 font-medium text-amber-300 hover:bg-amber-400/30 transition-colors"
-              >
-                Baca Sampel ↗
-              </a>
-            </div>
-          ) : (
-            <div className="pt-1 space-y-1">
-              <div className="font-semibold text-white">
-                {event.featuredWork?.title}
-              </div>
-              {event.featuredWork?.creator && (
-                <div className="text-white/50">
-                  {event.featuredWork.creator}
-                </div>
-              )}
-              {(() => {
-                const featuredHref = safeExternalHref(
-                  event.featuredWork?.externalUrl,
-                );
-                return featuredHref ? (
-                  <a
-                    href={featuredHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-amber-300 hover:underline pt-1"
-                  >
-                    Buka Tautan Karya ↗
-                  </a>
-                ) : null;
-              })()}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Description / "Tentang Acara" */}
-      <div className="space-y-2.5">
-        <h2 className="text-sm font-semibold text-white uppercase tracking-wider text-white/50">
-          Tentang Acara
-        </h2>
-        <div className="prose prose-invert prose-xs text-white/80 whitespace-pre-line leading-relaxed">
-          {event.description}
-        </div>
-      </div>
-
-      {/* "Lokasi - Cara Menuju Venue" with Map & Maps ↗ button (Screenshots 5 & 8) */}
-      <div className="space-y-2.5">
-        <h2 className="text-sm font-semibold text-white uppercase tracking-wider text-white/50">
-          Lokasi
-        </h2>
-        {event.format === "online" &&
-        !event.venueName &&
-        !event.venueAddress &&
-        !event.latitude ? (
-          <div className="flex items-center gap-2 rounded-xl border border-blue-500/25 bg-blue-500/10 p-3.5 text-xs text-blue-200">
-            <Video className="size-4 shrink-0 text-blue-400" />
-            <span>
-              Acara berlangsung secara daring. Tautan rapat akan tampil di panel
-              pendaftaran.
-            </span>
-          </div>
-        ) : (
-          <>
-            {event.isAddressHidden ? (
-              <p className="text-white/70">
-                Harap mendaftar untuk melihat lokasi tepat acara ini.
-                <br />
-                <span className="text-white/50">
-                  {event.district ? `${event.district}, ` : ""}
-                  {event.city || "Jakarta"}
-                </span>
-              </p>
-            ) : (
-              <div className="text-white/80 space-y-1">
-                <div className="font-semibold text-white">
-                  {event.venueName}
-                </div>
-                <div className="text-white/60">{event.venueAddress}</div>
-              </div>
-            )}
-
-            {/* Map Preview Box with Maps ↗ Overlay (Luma Screenshot 5 & 8) */}
-            <div className="relative h-44 w-full overflow-hidden rounded-xl border border-white/10 bg-[#161a22]">
-              {/* Simulated OpenStreetMap Vector Background */}
-              <svg className="absolute inset-0 size-full stroke-white/5 [stroke-width:1]">
-                <pattern
-                  id="detail-grid"
-                  width="30"
-                  height="30"
-                  patternUnits="userSpaceOnUse"
-                >
-                  <path d="M 30 0 L 0 0 0 30" fill="none" />
-                </pattern>
-                <rect width="100%" height="100%" fill="url(#detail-grid)" />
-                <path
-                  d="M 0 90 Q 150 70, 400 120"
-                  stroke="#25354d"
-                  strokeWidth="8"
-                  fill="none"
-                />
-                <path
-                  d="M 180 0 L 210 200"
-                  stroke="#1f2c3e"
-                  strokeWidth="6"
-                  fill="none"
-                />
-              </svg>
-
-              {/* Map Pin */}
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-                <div className="size-4 rounded-full border-2 border-white bg-red-500 shadow-lg animate-bounce" />
-                <span className="mt-1 rounded bg-black/80 px-1.5 py-0.5 text-[10px] text-white">
-                  {event.isAddressHidden
-                    ? event.city || "Jakarta"
-                    : event.venueName || "Venue"}
-                </span>
-              </div>
-
-              {/* Overlay Button "Maps ↗" (Luma Screenshot 5 & 8) */}
-              <a
-                href={googleMapsUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="absolute top-3 left-3 flex items-center gap-1.5 rounded-lg border border-white/20 bg-black/75 px-3 py-1.5 text-xs font-semibold text-white shadow-lg backdrop-blur-xs hover:bg-black transition-colors"
-              >
-                Maps ↗
-              </a>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Diselenggarakan Oleh (Screenshot 5 & 8) */}
-      <div className="space-y-2.5 border-t border-white/10 pt-4">
-        <h2 className="text-sm font-semibold text-white uppercase tracking-wider text-white/50">
-          Diselenggarakan Oleh
-        </h2>
-        <div className="flex items-center gap-3">
-          <div className="flex size-9 items-center justify-center rounded-full bg-amber-500/20 text-amber-300 font-bold text-sm">
-            {event.calendarName[0]}
-          </div>
-          <div>
-            <div className="font-semibold text-white">{event.calendarName}</div>
-            <div className="text-[11px] text-white/50">
-              Komunitas Terverifikasi AnzaBook
-            </div>
-          </div>
-        </div>
-
-        {event.coHosts && event.coHosts.length > 0 && (
-          <div className="mt-2 space-y-2 pl-2">
-            {event.coHosts.map((ch, idx) => (
-              <div
-                key={idx}
-                className="flex items-center gap-2.5 text-white/70"
-              >
-                {ch.avatarUrl ? (
-                  <img
-                    src={ch.avatarUrl}
-                    alt={ch.name}
-                    className="size-6 rounded-full object-cover border border-white/15 shrink-0"
-                  />
                 ) : (
-                  <span className="flex size-6 items-center justify-center rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold shrink-0">
-                    {ch.name.slice(0, 1).toUpperCase()}
-                  </span>
+                  <Button
+                    type="button"
+                    disabled={rsvpMutation.isPending}
+                    onClick={() => void handleRsvp()}
+                    style={themeVars.ctaPrimaryStyle}
+                    className="w-full min-h-11 rounded-xl hover:opacity-90 font-semibold text-sm"
+                  >
+                    {rsvpMutation.isPending
+                      ? "Mendaftarkan..."
+                      : "Daftar Acara"}
+                  </Button>
                 )}
-                <span className="text-white font-medium">{ch.name}</span>
-                {ch.roleLabel && (
-                  <span className="text-[10px] text-white/50">
-                    ({ch.roleLabel})
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
 
-      {/* Attendee Section "[N] Akan Pergi" (Luma Screenshots 5 & 8) */}
-      <div className="space-y-2 border-t border-white/10 pt-4">
-        <div className="font-semibold text-white text-sm">
-          {attendeeCount} Akan Pergi
-        </div>
-
-        {previews.length > 0 && (
-          <div className="space-y-1.5">
-            {/* Overlapping Avatar Stack */}
-            <div className="flex -space-x-2 overflow-hidden py-1">
-              {previews.map((att, idx) => (
-                <div
-                  key={idx}
-                  className="inline-block size-7 rounded-full ring-2 ring-[#121316] bg-amber-500/30 text-amber-200 text-[11px] font-bold flex items-center justify-center overflow-hidden"
-                >
-                  {att.image ? (
-                    <img
-                      src={att.image}
-                      alt={att.name}
-                      className="size-full object-cover"
-                    />
-                  ) : (
-                    att.name[0]
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Names string */}
-            <div className="text-[11px] text-white/60">{attendeeNamesText}</div>
-          </div>
-        )}
-      </div>
-
-      {/* Footer Links & Category Pill (Screenshots 5 & 8) */}
-      <div className="space-y-3 border-t border-white/10 pt-4 pb-2">
-        <div className="flex flex-col gap-1.5 text-xs text-white/50">
-          <a
-            href={`mailto:${event.calendarName.toLowerCase().replace(/\s+/g, "")}@anzabook.com`}
-            className="hover:text-white transition-colors"
-          >
-            Hubungi Penyelenggara
-          </a>
-          <button
-            type="button"
-            onClick={() => setReportModalOpen(true)}
-            className="text-left text-white/40 hover:text-red-400 transition-colors"
-          >
-            Laporkan Acara
-          </button>
-        </div>
-
-        {event.categoryTag && (
-          <div className="pt-1">
-            <span className="inline-block rounded-md bg-white/10 px-2.5 py-1 text-xs font-medium text-white/70">
-              #{event.categoryTag}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Report Modal */}
-      {reportModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-sm rounded-xl border border-white/15 bg-[#1a1b1f] p-5 text-white shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <div className="flex items-center gap-2">
-                <Flag className="size-4 text-red-400" />
-                <h3 className="font-semibold text-sm">Laporkan Acara</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setReportModalOpen(false)}
-                className="text-white/40 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-
-            {reportSent ? (
-              <div className="py-6 text-center text-emerald-400 space-y-1">
-                <CheckCircle2 className="size-8 mx-auto" />
-                <div className="font-semibold">Laporan Terkirim</div>
-                <div className="text-[11px] text-white/60">
-                  Tim kurator AnzaBook akan meninjau laporan Anda.
-                </div>
-              </div>
-            ) : (
-              <form onSubmit={handleSendReport} className="mt-3 space-y-3">
-                <p className="text-[11px] text-white/70">
-                  Sampaikan alasan pelaporan (misal: spam, konten tidak pantas,
-                  atau lokasi fiktif):
-                </p>
-                <textarea
-                  value={reportReason}
-                  onChange={(e) => setReportReason(e.target.value)}
-                  placeholder="Tuliskan detail laporan..."
-                  rows={3}
-                  className="w-full rounded-lg border border-white/10 bg-white/5 p-2.5 text-xs text-white placeholder-white/30 outline-none"
-                  required
-                />
-                <div className="flex justify-end gap-2 pt-1">
+                <div className="pt-2 border-t border-[var(--evt-border-subtle,var(--border))] flex items-center gap-2">
                   <Button
                     type="button"
                     variant="outline"
-                    size="xs"
-                    onClick={() => setReportModalOpen(false)}
-                    className="bg-transparent border-white/20 text-white hover:bg-white/10 hover:text-white"
+                    onClick={() => openShareStudio()}
+                    className="flex-1 min-h-11 rounded-xl text-xs font-semibold bg-[var(--evt-control-bg,transparent)] border-[var(--evt-border-subtle,var(--border))]"
                   >
-                    Batal
+                    <Share2 className="size-4" aria-hidden="true" />
+                    <span>Bagikan Acara (IG &amp; WA)</span>
                   </Button>
                   <Button
-                    type="submit"
-                    size="xs"
-                    disabled={reportMutation.isPending}
-                    className="bg-red-600 hover:bg-red-700 text-white"
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => void handleCopyShareLink()}
+                    aria-label={
+                      copiedLink
+                        ? "Tautan acara tersalin"
+                        : "Salin tautan acara"
+                    }
+                    title="Salin Tautan Acara"
+                    className="size-11 shrink-0 rounded-xl bg-[var(--evt-control-bg,transparent)] border-[var(--evt-border-subtle,var(--border))]"
                   >
-                    {reportMutation.isPending ? "Mengirim..." : "Kirim Laporan"}
+                    {copiedLink ? (
+                      <Check
+                        className="size-4 text-[var(--color-green)]"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <Copy className="size-4" aria-hidden="true" />
+                    )}
                   </Button>
                 </div>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
+              </div>
+            </div>
 
-      {/* Host Management Modals */}
-      {event.canManage && (
-        <>
-          <EventAttendeesDialog
-            open={isAttendeesModalOpen}
-            onClose={() => setIsAttendeesModalOpen(false)}
-            eventSlug={event.slug}
-            eventTitle={event.title}
-          />
-          <EditEventDialog
-            open={isEditModalOpen}
-            onClose={() => setIsEditModalOpen(false)}
-            event={event}
-          />
-        </>
-      )}
+            {event.canManage && (
+              <div
+                style={themeVars.glassSurfaceStyle}
+                className="evt-glass rounded-2xl border p-4 space-y-2.5"
+              >
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-foreground flex items-center gap-1.5">
+                    <Settings2
+                      className="size-4 text-[var(--color-accent)]"
+                      aria-hidden="true"
+                    />
+                    Meja Pengelola Acara
+                  </span>
+                  {event.pendingRsvpCount !== undefined &&
+                    event.pendingRsvpCount > 0 && (
+                      <span className="rounded-full bg-[var(--color-accent)] px-2 py-0.5 font-mono text-[10px] font-bold text-[var(--color-accent-ink)]">
+                        {event.pendingRsvpCount} menunggu
+                      </span>
+                    )}
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Pengeditan detail, daftar peserta, check-in, dan penghapusan
+                  acara dikelola terpisah di tab Dikelola Saya.
+                </p>
+                <Link
+                  to="/app"
+                  search={{ tab: "events", view: "hosting" }}
+                  style={{
+                    backgroundColor: "var(--evt-control-bg, var(--background))",
+                    borderColor: "var(--evt-border-subtle, var(--border))",
+                  }}
+                  className="min-h-11 w-full inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 text-xs font-semibold text-foreground hover:border-[var(--color-accent)] transition-colors"
+                >
+                  <CalendarIcon className="size-3.5" aria-hidden="true" />
+                  <span>Kelola di Dikelola Saya</span>
+                  <ArrowRight className="size-3.5" aria-hidden="true" />
+                </Link>
+              </div>
+            )}
+          </aside>
+        </div>
+
+        {reportModalOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-xs"
+            style={{ overscrollBehavior: "contain" }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="report-event-title"
+          >
+            <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 text-foreground shadow-2xl">
+              <div className="flex items-center justify-between pb-3 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <Flag
+                    className="size-4 text-[var(--color-error)]"
+                    aria-hidden="true"
+                  />
+                  <h3
+                    id="report-event-title"
+                    className="font-serif font-bold text-sm"
+                  >
+                    Laporkan Acara
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReportModalOpen(false)}
+                  aria-label="Tutup dialog laporan"
+                  className="size-10 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  <X className="size-4" aria-hidden="true" />
+                </button>
+              </div>
+
+              {reportSent ? (
+                <div className="py-6 text-center text-[var(--color-green)] space-y-1">
+                  <CheckCircle2 className="size-8 mx-auto" aria-hidden="true" />
+                  <div className="font-semibold text-sm">Laporan Terkirim</div>
+                  <p className="text-xs text-muted-foreground">
+                    Tim kurator AnzaBook akan meninjau laporan Anda.
+                  </p>
+                </div>
+              ) : (
+                <form onSubmit={handleSendReport} className="mt-3 space-y-3">
+                  <label
+                    htmlFor="report-event-reason"
+                    className="block text-xs text-muted-foreground"
+                  >
+                    Sampaikan alasan pelaporan (misal: spam, konten tidak
+                    pantas, atau lokasi fiktif):
+                  </label>
+                  <textarea
+                    id="report-event-reason"
+                    value={reportReason}
+                    onChange={(e) => setReportReason(e.target.value)}
+                    placeholder="Tuliskan detail laporan..."
+                    rows={3}
+                    className="w-full rounded-lg border border-border bg-[var(--color-paper-2)] p-3 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-[var(--color-accent)]"
+                    required
+                  />
+                  <div className="flex justify-end gap-2 pt-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setReportModalOpen(false)}
+                      className="min-h-11 text-xs"
+                    >
+                      Batal
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={reportMutation.isPending}
+                      className="min-h-11 bg-destructive text-destructive-foreground hover:opacity-90 text-xs font-semibold"
+                    >
+                      {reportMutation.isPending
+                        ? "Mengirim..."
+                        : "Kirim Laporan"}
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        )}
+
+        <EventShareDialog
+          event={event}
+          open={shareModalOpen}
+          onOpenChange={setShareModalOpen}
+          defaultTemplate={sharePreset.template}
+          defaultMode={sharePreset.mode}
+          defaultReaderName={resolvedUserName}
+          isUserGoing={isGoing}
+        />
+      </div>
     </div>
   );
 }

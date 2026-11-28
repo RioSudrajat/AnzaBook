@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Plus, Users, X } from "lucide-react";
+import { ChevronDown, Plus, Users, X } from "lucide-react";
 import { sanitizeCoHostAvatarUrl } from "@starter/shared/validators/community";
 import type {
   CommunityCalendarDto,
@@ -15,6 +15,7 @@ interface EventCoHostsFieldProps {
   onChange: (next: EventCoHostDto[]) => void;
   calendarSlug?: string;
   calendars?: CommunityCalendarDto[];
+  variant?: "card" | "ruled";
 }
 
 export function EventCoHostsField({
@@ -22,8 +23,10 @@ export function EventCoHostsField({
   onChange,
   calendarSlug,
   calendars = [],
+  variant = "card",
 }: EventCoHostsFieldProps) {
   const [isOpen, setIsOpen] = React.useState(coHosts.length > 0);
+  const [isQuickPickOpen, setIsQuickPickOpen] = React.useState(false);
   const [name, setName] = React.useState("");
   const [roleLabel, setRoleLabel] = React.useState("Co-Host");
   const { data: members = [] } = useCalendarMembers(calendarSlug || "");
@@ -110,22 +113,31 @@ export function EventCoHostsField({
   };
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-3.5 text-xs">
+    <div
+      className={
+        variant === "ruled"
+          ? "text-xs"
+          : "rounded-xl border border-border bg-[var(--color-paper-2)] p-3.5 text-xs"
+      }
+    >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Users className="size-4 text-amber-400 shrink-0" />
-          <span className="font-medium text-white">
+          <Users
+            className="size-4 text-[var(--color-accent)] shrink-0"
+            aria-hidden="true"
+          />
+          <span className="font-medium text-foreground">
             Co-Host &amp; Kolaborator
           </span>
-          <span className="text-[10px] text-white/40">
-            ({coHosts.length}/{MAX_COHOSTS} · Opsional)
+          <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
+            ({coHosts.length}/{MAX_COHOSTS})
           </span>
         </div>
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
           aria-expanded={isOpen}
-          className="text-xs text-amber-400 hover:text-amber-300 font-medium cursor-pointer"
+          className="min-h-11 px-2 text-xs text-[var(--color-accent)] hover:underline font-semibold cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
         >
           {isOpen ? "Tutup" : "+ Tambah"}
         </button>
@@ -136,16 +148,16 @@ export function EventCoHostsField({
           {coHosts.map((ch, idx) => (
             <li
               key={`${ch.name}-${idx}`}
-              className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-black/35 px-2.5 py-1.5 text-white"
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-1.5 text-foreground"
             >
               {ch.avatarUrl ? (
                 <img
                   src={ch.avatarUrl}
                   alt={ch.name}
-                  className="size-5 rounded-full object-cover border border-white/20 shrink-0"
+                  className="size-5 rounded-full object-cover border border-border shrink-0"
                 />
               ) : (
-                <span className="flex size-5 items-center justify-center rounded-full bg-amber-500/20 text-[10px] font-bold text-amber-300 shrink-0">
+                <span className="flex size-5 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-[10px] font-bold text-foreground shrink-0">
                   {ch.name.slice(0, 1).toUpperCase()}
                 </span>
               )}
@@ -153,7 +165,7 @@ export function EventCoHostsField({
                 {ch.name}
               </span>
               {ch.roleLabel && (
-                <span className="text-[10px] text-white/55">
+                <span className="text-[11px] text-muted-foreground">
                   ({ch.roleLabel})
                 </span>
               )}
@@ -161,9 +173,9 @@ export function EventCoHostsField({
                 type="button"
                 onClick={() => handleRemove(idx)}
                 aria-label={`Hapus kolaborator ${ch.name}`}
-                className="ml-0.5 rounded p-0.5 text-white/50 hover:bg-white/10 hover:text-white cursor-pointer"
+                className="ml-0.5 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer"
               >
-                <X className="size-3" />
+                <X className="size-3" aria-hidden="true" />
               </button>
             </li>
           ))}
@@ -171,39 +183,50 @@ export function EventCoHostsField({
       )}
 
       {isOpen && (
-        <div className="mt-3 space-y-2.5 border-t border-white/10 pt-3">
+        <div className="mt-3 space-y-2.5 border-t border-border pt-3">
           {partnerOptions.length > 0 && coHosts.length < MAX_COHOSTS && (
-            <div className="space-y-1">
-              <label
-                htmlFor="quick-pick-cohost"
-                className="block text-[11px] text-white/60"
+            <div className="relative space-y-1">
+              <button
+                type="button"
+                aria-expanded={isQuickPickOpen}
+                onClick={() => setIsQuickPickOpen((prev) => !prev)}
+                className="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 text-left text-xs text-foreground hover:border-foreground/30 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
               >
-                Pilih Cepat dari Pengurus atau Komunitas Kolaborasi
-              </label>
-              <select
-                id="quick-pick-cohost"
-                value=""
-                onChange={(e) => {
-                  const chosen = partnerOptions.find(
-                    (opt) => opt.key === e.target.value,
-                  );
-                  if (chosen) addCoHostEntry(chosen.coHost);
-                }}
-                className="w-full rounded-lg border border-white/15 bg-[#1e2025] px-3 py-2 text-xs text-white outline-none cursor-pointer focus:border-amber-400/60"
-              >
-                <option value="">
-                  -- Pilih Pengurus atau Komunitas Partner --
-                </option>
-                {partnerOptions.map((opt) => (
-                  <option
-                    key={opt.key}
-                    value={opt.key}
-                    className="bg-[#1e2025] text-white"
-                  >
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                <span>
+                  Pilih cepat dari pengurus atau komunitas (
+                  {partnerOptions.length})
+                </span>
+                <ChevronDown
+                  className={`size-3.5 text-muted-foreground transition-transform ${
+                    isQuickPickOpen ? "rotate-180" : ""
+                  }`}
+                  aria-hidden="true"
+                />
+              </button>
+
+              {isQuickPickOpen && (
+                <div className="max-h-52 overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-lg space-y-0.5">
+                  {partnerOptions.map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => {
+                        addCoHostEntry(opt.coHost);
+                        if (coHosts.length + 1 >= MAX_COHOSTS) {
+                          setIsQuickPickOpen(false);
+                        }
+                      }}
+                      className="flex w-full min-h-11 items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs text-foreground hover:bg-muted transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
+                    >
+                      <span className="truncate">{opt.label}</span>
+                      <Plus
+                        className="size-3.5 shrink-0 text-[var(--color-accent)]"
+                        aria-hidden="true"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -220,7 +243,7 @@ export function EventCoHostsField({
               disabled={coHosts.length >= MAX_COHOSTS}
               placeholder="Nama co-host / pembicara / mitra"
               aria-label="Nama kolaborator acara"
-              className="bg-black/30 border-white/10 text-white placeholder-white/30 text-xs h-9"
+              className="bg-background border-border text-xs h-11"
             />
             <Input
               value={roleLabel}
@@ -234,22 +257,22 @@ export function EventCoHostsField({
               disabled={coHosts.length >= MAX_COHOSTS}
               placeholder="Peran (mis. Moderator)"
               aria-label="Peran kolaborator acara"
-              className="bg-black/30 border-white/10 text-white placeholder-white/30 text-xs h-9"
+              className="bg-background border-border text-xs h-11"
             />
             <button
               type="button"
               onClick={handleManualAdd}
               disabled={!name.trim() || coHosts.length >= MAX_COHOSTS}
-              className="inline-flex h-9 items-center justify-center gap-1 rounded-lg bg-amber-400/20 px-3 text-xs font-medium text-amber-300 hover:bg-amber-400/30 disabled:opacity-40 transition-colors cursor-pointer"
+              className="inline-flex h-11 min-h-11 items-center justify-center gap-1 rounded-lg border border-[var(--color-accent)]/40 bg-[var(--color-accent-soft)] px-3.5 text-xs font-semibold text-foreground hover:opacity-90 disabled:opacity-40 transition-opacity cursor-pointer"
             >
-              <Plus className="size-3.5" />
+              <Plus className="size-3.5" aria-hidden="true" />
               <span>Tambah</span>
             </button>
           </div>
-          <p className="text-[10px] text-white/45">
+          <p className="text-[11px] text-muted-foreground">
             Kolaborator tampil di kartu dan halaman acara. Untuk memberi akses
-            kelola/edit/check-in kepada akun lain, tambahkan mereka di tab{" "}
-            <strong className="text-white/70">Pengurus &amp; Anggota</strong>{" "}
+            kelola/edit/check-in, tambahkan mereka di tab{" "}
+            <strong className="text-foreground">Pengurus &amp; Anggota</strong>{" "}
             komunitas.
           </p>
         </div>
